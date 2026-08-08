@@ -316,10 +316,48 @@ it('preserves staff profile and history location access with active tracking con
         ->assertInertia(fn (Assert $page) => $page
             ->where('location.canManage', false)
             ->where('location.tracker.id', $device->id)
+            ->where('location.tracker.detail_url', null)
             ->where('location.currentLocation.lat', -36.8485)
             ->where('location.trackingConsent.status', 'given'));
 
     $this->getJson(route('operations.clients.location.history', $client, false))
         ->assertOk()
         ->assertJsonStructure(['locations']);
+
+    $this->get("/security-devices/devices/{$device->id}")->assertForbidden();
+
+    $otherSite = Site::factory()->create(['is_active' => true]);
+    $otherSiteViewer = makeClientLocationConsentStaff($otherSite, 'location_other_site_device_viewer', [
+        'clients.viewAny',
+        'assets.viewAny',
+        'assets.telemetry.view',
+        'securityDevices.viewAny',
+        'securityDevices.devices.view',
+    ]);
+
+    $this->actingAs($otherSiteViewer)
+        ->get(route('operations.clients.show', $client, false))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('location.tracker.id', $device->id)
+            ->where('location.tracker.detail_url', null));
+
+    $this->get("/security-devices/devices/{$device->id}")->assertNotFound();
+
+    $deviceViewer = makeClientLocationConsentStaff($client->site, 'location_device_viewer', [
+        'clients.viewAny',
+        'assets.viewAny',
+        'assets.telemetry.view',
+        'securityDevices.viewAny',
+        'securityDevices.devices.view',
+    ]);
+
+    $this->actingAs($deviceViewer)
+        ->get(route('operations.clients.show', $client, false))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('location.tracker.id', $device->id)
+            ->where('location.tracker.detail_url', "/security-devices/devices/{$device->id}"));
+
+    $this->get("/security-devices/devices/{$device->id}")->assertOk();
 });

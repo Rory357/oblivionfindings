@@ -28,6 +28,7 @@ class MaintenanceOperationsController extends Controller
                 'type',
                 'site_id',
                 'device_id',
+                'domain',
             ])),
         ]);
     }

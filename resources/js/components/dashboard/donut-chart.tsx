@@ -104,12 +104,17 @@ export function DonutChart({
             {segments.items.length > 0 && (
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
                     {segments.items.map((s, i) => (
-                        <div key={`${s.label}-${i}`} className="flex items-center gap-1.5 text-xs">
+                        <div
+                            key={`${s.label}-${i}`}
+                            className="flex items-center gap-1.5 text-xs"
+                        >
                             <span
                                 className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
                                 style={{ backgroundColor: s.color }}
                             />
-                            <span className="text-muted-foreground">{s.label}</span>
+                            <span className="text-muted-foreground">
+                                {s.label}
+                            </span>
                             <span className="font-medium">{s.value}</span>
                         </div>
                     ))}

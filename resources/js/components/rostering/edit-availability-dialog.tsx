@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -21,7 +22,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type EditAvailabilityBlock = {
     id: number;
@@ -33,7 +33,12 @@ export type EditAvailabilityBlock = {
 export type EditAvailabilityDialogProps = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    staff: { id: number; name: string; email: string; role?: string | null } | null;
+    staff: {
+        id: number;
+        name: string;
+        email: string;
+        role?: string | null;
+    } | null;
     blocks: EditAvailabilityBlock[];
     onSaved?: () => void;
 };
@@ -156,20 +161,25 @@ export function EditAvailabilityDialog({
                     <DialogDescription className="flex flex-wrap items-center gap-2">
                         <span>{staff.email}</span>
                         {staff.role ? (
-                            <Badge variant="outline" className="text-xs capitalize">
+                            <Badge
+                                variant="outline"
+                                className="text-xs capitalize"
+                            >
                                 {staff.role.replace(/_/g, ' ')}
                             </Badge>
                         ) : null}
                         <span className="text-xs text-muted-foreground">
-                            · {totalBlocks} {totalBlocks === 1 ? 'block' : 'blocks'} ·{' '}
-                            {daysCovered} {daysCovered === 1 ? 'day' : 'days'} covered
+                            · {totalBlocks}{' '}
+                            {totalBlocks === 1 ? 'block' : 'blocks'} ·{' '}
+                            {daysCovered} {daysCovered === 1 ? 'day' : 'days'}{' '}
+                            covered
                         </span>
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4">
                     <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                             <Plus className="h-3 w-3" />
                             Add availability block
                         </div>
@@ -182,7 +192,10 @@ export function EditAvailabilityDialog({
                                     </SelectTrigger>
                                     <SelectContent>
                                         {DAY_LABELS.map((label, idx) => (
-                                            <SelectItem key={label} value={String(idx)}>
+                                            <SelectItem
+                                                key={label}
+                                                value={String(idx)}
+                                            >
                                                 {label}
                                             </SelectItem>
                                         ))}
@@ -194,7 +207,9 @@ export function EditAvailabilityDialog({
                                 <Input
                                     type="time"
                                     value={startTime}
-                                    onChange={(e) => setStartTime(e.target.value)}
+                                    onChange={(e) =>
+                                        setStartTime(e.target.value)
+                                    }
                                     className="h-9 text-sm"
                                 />
                             </div>
@@ -224,23 +239,28 @@ export function EditAvailabilityDialog({
                             </div>
                         </div>
                         {error ? (
-                            <p className="mt-2 text-xs text-status-critical">{error}</p>
+                            <p className="mt-2 text-xs text-status-critical">
+                                {error}
+                            </p>
                         ) : null}
                     </div>
 
                     <div className="max-h-[55vh] space-y-1.5 overflow-y-auto pr-1">
                         {grouped.map((g) => (
-                            <GuardrailCard unstyled
+                            <GuardrailCard
+                                unstyled
                                 key={g.day}
                                 className="grid grid-cols-[60px_1fr] items-start gap-3 rounded-md border border-border bg-card px-3 py-2"
                             >
                                 <div className="flex flex-col items-center justify-center rounded-md bg-muted/60 px-1 py-1.5 text-center">
-                                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                                    <span className="text-[10px] font-bold tracking-wide text-muted-foreground uppercase">
                                         {g.short}
                                     </span>
                                     <span className="text-[11px] font-semibold text-foreground/80">
                                         {g.blocks.length}
-                                        {g.blocks.length === 1 ? ' block' : ' blocks'}
+                                        {g.blocks.length === 1
+                                            ? ' block'
+                                            : ' blocks'}
                                     </span>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
@@ -256,10 +276,15 @@ export function EditAvailabilityDialog({
                                             >
                                                 <Clock className="h-3 w-3 text-status-success" />
                                                 {b.start_time}–{b.end_time}
-                                                <Button unstyled
+                                                <Button
+                                                    unstyled
                                                     type="button"
-                                                    onClick={() => handleRemove(b)}
-                                                    disabled={deletingId === b.id}
+                                                    onClick={() =>
+                                                        handleRemove(b)
+                                                    }
+                                                    disabled={
+                                                        deletingId === b.id
+                                                    }
                                                     className="ml-0.5 rounded-sm p-0.5 text-muted-foreground transition-colors hover:bg-status-critical-bg hover:text-status-critical disabled:opacity-50"
                                                     aria-label={`Remove ${g.label} ${b.start_time}-${b.end_time}`}
                                                 >

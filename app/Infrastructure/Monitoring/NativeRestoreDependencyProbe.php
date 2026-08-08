@@ -11,7 +11,7 @@ use Throwable;
 
 final readonly class NativeRestoreDependencyProbe implements RestoreDependencyProbe
 {
-    private const string SNAPSHOT_HEALTH_PATH = 'monitoring/configuration-snapshots/.restore-health-check';
+    private const string SNAPSHOT_HEALTH_PATH = SnapshotStore::RESTORE_HEALTH_PATH;
 
     public function __construct(
         private TimeSeriesStore $timeseries,
@@ -54,9 +54,13 @@ final readonly class NativeRestoreDependencyProbe implements RestoreDependencyPr
     private function snapshotStoreHealthy(): bool
     {
         try {
-            $this->snapshots->exists(self::SNAPSHOT_HEALTH_PATH);
+            if (! $this->snapshots->exists(self::SNAPSHOT_HEALTH_PATH)) {
+                return false;
+            }
 
-            return true;
+            $contents = $this->snapshots->read(self::SNAPSHOT_HEALTH_PATH);
+
+            return hash_equals(SnapshotStore::RESTORE_HEALTH_CONTENT, $contents);
         } catch (Throwable) {
             return false;
         }

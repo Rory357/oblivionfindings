@@ -1,8 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
+import { chartColor } from '@/components/finance/chart-palette';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     Table,
     TableBody,
@@ -11,13 +12,29 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Printer, Trash2, TrendingUp, TrendingDown, DollarSign, ArrowUpDown } from 'lucide-react';
-import { useState } from 'react';
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { PageHero, PageLayout } from '@/components/page';
-import { ConfirmDialog, formatMoney } from '@/components/finance';
-import { chartColor } from '@/components/finance/chart-palette';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import {
+    ArrowUpDown,
+    DollarSign,
+    Printer,
+    Trash2,
+    TrendingDown,
+    TrendingUp,
+} from 'lucide-react';
+import { useState } from 'react';
+import {
+    Bar,
+    CartesianGrid,
+    ComposedChart,
+    Legend,
+    Line,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
 type Inflows = {
     total: string;
@@ -88,7 +105,11 @@ type PageProps = {
 };
 
 const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(dateStr).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 
 const periodTypeLabels: Record<string, string> = {
     weekly: 'Weekly',
@@ -96,27 +117,37 @@ const periodTypeLabels: Record<string, string> = {
     monthly: 'Monthly',
 };
 
-export default function CashFlowForecastShow({ forecast, chartData }: PageProps) {
-    const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
+export default function CashFlowForecastShow({
+    forecast,
+    chartData,
+}: PageProps) {
+    const [selectedScenario, setSelectedScenario] = useState<number | null>(
+        null,
+    );
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Cash Flow Forecast', href: '/finance/cash-flow-forecast' },
-        { title: forecast.name, href: `/finance/cash-flow-forecast/${forecast.id}` },
+        {
+            title: forecast.name,
+            href: `/finance/cash-flow-forecast/${forecast.id}`,
+        },
     ];
 
     const isDraft = forecast.status === 'draft';
 
     const activeForecastData =
         selectedScenario !== null
-            ? forecast.scenarios.find((s) => s.id === selectedScenario)?.forecast_data ?? forecast.forecast_data
+            ? (forecast.scenarios.find((s) => s.id === selectedScenario)
+                  ?.forecast_data ?? forecast.forecast_data)
             : forecast.forecast_data;
 
     const activeScenarioName =
         selectedScenario !== null
-            ? forecast.scenarios.find((s) => s.id === selectedScenario)?.name ?? 'Base'
+            ? (forecast.scenarios.find((s) => s.id === selectedScenario)
+                  ?.name ?? 'Base')
             : 'Base Forecast';
 
     function confirmDelete() {
@@ -143,15 +174,23 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
             const scenarioData = scenario.forecast_data ?? [];
             scenarioData.forEach((period, idx) => {
                 if (rechartsData[idx]) {
-                    rechartsData[idx][`scenario_${scenario.id}`] = Number(period.closing_balance);
+                    rechartsData[idx][`scenario_${scenario.id}`] = Number(
+                        period.closing_balance,
+                    );
                 }
             });
         });
     }
 
     // KPI calculations
-    const totalInflows = activeForecastData.reduce((sum, p) => sum + Number(p.inflows.total), 0);
-    const totalOutflows = activeForecastData.reduce((sum, p) => sum + Number(p.outflows.total), 0);
+    const totalInflows = activeForecastData.reduce(
+        (sum, p) => sum + Number(p.inflows.total),
+        0,
+    );
+    const totalOutflows = activeForecastData.reduce(
+        (sum, p) => sum + Number(p.outflows.total),
+        0,
+    );
     const lastPeriod = activeForecastData[activeForecastData.length - 1];
     const finalBalance = lastPeriod ? Number(lastPeriod.closing_balance) : 0;
     const netCashFlow = totalInflows - Math.abs(totalOutflows);
@@ -162,37 +201,57 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/cash-flow-forecast"
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {forecast.name}
                                 <StatusBadge
-                                    variant={forecast.status === 'final' ? 'success' : 'neutral'}
-                                    label={forecast.status === 'final' ? 'Final' : 'Draft'}
+                                    variant={
+                                        forecast.status === 'final'
+                                            ? 'success'
+                                            : 'neutral'
+                                    }
+                                    label={
+                                        forecast.status === 'final'
+                                            ? 'Final'
+                                            : 'Draft'
+                                    }
                                 />
                             </span>
                         }
                         description={
                             <>
-                                {formatDate(forecast.period_start)} &ndash; {formatDate(forecast.period_end)}
-                                {' | '}{periodTypeLabels[forecast.period_type]} | Opening: {formatMoney(forecast.opening_balance)}
+                                {formatDate(forecast.period_start)} &ndash;{' '}
+                                {formatDate(forecast.period_end)}
+                                {' | '}
+                                {periodTypeLabels[forecast.period_type]} |
+                                Opening: {formatMoney(forecast.opening_balance)}
                                 {forecast.created_by && (
                                     <span className="mt-1 block text-sm">
-                                        Generated on {formatDate(forecast.forecast_date)} by {forecast.created_by.name}
+                                        Generated on{' '}
+                                        {formatDate(forecast.forecast_date)} by{' '}
+                                        {forecast.created_by.name}
                                     </span>
                                 )}
                             </>
                         }
                         actions={
                             <>
-                                <Button variant="outline" onClick={() => window.print()}>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => window.print()}
+                                >
                                     <Printer className="mr-2 h-4 w-4" />
                                     Print
                                 </Button>
                                 {isDraft && (
-                                    <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() => setDeleteOpen(true)}
+                                    >
                                         <Trash2 className="mr-2 h-4 w-4" />
                                         Delete
                                     </Button>
@@ -203,12 +262,16 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                 }
             >
                 {/* KPI Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
-                                <p className="text-sm text-muted-foreground">Total Inflows</p>
-                                <p className="text-2xl font-bold mt-1 text-status-success">{formatMoney(totalInflows)}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Total Inflows
+                                </p>
+                                <p className="mt-1 text-2xl font-bold text-status-success">
+                                    {formatMoney(totalInflows)}
+                                </p>
                             </div>
                             <TrendingUp className="h-8 w-8 text-status-success" />
                         </CardContent>
@@ -216,8 +279,12 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                     <Card>
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
-                                <p className="text-sm text-muted-foreground">Total Outflows</p>
-                                <p className="text-2xl font-bold mt-1 text-status-critical">{formatMoney(Math.abs(totalOutflows))}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Total Outflows
+                                </p>
+                                <p className="mt-1 text-2xl font-bold text-status-critical">
+                                    {formatMoney(Math.abs(totalOutflows))}
+                                </p>
                             </div>
                             <TrendingDown className="h-8 w-8 text-status-critical" />
                         </CardContent>
@@ -225,8 +292,12 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                     <Card>
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
-                                <p className="text-sm text-muted-foreground">Net Cash Flow</p>
-                                <p className={`text-2xl font-bold mt-1 ${netCashFlow >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
+                                <p className="text-sm text-muted-foreground">
+                                    Net Cash Flow
+                                </p>
+                                <p
+                                    className={`mt-1 text-2xl font-bold ${netCashFlow >= 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                >
                                     {formatMoney(netCashFlow)}
                                 </p>
                             </div>
@@ -236,8 +307,12 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                     <Card>
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
-                                <p className="text-sm text-muted-foreground">Final Balance</p>
-                                <p className={`text-2xl font-bold mt-1 ${finalBalance >= 0 ? 'text-foreground' : 'text-status-critical'}`}>
+                                <p className="text-sm text-muted-foreground">
+                                    Final Balance
+                                </p>
+                                <p
+                                    className={`mt-1 text-2xl font-bold ${finalBalance >= 0 ? 'text-foreground' : 'text-status-critical'}`}
+                                >
                                     {formatMoney(finalBalance)}
                                 </p>
                             </div>
@@ -255,7 +330,11 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                         <CardContent>
                             <div className="flex flex-wrap gap-3">
                                 <Button
-                                    variant={selectedScenario === null ? 'default' : 'outline'}
+                                    variant={
+                                        selectedScenario === null
+                                            ? 'default'
+                                            : 'outline'
+                                    }
                                     size="sm"
                                     onClick={() => setSelectedScenario(null)}
                                 >
@@ -264,9 +343,15 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                 {forecast.scenarios.map((scenario) => (
                                     <Button
                                         key={scenario.id}
-                                        variant={selectedScenario === scenario.id ? 'default' : 'outline'}
+                                        variant={
+                                            selectedScenario === scenario.id
+                                                ? 'default'
+                                                : 'outline'
+                                        }
                                         size="sm"
-                                        onClick={() => setSelectedScenario(scenario.id)}
+                                        onClick={() =>
+                                            setSelectedScenario(scenario.id)
+                                        }
                                     >
                                         {scenario.name}
                                         <span className="ml-2 text-xs opacity-70">
@@ -276,7 +361,10 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                 ))}
                             </div>
                             <p className="mt-2 text-sm text-muted-foreground">
-                                Currently viewing: <span className="font-medium">{activeScenarioName}</span>
+                                Currently viewing:{' '}
+                                <span className="font-medium">
+                                    {activeScenarioName}
+                                </span>
                             </p>
                         </CardContent>
                     </Card>
@@ -290,8 +378,19 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                     <CardContent>
                         <div className="h-[400px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={rechartsData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                                <ComposedChart
+                                    data={rechartsData}
+                                    margin={{
+                                        top: 20,
+                                        right: 30,
+                                        left: 20,
+                                        bottom: 20,
+                                    }}
+                                >
+                                    <CartesianGrid
+                                        strokeDasharray="3 3"
+                                        className="opacity-30"
+                                    />
                                     <XAxis
                                         dataKey="period"
                                         tick={{ fontSize: 12 }}
@@ -302,15 +401,31 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                     <YAxis
                                         tick={{ fontSize: 12 }}
                                         tickFormatter={(value: number) => {
-                                            if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-                                            if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(0)}k`;
+                                            if (Math.abs(value) >= 1000000)
+                                                return `$${(value / 1000000).toFixed(1)}M`;
+                                            if (Math.abs(value) >= 1000)
+                                                return `$${(value / 1000).toFixed(0)}k`;
                                             return `$${value}`;
                                         }}
                                     />
-                                    <Tooltip formatter={(value) => formatMoney(Number(value))} />
+                                    <Tooltip
+                                        formatter={(value) =>
+                                            formatMoney(Number(value))
+                                        }
+                                    />
                                     <Legend />
-                                    <Bar dataKey="inflows" name="Inflows" fill="var(--status-success)" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="outflows" name="Outflows" fill="var(--status-critical)" radius={[4, 4, 0, 0]} />
+                                    <Bar
+                                        dataKey="inflows"
+                                        name="Inflows"
+                                        fill="var(--status-success)"
+                                        radius={[4, 4, 0, 0]}
+                                    />
+                                    <Bar
+                                        dataKey="outflows"
+                                        name="Outflows"
+                                        fill="var(--status-critical)"
+                                        radius={[4, 4, 0, 0]}
+                                    />
                                     <Line
                                         type="monotone"
                                         dataKey="closingBalance"
@@ -348,22 +463,46 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Period</TableHead>
-                                        <TableHead className="text-right">Opening</TableHead>
-                                        <TableHead className="text-right">Invoice Receipts</TableHead>
-                                        <TableHead className="text-right">Overdue Collections</TableHead>
-                                        <TableHead className="text-right">Recurring Income</TableHead>
-                                        <TableHead className="text-right">Bill Payments</TableHead>
-                                        <TableHead className="text-right">Overdue Bills</TableHead>
-                                        <TableHead className="text-right">Recurring Exp.</TableHead>
-                                        <TableHead className="text-right">GST</TableHead>
-                                        <TableHead className="text-right">Net Flow</TableHead>
-                                        <TableHead className="text-right">Closing</TableHead>
+                                        <TableHead className="text-right">
+                                            Opening
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Invoice Receipts
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Overdue Collections
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Recurring Income
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Bill Payments
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Overdue Bills
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Recurring Exp.
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            GST
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Net Flow
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Closing
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {activeForecastData.map((period, idx) => {
-                                        const netFlow = Number(period.net_cash_flow);
-                                        const closingBal = Number(period.closing_balance);
+                                        const netFlow = Number(
+                                            period.net_cash_flow,
+                                        );
+                                        const closingBal = Number(
+                                            period.closing_balance,
+                                        );
 
                                         return (
                                             <TableRow key={idx}>
@@ -371,33 +510,60 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                                     {period.period_label}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums">
-                                                    {formatMoney(period.opening_balance)}
+                                                    {formatMoney(
+                                                        period.opening_balance,
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-status-success">
-                                                    {formatMoney(period.inflows.invoice_receipts)}
+                                                <TableCell className="text-right font-mono text-status-success tabular-nums">
+                                                    {formatMoney(
+                                                        period.inflows
+                                                            .invoice_receipts,
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-status-success">
-                                                    {formatMoney(period.inflows.overdue_collections)}
+                                                <TableCell className="text-right font-mono text-status-success tabular-nums">
+                                                    {formatMoney(
+                                                        period.inflows
+                                                            .overdue_collections,
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-status-success">
-                                                    {formatMoney(period.inflows.recurring_income)}
+                                                <TableCell className="text-right font-mono text-status-success tabular-nums">
+                                                    {formatMoney(
+                                                        period.inflows
+                                                            .recurring_income,
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-status-critical">
-                                                    {formatMoney(period.outflows.bill_payments)}
+                                                <TableCell className="text-right font-mono text-status-critical tabular-nums">
+                                                    {formatMoney(
+                                                        period.outflows
+                                                            .bill_payments,
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-status-critical">
-                                                    {formatMoney(period.outflows.overdue_bills)}
+                                                <TableCell className="text-right font-mono text-status-critical tabular-nums">
+                                                    {formatMoney(
+                                                        period.outflows
+                                                            .overdue_bills,
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-status-critical">
-                                                    {formatMoney(period.outflows.recurring_expenses)}
+                                                <TableCell className="text-right font-mono text-status-critical tabular-nums">
+                                                    {formatMoney(
+                                                        period.outflows
+                                                            .recurring_expenses,
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-status-critical">
-                                                    {formatMoney(period.outflows.gst_payments)}
+                                                <TableCell className="text-right font-mono text-status-critical tabular-nums">
+                                                    {formatMoney(
+                                                        period.outflows
+                                                            .gst_payments,
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className={`text-right font-mono font-semibold tabular-nums ${netFlow >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
+                                                <TableCell
+                                                    className={`text-right font-mono font-semibold tabular-nums ${netFlow >= 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                                >
                                                     {formatMoney(netFlow)}
                                                 </TableCell>
-                                                <TableCell className={`text-right font-mono font-semibold tabular-nums ${closingBal >= 0 ? '' : 'text-status-critical'}`}>
+                                                <TableCell
+                                                    className={`text-right font-mono font-semibold tabular-nums ${closingBal >= 0 ? '' : 'text-status-critical'}`}
+                                                >
                                                     {formatMoney(closingBal)}
                                                 </TableCell>
                                             </TableRow>
@@ -422,41 +588,77 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                         <TableRow>
                                             <TableHead>Scenario</TableHead>
                                             <TableHead>Description</TableHead>
-                                            <TableHead className="text-right">Final Balance</TableHead>
-                                            <TableHead className="text-right">Total Inflows</TableHead>
-                                            <TableHead className="text-right">Total Outflows</TableHead>
+                                            <TableHead className="text-right">
+                                                Final Balance
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Total Inflows
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Total Outflows
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {forecast.scenarios.map((scenario) => {
-                                            const periods = scenario.forecast_data ?? [];
-                                            const scenarioLastPeriod = periods[periods.length - 1];
-                                            const scenarioTotalInflows = periods.reduce(
-                                                (sum, p) => sum + Number(p.inflows?.total ?? 0),
-                                                0,
-                                            );
-                                            const scenarioTotalOutflows = periods.reduce(
-                                                (sum, p) => sum + Number(p.outflows?.total ?? 0),
-                                                0,
-                                            );
-                                            const scenarioFinalBalance = scenarioLastPeriod
-                                                ? Number(scenarioLastPeriod.closing_balance)
-                                                : 0;
+                                            const periods =
+                                                scenario.forecast_data ?? [];
+                                            const scenarioLastPeriod =
+                                                periods[periods.length - 1];
+                                            const scenarioTotalInflows =
+                                                periods.reduce(
+                                                    (sum, p) =>
+                                                        sum +
+                                                        Number(
+                                                            p.inflows?.total ??
+                                                                0,
+                                                        ),
+                                                    0,
+                                                );
+                                            const scenarioTotalOutflows =
+                                                periods.reduce(
+                                                    (sum, p) =>
+                                                        sum +
+                                                        Number(
+                                                            p.outflows?.total ??
+                                                                0,
+                                                        ),
+                                                    0,
+                                                );
+                                            const scenarioFinalBalance =
+                                                scenarioLastPeriod
+                                                    ? Number(
+                                                          scenarioLastPeriod.closing_balance,
+                                                      )
+                                                    : 0;
 
                                             return (
                                                 <TableRow key={scenario.id}>
-                                                    <TableCell className="font-medium">{scenario.name}</TableCell>
+                                                    <TableCell className="font-medium">
+                                                        {scenario.name}
+                                                    </TableCell>
                                                     <TableCell className="text-muted-foreground">
-                                                        {scenario.adjustments.description}
+                                                        {
+                                                            scenario.adjustments
+                                                                .description
+                                                        }
                                                     </TableCell>
-                                                    <TableCell className={`text-right font-mono font-semibold tabular-nums ${scenarioFinalBalance >= 0 ? '' : 'text-status-critical'}`}>
-                                                        {formatMoney(scenarioFinalBalance)}
+                                                    <TableCell
+                                                        className={`text-right font-mono font-semibold tabular-nums ${scenarioFinalBalance >= 0 ? '' : 'text-status-critical'}`}
+                                                    >
+                                                        {formatMoney(
+                                                            scenarioFinalBalance,
+                                                        )}
                                                     </TableCell>
-                                                    <TableCell className="text-right font-mono tabular-nums text-status-success">
-                                                        {formatMoney(scenarioTotalInflows)}
+                                                    <TableCell className="text-right font-mono text-status-success tabular-nums">
+                                                        {formatMoney(
+                                                            scenarioTotalInflows,
+                                                        )}
                                                     </TableCell>
-                                                    <TableCell className="text-right font-mono tabular-nums text-status-critical">
-                                                        {formatMoney(scenarioTotalOutflows)}
+                                                    <TableCell className="text-right font-mono text-status-critical tabular-nums">
+                                                        {formatMoney(
+                                                            scenarioTotalOutflows,
+                                                        )}
                                                     </TableCell>
                                                 </TableRow>
                                             );
@@ -475,7 +677,7 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                             <CardTitle>Assumptions</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                            <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
                                 {forecast.assumptions.map((assumption, idx) => (
                                     <li key={idx}>{assumption}</li>
                                 ))}
@@ -492,8 +694,10 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                 description={
                     <>
                         This permanently deletes the forecast{' '}
-                        <span className="font-medium text-foreground">{forecast.name}</span> and its
-                        scenarios. This can&rsquo;t be undone.
+                        <span className="font-medium text-foreground">
+                            {forecast.name}
+                        </span>{' '}
+                        and its scenarios. This can&rsquo;t be undone.
                     </>
                 }
                 confirmLabel="Delete forecast"

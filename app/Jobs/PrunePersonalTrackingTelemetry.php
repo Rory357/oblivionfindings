@@ -2,10 +2,15 @@
 
 namespace App\Jobs;
 
+use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\Queclink\QueclinkDevice;
+use App\Models\Queclink\QueclinkRawFrame;
 use App\Services\AuditLogger;
+use App\Support\SafeOperationalData;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -14,6 +19,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 
 /**
  * Enforce the retention period recorded on each personal-tracker assignment.
@@ -30,11 +36,15 @@ class PrunePersonalTrackingTelemetry implements ShouldQueue
 
     public function handle(): void
     {
+        $rawFrameRetentionDays = $this->rawFrameRetentionDays();
+        $canPruneRawFrames = $this->canPruneRawFrames();
+
         $totals = [
             'fleet_events_deleted' => 0,
             'asset_snapshots_deleted' => 0,
             'integration_events_deleted' => 0,
             'asset_summaries_redacted' => 0,
+            'queclink_raw_frames_deleted' => 0,
         ];
 
         DeviceAssignment::query()
@@ -50,25 +60,38 @@ class PrunePersonalTrackingTelemetry implements ShouldQueue
             ->whereHas('device', fn ($query) => $query->where('domain', 'tracking'))
             ->orderBy('id')
             ->lazyById(100)
-            ->each(function (DeviceAssignment $assignment) use (&$totals): void {
-                $counts = $this->enforceAssignment($assignment);
+            ->each(function (DeviceAssignment $assignment) use (&$totals, $canPruneRawFrames): void {
+                $counts = $this->enforceAssignment($assignment, $canPruneRawFrames);
 
                 foreach ($counts as $key => $count) {
                     $totals[$key] += $count;
                 }
             });
 
+        if ($canPruneRawFrames) {
+            $totals['queclink_raw_frames_deleted'] += $this->pruneRawFramesOlderThan(
+                now()->subDays($rawFrameRetentionDays),
+            );
+        } elseif (Schema::hasTable('queclink_raw_frames')) {
+            Log::warning('Queclink raw frame retention skipped fail closed.', SafeOperationalData::logContext([
+                'provider' => 'queclink',
+                'failure_category' => 'legal_hold_boundary_unavailable',
+                'items_errored' => 1,
+            ]));
+        }
+
         Log::info('Personal tracking retention enforcement completed.', $totals);
     }
 
     /** @return array<string, int> */
-    private function enforceAssignment(DeviceAssignment $assignment): array
+    private function enforceAssignment(DeviceAssignment $assignment, bool $canPruneRawFrames): array
     {
         $counts = [
             'fleet_events_deleted' => 0,
             'asset_snapshots_deleted' => 0,
             'integration_events_deleted' => 0,
             'asset_summaries_redacted' => 0,
+            'queclink_raw_frames_deleted' => 0,
         ];
         $device = $assignment->device;
         if (! $device || ! $assignment->assigned_at) {
@@ -93,8 +116,19 @@ class PrunePersonalTrackingTelemetry implements ShouldQueue
             $device,
             $assignmentStart,
             $deletionEnd,
+            $canPruneRawFrames,
             &$counts,
         ): void {
+            if ($canPruneRawFrames) {
+                $query = DB::table('queclink_raw_frames')
+                    ->where('canonical_device_id', $device->id)
+                    ->where('device_assignment_id', $assignment->id)
+                    ->where('created_at', '>=', $assignmentStart)
+                    ->where('created_at', '<', $deletionEnd);
+                $this->excludeActiveRawFrameHolds($query, (int) $assignment->id);
+                $counts['queclink_raw_frames_deleted'] = $query->delete();
+            }
+
             if (Schema::hasTable('fleet_telemetry_events')) {
                 $counts['fleet_events_deleted'] = DB::table('fleet_telemetry_events')
                     ->where(fn (Builder $query) => $this->whereDeviceLineage(
@@ -192,5 +226,104 @@ class PrunePersonalTrackingTelemetry implements ShouldQueue
                     ->where('asset_tracker_id', $legacyTrackerId);
             });
         }
+    }
+
+    private function rawFrameRetentionDays(): int
+    {
+        $value = config('services.queclink.listener.raw_frame_retention_days', 30);
+        if (! is_int($value) && (! is_string($value) || preg_match('/^\d+$/', $value) !== 1)) {
+            throw new InvalidArgumentException('Invalid Queclink raw frame retention limit.');
+        }
+
+        $days = (int) $value;
+        if ($days < 1 || $days > 365) {
+            throw new InvalidArgumentException('Invalid Queclink raw frame retention limit.');
+        }
+
+        return $days;
+    }
+
+    private function canPruneRawFrames(): bool
+    {
+        return Schema::hasTable('queclink_raw_frames')
+            && Schema::hasTable('queclink_devices')
+            && Schema::hasTable('device_assignments')
+            && Schema::hasTable('legal_holds')
+            && Schema::hasColumn('queclink_raw_frames', 'canonical_device_id')
+            && Schema::hasColumn('queclink_raw_frames', 'device_assignment_id')
+            && Schema::hasColumn('queclink_raw_frames', 'binding_uuid');
+    }
+
+    private function pruneRawFramesOlderThan(Carbon $cutoff): int
+    {
+        $deleted = 0;
+
+        do {
+            $query = DB::table('queclink_raw_frames')
+                ->where('created_at', '<', $cutoff)
+                ->limit(1000);
+            $this->excludeActiveRawFrameHolds($query);
+            $batch = $query->delete();
+            $deleted += $batch;
+        } while ($batch === 1000);
+
+        return $deleted;
+    }
+
+    private function excludeActiveRawFrameHolds(Builder $frames, ?int $assignmentId = null): void
+    {
+        $rawFrameTypes = $this->morphTypes(QueclinkRawFrame::class);
+        $providerDeviceTypes = $this->morphTypes(QueclinkDevice::class);
+        $deviceTypes = $this->morphTypes(Device::class);
+        $assignmentTypes = $this->morphTypes(DeviceAssignment::class);
+
+        $frames->whereNotExists(function (Builder $holds) use (
+            $rawFrameTypes,
+            $providerDeviceTypes,
+            $deviceTypes,
+            $assignmentTypes,
+            $assignmentId,
+        ): void {
+            $holds->selectRaw('1')
+                ->from('legal_holds')
+                ->where('status', 'active')
+                ->where(function (Builder $held) use (
+                    $rawFrameTypes,
+                    $providerDeviceTypes,
+                    $deviceTypes,
+                    $assignmentTypes,
+                    $assignmentId,
+                ): void {
+                    $held->where(function (Builder $direct) use ($rawFrameTypes): void {
+                        $direct->whereIn('holdable_type', $rawFrameTypes)
+                            ->whereColumn('holdable_id', 'queclink_raw_frames.id');
+                    })->orWhere(function (Builder $providerDevice) use ($providerDeviceTypes): void {
+                        $providerDevice->whereIn('holdable_type', $providerDeviceTypes)
+                            ->whereColumn('holdable_id', 'queclink_raw_frames.queclink_device_id');
+                    })->orWhere(function (Builder $canonicalDevice) use ($deviceTypes): void {
+                        $canonicalDevice->whereIn('holdable_type', $deviceTypes)
+                            ->whereColumn('holdable_id', 'queclink_raw_frames.canonical_device_id');
+                    })->orWhere(function (Builder $assignment) use ($assignmentTypes, $assignmentId): void {
+                        $assignment->whereIn('holdable_type', $assignmentTypes);
+
+                        if ($assignmentId !== null) {
+                            $assignment->where('holdable_id', $assignmentId);
+
+                            return;
+                        }
+
+                        $assignment->whereColumn('holdable_id', 'queclink_raw_frames.device_assignment_id');
+                    });
+                });
+        });
+    }
+
+    /** @return list<string> */
+    private function morphTypes(string $modelClass): array
+    {
+        return array_values(array_unique([
+            $modelClass,
+            Relation::getMorphAlias($modelClass),
+        ]));
     }
 }

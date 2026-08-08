@@ -1,9 +1,9 @@
 import { router, usePage } from '@inertiajs/react';
 import {
+    Activity,
     ArrowDownToLine,
     ArrowUpFromLine,
     BarChart3,
-    Activity,
     GitBranch,
     LineChart,
     Scale,
@@ -41,15 +41,78 @@ type ReportTabDef = FinanceTabItem & {
 const reportsView = (c: CanTree) => !!c?.finance?.reports?.view;
 
 export const REPORT_TABS: ReportTabDef[] = [
-    { id: 'profit-loss', label: 'Profit & loss', icon: TrendingUp, tone: 'primary', href: '/finance/reports/profit-loss', requires: reportsView },
-    { id: 'balance-sheet', label: 'Balance sheet', icon: Scale, tone: 'info', href: '/finance/reports/balance-sheet', requires: reportsView },
-    { id: 'trial-balance', label: 'Trial balance', icon: BarChart3, tone: 'violet', href: '/finance/reports/trial-balance', requires: reportsView },
-    { id: 'cash-flow', label: 'Cash flow', icon: Activity, tone: 'success', href: '/finance/reports/cash-flow', requires: reportsView },
-    { id: 'aged-receivables', label: 'Aged AR', icon: ArrowDownToLine, tone: 'warning', href: '/finance/reports/aged-receivables', requires: reportsView },
-    { id: 'aged-payables', label: 'Aged AP', icon: ArrowUpFromLine, tone: 'critical', href: '/finance/reports/aged-payables', requires: reportsView },
-    { id: 'funding-summary', label: 'Funding summary', icon: GitBranch, tone: 'info', href: '/finance/reports/funding-stream-summary', requires: reportsView },
-    { id: 'budget-vs-actuals', label: 'Budget vs actuals', icon: Target, tone: 'violet', href: '/finance/reports/budget-vs-actuals', requires: reportsView },
-    { id: 'cash-flow-forecast', label: 'Cash-flow forecast', icon: LineChart, tone: 'primary', href: '/finance/cash-flow-forecast', requires: reportsView },
+    {
+        id: 'profit-loss',
+        label: 'Profit & loss',
+        icon: TrendingUp,
+        tone: 'primary',
+        href: '/finance/reports/profit-loss',
+        requires: reportsView,
+    },
+    {
+        id: 'balance-sheet',
+        label: 'Balance sheet',
+        icon: Scale,
+        tone: 'info',
+        href: '/finance/reports/balance-sheet',
+        requires: reportsView,
+    },
+    {
+        id: 'trial-balance',
+        label: 'Trial balance',
+        icon: BarChart3,
+        tone: 'violet',
+        href: '/finance/reports/trial-balance',
+        requires: reportsView,
+    },
+    {
+        id: 'cash-flow',
+        label: 'Cash flow',
+        icon: Activity,
+        tone: 'success',
+        href: '/finance/reports/cash-flow',
+        requires: reportsView,
+    },
+    {
+        id: 'aged-receivables',
+        label: 'Aged AR',
+        icon: ArrowDownToLine,
+        tone: 'warning',
+        href: '/finance/reports/aged-receivables',
+        requires: reportsView,
+    },
+    {
+        id: 'aged-payables',
+        label: 'Aged AP',
+        icon: ArrowUpFromLine,
+        tone: 'critical',
+        href: '/finance/reports/aged-payables',
+        requires: reportsView,
+    },
+    {
+        id: 'funding-summary',
+        label: 'Funding summary',
+        icon: GitBranch,
+        tone: 'info',
+        href: '/finance/reports/funding-stream-summary',
+        requires: reportsView,
+    },
+    {
+        id: 'budget-vs-actuals',
+        label: 'Budget vs actuals',
+        icon: Target,
+        tone: 'violet',
+        href: '/finance/reports/budget-vs-actuals',
+        requires: reportsView,
+    },
+    {
+        id: 'cash-flow-forecast',
+        label: 'Cash-flow forecast',
+        icon: LineChart,
+        tone: 'primary',
+        href: '/finance/cash-flow-forecast',
+        requires: reportsView,
+    },
 ];
 
 /**
@@ -64,7 +127,9 @@ export function ReportsTabsFooter({ active }: { active: ReportTabId }) {
     const page = usePage();
     const can = (page.props as { auth?: { can?: CanTree } })?.auth?.can;
 
-    const visible = REPORT_TABS.filter((t) => t.id === active || t.requires(can));
+    const visible = REPORT_TABS.filter(
+        (t) => t.id === active || t.requires(can),
+    );
 
     const handleTab = (id: string) => {
         if (id === active) return;

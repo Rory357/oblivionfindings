@@ -1,4 +1,8 @@
-import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
+import {
+    CompensationHero,
+    CompensationTabs,
+    type CompensationHeroStats,
+} from '@/components/hr';
 import { ExpenseClaimDialog } from '@/components/hr/expense-claim-dialog';
 import { StatusBadge } from '@/components/hr/status-badge';
 import { PageLayout } from '@/components/page';
@@ -121,9 +125,13 @@ export default function ExpenseIndex({
         .filter((c) => c.status === 'submitted')
         .map((c) => c.id);
     const toggleOne = (id: number) =>
-        setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+        setSelected((s) =>
+            s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
+        );
     const toggleAll = () =>
-        setSelected((s) => (s.length === pendingIds.length ? [] : [...pendingIds]));
+        setSelected((s) =>
+            s.length === pendingIds.length ? [] : [...pendingIds],
+        );
     const bulkApprove = () => {
         if (!selected.length) return;
         router.post(
@@ -265,10 +273,15 @@ export default function ExpenseIndex({
                 {canDecide && selected.length > 0 ? (
                     <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5">
                         <span className="text-sm font-medium">
-                            {selected.length} claim{selected.length === 1 ? '' : 's'} selected
+                            {selected.length} claim
+                            {selected.length === 1 ? '' : 's'} selected
                         </span>
                         <div className="flex items-center gap-2">
-                            <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setSelected([])}
+                            >
                                 Clear
                             </Button>
                             <Button size="sm" onClick={bulkApprove}>
@@ -291,9 +304,12 @@ export default function ExpenseIndex({
                                                 aria-label="Select all awaiting claims"
                                                 checked={
                                                     pendingIds.length > 0 &&
-                                                    selected.length === pendingIds.length
+                                                    selected.length ===
+                                                        pendingIds.length
                                                 }
-                                                disabled={pendingIds.length === 0}
+                                                disabled={
+                                                    pendingIds.length === 0
+                                                }
                                                 onCheckedChange={toggleAll}
                                             />
                                         </TableHead>
@@ -326,8 +342,14 @@ export default function ExpenseIndex({
                                                     {isPending ? (
                                                         <Checkbox
                                                             aria-label={`Select claim ${claim.claim_number}`}
-                                                            checked={selected.includes(claim.id)}
-                                                            onCheckedChange={() => toggleOne(claim.id)}
+                                                            checked={selected.includes(
+                                                                claim.id,
+                                                            )}
+                                                            onCheckedChange={() =>
+                                                                toggleOne(
+                                                                    claim.id,
+                                                                )
+                                                            }
                                                         />
                                                     ) : null}
                                                 </TableCell>
@@ -362,46 +384,41 @@ export default function ExpenseIndex({
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center justify-end gap-1.5">
-                                                    {canDecide &&
-                                                        isPending && (
-                                                            <>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    disabled={
-                                                                        busy
-                                                                    }
-                                                                    onClick={() =>
-                                                                        approve(
-                                                                            claim,
-                                                                        )
-                                                                    }
-                                                                    className="border-status-success/40 text-status-success hover:bg-status-success-bg"
-                                                                >
-                                                                    <CheckCircle className="mr-1 h-3.5 w-3.5" />
-                                                                    Approve
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    disabled={
-                                                                        busy
-                                                                    }
-                                                                    onClick={() => {
-                                                                        setRejectionReason(
-                                                                            '',
-                                                                        );
-                                                                        setRejectTarget(
-                                                                            claim,
-                                                                        );
-                                                                    }}
-                                                                    className="border-status-critical/40 text-status-critical hover:bg-status-critical-bg"
-                                                                >
-                                                                    <XCircle className="mr-1 h-3.5 w-3.5" />
-                                                                    Reject
-                                                                </Button>
-                                                            </>
-                                                        )}
+                                                    {canDecide && isPending && (
+                                                        <>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                disabled={busy}
+                                                                onClick={() =>
+                                                                    approve(
+                                                                        claim,
+                                                                    )
+                                                                }
+                                                                className="border-status-success/40 text-status-success hover:bg-status-success-bg"
+                                                            >
+                                                                <CheckCircle className="mr-1 h-3.5 w-3.5" />
+                                                                Approve
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                disabled={busy}
+                                                                onClick={() => {
+                                                                    setRejectionReason(
+                                                                        '',
+                                                                    );
+                                                                    setRejectTarget(
+                                                                        claim,
+                                                                    );
+                                                                }}
+                                                                className="border-status-critical/40 text-status-critical hover:bg-status-critical-bg"
+                                                            >
+                                                                <XCircle className="mr-1 h-3.5 w-3.5" />
+                                                                Reject
+                                                            </Button>
+                                                        </>
+                                                    )}
                                                     {claim.status ===
                                                         'rejected' && (
                                                         <Button
@@ -478,7 +495,9 @@ export default function ExpenseIndex({
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Reject expense claim</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            Reject expense claim
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
                             {rejectTarget
                                 ? `Provide a reason for rejecting ${rejectTarget.claim_number} (${rejectTarget.title}). The claimant will see this.`
@@ -491,9 +510,7 @@ export default function ExpenseIndex({
                             id="reject-reason"
                             rows={3}
                             value={rejectionReason}
-                            onChange={(e) =>
-                                setRejectionReason(e.target.value)
-                            }
+                            onChange={(e) => setRejectionReason(e.target.value)}
                             placeholder="e.g. Missing receipt for the accommodation line."
                         />
                     </div>

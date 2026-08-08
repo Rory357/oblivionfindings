@@ -142,8 +142,8 @@ const Terms: React.FC = () => {
                                 written consent
                             </li>
                             <li>
-                                Assisting with privacy impact
-                                assessments and breach notifications
+                                Assisting with privacy impact assessments and
+                                breach notifications
                             </li>
                             <li>
                                 Returning or deleting all personal data upon
@@ -170,8 +170,8 @@ const Terms: React.FC = () => {
                                 into the system
                             </li>
                             <li>
-                                Ensuring you have Information Privacy Principles basis for processing
-                                resident data
+                                Ensuring you have Information Privacy Principles
+                                basis for processing resident data
                             </li>
                             <li>
                                 Training your staff on proper use of the

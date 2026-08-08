@@ -23,7 +23,12 @@ import {
 } from 'lucide-react';
 import { type MouseEvent as ReactMouseEvent, useState } from 'react';
 
-import { type Handover, clientName, fmtShiftRange, statusLabel } from './shared';
+import {
+    type Handover,
+    clientName,
+    fmtShiftRange,
+    statusLabel,
+} from './shared';
 
 export type HandoverCtxHandlers = {
     onOpen: (h: Handover) => void;
@@ -36,7 +41,10 @@ export type HandoverCtxHandlers = {
 // the tag matches the StatusPill without re-deriving Tailwind classes.
 const STATUS_TAG: Record<string, { bg: string; color: string }> = {
     draft: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
-    submitted: { bg: 'var(--status-warning-bg)', color: 'var(--status-warning)' },
+    submitted: {
+        bg: 'var(--status-warning-bg)',
+        color: 'var(--status-warning)',
+    },
     acknowledged: {
         bg: 'var(--status-success-bg)',
         color: 'var(--status-success)',
@@ -45,7 +53,10 @@ const STATUS_TAG: Record<string, { bg: string; color: string }> = {
 
 /** Build the right-click menu items for a handover, guarded by its `can_*`
  *  flags + which related entities exist. Exported for unit testing. */
-export function buildItems(h: Handover, handlers: HandoverCtxHandlers): ShiftCtxItem[] {
+export function buildItems(
+    h: Handover,
+    handlers: HandoverCtxHandlers,
+): ShiftCtxItem[] {
     const client = h.client;
     const outShift = h.outgoing_shift;
     const outStaff = h.outgoing_staff;
@@ -61,7 +72,11 @@ export function buildItems(h: Handover, handlers: HandoverCtxHandlers): ShiftCtx
         },
     ];
 
-    if (h.status === 'submitted' && h.can_acknowledge && handlers.onAcknowledge) {
+    if (
+        h.status === 'submitted' &&
+        h.can_acknowledge &&
+        handlers.onAcknowledge
+    ) {
         items.push({
             icon: <Check className="h-3.5 w-3.5" />,
             label: 'Acknowledge',

@@ -42,19 +42,14 @@ describe('site profile operations ownership', () => {
 
     it('opens the canonical calendar create workflow from Site Profile deep links', () => {
         const calendar = readFileSync(
-            resolve(
-                root,
-                'resources/js/pages/sites/calendar/SiteCalendar.tsx',
-            ),
+            resolve(root, 'resources/js/pages/sites/calendar/SiteCalendar.tsx'),
             'utf8',
         );
 
-        expect(calendar).toContain(
-            "new URLSearchParams(window.location.search).get('action')",
+        expect(calendar).toMatch(
+            /const\s+action\s*=\s*new\s+URLSearchParams\(\s*window\.location\.search\s*\)\.get\(\s*['"]action['"]\s*,?\s*\);/,
         );
-        expect(calendar).toContain(
-            "action === 'create' || action === 'add'",
-        );
+        expect(calendar).toContain("action === 'create' || action === 'add'");
         expect(calendar).toContain('openCreate();');
     });
 

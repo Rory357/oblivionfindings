@@ -4,9 +4,11 @@ namespace App\Domain\Monitoring\Services;
 
 use App\Domain\Monitoring\Contracts\SnapshotStore;
 use App\Domain\Monitoring\Contracts\TimeSeriesStore;
+use App\Domain\Monitoring\Data\TimeSeriesPoint;
 use App\Domain\Monitoring\Exceptions\TimeSeriesUnavailable;
 use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\MetricCurrentSummary;
+use App\Domain\Monitoring\Models\MetricRollupCoverage;
 use App\Domain\Monitoring\Models\MetricSeries;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
 use App\Domain\Monitoring\Models\MonitoringRetentionTombstone;
@@ -16,6 +18,7 @@ use App\Models\Site;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Throwable;
 
 final class RetentionEnforcer
 {
@@ -25,7 +28,7 @@ final class RetentionEnforcer
         private readonly MonitoringRetentionPolicyMatcher $policyMatcher,
     ) {}
 
-    /** @return array{metric_payloads_deleted: int, snapshot_payloads_deleted: int, held_series: int, held_snapshots: int} */
+    /** @return array{metric_payloads_deleted: int, snapshot_payloads_deleted: int, held_series: int, held_snapshots: int, rollup_coverage_blocked_series: int} */
     public function enforce(
         ?CarbonImmutable $now = null,
         ?int $actorId = null,
@@ -43,6 +46,7 @@ final class RetentionEnforcer
             'snapshot_payloads_deleted' => 0,
             'held_series' => 0,
             'held_snapshots' => 0,
+            'rollup_coverage_blocked_series' => 0,
         ];
         $policies = MonitoringRetentionPolicy::query()->where('is_active', true)->get();
 
@@ -71,7 +75,7 @@ final class RetentionEnforcer
                     /** @var MonitoringRetentionPolicy $policy */
                     $policy = $matches->sortBy(fn (MonitoringRetentionPolicy $candidate): int => (int) $candidate->{$daysField})->first();
                     $cutoff = $now->subDays((int) $policy->{$daysField});
-                    if ($series->first_point_at->greaterThan($cutoff)) {
+                    if ($series->first_point_at->greaterThanOrEqualTo($cutoff)) {
                         continue;
                     }
                     $periodStart = CarbonImmutable::instance($series->first_point_at)->utc();
@@ -82,15 +86,7 @@ final class RetentionEnforcer
                         ->exists()) {
                         continue;
                     }
-
-                    $this->timeSeries->deleteRange(
-                        $series->external_key,
-                        $series->retention_tier,
-                        $periodStart,
-                        $cutoff,
-                    );
-
-                    DB::transaction(function () use (
+                    $outcome = DB::transaction(function () use (
                         $series,
                         $policy,
                         $periodStart,
@@ -98,32 +94,52 @@ final class RetentionEnforcer
                         $actorId,
                         $jobReference,
                         $now,
-                    ): void {
+                    ): string {
                         $locked = MetricSeries::query()->lockForUpdate()->findOrFail($series->id);
+                        if ($locked->first_point_at === null
+                            || ! CarbonImmutable::instance($locked->first_point_at)->utc()->equalTo($periodStart)) {
+                            return 'stale';
+                        }
+                        if (! $this->hasRequiredRollupCoverage(
+                            $locked,
+                            $periodStart,
+                            $cutoff,
+                            lockForUpdate: true,
+                        )) {
+                            return 'coverage_blocked';
+                        }
+
+                        $this->timeSeries->deleteRange(
+                            (string) $locked->external_key,
+                            (string) $locked->retention_tier,
+                            $periodStart,
+                            $cutoff,
+                        );
+
                         $summary = MetricCurrentSummary::query()
                             ->where('series_id', $series->id)
                             ->lockForUpdate()
                             ->first();
-                        if ($summary?->observed_at !== null && $summary->observed_at->lessThanOrEqualTo($cutoff)) {
+                        if ($summary?->observed_at !== null && $summary->observed_at->lessThan($cutoff)) {
                             $summary->delete();
                         }
                         $locked->first_point_at = $locked->last_point_at !== null
-                            && $locked->last_point_at->greaterThan($cutoff)
-                                ? $cutoff->addMicrosecond()
+                            && $locked->last_point_at->greaterThanOrEqualTo($cutoff)
+                                ? $cutoff
                                 : null;
-                        if ($locked->last_point_at !== null && $locked->last_point_at->lessThanOrEqualTo($cutoff)) {
+                        if ($locked->last_point_at !== null && $locked->last_point_at->lessThan($cutoff)) {
                             $locked->last_point_at = null;
                         }
                         $locked->save();
 
                         MonitoringRetentionTombstone::query()->create([
                             'tombstone_uuid' => (string) Str::uuid(),
-                            'series_id' => $series->id,
-                            'site_id' => $series->site_id,
-                            'device_id' => $series->device_id,
-                            'monitor_id' => $series->monitor_id,
-                            'data_class' => $series->data_class,
-                            'retention_tier' => $series->retention_tier,
+                            'series_id' => $locked->id,
+                            'site_id' => $locked->site_id,
+                            'device_id' => $locked->device_id,
+                            'monitor_id' => $locked->monitor_id,
+                            'data_class' => $locked->data_class,
+                            'retention_tier' => $locked->retention_tier,
                             'period_start' => $periodStart,
                             'period_end' => $cutoff,
                             'policy_id' => $policy->id,
@@ -131,8 +147,14 @@ final class RetentionEnforcer
                             'job_reference' => $jobReference,
                             'deleted_at' => $now,
                         ]);
+
+                        return 'deleted';
                     }, 3);
-                    $result['metric_payloads_deleted']++;
+                    if ($outcome === 'coverage_blocked') {
+                        $result['rollup_coverage_blocked_series']++;
+                    } elseif ($outcome === 'deleted') {
+                        $result['metric_payloads_deleted']++;
+                    }
                 }
             });
 
@@ -223,6 +245,150 @@ final class RetentionEnforcer
         });
 
         return $missing;
+    }
+
+    private function hasRequiredRollupCoverage(
+        MetricSeries $source,
+        CarbonImmutable $from,
+        CarbonImmutable $until,
+        bool $lockForUpdate = false,
+    ): bool {
+        $targetTier = match ($source->retention_tier) {
+            'raw' => 'hourly',
+            'hourly' => 'daily',
+            default => null,
+        };
+        if ($targetTier === null) {
+            return true;
+        }
+
+        $query = MetricRollupCoverage::query()
+            ->where('source_series_id', $source->id)
+            ->where('target_tier', $targetTier);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+        $coverage = $query->first();
+        if ($coverage === null
+            || $coverage->covered_from->greaterThan($from)
+            || $coverage->covered_until->lessThan($until)) {
+            return false;
+        }
+
+        $target = $coverage->targetSeries;
+
+        $matches = $target instanceof MetricSeries
+            && $target->retention_tier === $targetTier
+            && (int) $target->site_id === (int) $source->site_id
+            && (int) $target->device_id === (int) $source->device_id
+            && $target->monitor_id === $source->monitor_id
+            && $target->metric === $source->metric
+            && $target->dimensions_hash === $source->dimensions_hash
+            && $target->unit === $source->unit
+            && $target->source === $source->source
+            && $target->data_class === $source->data_class
+            && $target->privacy_class === $source->privacy_class;
+        if (! $matches) {
+            return false;
+        }
+
+        return $this->hasCurrentRollupEvidence($source, $target, $targetTier, $from, $until);
+    }
+
+    private function hasCurrentRollupEvidence(
+        MetricSeries $source,
+        MetricSeries $target,
+        string $targetTier,
+        CarbonImmutable $from,
+        CarbonImmutable $until,
+    ): bool {
+        $cursor = $from;
+        $sourceEvidenceFound = false;
+
+        try {
+            while ($cursor->lessThan($until)) {
+                $windowEnd = $targetTier === 'hourly'
+                    ? $cursor->addDay()
+                    : $cursor->addDays(31);
+                if ($windowEnd->greaterThan($until)) {
+                    $windowEnd = $until;
+                }
+
+                $sourcePoints = $this->timeSeries->range(
+                    (string) $source->external_key,
+                    (string) $source->retention_tier,
+                    $cursor,
+                    $windowEnd,
+                );
+                $expectedBuckets = [];
+                foreach ($sourcePoints as $point) {
+                    if (! $this->pointMatchesSeries($point, $source, $cursor, $windowEnd)) {
+                        return false;
+                    }
+
+                    $sourceEvidenceFound = true;
+                    $bucket = $targetTier === 'hourly'
+                        ? $point->observedAt->utc()->startOfHour()
+                        : $point->observedAt->utc()->startOfDay();
+                    $expectedBuckets[$bucket->format('Y-m-d\TH:i:s.u\Z')] = $bucket;
+                }
+
+                if ($expectedBuckets !== []) {
+                    $expectedBucketKeys = array_keys($expectedBuckets);
+                    sort($expectedBucketKeys, SORT_STRING);
+                    $targetFrom = $expectedBuckets[$expectedBucketKeys[0]];
+                    $lastBucket = $expectedBuckets[$expectedBucketKeys[array_key_last($expectedBucketKeys)]];
+                    $targetUntil = $targetTier === 'hourly'
+                        ? $lastBucket->addHour()
+                        : $lastBucket->addDay();
+                    $actualBuckets = [];
+                    foreach ($this->timeSeries->range(
+                        (string) $target->external_key,
+                        $targetTier,
+                        $targetFrom,
+                        $targetUntil,
+                    ) as $point) {
+                        if (! $this->pointMatchesSeries($point, $target, $targetFrom, $targetUntil)) {
+                            return false;
+                        }
+
+                        $bucket = $targetTier === 'hourly'
+                            ? $point->observedAt->utc()->startOfHour()
+                            : $point->observedAt->utc()->startOfDay();
+                        if (! $bucket->equalTo($point->observedAt)) {
+                            return false;
+                        }
+                        $actualBuckets[$bucket->format('Y-m-d\TH:i:s.u\Z')] = true;
+                    }
+
+                    foreach ($expectedBucketKeys as $expectedBucket) {
+                        if (! isset($actualBuckets[$expectedBucket])) {
+                            return false;
+                        }
+                    }
+                }
+
+                $cursor = $windowEnd;
+            }
+        } catch (Throwable) {
+            return false;
+        }
+
+        return $sourceEvidenceFound;
+    }
+
+    private function pointMatchesSeries(
+        mixed $point,
+        MetricSeries $series,
+        CarbonImmutable $from,
+        CarbonImmutable $until,
+    ): bool {
+        return $point instanceof TimeSeriesPoint
+            && $point->externalKey === $series->external_key
+            && $point->seriesId === (int) $series->id
+            && $point->tier === $series->retention_tier
+            && $point->observedAt->greaterThanOrEqualTo($from)
+            && $point->observedAt->lessThan($until);
     }
 
     private function hasExternalHold(MetricSeries $series): bool

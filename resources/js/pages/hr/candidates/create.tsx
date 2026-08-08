@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,7 +13,6 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -67,7 +67,9 @@ export default function CandidateCreate({ sites, roles }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New Candidate" />
             <PageShell>
-                <PageHero category="hr" variant="compact"
+                <PageHero
+                    category="hr"
+                    variant="compact"
                     title="New Candidate"
                     description="Add a new candidate to the recruitment pipeline."
                     actions={

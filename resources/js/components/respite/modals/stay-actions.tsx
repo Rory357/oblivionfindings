@@ -89,7 +89,8 @@ export function CheckInModal({
                                 Check in {stay.client}
                             </DialogTitle>
                             <DialogDescription className="text-left">
-                                Complete the arrival safety acknowledgement before activating the stay.
+                                Complete the arrival safety acknowledgement
+                                before activating the stay.
                             </DialogDescription>
                         </div>
                         {needsAnaphylaxis ? (
@@ -215,13 +216,17 @@ export function MedicationReconciliationModal({
                                 Reconcile medications
                             </DialogTitle>
                             <DialogDescription className="text-left">
-                                Complete admission medication reconciliation for {stay.client}.
+                                Complete admission medication reconciliation for{' '}
+                                {stay.client}.
                             </DialogDescription>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div className="grid gap-1.5">
                                 <Label>Source</Label>
-                                <Select value={source} onValueChange={setSource}>
+                                <Select
+                                    value={source}
+                                    onValueChange={setSource}
+                                >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
@@ -425,10 +430,19 @@ export function IncidentModal({
                                         value={incidentType}
                                         setValue={setIncidentType}
                                         options={[
-                                            ['health_safety', 'Health and safety'],
+                                            [
+                                                'health_safety',
+                                                'Health and safety',
+                                            ],
                                             ['serious_harm', 'Serious harm'],
-                                            ['serious_injury', 'Serious injury'],
-                                            ['privacy_breach', 'Privacy breach'],
+                                            [
+                                                'serious_injury',
+                                                'Serious injury',
+                                            ],
+                                            [
+                                                'privacy_breach',
+                                                'Privacy breach',
+                                            ],
                                             ['death', 'Death'],
                                         ]}
                                     />
@@ -525,7 +539,8 @@ export function DischargeModal({
                                 Discharge {stay.client}
                             </DialogTitle>
                             <DialogDescription className="text-left">
-                                Capture structured discharge and medication handover details.
+                                Capture structured discharge and medication
+                                handover details.
                             </DialogDescription>
                         </div>
                         <TextareaField
@@ -676,7 +691,8 @@ export function ComplaintModal({
                                 Log complaint
                             </DialogTitle>
                             <DialogDescription className="text-left">
-                                Record rights, advocacy or service feedback for {stay.client}.
+                                Record rights, advocacy or service feedback for{' '}
+                                {stay.client}.
                             </DialogDescription>
                         </div>
                         <div className="grid gap-3">

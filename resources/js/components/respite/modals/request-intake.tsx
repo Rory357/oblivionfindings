@@ -381,7 +381,8 @@ function Segmented<T extends string>({
             {options.map((o) => {
                 const active = value === o.value;
                 return (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         key={o.value}
                         type="button"
                         onClick={() => onChange(o.value)}

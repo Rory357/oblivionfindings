@@ -118,6 +118,21 @@ final class MilesightWebhookContractTest extends TestCase
         $this->assertDatabaseCount('monitoring_outbox', 0);
     }
 
+    public function test_signed_webhook_cannot_reactivate_an_archived_site_mapping(): void
+    {
+        [$site, $device, $secret] = $this->mappedDevice();
+        $site->forceFill(['archived_at' => now()])->save();
+
+        $this->postJson(
+            '/webhooks/milesight',
+            $this->payload((string) $device->external_ref['provider_entity_id']),
+            $this->headers($secret),
+        )->assertUnprocessable();
+
+        $this->assertDatabaseCount('monitoring_outbox', 0);
+        $this->assertDatabaseCount('integration_events', 0);
+    }
+
     /** @return array{Site, Device, string} */
     private function mappedDevice(): array
     {

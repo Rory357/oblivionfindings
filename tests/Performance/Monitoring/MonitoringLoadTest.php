@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Tests\TestCase;
 
 final class MonitoringLoadTest extends TestCase
@@ -205,7 +206,7 @@ final class MonitoringLoadTest extends TestCase
         $this->assertSame($scale['monitors'], array_sum($hourly));
 
         $evidence = [
-            'mode' => $writeEvidence ? 'full' : 'smoke',
+            'scale_profile' => $writeEvidence ? 'full_scale' : 'smoke',
             'scale' => $scale,
             'seed_ms' => $seedMs,
             'phases' => $phaseTimings,
@@ -215,15 +216,9 @@ final class MonitoringLoadTest extends TestCase
             'inbox_effects' => count($inboxEffects),
             'correlations' => count($correlations),
             'visible_devices_for_restricted_site' => $actualVisible,
-            'checked_at' => now()->utc()->toIso8601String(),
         ];
         if ($writeEvidence) {
-            $directory = base_path('output/monitoring/load');
-            File::ensureDirectoryExists($directory);
-            File::put(
-                $directory.'/native-monitoring-load-'.now()->utc()->format('YmdTHis\Z').'.json',
-                json_encode($evidence, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
-            );
+            $this->writeLocalSyntheticEvidence('native-monitoring-load', $evidence);
         }
     }
 
@@ -316,22 +311,69 @@ final class MonitoringLoadTest extends TestCase
         );
 
         if (env('MONITORING_WRITE_EVIDENCE') === '1') {
-            $directory = base_path('output/monitoring/load');
-            File::ensureDirectoryExists($directory);
-            File::put(
-                $directory.'/device-command-recovery-'.now()->utc()->format('YmdTHis\Z').'.json',
-                json_encode([
-                    'records' => $total,
-                    'batch_limit' => 1_000,
-                    'first_pass' => $first,
-                    'second_pass' => $second,
-                    'idempotent_final_pass' => $third,
-                    'elapsed_ms' => round($elapsedMs, 3),
-                    'issued_commands_repeated' => 0,
-                    'checked_at' => now()->utc()->toIso8601String(),
-                ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
-            );
+            $this->writeLocalSyntheticEvidence('device-command-recovery', [
+                'records' => $total,
+                'batch_limit' => 1_000,
+                'first_pass' => $first,
+                'second_pass' => $second,
+                'idempotent_final_pass' => $third,
+                'elapsed_ms' => round($elapsedMs, 3),
+                'issued_commands_repeated' => 0,
+            ]);
         }
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function writeLocalSyntheticEvidence(string $prefix, array $payload): void
+    {
+        $directory = base_path('output/monitoring/load');
+        File::ensureDirectoryExists($directory);
+
+        $artifactId = (string) Str::orderedUuid();
+        $checkedAt = now()->utc();
+        $evidence = array_merge($payload, [
+            'evidence_contract' => 'monitoring-local-synthetic-v1',
+            'artifact_id' => $artifactId,
+            'evidence_classification' => 'local_synthetic_fixture',
+            'execution_scope' => 'test_process_only',
+            'network_io_performed' => false,
+            'deployed_runtime_observed' => false,
+            'soak_duration_proven' => false,
+            'v09_release_evidence' => false,
+            'checked_at' => $checkedAt->toIso8601String(),
+        ]);
+        $contents = json_encode($evidence, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR).PHP_EOL;
+        $path = sprintf(
+            '%s/%s-%s-%s.json',
+            $directory,
+            $prefix,
+            $checkedAt->format('Ymd\THis.u\Z'),
+            $artifactId,
+        );
+        $stream = fopen($path, 'xb');
+        if ($stream === false) {
+            throw new RuntimeException('Unable to create a unique local synthetic monitoring evidence artifact.');
+        }
+
+        $offset = 0;
+        try {
+            while ($offset < strlen($contents)) {
+                $written = fwrite($stream, substr($contents, $offset));
+                if ($written === false || $written === 0) {
+                    throw new RuntimeException('Unable to write the complete local synthetic monitoring evidence artifact.');
+                }
+                $offset += $written;
+            }
+            if (! fflush($stream)) {
+                throw new RuntimeException('Unable to flush the local synthetic monitoring evidence artifact.');
+            }
+        } catch (RuntimeException $exception) {
+            fclose($stream);
+            unlink($path);
+
+            throw $exception;
+        }
+        fclose($stream);
     }
 
     private function supervisorSection(string $config, string $program): string

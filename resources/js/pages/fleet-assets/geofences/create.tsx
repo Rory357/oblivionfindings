@@ -254,7 +254,11 @@ export function GeofenceWizard({
         };
 
         if (geofence) {
-            router.put(`/fleet-assets/geofences/${geofence.id}`, payload, options);
+            router.put(
+                `/fleet-assets/geofences/${geofence.id}`,
+                payload,
+                options,
+            );
         } else {
             router.post('/fleet-assets/geofences', payload, options);
         }
@@ -285,7 +289,11 @@ export function GeofenceWizard({
             steps={steps}
             stepIndex={stepIndex}
             onStepClick={(index) => {
-                if (index === 0 || (index === 1 && canLeaveScope) || canReview) {
+                if (
+                    index === 0 ||
+                    (index === 1 && canLeaveScope) ||
+                    canReview
+                ) {
                     setStepIndex(index);
                 }
             }}
@@ -337,15 +345,21 @@ export function GeofenceWizard({
                             <Input
                                 id="geofence-name"
                                 value={name}
-                                onChange={(event) => setName(event.target.value)}
+                                onChange={(event) =>
+                                    setName(event.target.value)
+                                }
                                 placeholder="e.g. Kauri House boundary"
                             />
                             {errors.name ? (
-                                <p className="text-sm text-destructive">{errors.name}</p>
+                                <p className="text-sm text-destructive">
+                                    {errors.name}
+                                </p>
                             ) : null}
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="geofence-description">Description</Label>
+                            <Label htmlFor="geofence-description">
+                                Description
+                            </Label>
                             <Textarea
                                 id="geofence-description"
                                 value={description}
@@ -357,32 +371,44 @@ export function GeofenceWizard({
                         <div className="space-y-2">
                             <Label>Scope</Label>
                             <div className="flex gap-2">
-                                {(['vehicle', 'resident'] as const).map((value) => (
-                                    <Button
-                                        key={value}
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setScope(value)}
-                                        className={cn(
-                                            scope === value &&
-                                                'border-primary bg-primary/10 text-primary',
-                                        )}
-                                    >
-                                        {value === 'vehicle' ? 'Vehicle' : 'Resident'}
-                                    </Button>
-                                ))}
+                                {(['vehicle', 'resident'] as const).map(
+                                    (value) => (
+                                        <Button
+                                            key={value}
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setScope(value)}
+                                            className={cn(
+                                                scope === value &&
+                                                    'border-primary bg-primary/10 text-primary',
+                                            )}
+                                        >
+                                            {value === 'vehicle'
+                                                ? 'Vehicle'
+                                                : 'Resident'}
+                                        </Button>
+                                    ),
+                                )}
                             </div>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="geofence-site">Quick-fill from site</Label>
-                                <Select value={siteId} onValueChange={handleSiteQuickFill}>
+                                <Label htmlFor="geofence-site">
+                                    Quick-fill from site
+                                </Label>
+                                <Select
+                                    value={siteId}
+                                    onValueChange={handleSiteQuickFill}
+                                >
                                     <SelectTrigger id="geofence-site">
                                         <SelectValue placeholder="Select site" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {sites.map((site) => (
-                                            <SelectItem key={site.id} value={String(site.id)}>
+                                            <SelectItem
+                                                key={site.id}
+                                                value={String(site.id)}
+                                            >
                                                 {site.name}
                                             </SelectItem>
                                         ))}
@@ -390,14 +416,22 @@ export function GeofenceWizard({
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="geofence-asset">Link to asset</Label>
-                                <Select value={assetId} onValueChange={setAssetId}>
+                                <Label htmlFor="geofence-asset">
+                                    Link to asset
+                                </Label>
+                                <Select
+                                    value={assetId}
+                                    onValueChange={setAssetId}
+                                >
                                     <SelectTrigger id="geofence-asset">
                                         <SelectValue placeholder="Select asset" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {assets.map((asset) => (
-                                            <SelectItem key={asset.id} value={String(asset.id)}>
+                                            <SelectItem
+                                                key={asset.id}
+                                                value={String(asset.id)}
+                                            >
                                                 {asset.name}
                                             </SelectItem>
                                         ))}
@@ -411,7 +445,8 @@ export function GeofenceWizard({
                 {stepIndex === 1 ? (
                     <div className="space-y-3">
                         <p className="text-sm text-muted-foreground">
-                            Draw a circle or polygon. This large map remains scroll-safe inside the wizard.
+                            Draw a circle or polygon. This large map remains
+                            scroll-safe inside the wizard.
                         </p>
                         <GeofenceDrawMap
                             center={mapCenter}
@@ -432,23 +467,53 @@ export function GeofenceWizard({
                     <div className="space-y-5">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="geofence-breach">Breach type</Label>
-                                <Select value={breachType} onValueChange={setBreachType}>
-                                    <SelectTrigger id="geofence-breach"><SelectValue /></SelectTrigger>
+                                <Label htmlFor="geofence-breach">
+                                    Breach type
+                                </Label>
+                                <Select
+                                    value={breachType}
+                                    onValueChange={setBreachType}
+                                >
+                                    <SelectTrigger id="geofence-breach">
+                                        <SelectValue />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="enter">Enter only</SelectItem>
-                                        <SelectItem value="exit">Exit only</SelectItem>
-                                        <SelectItem value="both">Enter and exit</SelectItem>
+                                        <SelectItem value="enter">
+                                            Enter only
+                                        </SelectItem>
+                                        <SelectItem value="exit">
+                                            Exit only
+                                        </SelectItem>
+                                        <SelectItem value="both">
+                                            Enter and exit
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="geofence-severity">Severity</Label>
-                                <Select value={alertSeverity} onValueChange={setAlertSeverity}>
-                                    <SelectTrigger id="geofence-severity"><SelectValue /></SelectTrigger>
+                                <Label htmlFor="geofence-severity">
+                                    Severity
+                                </Label>
+                                <Select
+                                    value={alertSeverity}
+                                    onValueChange={setAlertSeverity}
+                                >
+                                    <SelectTrigger id="geofence-severity">
+                                        <SelectValue />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        {['low', 'medium', 'high', 'critical'].map((value) => (
-                                            <SelectItem key={value} value={value}>{value}</SelectItem>
+                                        {[
+                                            'low',
+                                            'medium',
+                                            'high',
+                                            'critical',
+                                        ].map((value) => (
+                                            <SelectItem
+                                                key={value}
+                                                value={value}
+                                            >
+                                                {value}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -456,17 +521,36 @@ export function GeofenceWizard({
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                             {[
-                                ['Alert on enter', alertOnEnter, setAlertOnEnter],
+                                [
+                                    'Alert on enter',
+                                    alertOnEnter,
+                                    setAlertOnEnter,
+                                ],
                                 ['Alert on exit', alertOnExit, setAlertOnExit],
-                                ['Alert on speed violation', alertOnSpeed, setAlertOnSpeed],
-                                ['Notify Control Room', notifyControlRoom, setNotifyControlRoom],
+                                [
+                                    'Alert on speed violation',
+                                    alertOnSpeed,
+                                    setAlertOnSpeed,
+                                ],
+                                [
+                                    'Notify Control Room',
+                                    notifyControlRoom,
+                                    setNotifyControlRoom,
+                                ],
                             ].map(([label, checked, setter]) => (
-                                <label key={String(label)} className="flex min-h-11 items-center gap-3 rounded-lg border p-3 text-sm">
+                                <label
+                                    key={String(label)}
+                                    className="flex min-h-11 items-center gap-3 rounded-lg border p-3 text-sm"
+                                >
                                     <input
                                         type="checkbox"
                                         checked={Boolean(checked)}
                                         onChange={(event) =>
-                                            (setter as (value: boolean) => void)(event.target.checked)
+                                            (
+                                                setter as (
+                                                    value: boolean,
+                                                ) => void
+                                            )(event.target.checked)
                                         }
                                     />
                                     {String(label)}
@@ -475,16 +559,40 @@ export function GeofenceWizard({
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="geofence-start">Active from</Label>
-                                <Input id="geofence-start" type="time" value={scheduleStart} onChange={(event) => setScheduleStart(event.target.value)} />
+                                <Label htmlFor="geofence-start">
+                                    Active from
+                                </Label>
+                                <Input
+                                    id="geofence-start"
+                                    type="time"
+                                    value={scheduleStart}
+                                    onChange={(event) =>
+                                        setScheduleStart(event.target.value)
+                                    }
+                                />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="geofence-end">Active until</Label>
-                                <Input id="geofence-end" type="time" value={scheduleEnd} onChange={(event) => setScheduleEnd(event.target.value)} />
+                                <Label htmlFor="geofence-end">
+                                    Active until
+                                </Label>
+                                <Input
+                                    id="geofence-end"
+                                    type="time"
+                                    value={scheduleEnd}
+                                    onChange={(event) =>
+                                        setScheduleEnd(event.target.value)
+                                    }
+                                />
                             </div>
                         </div>
                         <label className="flex min-h-11 items-center gap-3 rounded-lg border p-3 text-sm">
-                            <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} />
+                            <input
+                                type="checkbox"
+                                checked={isActive}
+                                onChange={(event) =>
+                                    setIsActive(event.target.checked)
+                                }
+                            />
                             Geofence is active
                         </label>
                     </div>
@@ -492,7 +600,9 @@ export function GeofenceWizard({
 
                 {stepIndex === 3 ? (
                     <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Review geofence</h3>
+                        <h3 className="text-lg font-semibold">
+                            Review geofence
+                        </h3>
                         <div className="grid gap-3 sm:grid-cols-2">
                             {[
                                 ['Name', name],
@@ -501,12 +611,24 @@ export function GeofenceWizard({
                                 ['Shape', shape?.type ?? 'Not drawn'],
                                 ['Breach alerts', breachType],
                                 ['Severity', alertSeverity],
-                                ['Schedule', scheduleStart || scheduleEnd ? `${scheduleStart || 'Any'}–${scheduleEnd || 'Any'}` : 'Always active'],
+                                [
+                                    'Schedule',
+                                    scheduleStart || scheduleEnd
+                                        ? `${scheduleStart || 'Any'}–${scheduleEnd || 'Any'}`
+                                        : 'Always active',
+                                ],
                                 ['Status', isActive ? 'Active' : 'Inactive'],
                             ].map(([label, value]) => (
-                                <div key={label} className="rounded-lg border bg-muted/20 p-3">
-                                    <div className="text-xs text-muted-foreground">{label}</div>
-                                    <div className="mt-1 text-sm font-semibold capitalize">{value}</div>
+                                <div
+                                    key={label}
+                                    className="rounded-lg border bg-muted/20 p-3"
+                                >
+                                    <div className="text-xs text-muted-foreground">
+                                        {label}
+                                    </div>
+                                    <div className="mt-1 text-sm font-semibold capitalize">
+                                        {value}
+                                    </div>
                                 </div>
                             ))}
                         </div>

@@ -35,9 +35,21 @@ export function ReportsPane({
 
     const maxSite = Math.max(1, ...report.by_site.map((s) => s.hours));
     const kpis = [
-        { label: 'Total hours', value: `${report.kpis.total_hours}h`, tone: '' },
-        { label: 'Overtime · >40h', value: `${report.kpis.overtime_hours}h`, tone: 'text-status-warning' },
-        { label: 'Break fails', value: `${report.kpis.break_fails}`, tone: report.kpis.break_fails > 0 ? 'text-status-warning' : '' },
+        {
+            label: 'Total hours',
+            value: `${report.kpis.total_hours}h`,
+            tone: '',
+        },
+        {
+            label: 'Overtime · >40h',
+            value: `${report.kpis.overtime_hours}h`,
+            tone: 'text-status-warning',
+        },
+        {
+            label: 'Break fails',
+            value: `${report.kpis.break_fails}`,
+            tone: report.kpis.break_fails > 0 ? 'text-status-warning' : '',
+        },
         { label: 'Mileage', value: `${report.kpis.mileage_km} km`, tone: '' },
     ];
 
@@ -45,7 +57,9 @@ export function ReportsPane({
         <div className="flex flex-col gap-[18px]">
             <div className="flex flex-wrap items-center gap-2.5">
                 <div>
-                    <h2 className="text-[16px] font-bold">Hours &amp; compliance · this week</h2>
+                    <h2 className="text-[16px] font-bold">
+                        Hours &amp; compliance · this week
+                    </h2>
                     <p className="mt-0.5 text-[12.5px] text-muted-foreground">
                         {report.week_start} – {report.week_end}
                     </p>
@@ -67,11 +81,16 @@ export function ReportsPane({
 
             <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
                 {kpis.map((k) => (
-                    <div key={k.label} className="rounded-2xl border border-border bg-card px-4 py-3.5">
-                        <div className="text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
+                    <div
+                        key={k.label}
+                        className="rounded-2xl border border-border bg-card px-4 py-3.5"
+                    >
+                        <div className="text-[11px] font-bold tracking-[0.05em] text-muted-foreground uppercase">
                             {k.label}
                         </div>
-                        <div className={`mt-1 text-[25px] font-bold tabular-nums ${k.tone}`}>
+                        <div
+                            className={`mt-1 text-[25px] font-bold tabular-nums ${k.tone}`}
+                        >
                             {k.value}
                         </div>
                     </div>
@@ -80,21 +99,31 @@ export function ReportsPane({
 
             <div className="grid gap-[18px] lg:grid-cols-2">
                 <section className="rounded-2xl border border-border bg-card px-[18px] py-4">
-                    <h3 className="mb-3.5 text-[14px] font-bold">Hours by site</h3>
+                    <h3 className="mb-3.5 text-[14px] font-bold">
+                        Hours by site
+                    </h3>
                     {report.by_site.length === 0 ? (
-                        <p className="text-[12.5px] text-muted-foreground">No hours recorded.</p>
+                        <p className="text-[12.5px] text-muted-foreground">
+                            No hours recorded.
+                        </p>
                     ) : (
                         <div className="flex flex-col gap-3">
                             {report.by_site.map((s) => (
                                 <div key={s.name}>
                                     <div className="mb-1 flex justify-between text-[12.5px]">
-                                        <span className="font-semibold">{s.name}</span>
-                                        <span className="tabular-nums text-muted-foreground">{s.hours}h</span>
+                                        <span className="font-semibold">
+                                            {s.name}
+                                        </span>
+                                        <span className="text-muted-foreground tabular-nums">
+                                            {s.hours}h
+                                        </span>
                                     </div>
                                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                                         <div
                                             className="h-full rounded-full bg-primary"
-                                            style={{ width: `${(s.hours / maxSite) * 100}%` }}
+                                            style={{
+                                                width: `${(s.hours / maxSite) * 100}%`,
+                                            }}
                                         />
                                     </div>
                                 </div>
@@ -105,10 +134,14 @@ export function ReportsPane({
 
                 <section className="overflow-hidden rounded-2xl border border-border bg-card">
                     <div className="border-b border-border px-[18px] py-3.5">
-                        <h3 className="text-[14px] font-bold">Hours by staff</h3>
+                        <h3 className="text-[14px] font-bold">
+                            Hours by staff
+                        </h3>
                     </div>
                     {report.by_staff.length === 0 ? (
-                        <p className="px-[18px] py-6 text-[12.5px] text-muted-foreground">No hours recorded.</p>
+                        <p className="px-[18px] py-6 text-[12.5px] text-muted-foreground">
+                            No hours recorded.
+                        </p>
                     ) : (
                         <div className="flex flex-col">
                             {report.by_staff.map((r) => (
@@ -123,16 +156,22 @@ export function ReportsPane({
                                         >
                                             {initials(r.name)}
                                         </span>
-                                        <span className="truncate text-[12.5px] font-semibold">{r.name}</span>
+                                        <span className="truncate text-[12.5px] font-semibold">
+                                            {r.name}
+                                        </span>
                                     </div>
-                                    <span className="text-[12.5px] font-bold tabular-nums">{r.hours}h</span>
+                                    <span className="text-[12.5px] font-bold tabular-nums">
+                                        {r.hours}h
+                                    </span>
                                     <span className="text-[12.5px] tabular-nums">
                                         {r.overtime > 0 ? (
                                             <span className="rounded-full border border-status-warning/30 bg-status-warning-bg px-2 py-0.5 text-[10.5px] font-semibold text-status-warning">
                                                 +{r.overtime}h OT
                                             </span>
                                         ) : (
-                                            <span className="text-muted-foreground">—</span>
+                                            <span className="text-muted-foreground">
+                                                —
+                                            </span>
                                         )}
                                     </span>
                                 </div>

@@ -214,6 +214,28 @@ final readonly class NativeMonitoringDefinitionService
         }, 3);
     }
 
+    /**
+     * Fail closed while supervised monitoring still owns active execution for
+     * a Device. Operators must retire those definitions through the existing
+     * monitor lifecycle so dependency checks and monitor history are retained.
+     */
+    public function assertDeviceCanBeDecommissioned(Device $device): void
+    {
+        $enabledMonitorIds = Monitor::query()
+            ->where('device_id', $device->id)
+            ->where('is_enabled', true)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id'])
+            ->pluck('id');
+
+        if ($enabledMonitorIds->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'device' => 'Deactivate this Device\'s enabled monitors before decommissioning it.',
+            ]);
+        }
+    }
+
     /** @param array<string, mixed> $data */
     public function createScope(User $actor, Site $site, array $data): DiscoveryScope
     {

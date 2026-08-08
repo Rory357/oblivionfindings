@@ -1,4 +1,21 @@
-import { Button } from '@/components/ui/button';
+import type { CompensationQuickAction } from '@/components/hr';
+import { CompensationHero, CompensationTabs } from '@/components/hr';
+import { StatusBadge, type StatusTone } from '@/components/hr/status-badge';
+import {
+    Field,
+    InfoCard,
+    ReviewCard,
+    ReviewRow,
+    Ring,
+    SelectInput,
+    StepHead,
+    SubHead,
+    WizardShell,
+    type WizardStep,
+    WizardStepPane,
+    useWizard,
+} from '@/components/hr/wizard';
+import { PageLayout } from '@/components/page';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -9,6 +26,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -18,7 +36,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Sheet,
@@ -34,24 +51,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { CompensationTabs, CompensationHero } from '@/components/hr';
-import type { CompensationQuickAction } from '@/components/hr';
-import { StatusBadge, type StatusTone } from '@/components/hr/status-badge';
-import {
-    Field,
-    InfoCard,
-    Ring,
-    SelectInput,
-    StepHead,
-    SubHead,
-    WizardShell,
-    WizardStepPane,
-    ReviewCard,
-    ReviewRow,
-    type WizardStep,
-    useWizard,
-} from '@/components/hr/wizard';
-import { PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, router } from '@inertiajs/react';
@@ -59,10 +58,10 @@ import {
     AlertTriangle,
     Banknote,
     CalendarRange,
+    CircleOff,
     ClipboardCheck,
     ClipboardList,
     Copy,
-    CircleOff,
     DollarSign,
     Download,
     Layers,
@@ -120,7 +119,10 @@ type Stats = {
 };
 
 type Props = {
-    bands: { data: SalaryBand[]; links: { url: string | null; label: string; active: boolean }[] };
+    bands: {
+        data: SalaryBand[];
+        links: { url: string | null; label: string; active: boolean }[];
+    };
     filters: { role: string | null; active_only: boolean; as_of: string };
     stats: Stats;
     can: { manage: boolean; benefits?: boolean; expenses?: boolean };
@@ -178,8 +180,10 @@ function bandLifecycle(band: SalaryBand): { status: string; tone: StatusTone } {
     const now = Date.now();
     const from = new Date(band.effective_from).getTime();
     const to = band.effective_to ? new Date(band.effective_to).getTime() : null;
-    if (!Number.isNaN(from) && from > now) return { status: 'scheduled', tone: 'info' };
-    if (to != null && !Number.isNaN(to) && to < now) return { status: 'expired', tone: 'neutral' };
+    if (!Number.isNaN(from) && from > now)
+        return { status: 'scheduled', tone: 'info' };
+    if (to != null && !Number.isNaN(to) && to < now)
+        return { status: 'expired', tone: 'neutral' };
     return { status: 'active', tone: 'success' };
 }
 
@@ -226,7 +230,9 @@ function RangeBar({
     const midValid = valid && !Number.isNaN(mid);
 
     const pct = (salary: number) =>
-        valid ? Math.min(100, Math.max(0, ((salary - min) / (max - min)) * 100)) : 0;
+        valid
+            ? Math.min(100, Math.max(0, ((salary - min) / (max - min)) * 100))
+            : 0;
 
     const midPct = midValid ? pct(mid) : 50;
     // Target zone = 90%–110% of the midpoint (Mercer compa-ratio convention).
@@ -242,7 +248,10 @@ function RangeBar({
                 {midValid ? (
                     <div
                         className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-primary/25"
-                        style={{ left: `${zoneStart}%`, width: `${Math.max(0, zoneEnd - zoneStart)}%` }}
+                        style={{
+                            left: `${zoneStart}%`,
+                            width: `${Math.max(0, zoneEnd - zoneStart)}%`,
+                        }}
                     />
                 ) : null}
                 {/* mid marker */}
@@ -260,7 +269,10 @@ function RangeBar({
                           const left = pct(salary);
                           const dotLabel = `${p.name}: ${compaLabel(p.compa_ratio)} compa-ratio, ${p.position} band`;
                           return (
-                              <TooltipProvider key={`${p.name}-${i}`} delayDuration={100}>
+                              <TooltipProvider
+                                  key={`${p.name}-${i}`}
+                                  delayDuration={100}
+                              >
                                   <Tooltip>
                                       <TooltipTrigger asChild>
                                           {/* eslint-disable-next-line no-restricted-syntax -- focusable plotted-employee marker; must be a native button for the tooltip trigger + keyboard access. */}
@@ -277,8 +289,11 @@ function RangeBar({
                                           />
                                       </TooltipTrigger>
                                       <TooltipContent>
-                                          <span className="font-medium">{p.name}</span> ·{' '}
-                                          {compaLabel(p.compa_ratio)} compa · {p.position}
+                                          <span className="font-medium">
+                                              {p.name}
+                                          </span>{' '}
+                                          · {compaLabel(p.compa_ratio)} compa ·{' '}
+                                          {p.position}
                                       </TooltipContent>
                                   </Tooltip>
                               </TooltipProvider>
@@ -287,10 +302,16 @@ function RangeBar({
                     : null}
             </div>
             {showLabels ? (
-                <div className="mt-1 flex justify-between text-[11px] tabular-nums text-muted-foreground">
-                    <span>{formatCurrency(band.min_salary, band.currency)}</span>
-                    <span className="font-medium text-primary">{formatCurrency(band.mid_salary, band.currency)}</span>
-                    <span>{formatCurrency(band.max_salary, band.currency)}</span>
+                <div className="mt-1 flex justify-between text-[11px] text-muted-foreground tabular-nums">
+                    <span>
+                        {formatCurrency(band.min_salary, band.currency)}
+                    </span>
+                    <span className="font-medium text-primary">
+                        {formatCurrency(band.mid_salary, band.currency)}
+                    </span>
+                    <span>
+                        {formatCurrency(band.max_salary, band.currency)}
+                    </span>
                 </div>
             ) : null}
         </div>
@@ -337,9 +358,14 @@ function BandRow({
                 </span>
                 <span className="min-w-0">
                     <span className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold">{band.position_role}</span>
+                        <span className="truncate text-sm font-semibold">
+                            {band.position_role}
+                        </span>
                         {life.status !== 'active' ? (
-                            <StatusBadge status={life.status} tone={life.tone} />
+                            <StatusBadge
+                                status={life.status}
+                                tone={life.tone}
+                            />
                         ) : null}
                     </span>
                     <span className="mt-0.5 block truncate text-xs text-muted-foreground">
@@ -353,28 +379,40 @@ function BandRow({
                             <StatusBadge
                                 status={outOfBand > 0 ? 'out' : 'in'}
                                 tone={outOfBand > 0 ? 'critical' : 'success'}
-                                label={outOfBand > 0 ? `${outOfBand} out of band` : 'all in band'}
+                                label={
+                                    outOfBand > 0
+                                        ? `${outOfBand} out of band`
+                                        : 'all in band'
+                                }
                             />
                         ) : null}
                     </span>
-                    <span className="mt-1 block text-[11px] tabular-nums text-muted-foreground">
+                    <span className="mt-1 block text-[11px] text-muted-foreground tabular-nums">
                         {formatCurrency(band.min_hourly, band.currency)}–
-                        {formatCurrency(band.max_hourly, band.currency)}/hr · eff.{' '}
-                        {formatDate(band.effective_from)}
+                        {formatCurrency(band.max_hourly, band.currency)}/hr ·
+                        eff. {formatDate(band.effective_from)}
                     </span>
                 </span>
             </button>
 
             {/* Range column */}
             <div className="min-w-0 flex-1">
-                <div className="mb-1 flex justify-between text-[11px] tabular-nums text-muted-foreground">
-                    <span>{formatCurrency(band.min_salary, band.currency)}</span>
+                <div className="mb-1 flex justify-between text-[11px] text-muted-foreground tabular-nums">
+                    <span>
+                        {formatCurrency(band.min_salary, band.currency)}
+                    </span>
                     <span className="font-medium text-foreground">
                         mid {formatCurrency(band.mid_salary, band.currency)}
                     </span>
-                    <span>{formatCurrency(band.max_salary, band.currency)}</span>
+                    <span>
+                        {formatCurrency(band.max_salary, band.currency)}
+                    </span>
                 </div>
-                <RangeBar band={band} placements={band.placements} showLabels={false} />
+                <RangeBar
+                    band={band}
+                    placements={band.placements}
+                    showLabels={false}
+                />
             </div>
 
             {/* Actions */}
@@ -406,11 +444,13 @@ function BandRow({
                             </DropdownMenuItem>
                             {band.is_active ? (
                                 <DropdownMenuItem onClick={onDeactivate}>
-                                    <CircleOff className="h-3.5 w-3.5" /> Deactivate band
+                                    <CircleOff className="h-3.5 w-3.5" />{' '}
+                                    Deactivate band
                                 </DropdownMenuItem>
                             ) : (
                                 <DropdownMenuItem onClick={onReactivate}>
-                                    <RotateCcw className="h-3.5 w-3.5" /> Reactivate band
+                                    <RotateCcw className="h-3.5 w-3.5" />{' '}
+                                    Reactivate band
                                 </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>
@@ -436,11 +476,18 @@ function PersonMiniBar({
     const min = num(band.min_salary);
     const mid = num(band.mid_salary);
     const max = num(band.max_salary);
-    if ([min, mid, max].some(Number.isNaN) || max <= min || placement.compa_ratio == null) {
+    if (
+        [min, mid, max].some(Number.isNaN) ||
+        max <= min ||
+        placement.compa_ratio == null
+    ) {
         return null;
     }
     const salary = placement.compa_ratio * mid;
-    const left = Math.min(100, Math.max(0, ((salary - min) / (max - min)) * 100));
+    const left = Math.min(
+        100,
+        Math.max(0, ((salary - min) / (max - min)) * 100),
+    );
     return (
         <div className="relative mt-1.5 h-1.5">
             <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted" />
@@ -478,16 +525,24 @@ function BandDrawer({
                         <SheetHeader className="border-b border-border">
                             <SheetTitle>{band.position_role}</SheetTitle>
                             <SheetDescription>
-                                {band.band_name} · {formatCurrency(band.min_salary, band.currency)}–
-                                {formatCurrency(band.max_salary, band.currency)} ·{' '}
-                                {formatCurrency(band.min_hourly, band.currency)}–
-                                {formatCurrency(band.max_hourly, band.currency)}/hr
+                                {band.band_name} ·{' '}
+                                {formatCurrency(band.min_salary, band.currency)}
+                                –
+                                {formatCurrency(band.max_salary, band.currency)}{' '}
+                                ·{' '}
+                                {formatCurrency(band.min_hourly, band.currency)}
+                                –
+                                {formatCurrency(band.max_hourly, band.currency)}
+                                /hr
                             </SheetDescription>
                         </SheetHeader>
 
                         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
                             <div className="rounded-xl border border-border bg-muted/30 p-4">
-                                <RangeBar band={band} placements={band.placements} />
+                                <RangeBar
+                                    band={band}
+                                    placements={band.placements}
+                                />
                             </div>
 
                             <div className="grid grid-cols-3 gap-2 text-center">
@@ -495,27 +550,35 @@ function BandDrawer({
                                     <div className="text-lg font-bold text-status-success tabular-nums">
                                         {band.in_band ?? 0}
                                     </div>
-                                    <div className="text-[11px] text-muted-foreground">In band</div>
+                                    <div className="text-[11px] text-muted-foreground">
+                                        In band
+                                    </div>
                                 </div>
                                 <div className="rounded-lg border border-border p-2">
                                     <div className="text-lg font-bold text-status-warning tabular-nums">
                                         {band.under_band ?? 0}
                                     </div>
-                                    <div className="text-[11px] text-muted-foreground">Under</div>
+                                    <div className="text-[11px] text-muted-foreground">
+                                        Under
+                                    </div>
                                 </div>
                                 <div className="rounded-lg border border-border p-2">
                                     <div className="text-lg font-bold tabular-nums">
                                         {compaLabel(band.avg_compa_ratio)}
                                     </div>
-                                    <div className="text-[11px] text-muted-foreground">Avg compa</div>
+                                    <div className="text-[11px] text-muted-foreground">
+                                        Avg compa
+                                    </div>
                                 </div>
                             </div>
 
                             <div>
-                                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    People in this band ({band.placements?.length ?? 0})
+                                <h4 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                    People in this band (
+                                    {band.placements?.length ?? 0})
                                 </h4>
-                                {band.placements && band.placements.length > 0 ? (
+                                {band.placements &&
+                                band.placements.length > 0 ? (
                                     <ul className="space-y-1.5">
                                         {band.placements.map((p, i) => (
                                             <li
@@ -531,8 +594,11 @@ function BandDrawer({
                                                             <span className="block truncate text-sm font-medium">
                                                                 {p.name}
                                                             </span>
-                                                            <span className="block text-[11px] tabular-nums text-muted-foreground">
-                                                                {compaLabel(p.compa_ratio)} compa
+                                                            <span className="block text-[11px] text-muted-foreground tabular-nums">
+                                                                {compaLabel(
+                                                                    p.compa_ratio,
+                                                                )}{' '}
+                                                                compa
                                                             </span>
                                                         </span>
                                                     </span>
@@ -541,20 +607,25 @@ function BandDrawer({
                                                         tone={
                                                             p.position === 'in'
                                                                 ? 'success'
-                                                                : p.position === 'under'
+                                                                : p.position ===
+                                                                    'under'
                                                                   ? 'warning'
                                                                   : 'critical'
                                                         }
                                                         label={
                                                             p.position === 'in'
                                                                 ? 'In band'
-                                                                : p.position === 'under'
+                                                                : p.position ===
+                                                                    'under'
                                                                   ? 'Under'
                                                                   : 'Over'
                                                         }
                                                     />
                                                 </div>
-                                                <PersonMiniBar band={band} placement={p} />
+                                                <PersonMiniBar
+                                                    band={band}
+                                                    placement={p}
+                                                />
                                             </li>
                                         ))}
                                     </ul>
@@ -577,7 +648,11 @@ function BandDrawer({
                                     <Copy className="mr-1.5 h-3.5 w-3.5" />
                                     Duplicate
                                 </Button>
-                                <Button type="button" size="sm" onClick={() => onEdit(band)}>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => onEdit(band)}
+                                >
                                     <Pencil className="mr-1.5 h-3.5 w-3.5" />
                                     Edit band
                                 </Button>
@@ -622,9 +697,24 @@ const emptyForm: BandForm = {
 
 const WIZARD_STEPS: readonly WizardStep[] = [
     { key: 'role', label: 'Role & band', blurb: 'Who it covers', icon: Tag },
-    { key: 'ranges', label: 'Pay ranges', blurb: 'Min · mid · max', icon: DollarSign },
-    { key: 'dates', label: 'Effective dating', blurb: 'When it applies', icon: CalendarRange },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ClipboardList },
+    {
+        key: 'ranges',
+        label: 'Pay ranges',
+        blurb: 'Min · mid · max',
+        icon: DollarSign,
+    },
+    {
+        key: 'dates',
+        label: 'Effective dating',
+        blurb: 'When it applies',
+        icon: CalendarRange,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: ClipboardList,
+    },
 ];
 
 const CURRENCY_OPTIONS = [
@@ -687,17 +777,26 @@ function BandWizard({
     }, [existingBands, form.position_role, minS, maxS, editId]);
 
     const datesError = useMemo(() => {
-        if (form.effective_to && form.effective_from && form.effective_to <= form.effective_from)
+        if (
+            form.effective_to &&
+            form.effective_from &&
+            form.effective_to <= form.effective_from
+        )
             return 'Effective-to must be after effective-from.';
         return null;
     }, [form.effective_from, form.effective_to]);
 
     const stepValid = (i: number) => {
-        if (i === 0) return form.position_role.trim() !== '' && form.band_name.trim() !== '';
+        if (i === 0)
+            return (
+                form.position_role.trim() !== '' && form.band_name.trim() !== ''
+            );
         if (i === 1)
             return (
                 !rangeError &&
-                [minS, midS, maxS, minH, maxH].every((v) => !Number.isNaN(v) && v >= 0)
+                [minS, midS, maxS, minH, maxH].every(
+                    (v) => !Number.isNaN(v) && v >= 0,
+                )
             );
         if (i === 2) return form.effective_from !== '' && !datesError;
         return true;
@@ -711,11 +810,16 @@ function BandWizard({
         const checks = [
             form.position_role.trim() !== '',
             form.band_name.trim() !== '',
-            !Number.isNaN(minS) && !Number.isNaN(midS) && !Number.isNaN(maxS) && !rangeError,
+            !Number.isNaN(minS) &&
+                !Number.isNaN(midS) &&
+                !Number.isNaN(maxS) &&
+                !rangeError,
             !Number.isNaN(minH) && !Number.isNaN(maxH) && !rangeError,
             form.effective_from !== '' && !datesError,
         ];
-        return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+        return Math.round(
+            (checks.filter(Boolean).length / checks.length) * 100,
+        );
     }, [form, minS, midS, maxS, minH, maxH, rangeError, datesError]);
 
     const submit = (e?: FormEvent) => {
@@ -726,20 +830,26 @@ function BandWizard({
         const opts = {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success(editId ? 'Salary band updated.' : 'Salary band created.');
+                toast.success(
+                    editId ? 'Salary band updated.' : 'Salary band created.',
+                );
                 onClose();
             },
-            onError: () => toast.error('Could not save the band. Check the highlighted fields.'),
+            onError: () =>
+                toast.error(
+                    'Could not save the band. Check the highlighted fields.',
+                ),
             onFinish: () => setSaving(false),
         };
-        if (editId) router.put(`/hr/compensation/bands/${editId}`, payload, opts);
+        if (editId)
+            router.put(`/hr/compensation/bands/${editId}`, payload, opts);
         else router.post('/hr/compensation/bands', payload, opts);
     };
 
     const railExtra = (
         // eslint-disable-next-line no-restricted-syntax -- compact rail preview panel, custom wizard-rail surface.
         <div className="rounded-lg border border-border bg-card/60 p-3">
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                 Live preview
             </div>
             {[minS, midS, maxS].every((v) => !Number.isNaN(v)) ? (
@@ -753,7 +863,9 @@ function BandWizard({
                     showDots={false}
                 />
             ) : (
-                <p className="text-[11px] text-muted-foreground">Enter min/mid/max to preview the range.</p>
+                <p className="text-[11px] text-muted-foreground">
+                    Enter min/mid/max to preview the range.
+                </p>
             )}
         </div>
     );
@@ -772,7 +884,9 @@ function BandWizard({
             onStepClick={(i) => {
                 // Going back is always allowed; jumping forward requires every
                 // intervening step to be valid (no skipping to an invalid Review).
-                const forwardOk = Array.from({ length: i }, (_, s) => stepValid(s)).every(Boolean);
+                const forwardOk = Array.from({ length: i }, (_, s) =>
+                    stepValid(s),
+                ).every(Boolean);
                 if (i <= wiz.index || forwardOk) wiz.goTo(i);
             }}
             pct={completeness}
@@ -785,7 +899,11 @@ function BandWizard({
             footerEnd={
                 <>
                     {!wiz.isFirst ? (
-                        <Button type="button" variant="outline" onClick={wiz.back}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={wiz.back}
+                        >
                             Back
                         </Button>
                     ) : null}
@@ -798,8 +916,16 @@ function BandWizard({
                             Continue
                         </Button>
                     ) : (
-                        <Button type="button" onClick={() => submit()} disabled={saving || !formValid}>
-                            {saving ? 'Saving…' : editId ? 'Update band' : 'Create band'}
+                        <Button
+                            type="button"
+                            onClick={() => submit()}
+                            disabled={saving || !formValid}
+                        >
+                            {saving
+                                ? 'Saving…'
+                                : editId
+                                  ? 'Update band'
+                                  : 'Create band'}
                         </Button>
                     )}
                 </>
@@ -817,14 +943,22 @@ function BandWizard({
                         <Field label="Position role" required>
                             <Input
                                 value={form.position_role}
-                                onChange={(e) => set('position_role', e.target.value)}
+                                onChange={(e) =>
+                                    set('position_role', e.target.value)
+                                }
                                 placeholder="Support Worker"
                             />
                         </Field>
-                        <Field label="Band name" required hint="e.g. tier or level">
+                        <Field
+                            label="Band name"
+                            required
+                            hint="e.g. tier or level"
+                        >
                             <Input
                                 value={form.band_name}
-                                onChange={(e) => set('band_name', e.target.value)}
+                                onChange={(e) =>
+                                    set('band_name', e.target.value)
+                                }
                                 placeholder="Band B"
                             />
                         </Field>
@@ -857,7 +991,9 @@ function BandWizard({
                                 step="0.01"
                                 min="0"
                                 value={form.min_salary}
-                                onChange={(e) => set('min_salary', e.target.value)}
+                                onChange={(e) =>
+                                    set('min_salary', e.target.value)
+                                }
                             />
                         </Field>
                         <Field label="Midpoint" required>
@@ -866,7 +1002,9 @@ function BandWizard({
                                 step="0.01"
                                 min="0"
                                 value={form.mid_salary}
-                                onChange={(e) => set('mid_salary', e.target.value)}
+                                onChange={(e) =>
+                                    set('mid_salary', e.target.value)
+                                }
                             />
                         </Field>
                         <Field label="Maximum" required>
@@ -875,7 +1013,9 @@ function BandWizard({
                                 step="0.01"
                                 min="0"
                                 value={form.max_salary}
-                                onChange={(e) => set('max_salary', e.target.value)}
+                                onChange={(e) =>
+                                    set('max_salary', e.target.value)
+                                }
                             />
                         </Field>
                         <SubHead icon={DollarSign}>Hourly equivalent</SubHead>
@@ -884,12 +1024,19 @@ function BandWizard({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                disabled={Number.isNaN(minS) || Number.isNaN(maxS)}
+                                disabled={
+                                    Number.isNaN(minS) || Number.isNaN(maxS)
+                                }
                                 onClick={() => {
                                     // Standard NZ full-time year: 40h/week × 52 = 2080h.
-                                    const round2 = (n: number) => (Math.round((n / 2080) * 100) / 100).toString();
-                                    if (!Number.isNaN(minS)) set('min_hourly', round2(minS));
-                                    if (!Number.isNaN(maxS)) set('max_hourly', round2(maxS));
+                                    const round2 = (n: number) =>
+                                        (
+                                            Math.round((n / 2080) * 100) / 100
+                                        ).toString();
+                                    if (!Number.isNaN(minS))
+                                        set('min_hourly', round2(minS));
+                                    if (!Number.isNaN(maxS))
+                                        set('max_hourly', round2(maxS));
                                 }}
                             >
                                 Derive from salary (÷2080h)
@@ -901,7 +1048,9 @@ function BandWizard({
                                 step="0.01"
                                 min="0"
                                 value={form.min_hourly}
-                                onChange={(e) => set('min_hourly', e.target.value)}
+                                onChange={(e) =>
+                                    set('min_hourly', e.target.value)
+                                }
                             />
                         </Field>
                         <Field label="Max hourly" required>
@@ -910,7 +1059,9 @@ function BandWizard({
                                 step="0.01"
                                 min="0"
                                 value={form.max_hourly}
-                                onChange={(e) => set('max_hourly', e.target.value)}
+                                onChange={(e) =>
+                                    set('max_hourly', e.target.value)
+                                }
                             />
                         </Field>
                         <div className="hidden sm:block" />
@@ -923,8 +1074,17 @@ function BandWizard({
                         {!rangeError && overlap ? (
                             <InfoCard icon={AlertTriangle} tone="warn">
                                 This range overlaps the existing band{' '}
-                                <strong>{overlap.band_name}</strong> ({formatCurrency(overlap.min_salary, overlap.currency)}–
-                                {formatCurrency(overlap.max_salary, overlap.currency)}) for this role.
+                                <strong>{overlap.band_name}</strong> (
+                                {formatCurrency(
+                                    overlap.min_salary,
+                                    overlap.currency,
+                                )}
+                                –
+                                {formatCurrency(
+                                    overlap.max_salary,
+                                    overlap.currency,
+                                )}
+                                ) for this role.
                             </InfoCard>
                         ) : null}
                     </div>
@@ -944,14 +1104,22 @@ function BandWizard({
                             <Input
                                 type="date"
                                 value={form.effective_from}
-                                onChange={(e) => set('effective_from', e.target.value)}
+                                onChange={(e) =>
+                                    set('effective_from', e.target.value)
+                                }
                             />
                         </Field>
-                        <Field label="Effective to" hint="optional" error={datesError ?? undefined}>
+                        <Field
+                            label="Effective to"
+                            hint="optional"
+                            error={datesError ?? undefined}
+                        >
                             <Input
                                 type="date"
                                 value={form.effective_to}
-                                onChange={(e) => set('effective_to', e.target.value)}
+                                onChange={(e) =>
+                                    set('effective_to', e.target.value)
+                                }
                             />
                         </Field>
                     </div>
@@ -965,28 +1133,63 @@ function BandWizard({
                     <div className="mb-5 flex items-center gap-4 rounded-xl border border-border bg-muted/30 p-4">
                         <Ring pct={completeness} />
                         <div>
-                            <h2 className="text-lg font-bold">Review the band</h2>
+                            <h2 className="text-lg font-bold">
+                                Review the band
+                            </h2>
                             <p className="text-sm text-muted-foreground">
-                                Confirm the details below, then {editId ? 'update' : 'create'} the band.
+                                Confirm the details below, then{' '}
+                                {editId ? 'update' : 'create'} the band.
                             </p>
                         </div>
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={Tag} title="Role & band" onEdit={() => wiz.goTo(0)}>
-                            <ReviewRow label="Position role" value={form.position_role} />
-                            <ReviewRow label="Band name" value={form.band_name} />
+                        <ReviewCard
+                            icon={Tag}
+                            title="Role & band"
+                            onEdit={() => wiz.goTo(0)}
+                        >
+                            <ReviewRow
+                                label="Position role"
+                                value={form.position_role}
+                            />
+                            <ReviewRow
+                                label="Band name"
+                                value={form.band_name}
+                            />
                             <ReviewRow label="Currency" value={form.currency} />
                         </ReviewCard>
-                        <ReviewCard icon={CalendarRange} title="Effective dating" onEdit={() => wiz.goTo(2)}>
-                            <ReviewRow label="From" value={formatDate(form.effective_from)} />
+                        <ReviewCard
+                            icon={CalendarRange}
+                            title="Effective dating"
+                            onEdit={() => wiz.goTo(2)}
+                        >
+                            <ReviewRow
+                                label="From"
+                                value={formatDate(form.effective_from)}
+                            />
                             <ReviewRow
                                 label="To"
-                                value={form.effective_to ? formatDate(form.effective_to) : 'Open-ended'}
+                                value={
+                                    form.effective_to
+                                        ? formatDate(form.effective_to)
+                                        : 'Open-ended'
+                                }
                             />
                         </ReviewCard>
-                        <ReviewCard icon={DollarSign} title="Pay ranges" onEdit={() => wiz.goTo(1)} span>
-                            <ReviewRow label="Salary" value={`${formatCurrency(form.min_salary, form.currency)} · ${formatCurrency(form.mid_salary, form.currency)} · ${formatCurrency(form.max_salary, form.currency)}`} />
-                            <ReviewRow label="Hourly" value={`${formatCurrency(form.min_hourly, form.currency)} – ${formatCurrency(form.max_hourly, form.currency)}`} />
+                        <ReviewCard
+                            icon={DollarSign}
+                            title="Pay ranges"
+                            onEdit={() => wiz.goTo(1)}
+                            span
+                        >
+                            <ReviewRow
+                                label="Salary"
+                                value={`${formatCurrency(form.min_salary, form.currency)} · ${formatCurrency(form.mid_salary, form.currency)} · ${formatCurrency(form.max_salary, form.currency)}`}
+                            />
+                            <ReviewRow
+                                label="Hourly"
+                                value={`${formatCurrency(form.min_hourly, form.currency)} – ${formatCurrency(form.max_hourly, form.currency)}`}
+                            />
                             <div className="pt-3">
                                 <RangeBar
                                     band={{
@@ -1001,7 +1204,9 @@ function BandWizard({
                         </ReviewCard>
                         {overlap ? (
                             <InfoCard icon={AlertTriangle} tone="warn">
-                                Heads up — this range overlaps <strong>{overlap.band_name}</strong> for the same role.
+                                Heads up — this range overlaps{' '}
+                                <strong>{overlap.band_name}</strong> for the
+                                same role.
                             </InfoCard>
                         ) : null}
                     </div>
@@ -1043,7 +1248,8 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
         min_hourly: band.min_hourly,
         max_hourly: band.max_hourly,
         currency: band.currency,
-        effective_from: band.effective_from?.slice(0, 10) ?? emptyForm.effective_from,
+        effective_from:
+            band.effective_from?.slice(0, 10) ?? emptyForm.effective_from,
         effective_to: band.effective_to?.slice(0, 10) ?? '',
     });
 
@@ -1073,13 +1279,21 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
     const confirmLifecycleChange = () => {
         if (!lifecycleTarget) return;
         const { band, action } = lifecycleTarget;
-        router.post(`/hr/compensation/bands/${band.id}/${action}`, {}, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success(action === 'deactivate' ? 'Salary band deactivated' : 'Salary band reactivated');
-                setLifecycleTarget(null);
+        router.post(
+            `/hr/compensation/bands/${band.id}/${action}`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(
+                        action === 'deactivate'
+                            ? 'Salary band deactivated'
+                            : 'Salary band reactivated',
+                    );
+                    setLifecycleTarget(null);
+                },
             },
-        });
+        );
     };
 
     const exportUrl = useMemo(() => {
@@ -1097,13 +1311,35 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
     }, [roleQuery, filters.role, filters.active_only, filters.as_of]);
 
     const heroActions: CompensationQuickAction[] = [
-        ...(can.manage ? [{ label: 'New band', icon: Plus, onClick: openCreate }] : []),
         ...(can.manage
-            ? [{ label: 'Start pay review', icon: ClipboardCheck, href: '/hr/compensation/reviews' }]
+            ? [{ label: 'New band', icon: Plus, onClick: openCreate }]
             : []),
-        ...(can.manage ? [{ label: 'Record bonus', icon: Banknote, href: '/hr/compensation/bonuses' }] : []),
+        ...(can.manage
+            ? [
+                  {
+                      label: 'Start pay review',
+                      icon: ClipboardCheck,
+                      href: '/hr/compensation/reviews',
+                  },
+              ]
+            : []),
+        ...(can.manage
+            ? [
+                  {
+                      label: 'Record bonus',
+                      icon: Banknote,
+                      href: '/hr/compensation/bonuses',
+                  },
+              ]
+            : []),
         ...(can.expenses
-            ? [{ label: 'New claim', icon: Receipt, href: '/hr/compensation/expenses/create' }]
+            ? [
+                  {
+                      label: 'New claim',
+                      icon: Receipt,
+                      href: '/hr/compensation/expenses/create',
+                  },
+              ]
             : []),
         { label: 'Export', icon: Download, href: exportUrl },
     ];
@@ -1113,7 +1349,12 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
             <Head title="Compensation & Benefits" />
 
             <PageLayout
-                hero={<CompensationHero stats={stats} quickActions={heroActions} />}
+                hero={
+                    <CompensationHero
+                        stats={stats}
+                        quickActions={heroActions}
+                    />
+                }
             >
                 <CompensationTabs active="bands" />
 
@@ -1121,35 +1362,41 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
                         <div className="relative w-full sm:max-w-xs">
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 value={roleQuery}
                                 onChange={(e) => setRoleQuery(e.target.value)}
                                 onKeyDown={(e) => {
-                                    if (e.key === 'Enter') onFilter({ role: roleQuery || null });
+                                    if (e.key === 'Enter')
+                                        onFilter({ role: roleQuery || null });
                                 }}
                                 onBlur={() => {
-                                    if ((filters.role ?? '') !== roleQuery) onFilter({ role: roleQuery || null });
+                                    if ((filters.role ?? '') !== roleQuery)
+                                        onFilter({ role: roleQuery || null });
                                 }}
                                 placeholder="Filter by role…"
                                 className="pl-8"
                                 aria-label="Filter by position role"
                             />
                         </div>
-                        <label className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
+                        <label className="flex items-center gap-2 text-sm whitespace-nowrap text-muted-foreground">
                             <Switch
                                 checked={filters.active_only}
-                                onCheckedChange={(checked) => onFilter({ active_only: checked })}
+                                onCheckedChange={(checked) =>
+                                    onFilter({ active_only: checked })
+                                }
                                 aria-label="Active bands only"
                             />
                             Active bands only
                         </label>
-                        <label className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
+                        <label className="flex items-center gap-2 text-sm whitespace-nowrap text-muted-foreground">
                             As of
                             <Input
                                 type="date"
                                 value={filters.as_of ?? ''}
-                                onChange={(e) => onFilter({ as_of: e.target.value })}
+                                onChange={(e) =>
+                                    onFilter({ as_of: e.target.value })
+                                }
                                 className="h-9 w-auto"
                                 aria-label="Bands active as of date"
                             />
@@ -1174,16 +1421,20 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
                 {/* Legend */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-primary" /> In band
+                        <span className="h-2.5 w-2.5 rounded-full bg-primary" />{' '}
+                        In band
                     </span>
                     <span className="inline-flex items-center gap-2">
-                        <span className="h-2 w-2 rotate-45 rounded-[2px] bg-status-critical" /> Under / over band
+                        <span className="h-2 w-2 rotate-45 rounded-[2px] bg-status-critical" />{' '}
+                        Under / over band
                     </span>
                     <span className="inline-flex items-center gap-1.5">
-                        <span className="h-3 w-0.5 rounded bg-primary" /> Midpoint (compa-ratio 1.0)
+                        <span className="h-3 w-0.5 rounded bg-primary" />{' '}
+                        Midpoint (compa-ratio 1.0)
                     </span>
                     <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2.5 w-6 rounded-full bg-primary/25" /> Target zone (0.9–1.1)
+                        <span className="h-2.5 w-6 rounded-full bg-primary/25" />{' '}
+                        Target zone (0.9–1.1)
                     </span>
                 </div>
 
@@ -1198,22 +1449,37 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
                                 onView={() => setDrawerBand(band)}
                                 onEdit={() => openEdit(band)}
                                 onDuplicate={() => openDuplicate(band)}
-                                onDeactivate={() => setLifecycleTarget({ band, action: 'deactivate' })}
-                                onReactivate={() => setLifecycleTarget({ band, action: 'reactivate' })}
+                                onDeactivate={() =>
+                                    setLifecycleTarget({
+                                        band,
+                                        action: 'deactivate',
+                                    })
+                                }
+                                onReactivate={() =>
+                                    setLifecycleTarget({
+                                        band,
+                                        action: 'reactivate',
+                                    })
+                                }
                             />
                         ))}
                     </div>
                 ) : (
                     <EmptyState
                         icon={Layers}
-                        heading={filters.role || filters.active_only ? 'No bands match your filters' : 'No salary bands yet'}
+                        heading={
+                            filters.role || filters.active_only
+                                ? 'No bands match your filters'
+                                : 'No salary bands yet'
+                        }
                         description={
                             filters.role || filters.active_only
                                 ? 'Try clearing the role filter or the active-only toggle.'
                                 : 'Create your first salary band to start placing people by compa-ratio.'
                         }
                         action={
-                            can.manage && !(filters.role || filters.active_only) ? (
+                            can.manage &&
+                            !(filters.role || filters.active_only) ? (
                                 <Button size="sm" onClick={openCreate}>
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     New band
@@ -1223,7 +1489,9 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
                     />
                 )}
 
-                {bands?.links?.length ? <LaravelPagination links={bands.links} /> : null}
+                {bands?.links?.length ? (
+                    <LaravelPagination links={bands.links} />
+                ) : null}
             </PageLayout>
 
             <BandDrawer
@@ -1259,7 +1527,9 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            {lifecycleTarget?.action === 'reactivate' ? 'Reactivate band?' : 'Deactivate band?'}
+                            {lifecycleTarget?.action === 'reactivate'
+                                ? 'Reactivate band?'
+                                : 'Deactivate band?'}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             {lifecycleTarget?.action === 'reactivate'
@@ -1270,7 +1540,9 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={confirmLifecycleChange}>
-                            {lifecycleTarget?.action === 'reactivate' ? 'Reactivate band' : 'Deactivate band'}
+                            {lifecycleTarget?.action === 'reactivate'
+                                ? 'Reactivate band'
+                                : 'Deactivate band'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

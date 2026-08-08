@@ -1,4 +1,13 @@
+import {
+    CompensationHero,
+    CompensationTabs,
+    type CompensationHeroStats,
+    type CompensationQuickAction,
+} from '@/components/hr';
+import { StatusBadge, type StatusTone } from '@/components/hr/status-badge';
+import { PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Table,
@@ -8,15 +17,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { EmptyState } from '@/components/ui/empty-state';
-import {
-    CompensationHero,
-    CompensationTabs,
-    type CompensationHeroStats,
-    type CompensationQuickAction,
-} from '@/components/hr';
-import { StatusBadge, type StatusTone } from '@/components/hr/status-badge';
-import { PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { Download, History as HistoryIcon, Plus } from 'lucide-react';
@@ -35,7 +35,10 @@ type Change = {
 };
 
 type Props = {
-    history: { data: Change[]; links: { url: string | null; label: string; active: boolean }[] };
+    history: {
+        data: Change[];
+        links: { url: string | null; label: string; active: boolean }[];
+    };
     filters: { change_type: string | null };
     stats: CompensationHeroStats;
     can: { manage: boolean };
@@ -65,7 +68,11 @@ const formatDate = (value?: string | null) => {
     const d = new Date(value);
     return Number.isNaN(d.getTime())
         ? value
-        : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+        : d.toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
 const money = (value: string | null) => {
@@ -84,7 +91,14 @@ export default function CompensationHistoryIndex({ history, stats }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Compensation & Benefits" />
 
-            <PageLayout hero={<CompensationHero stats={stats} quickActions={heroActions} />}>
+            <PageLayout
+                hero={
+                    <CompensationHero
+                        stats={stats}
+                        quickActions={heroActions}
+                    />
+                }
+            >
                 <CompensationTabs active="history" />
 
                 <Card>
@@ -106,17 +120,26 @@ export default function CompensationHistoryIndex({ history, stats }: Props) {
                                     {history.data.map((c) => (
                                         <TableRow key={c.id}>
                                             <TableCell className="font-medium">
-                                                {c.employee_profile?.user?.name ?? 'Unknown'}
+                                                {c.employee_profile?.user
+                                                    ?.name ?? 'Unknown'}
                                             </TableCell>
                                             <TableCell>
                                                 <StatusBadge
                                                     status={c.change_type}
-                                                    tone={CHANGE_TONE[c.change_type] ?? 'neutral'}
+                                                    tone={
+                                                        CHANGE_TONE[
+                                                            c.change_type
+                                                        ] ?? 'neutral'
+                                                    }
                                                 />
                                             </TableCell>
-                                            <TableCell className="text-sm">{formatDate(c.effective_date)}</TableCell>
-                                            <TableCell className="text-sm tabular-nums text-muted-foreground">
-                                                {money(c.previous_annual_salary)}
+                                            <TableCell className="text-sm">
+                                                {formatDate(c.effective_date)}
+                                            </TableCell>
+                                            <TableCell className="text-sm text-muted-foreground tabular-nums">
+                                                {money(
+                                                    c.previous_annual_salary,
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-sm font-medium tabular-nums">
                                                 {money(c.new_annual_salary)}
@@ -143,7 +166,9 @@ export default function CompensationHistoryIndex({ history, stats }: Props) {
                     </CardContent>
                 </Card>
 
-                {history?.links?.length ? <LaravelPagination links={history.links} /> : null}
+                {history?.links?.length ? (
+                    <LaravelPagination links={history.links} />
+                ) : null}
             </PageLayout>
         </AppLayout>
     );

@@ -37,8 +37,24 @@ const baseItem: StockRow = {
     is_expiring_soon: false,
     is_expiring_90: false,
     movements: [
-        { id: 1, at: '2026-06-10T09:00:00+12:00', actor: 'Nurse Joy', type: 'received', summary: 'Stock received', delta: 30, unit: 'tablets' },
-        { id: 2, at: '2026-06-11T09:00:00+12:00', actor: 'Nurse Joy', type: 'adjusted', summary: 'Damaged blister', delta: -2, unit: 'tablets' },
+        {
+            id: 1,
+            at: '2026-06-10T09:00:00+12:00',
+            actor: 'Nurse Joy',
+            type: 'received',
+            summary: 'Stock received',
+            delta: 30,
+            unit: 'tablets',
+        },
+        {
+            id: 2,
+            at: '2026-06-11T09:00:00+12:00',
+            actor: 'Nurse Joy',
+            type: 'adjusted',
+            summary: 'Damaged blister',
+            delta: -2,
+            unit: 'tablets',
+        },
     ],
 };
 
@@ -55,7 +71,13 @@ describe('StockDetailDialog', () => {
         render(
             <StockDetailDialog
                 item={baseItem}
-                openOrder={{ status: 'submitted', pharmacy_name: 'PharmCo', order_type: 'routine', quantity_ordered: 30, ordered_at: '2026-06-09' }}
+                openOrder={{
+                    status: 'submitted',
+                    pharmacy_name: 'PharmCo',
+                    order_type: 'routine',
+                    quantity_ordered: 30,
+                    ordered_at: '2026-06-09',
+                }}
                 onClose={() => {}}
                 onAdjust={onAdjust}
                 onCount={onCount}
@@ -75,13 +97,29 @@ describe('StockDetailDialog', () => {
     });
 
     it('jumps to the client profile MAR tab from the footer', () => {
-        render(<StockDetailDialog item={baseItem} onClose={() => {}} onAdjust={() => {}} onCount={() => {}} onOrder={() => {}} />);
+        render(
+            <StockDetailDialog
+                item={baseItem}
+                onClose={() => {}}
+                onAdjust={() => {}}
+                onCount={() => {}}
+                onOrder={() => {}}
+            />,
+        );
         fireEvent.click(screen.getByRole('button', { name: /^Client$/i }));
         expect(visit).toHaveBeenCalledWith('/operations/clients/7?tab=mar');
     });
 
     it('shows the movement history on the activity tab', () => {
-        render(<StockDetailDialog item={baseItem} onClose={() => {}} onAdjust={() => {}} onCount={() => {}} onOrder={() => {}} />);
+        render(
+            <StockDetailDialog
+                item={baseItem}
+                onClose={() => {}}
+                onAdjust={() => {}}
+                onCount={() => {}}
+                onOrder={() => {}}
+            />,
+        );
         fireEvent.click(screen.getByText('Activity'));
         expect(screen.getByText('Damaged blister')).toBeTruthy();
         expect(screen.getByText(/\+30/)).toBeTruthy();

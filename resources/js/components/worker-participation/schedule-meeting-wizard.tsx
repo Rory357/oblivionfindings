@@ -151,10 +151,7 @@ function initialState(): WizardState {
 /*  Validation (mirrors Store{Committee,Meeting}Request)               */
 /* ------------------------------------------------------------------ */
 
-function validateStep(
-    key: StepKey,
-    d: WizardState,
-): Record<string, string> {
+function validateStep(key: StepKey, d: WizardState): Record<string, string> {
     const e: Record<string, string> = {};
     if (key === 'committee') {
         if (d.mode === 'existing') {
@@ -162,7 +159,8 @@ function validateStep(
         } else {
             if (!d.new_name.trim()) e.new_name = 'Committee name is required';
             if (!d.new_site_id) e.new_site_id = 'Choose a site';
-            if (!d.new_frequency) e.new_frequency = 'Choose a meeting frequency';
+            if (!d.new_frequency)
+                e.new_frequency = 'Choose a meeting frequency';
             if (!d.new_established_at)
                 e.new_established_at = 'Established date is required';
             if (d.new_member_ids.length < 1)
@@ -170,7 +168,8 @@ function validateStep(
         }
     }
     if (key === 'schedule') {
-        if (!d.scheduled_at) e.scheduled_at = 'A meeting date & time is required';
+        if (!d.scheduled_at)
+            e.scheduled_at = 'A meeting date & time is required';
     }
     return e;
 }
@@ -222,7 +221,13 @@ function idsToNames(ids: number[], staff: Option[]): string[] {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose }: Props) {
+export function ScheduleMeetingWizard({
+    open,
+    committees,
+    sites,
+    staff,
+    onClose,
+}: Props) {
     const [data, setData] = useState<WizardState>(initialState);
     const [stepIndex, setStepIndex] = useState(0);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -239,7 +244,8 @@ export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose 
 
     const selectedCommittee =
         data.mode === 'existing'
-            ? committees.find((c) => String(c.id) === data.committee_id) ?? null
+            ? (committees.find((c) => String(c.id) === data.committee_id) ??
+              null)
             : null;
 
     // Default the attendee list to the chosen committee's members the first time
@@ -257,9 +263,15 @@ export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose 
         setStepIndex((i) => {
             const ni = Math.min(i + 1, lastIndex);
             // Seed attendees from committee members when first reaching Attendees.
-            if (STEPS[ni].key === 'attendees' && data.attendee_ids.length === 0) {
+            if (
+                STEPS[ni].key === 'attendees' &&
+                data.attendee_ids.length === 0
+            ) {
                 if (data.mode === 'new' && data.new_member_ids.length) {
-                    setData((prev) => ({ ...prev, attendee_ids: prev.new_member_ids }));
+                    setData((prev) => ({
+                        ...prev,
+                        attendee_ids: prev.new_member_ids,
+                    }));
                 }
             }
             return ni;
@@ -288,7 +300,9 @@ export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose 
             data.agenda_items.length > 0,
             data.attendee_ids.length > 0,
         ];
-        return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+        return Math.round(
+            (checks.filter(Boolean).length / checks.length) * 100,
+        );
     }, [data]);
 
     /** POST the meeting against a known committee id. */
@@ -307,7 +321,8 @@ export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose 
                 preserveScroll: true,
                 preserveState: true,
                 onSuccess: (pg) => {
-                    const flash = (pg.props as { flash?: { error?: string } }).flash;
+                    const flash = (pg.props as { flash?: { error?: string } })
+                        .flash;
                     if (!flash?.error) setDone(true);
                     setProcessing(false);
                 },
@@ -353,14 +368,17 @@ export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose 
                 schedule_meeting: true,
                 scheduled_at: data.scheduled_at,
                 location: data.location || null,
-                agenda_items: data.agenda_items.map((a) => a.trim()).filter(Boolean),
+                agenda_items: data.agenda_items
+                    .map((a) => a.trim())
+                    .filter(Boolean),
                 attendees: data.attendee_ids,
             },
             {
                 preserveScroll: true,
                 preserveState: true,
                 onSuccess: (pg) => {
-                    const flash = (pg.props as { flash?: { error?: string } }).flash;
+                    const flash = (pg.props as { flash?: { error?: string } })
+                        .flash;
                     if (!flash?.error) setDone(true);
                     setProcessing(false);
                 },
@@ -381,9 +399,9 @@ export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose 
             blurb={
                 <>
                     The committee meeting is on the register as{' '}
-                    <span className="font-semibold">Scheduled</span>. Add minutes
-                    and action items once it has taken place, or upload the signed
-                    minutes from the meeting&rsquo;s detail view.
+                    <span className="font-semibold">Scheduled</span>. Add
+                    minutes and action items once it has taken place, or upload
+                    the signed minutes from the meeting&rsquo;s detail view.
                 </>
             }
             actions={
@@ -413,11 +431,13 @@ export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose 
                 <Button onClick={submit} disabled={processing}>
                     {processing ? (
                         <>
-                            <Loader2 className="h-4 w-4 animate-spin" /> Scheduling…
+                            <Loader2 className="h-4 w-4 animate-spin" />{' '}
+                            Scheduling…
                         </>
                     ) : (
                         <>
-                            <CalendarPlus className="h-4 w-4" /> Schedule meeting
+                            <CalendarPlus className="h-4 w-4" /> Schedule
+                            meeting
                         </>
                     )}
                 </Button>
@@ -512,7 +532,7 @@ function StepCommittee({
     errors: Record<string, string>;
 }) {
     const siteName = (id: number | null) =>
-        id == null ? null : sites.find((s) => s.id === id)?.name ?? null;
+        id == null ? null : (sites.find((s) => s.id === id)?.name ?? null);
 
     return (
         <div>
@@ -527,8 +547,16 @@ function StepCommittee({
                         value={data.mode}
                         onChange={(v) => set('mode', v)}
                         options={[
-                            { value: 'existing', label: 'Existing committee', icon: Building2 },
-                            { value: 'new', label: 'New committee', icon: Plus },
+                            {
+                                value: 'existing',
+                                label: 'Existing committee',
+                                icon: Building2,
+                            },
+                            {
+                                value: 'new',
+                                label: 'New committee',
+                                icon: Plus,
+                            },
                         ]}
                     />
                 </Field>
@@ -580,7 +608,9 @@ function StepCommittee({
                         >
                             <Input
                                 value={data.new_name}
-                                onChange={(e) => set('new_name', e.target.value)}
+                                onChange={(e) =>
+                                    set('new_name', e.target.value)
+                                }
                                 placeholder="e.g. Hamilton East H&S Committee"
                                 aria-invalid={!!errors.new_name}
                             />
@@ -635,7 +665,10 @@ function StepCommittee({
                             <ChipMulti
                                 values={idsToNames(data.new_member_ids, staff)}
                                 onChange={(names) =>
-                                    set('new_member_ids', namesToIds(names, staff))
+                                    set(
+                                        'new_member_ids',
+                                        namesToIds(names, staff),
+                                    )
                                 }
                                 options={staff.map((s) => s.name)}
                             />
@@ -685,11 +718,7 @@ function StepSchedule({
                 blurb="Set the date, time and location, and outline the agenda so attendees know what to expect."
             />
             <div className="grid gap-4 sm:grid-cols-2">
-                <Field
-                    label="Date & time"
-                    required
-                    error={errors.scheduled_at}
-                >
+                <Field label="Date & time" required error={errors.scheduled_at}>
                     <Input
                         type="datetime-local"
                         value={data.scheduled_at}
@@ -717,8 +746,8 @@ function StepSchedule({
                     <div className="grid gap-2">
                         {data.agenda_items.length === 0 ? (
                             <div className="rounded-lg border border-dashed border-border p-3.5 text-center text-[13px] text-muted-foreground">
-                                No agenda items yet. Add the matters this meeting
-                                will cover.
+                                No agenda items yet. Add the matters this
+                                meeting will cover.
                             </div>
                         ) : null}
                         {data.agenda_items.map((item, i) => (
@@ -728,7 +757,9 @@ function StepSchedule({
                                 </span>
                                 <Input
                                     value={item}
-                                    onChange={(e) => updAgenda(i, e.target.value)}
+                                    onChange={(e) =>
+                                        updAgenda(i, e.target.value)
+                                    }
                                     placeholder={`Agenda item ${i + 1}`}
                                 />
                                 {/* eslint-disable-next-line no-restricted-syntax -- icon-only remove affordance for a repeater row (mirrors the Add-Client condition rows) */}
@@ -782,7 +813,8 @@ function StepAttendees({
     committeeMemberIds: number[] | null;
     committeeName: string | null;
 }) {
-    const allSelected = data.attendee_ids.length === staff.length && staff.length > 0;
+    const allSelected =
+        data.attendee_ids.length === staff.length && staff.length > 0;
     const toggleAll = () =>
         set('attendee_ids', allSelected ? [] : staff.map((s) => s.id));
     const seedFromMembers =
@@ -858,7 +890,8 @@ function StepAttendees({
 
                 <InfoCard icon={Info}>
                     Expected attendees are recorded against the meeting now.
-                    Actual attendance is confirmed when the meeting is completed.
+                    Actual attendance is confirmed when the meeting is
+                    completed.
                 </InfoCard>
             </div>
         </div>
@@ -886,14 +919,16 @@ function StepReview({
 }) {
     const committeeName =
         data.mode === 'existing'
-            ? selectedCommittee?.name ?? '—'
+            ? (selectedCommittee?.name ?? '—')
             : data.new_name || '—';
     const siteName =
         data.mode === 'existing'
             ? selectedCommittee?.site_id != null
-                ? sites.find((s) => s.id === selectedCommittee.site_id)?.name ?? null
+                ? (sites.find((s) => s.id === selectedCommittee.site_id)
+                      ?.name ?? null)
                 : null
-            : sites.find((s) => String(s.id) === data.new_site_id)?.name ?? null;
+            : (sites.find((s) => String(s.id) === data.new_site_id)?.name ??
+              null);
     const attendeeNames = idsToNames(data.attendee_ids, staff);
     const memberNames = idsToNames(data.new_member_ids, staff);
 

@@ -80,7 +80,11 @@ export function riskFill(r: string): string {
 
 // ── shared chrome ───────────────────────────────────────────────────────
 
-type SrTable = { caption: string; columns: string[]; rows: (string | number)[][] };
+type SrTable = {
+    caption: string;
+    columns: string[];
+    rows: (string | number)[][];
+};
 
 export function ChartCard({
     title,
@@ -103,8 +107,14 @@ export function ChartCard({
         <Card className={cn('rounded-xl shadow-sm', className)}>
             <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-1">
                 <div className="min-w-0">
-                    <CardTitle className="text-sm font-bold tracking-tight">{title}</CardTitle>
-                    {subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p> : null}
+                    <CardTitle className="text-sm font-bold tracking-tight">
+                        {title}
+                    </CardTitle>
+                    {subtitle ? (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            {subtitle}
+                        </p>
+                    ) : null}
                 </div>
                 {action}
             </CardHeader>
@@ -146,13 +156,25 @@ function ChartTooltip({ active, payload, label }: any) {
     return (
         // eslint-disable-next-line no-restricted-syntax -- chart tooltip popover, not a content card
         <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg">
-            {label ? <p className="mb-1 font-semibold text-foreground">{label}</p> : null}
+            {label ? (
+                <p className="mb-1 font-semibold text-foreground">{label}</p>
+            ) : null}
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {payload.map((p: any, i: number) => (
-                <p key={i} className="flex items-center gap-1.5 text-muted-foreground">
-                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: p.color || p.stroke || p.fill }} />
+                <p
+                    key={i}
+                    className="flex items-center gap-1.5 text-muted-foreground"
+                >
+                    <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{
+                            backgroundColor: p.color || p.stroke || p.fill,
+                        }}
+                    />
                     <span className="capitalize">{p.name}</span>
-                    <span className="ml-auto pl-3 font-semibold tabular-nums text-foreground">{p.value ?? '—'}</span>
+                    <span className="ml-auto pl-3 font-semibold text-foreground tabular-nums">
+                        {p.value ?? '—'}
+                    </span>
                 </p>
             ))}
         </div>
@@ -167,9 +189,18 @@ function NeedsData({ label }: { label: string }) {
     );
 }
 
-function EmptyState({ height = 200, label = 'No data for this period.' }: { height?: number; label?: string }) {
+function EmptyState({
+    height = 200,
+    label = 'No data for this period.',
+}: {
+    height?: number;
+    label?: string;
+}) {
     return (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 text-center" style={{ height }}>
+        <div
+            className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 text-center"
+            style={{ height }}
+        >
             <p className="text-xs text-muted-foreground">{label}</p>
         </div>
     );
@@ -185,28 +216,72 @@ function lastBigDot(color: string, count: number) {
             return <g key={index} />;
         }
         const last = index === count - 1;
-        return <circle key={index} cx={cx} cy={cy} r={last ? 5 : 3} fill={color} stroke="var(--card)" strokeWidth={last ? 2 : 1} />;
+        return (
+            <circle
+                key={index}
+                cx={cx}
+                cy={cy}
+                r={last ? 5 : 3}
+                fill={color}
+                stroke="var(--card)"
+                strokeWidth={last ? 2 : 1}
+            />
+        );
     };
 }
 
 // ── Trend charts ────────────────────────────────────────────────────────
 
-export function LtifrTrifrChart({ trends, height = 240 }: { trends: TrendPoint[]; height?: number }) {
+export function LtifrTrifrChart({
+    trends,
+    height = 240,
+}: {
+    trends: TrendPoint[];
+    height?: number;
+}) {
     if (!trends.some((t) => t.ltifr !== null || t.trifr !== null)) {
-        return <NeedsData label="LTIFR / TRIFR need recorded hours-worked data for this period." />;
+        return (
+            <NeedsData label="LTIFR / TRIFR need recorded hours-worked data for this period." />
+        );
     }
     return (
         <ResponsiveContainer width="100%" height={height}>
-            <ComposedChart data={trends} margin={{ top: 8, right: 12, left: -14, bottom: 0 }}>
+            <ComposedChart
+                data={trends}
+                margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
+            >
                 <defs>
                     <linearGradient id="ltifr-grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={TOKEN.warning} stopOpacity={0.26} />
-                        <stop offset="100%" stopColor={TOKEN.warning} stopOpacity={0.01} />
+                        <stop
+                            offset="0%"
+                            stopColor={TOKEN.warning}
+                            stopOpacity={0.26}
+                        />
+                        <stop
+                            offset="100%"
+                            stopColor={TOKEN.warning}
+                            stopOpacity={0.01}
+                        />
                     </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={TOKEN.grid} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 'auto']} tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} width={34} />
+                <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={TOKEN.grid}
+                    vertical={false}
+                />
+                <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                />
+                <YAxis
+                    domain={[0, 'auto']}
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={34}
+                />
                 <Tooltip content={<ChartTooltip />} />
                 <Legend wrapperStyle={legendStyle} iconType="plainline" />
                 <Area
@@ -256,16 +331,42 @@ export function SingleAreaChart({
     const gradId = `area-${String(dataKey)}`;
     return (
         <ResponsiveContainer width="100%" height={height}>
-            <ComposedChart data={trends} margin={{ top: 8, right: 12, left: -14, bottom: 0 }}>
+            <ComposedChart
+                data={trends}
+                margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
+            >
                 <defs>
                     <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={color} stopOpacity={0.24} />
-                        <stop offset="100%" stopColor={color} stopOpacity={0.01} />
+                        <stop
+                            offset="0%"
+                            stopColor={color}
+                            stopOpacity={0.24}
+                        />
+                        <stop
+                            offset="100%"
+                            stopColor={color}
+                            stopOpacity={0.01}
+                        />
                     </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={TOKEN.grid} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} />
-                <YAxis domain={domain ?? [0, 'auto']} tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} width={34} />
+                <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={TOKEN.grid}
+                    vertical={false}
+                />
+                <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                />
+                <YAxis
+                    domain={domain ?? [0, 'auto']}
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={34}
+                />
                 <Tooltip content={<ChartTooltip />} />
                 <Area
                     type="monotone"
@@ -284,17 +385,59 @@ export function SingleAreaChart({
     );
 }
 
-export function HazardBurndownChart({ trends, height = 240 }: { trends: TrendPoint[]; height?: number }) {
+export function HazardBurndownChart({
+    trends,
+    height = 240,
+}: {
+    trends: TrendPoint[];
+    height?: number;
+}) {
     return (
         <ResponsiveContainer width="100%" height={height}>
-            <ComposedChart data={trends} margin={{ top: 8, right: 12, left: -14, bottom: 0 }} barGap={2}>
-                <CartesianGrid strokeDasharray="3 3" stroke={TOKEN.grid} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} width={30} />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--accent)', fillOpacity: 0.5 }} />
+            <ComposedChart
+                data={trends}
+                margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
+                barGap={2}
+            >
+                <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={TOKEN.grid}
+                    vertical={false}
+                />
+                <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                />
+                <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={30}
+                />
+                <Tooltip
+                    content={<ChartTooltip />}
+                    cursor={{ fill: 'var(--accent)', fillOpacity: 0.5 }}
+                />
                 <Legend wrapperStyle={legendStyle} />
-                <Bar dataKey="hazards_opened" name="Opened" fill={TOKEN.warning} radius={[3, 3, 0, 0]} maxBarSize={18} isAnimationActive={false} />
-                <Bar dataKey="hazards_closed" name="Closed" fill={TOKEN.success} radius={[3, 3, 0, 0]} maxBarSize={18} isAnimationActive={false} />
+                <Bar
+                    dataKey="hazards_opened"
+                    name="Opened"
+                    fill={TOKEN.warning}
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={18}
+                    isAnimationActive={false}
+                />
+                <Bar
+                    dataKey="hazards_closed"
+                    name="Closed"
+                    fill={TOKEN.success}
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={18}
+                    isAnimationActive={false}
+                />
                 <Line
                     type="monotone"
                     dataKey="hazards_open"
@@ -310,14 +453,46 @@ export function HazardBurndownChart({ trends, height = 240 }: { trends: TrendPoi
     );
 }
 
-export function CaClosureChart({ trends, height = 220 }: { trends: TrendPoint[]; height?: number }) {
+export function CaClosureChart({
+    trends,
+    height = 220,
+}: {
+    trends: TrendPoint[];
+    height?: number;
+}) {
     return (
         <ResponsiveContainer width="100%" height={height}>
-            <ComposedChart data={trends} margin={{ top: 8, right: 6, left: -14, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={TOKEN.grid} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="days" tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} width={30} />
-                <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} width={34} />
+            <ComposedChart
+                data={trends}
+                margin={{ top: 8, right: 6, left: -14, bottom: 0 }}
+            >
+                <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={TOKEN.grid}
+                    vertical={false}
+                />
+                <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                />
+                <YAxis
+                    yAxisId="days"
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={30}
+                />
+                <YAxis
+                    yAxisId="pct"
+                    orientation="right"
+                    domain={[0, 100]}
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={34}
+                />
                 <Tooltip content={<ChartTooltip />} />
                 <Legend wrapperStyle={legendStyle} iconType="plainline" />
                 <Line
@@ -350,32 +525,109 @@ export function CaClosureChart({ trends, height = 220 }: { trends: TrendPoint[];
     );
 }
 
-export function WorksafeNotifiableChart({ trends, height = 220 }: { trends: TrendPoint[]; height?: number }) {
+export function WorksafeNotifiableChart({
+    trends,
+    height = 220,
+}: {
+    trends: TrendPoint[];
+    height?: number;
+}) {
     return (
         <ResponsiveContainer width="100%" height={height}>
-            <BarChart data={trends} margin={{ top: 8, right: 12, left: -14, bottom: 0 }} barGap={2}>
-                <CartesianGrid strokeDasharray="3 3" stroke={TOKEN.grid} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} width={30} />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--accent)', fillOpacity: 0.5 }} />
+            <BarChart
+                data={trends}
+                margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
+                barGap={2}
+            >
+                <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={TOKEN.grid}
+                    vertical={false}
+                />
+                <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                />
+                <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={30}
+                />
+                <Tooltip
+                    content={<ChartTooltip />}
+                    cursor={{ fill: 'var(--accent)', fillOpacity: 0.5 }}
+                />
                 <Legend wrapperStyle={legendStyle} />
-                <Bar dataKey="worksafe_notified" name="Notified" fill={TOKEN.primary} radius={[3, 3, 0, 0]} maxBarSize={18} isAnimationActive={false} />
-                <Bar dataKey="worksafe_awaiting" name="Awaiting" fill={TOKEN.critical} radius={[3, 3, 0, 0]} maxBarSize={18} isAnimationActive={false} />
+                <Bar
+                    dataKey="worksafe_notified"
+                    name="Notified"
+                    fill={TOKEN.primary}
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={18}
+                    isAnimationActive={false}
+                />
+                <Bar
+                    dataKey="worksafe_awaiting"
+                    name="Awaiting"
+                    fill={TOKEN.critical}
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={18}
+                    isAnimationActive={false}
+                />
             </BarChart>
         </ResponsiveContainer>
     );
 }
 
-export function WorkerParticipationChart({ trends, height = 220 }: { trends: TrendPoint[]; height?: number }) {
-    if (!trends.some((t) => t.worker_engagement !== null || t.worker_consultation !== null)) {
-        return <NeedsData label="No worker-participation records (HSR/committee meetings, consultations) for this period." />;
+export function WorkerParticipationChart({
+    trends,
+    height = 220,
+}: {
+    trends: TrendPoint[];
+    height?: number;
+}) {
+    if (
+        !trends.some(
+            (t) =>
+                t.worker_engagement !== null || t.worker_consultation !== null,
+        )
+    ) {
+        return (
+            <NeedsData label="No worker-participation records (HSR/committee meetings, consultations) for this period." />
+        );
     }
     return (
         <ResponsiveContainer width="100%" height={height}>
-            <LineChart data={trends} margin={{ top: 8, right: 12, left: -14, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={TOKEN.grid} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} />
-                <YAxis domain={[(min: number) => Math.min(50, Math.floor((min || 50) / 10) * 10), 100]} tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} width={34} />
+            <LineChart
+                data={trends}
+                margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
+            >
+                <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={TOKEN.grid}
+                    vertical={false}
+                />
+                <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                />
+                <YAxis
+                    domain={[
+                        (min: number) =>
+                            Math.min(50, Math.floor((min || 50) / 10) * 10),
+                        100,
+                    ]}
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={34}
+                />
                 <Tooltip content={<ChartTooltip />} />
                 <Legend wrapperStyle={legendStyle} iconType="plainline" />
                 <Line
@@ -420,18 +672,72 @@ export function RootCausePareto({
     onBarCtx?: (e: React.MouseEvent, row: RootCauseRow) => void;
 }) {
     if (!data.length) {
-        return <EmptyState height={height} label="No root-cause categories recorded for this period." />;
+        return (
+            <EmptyState
+                height={height}
+                label="No root-cause categories recorded for this period."
+            />
+        );
     }
-    const barColor = (i: number) => (i === 0 ? TOKEN.critical : i <= 2 ? TOKEN.warning : TOKEN.primary);
+    const barColor = (i: number) =>
+        i === 0 ? TOKEN.critical : i <= 2 ? TOKEN.warning : TOKEN.primary;
     return (
         <ResponsiveContainer width="100%" height={height}>
-            <ComposedChart data={data} margin={{ top: 16, right: 8, left: -14, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={TOKEN.grid} vertical={false} />
-                <XAxis dataKey="cause" tick={{ fontSize: 10, fill: TOKEN.axis }} axisLine={false} tickLine={false} interval={0} angle={-12} textAnchor="end" height={48} />
-                <YAxis yAxisId="count" allowDecimals={false} tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} width={28} />
-                <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} width={40} />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--accent)', fillOpacity: 0.5 }} />
-                <ReferenceLine yAxisId="pct" y={80} stroke={TOKEN.critical} strokeDasharray="4 4" strokeWidth={1.5} ifOverflow="extendDomain" label={{ value: '80%', position: 'right', fontSize: 10, fill: TOKEN.critical }} />
+            <ComposedChart
+                data={data}
+                margin={{ top: 16, right: 8, left: -14, bottom: 0 }}
+            >
+                <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={TOKEN.grid}
+                    vertical={false}
+                />
+                <XAxis
+                    dataKey="cause"
+                    tick={{ fontSize: 10, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={0}
+                    angle={-12}
+                    textAnchor="end"
+                    height={48}
+                />
+                <YAxis
+                    yAxisId="count"
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={28}
+                />
+                <YAxis
+                    yAxisId="pct"
+                    orientation="right"
+                    domain={[0, 100]}
+                    tickFormatter={(v) => `${v}%`}
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={40}
+                />
+                <Tooltip
+                    content={<ChartTooltip />}
+                    cursor={{ fill: 'var(--accent)', fillOpacity: 0.5 }}
+                />
+                <ReferenceLine
+                    yAxisId="pct"
+                    y={80}
+                    stroke={TOKEN.critical}
+                    strokeDasharray="4 4"
+                    strokeWidth={1.5}
+                    ifOverflow="extendDomain"
+                    label={{
+                        value: '80%',
+                        position: 'right',
+                        fontSize: 10,
+                        fill: TOKEN.critical,
+                    }}
+                />
                 <Bar
                     yAxisId="count"
                     dataKey="count"
@@ -446,7 +752,15 @@ export function RootCausePareto({
                     {data.map((row, i) => (
                         <Cell key={row.cause} fill={barColor(i)} />
                     ))}
-                    <LabelList dataKey="count" position="top" style={{ fontSize: 11, fill: TOKEN.axis, fontWeight: 600 }} />
+                    <LabelList
+                        dataKey="count"
+                        position="top"
+                        style={{
+                            fontSize: 11,
+                            fill: TOKEN.axis,
+                            fontWeight: 600,
+                        }}
+                    />
                 </Bar>
                 <Line
                     yAxisId="pct"
@@ -466,7 +780,12 @@ export function RootCausePareto({
 
 // ── Hover-focus donut + interactive breakdown rows ──────────────────────
 
-export type DonutDatum = { key: string; label: string; value: number; color: string };
+export type DonutDatum = {
+    key: string;
+    label: string;
+    value: number;
+    color: string;
+};
 
 export function FocusDonut({
     segments,
@@ -487,7 +806,11 @@ export function FocusDonut({
 
     return (
         <div className="flex flex-col items-center gap-3 sm:flex-row">
-            <div className="relative shrink-0" style={{ width: 168, height: 168 }} aria-hidden="true">
+            <div
+                className="relative shrink-0"
+                style={{ width: 168, height: 168 }}
+                aria-hidden="true"
+            >
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
@@ -506,14 +829,27 @@ export function FocusDonut({
                             isAnimationActive={false}
                         >
                             {segments.map((s, i) => (
-                                <Cell key={s.key} fill={s.color} fillOpacity={active == null || active === i ? 1 : 0.45} cursor={onSegment ? 'pointer' : undefined} />
+                                <Cell
+                                    key={s.key}
+                                    fill={s.color}
+                                    fillOpacity={
+                                        active == null || active === i
+                                            ? 1
+                                            : 0.45
+                                    }
+                                    cursor={onSegment ? 'pointer' : undefined}
+                                />
                             ))}
                         </Pie>
                     </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-xl font-bold tabular-nums text-foreground">{focus ? focus.value : total}</span>
-                    <span className="max-w-[92px] truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{focus ? focus.label : 'Total'}</span>
+                    <span className="text-xl font-bold text-foreground tabular-nums">
+                        {focus ? focus.value : total}
+                    </span>
+                    <span className="max-w-[92px] truncate text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                        {focus ? focus.label : 'Total'}
+                    </span>
                 </div>
             </div>
             <ul className="w-full space-y-0.5">
@@ -528,10 +864,19 @@ export function FocusDonut({
                             onClick={() => onSegment?.(s)}
                             onContextMenu={(e) => onSegmentCtx?.(e, s)}
                         >
-                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
-                            <span className="truncate capitalize text-foreground">{s.label}</span>
-                            <span className="ml-auto pl-2 font-semibold tabular-nums text-foreground">{s.value}</span>
-                            <span className="w-9 text-right tabular-nums text-muted-foreground">{Math.round((s.value / total) * 100)}%</span>
+                            <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: s.color }}
+                            />
+                            <span className="truncate text-foreground capitalize">
+                                {s.label}
+                            </span>
+                            <span className="ml-auto pl-2 font-semibold text-foreground tabular-nums">
+                                {s.value}
+                            </span>
+                            <span className="w-9 text-right text-muted-foreground tabular-nums">
+                                {Math.round((s.value / total) * 100)}%
+                            </span>
                         </button>
                     </li>
                 ))}
@@ -542,24 +887,73 @@ export function FocusDonut({
 
 // ── Horizontal breakdown bars + interactive rows ────────────────────────
 
-export type BreakdownItem = { key: string; label: string; value: number; color: string };
+export type BreakdownItem = {
+    key: string;
+    label: string;
+    value: number;
+    color: string;
+};
 
-export function HorizontalBars({ data, height = 200 }: { data: BreakdownItem[]; height?: number }) {
+export function HorizontalBars({
+    data,
+    height = 200,
+}: {
+    data: BreakdownItem[];
+    height?: number;
+}) {
     if (!data.length) {
         return <EmptyState height={height} />;
     }
     return (
         <ResponsiveContainer width="100%" height={height}>
-            <BarChart data={data} layout="vertical" margin={{ top: 4, right: 30, left: 6, bottom: 4 }}>
-                <CartesianGrid horizontal={false} stroke={TOKEN.grid} strokeDasharray="3 3" />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="label" width={116} tick={{ fontSize: 11, fill: TOKEN.axis }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--accent)', fillOpacity: 0.5 }} />
-                <Bar dataKey="value" name="Count" radius={[0, 5, 5, 0]} maxBarSize={22} isAnimationActive={false}>
+            <BarChart
+                data={data}
+                layout="vertical"
+                margin={{ top: 4, right: 30, left: 6, bottom: 4 }}
+            >
+                <CartesianGrid
+                    horizontal={false}
+                    stroke={TOKEN.grid}
+                    strokeDasharray="3 3"
+                />
+                <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                />
+                <YAxis
+                    type="category"
+                    dataKey="label"
+                    width={116}
+                    tick={{ fontSize: 11, fill: TOKEN.axis }}
+                    axisLine={false}
+                    tickLine={false}
+                />
+                <Tooltip
+                    content={<ChartTooltip />}
+                    cursor={{ fill: 'var(--accent)', fillOpacity: 0.5 }}
+                />
+                <Bar
+                    dataKey="value"
+                    name="Count"
+                    radius={[0, 5, 5, 0]}
+                    maxBarSize={22}
+                    isAnimationActive={false}
+                >
                     {data.map((d) => (
                         <Cell key={d.key} fill={d.color} />
                     ))}
-                    <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: TOKEN.axis, fontWeight: 600 }} />
+                    <LabelList
+                        dataKey="value"
+                        position="right"
+                        style={{
+                            fontSize: 11,
+                            fill: TOKEN.axis,
+                            fontWeight: 600,
+                        }}
+                    />
                 </Bar>
             </BarChart>
         </ResponsiveContainer>
@@ -581,7 +975,7 @@ export function BreakdownRows({
         return null;
     }
     return (
-        <ul className="mt-2 space-y-0.5 border-t border-line pt-2">
+        <ul className="border-line mt-2 space-y-0.5 border-t pt-2">
             {items.map((d) => (
                 <li key={d.key}>
                     {/* eslint-disable-next-line no-restricted-syntax -- interactive drill row, custom dense layout */}
@@ -591,10 +985,19 @@ export function BreakdownRows({
                         onClick={() => onItem?.(d)}
                         onContextMenu={(e) => onItemCtx?.(e, d)}
                     >
-                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: d.color }} />
-                        <span className="truncate capitalize text-foreground">{d.label}</span>
-                        <span className="ml-auto pl-2 font-semibold tabular-nums text-foreground">{d.value}</span>
-                        <span className="w-9 text-right tabular-nums text-muted-foreground">{Math.round((d.value / total) * 100)}%</span>
+                        <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: d.color }}
+                        />
+                        <span className="truncate text-foreground capitalize">
+                            {d.label}
+                        </span>
+                        <span className="ml-auto pl-2 font-semibold text-foreground tabular-nums">
+                            {d.value}
+                        </span>
+                        <span className="w-9 text-right text-muted-foreground tabular-nums">
+                            {Math.round((d.value / total) * 100)}%
+                        </span>
                     </button>
                 </li>
             ))}

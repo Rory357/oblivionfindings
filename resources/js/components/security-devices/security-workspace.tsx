@@ -1,4 +1,8 @@
 import { OperationalStateBadge } from '@/components/security-devices/estate-operations';
+import {
+    ControlRoomAlertAccessRequired,
+    type ControlRoomAlertAccess,
+} from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
@@ -79,12 +83,13 @@ type SecurityEvent = {
 type SecurityAlert = {
     id: number;
     reference: string | null;
-    title: string;
-    severity: string;
-    status: string;
+    title: string | null;
+    severity: string | null;
+    status: string | null;
     triggeredAt: string | null;
     canonicalDeviceId: number | null;
-    href: string;
+    href: string | null;
+    access: ControlRoomAlertAccess;
 };
 
 export type SecurityWorkspaceData = {
@@ -570,31 +575,44 @@ function EventsPanel({ data }: { data: SecurityWorkspaceData }) {
                 </CardHeader>
                 <CardContent className="space-y-3">
                     {controlRoomAlerts.length > 0 ? (
-                        controlRoomAlerts.map((alert) => (
-                            <Link
-                                key={alert.id}
-                                href={alert.href}
-                                className="frontline-focus block rounded-xl border border-border p-3 transition-colors hover:border-primary/40"
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <p className="font-semibold">
-                                            {alert.title}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {alert.reference ??
-                                                `Alert #${alert.id}`}
-                                            {alert.triggeredAt
-                                                ? ` • ${formatRelative(alert.triggeredAt)}`
-                                                : ''}
-                                        </p>
+                        controlRoomAlerts.map((alert) =>
+                            alert.href && alert.access.state === 'available' ? (
+                                <Link
+                                    key={alert.id}
+                                    href={alert.href}
+                                    className="frontline-focus block rounded-xl border border-border p-3 transition-colors hover:border-primary/40"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="font-semibold">
+                                                {alert.title}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {alert.reference ??
+                                                    `Alert #${alert.id}`}
+                                                {alert.triggeredAt
+                                                    ? ` • ${formatRelative(alert.triggeredAt)}`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                        {alert.severity ? (
+                                            <OperationalStateBadge
+                                                state={alert.severity}
+                                            />
+                                        ) : null}
                                     </div>
-                                    <OperationalStateBadge
-                                        state={alert.severity}
+                                </Link>
+                            ) : (
+                                <div
+                                    key={alert.id}
+                                    className="rounded-xl border border-border px-3"
+                                >
+                                    <ControlRoomAlertAccessRequired
+                                        label={alert.access.label}
                                     />
                                 </div>
-                            </Link>
-                        ))
+                            ),
+                        )
                     ) : (
                         <p className="text-sm text-muted-foreground">
                             {data.permissions.control_room

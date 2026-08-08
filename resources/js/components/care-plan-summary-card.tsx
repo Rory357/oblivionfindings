@@ -1,8 +1,14 @@
-import { Link } from '@inertiajs/react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, CheckCircle2, AlertTriangle, Eye, Pencil } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Link } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    Calendar,
+    CheckCircle2,
+    Eye,
+    Pencil,
+} from 'lucide-react';
 
 interface CarePlanSummaryCardProps {
     plan: {
@@ -32,19 +38,27 @@ const STATUS_BADGE: Record<string, string> = {
     active: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     draft: 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground',
     review: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
-    archived: 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground',
+    archived:
+        'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground',
 };
 
 const PLAN_TYPE_BADGE: Record<string, string> = {
-    standard: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
-    emergency: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
-    interim: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
+    standard:
+        'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    emergency:
+        'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+    interim:
+        'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
     review: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
 };
 
 function formatDate(date: string | null | undefined): string {
     if (!date) return '—';
-    return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(date).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
 function daysUntil(date: string | null | undefined): number | null {
@@ -53,7 +67,15 @@ function daysUntil(date: string | null | undefined): number | null {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-function MiniProgressRing({ achieved, total, size = 36 }: { achieved: number; total: number; size?: number }) {
+function MiniProgressRing({
+    achieved,
+    total,
+    size = 36,
+}: {
+    achieved: number;
+    total: number;
+    size?: number;
+}) {
     const strokeWidth = 4;
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
@@ -62,7 +84,12 @@ function MiniProgressRing({ achieved, total, size = 36 }: { achieved: number; to
     const dashGap = circumference - dashLength;
 
     return (
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
+        <svg
+            width={size}
+            height={size}
+            viewBox={`0 0 ${size} ${size}`}
+            className="shrink-0"
+        >
             <circle
                 cx={size / 2}
                 cy={size / 2}
@@ -101,10 +128,15 @@ function MiniProgressRing({ achieved, total, size = 36 }: { achieved: number; to
     );
 }
 
-export function CarePlanSummaryCard({ plan, showClient = false, compact = false }: CarePlanSummaryCardProps) {
+export function CarePlanSummaryCard({
+    plan,
+    showClient = false,
+    compact = false,
+}: CarePlanSummaryCardProps) {
     const borderColor = STATUS_BORDER[plan.status] ?? STATUS_BORDER.draft;
     const statusBadge = STATUS_BADGE[plan.status] ?? STATUS_BADGE.draft;
-    const typeBadge = PLAN_TYPE_BADGE[plan.plan_type] ?? PLAN_TYPE_BADGE.standard;
+    const typeBadge =
+        PLAN_TYPE_BADGE[plan.plan_type] ?? PLAN_TYPE_BADGE.standard;
 
     const goalsCount = plan.goals_count ?? 0;
     const goalsAchieved = plan.goals_achieved_count ?? 0;
@@ -113,28 +145,40 @@ export function CarePlanSummaryCard({ plan, showClient = false, compact = false 
     const isReviewOverdue = reviewDays !== null && reviewDays < 0;
 
     return (
-        <Card className={`border-l-4 ${borderColor} transition-shadow hover:shadow-md`}>
+        <Card
+            className={`border-l-4 ${borderColor} transition-shadow hover:shadow-md`}
+        >
             <CardContent className={compact ? 'p-3' : 'p-4'}>
                 <div className="flex items-start gap-3">
                     {/* Progress ring */}
-                    <MiniProgressRing achieved={goalsAchieved} total={goalsCount} size={compact ? 32 : 36} />
+                    <MiniProgressRing
+                        achieved={goalsAchieved}
+                        total={goalsCount}
+                        size={compact ? 32 : 36}
+                    />
 
                     {/* Main content */}
                     <div className="min-w-0 flex-1">
                         {/* Header row */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className={`font-semibold text-foreground truncate ${compact ? 'text-sm' : 'text-base'}`}>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h3
+                                className={`truncate font-semibold text-foreground ${compact ? 'text-sm' : 'text-base'}`}
+                            >
                                 {plan.title}
                             </h3>
-                            <Badge className={`${statusBadge} border-0 text-[10px] capitalize`}>
+                            <Badge
+                                className={`${statusBadge} border-0 text-[10px] capitalize`}
+                            >
                                 {plan.status}
                             </Badge>
-                            <Badge className={`${typeBadge} border-0 text-[10px] capitalize`}>
+                            <Badge
+                                className={`${typeBadge} border-0 text-[10px] capitalize`}
+                            >
                                 {plan.plan_type.replace(/_/g, ' ')}
                             </Badge>
                             {isReviewOverdue && (
-                                <Badge className="border-0 bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning text-[10px]">
-                                    <AlertTriangle className="h-3 w-3 mr-0.5" />
+                                <Badge className="border-0 bg-status-warning-bg text-[10px] text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
+                                    <AlertTriangle className="mr-0.5 h-3 w-3" />
                                     Review overdue
                                 </Badge>
                             )}
@@ -142,14 +186,14 @@ export function CarePlanSummaryCard({ plan, showClient = false, compact = false 
 
                         {/* Client name */}
                         {showClient && plan.client && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
+                            <p className="mt-0.5 text-xs text-muted-foreground">
                                 {plan.client.first_name} {plan.client.last_name}
                             </p>
                         )}
 
                         {/* Goals summary */}
-                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-3">
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <CheckCircle2 className="h-3 w-3 text-status-success" />
                                 {goalsAchieved}/{goalsCount} goals completed
                             </span>
@@ -157,20 +201,27 @@ export function CarePlanSummaryCard({ plan, showClient = false, compact = false 
 
                         {/* Dates */}
                         {!compact && (
-                            <div className="flex items-center gap-4 mt-2 text-[11px] text-muted-foreground flex-wrap">
+                            <div className="mt-2 flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
                                 {(plan.starts_at || plan.ends_at) && (
                                     <span className="flex items-center gap-1">
                                         <Calendar className="h-3 w-3" />
-                                        {formatDate(plan.starts_at)} — {formatDate(plan.ends_at)}
+                                        {formatDate(plan.starts_at)} —{' '}
+                                        {formatDate(plan.ends_at)}
                                     </span>
                                 )}
                                 {plan.next_review_at && (
-                                    <span className={`flex items-center gap-1 ${isReviewOverdue ? 'text-status-warning dark:text-status-warning font-medium' : ''}`}>
+                                    <span
+                                        className={`flex items-center gap-1 ${isReviewOverdue ? 'font-medium text-status-warning dark:text-status-warning' : ''}`}
+                                    >
                                         <Calendar className="h-3 w-3" />
-                                        Review: {formatDate(plan.next_review_at)}
-                                        {reviewDays !== null && !isReviewOverdue && (
-                                            <span className="text-muted-foreground">({reviewDays}d)</span>
-                                        )}
+                                        Review:{' '}
+                                        {formatDate(plan.next_review_at)}
+                                        {reviewDays !== null &&
+                                            !isReviewOverdue && (
+                                                <span className="text-muted-foreground">
+                                                    ({reviewDays}d)
+                                                </span>
+                                            )}
                                     </span>
                                 )}
                             </div>
@@ -179,15 +230,29 @@ export function CarePlanSummaryCard({ plan, showClient = false, compact = false 
 
                     {/* Quick actions */}
                     {!compact && (
-                        <div className="flex items-center gap-1 shrink-0">
-                            <Button variant="ghost" size="sm" asChild className="h-7 w-7 p-0">
-                                <Link href={`/operations/care-plans/${plan.id}`}>
+                        <div className="flex shrink-0 items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                asChild
+                                className="h-7 w-7 p-0"
+                            >
+                                <Link
+                                    href={`/operations/care-plans/${plan.id}`}
+                                >
                                     <Eye className="h-3.5 w-3.5" />
                                 </Link>
                             </Button>
                             {plan.status !== 'archived' && (
-                                <Button variant="ghost" size="sm" asChild className="h-7 w-7 p-0">
-                                    <Link href={`/operations/care-plans/${plan.id}/edit`}>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    asChild
+                                    className="h-7 w-7 p-0"
+                                >
+                                    <Link
+                                        href={`/operations/care-plans/${plan.id}/edit`}
+                                    >
                                         <Pencil className="h-3.5 w-3.5" />
                                     </Link>
                                 </Button>

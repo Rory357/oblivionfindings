@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { router } from '@inertiajs/react';
-import axios from 'axios';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -9,10 +8,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { router } from '@inertiajs/react';
+import axios from 'axios';
 import { AlertCircle, CalendarDays, FolderOpen, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 
 export interface MeetingWithoutPack {
     id: number;
@@ -56,7 +56,12 @@ export function GenerateBoardPackDialog({
             const response = await axios.post(
                 `/governance/meetings/${selectedId}/packs`,
                 {},
-                { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } },
+                {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                },
             );
             const status = response.data?.status as string | undefined;
             if (status === 'generated' && response.data?.pack_id) {
@@ -83,7 +88,10 @@ export function GenerateBoardPackDialog({
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
                 className="max-h-[85vh] overflow-y-auto"
-                style={{ maxWidth: 'min(92vw, 720px)', width: 'min(92vw, 720px)' }}
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
             >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
@@ -91,14 +99,16 @@ export function GenerateBoardPackDialog({
                         Generate Board Pack
                     </DialogTitle>
                     <DialogDescription>
-                        A board pack is generated from a meeting&apos;s agenda, CEO report,
-                        resolutions, and attendance. Pick a meeting below — one pack per meeting.
+                        A board pack is generated from a meeting&apos;s agenda,
+                        CEO report, resolutions, and attendance. Pick a meeting
+                        below — one pack per meeting.
                     </DialogDescription>
                 </DialogHeader>
 
                 {meetings.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                        Every scheduled meeting already has a board pack. Add a new meeting first.
+                        Every scheduled meeting already has a board pack. Add a
+                        new meeting first.
                     </div>
                 ) : (
                     <div className="space-y-2">
@@ -106,7 +116,8 @@ export function GenerateBoardPackDialog({
                             const active = selectedId === m.id;
                             const hasAgenda = m.agenda_items_count > 0;
                             return (
-                                <Button unstyled
+                                <Button
+                                    unstyled
                                     key={m.id}
                                     type="button"
                                     onClick={() => setSelectedId(m.id)}
@@ -125,8 +136,13 @@ export function GenerateBoardPackDialog({
                                     </span>
                                     <span className="min-w-0 flex-1 space-y-1">
                                         <span className="flex flex-wrap items-center gap-2">
-                                            <span className="truncate text-sm font-medium">{m.title}</span>
-                                            <Badge variant="outline" className="text-[10px] uppercase">
+                                            <span className="truncate text-sm font-medium">
+                                                {m.title}
+                                            </span>
+                                            <Badge
+                                                variant="outline"
+                                                className="text-[10px] uppercase"
+                                            >
                                                 {m.status}
                                             </Badge>
                                             <Badge
@@ -139,15 +155,19 @@ export function GenerateBoardPackDialog({
                                                 )}
                                             >
                                                 {m.agenda_items_count} agenda{' '}
-                                                {m.agenda_items_count === 1 ? 'item' : 'items'}
+                                                {m.agenda_items_count === 1
+                                                    ? 'item'
+                                                    : 'items'}
                                             </Badge>
                                         </span>
                                         <span className="block text-xs text-muted-foreground">
-                                            Scheduled {formatScheduled(m.scheduled_at)}
+                                            Scheduled{' '}
+                                            {formatScheduled(m.scheduled_at)}
                                         </span>
                                         {!hasAgenda && (
-                                            <span className="block text-xs italic text-status-warning">
-                                                Add at least one agenda item before generating.
+                                            <span className="block text-xs text-status-warning italic">
+                                                Add at least one agenda item
+                                                before generating.
                                             </span>
                                         )}
                                     </span>
@@ -174,7 +194,9 @@ export function GenerateBoardPackDialog({
                         disabled={!selectedId || generating}
                         dusk="generate-pack-confirm"
                     >
-                        {generating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {generating && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
                         Generate pack
                     </Button>
                 </DialogFooter>

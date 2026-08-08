@@ -1,6 +1,12 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { ReasonDialog } from '@/components/reason-dialog';
+import {
+    DeviceDocumentHistory,
+    type DeviceDocumentHistoryItem,
+} from '@/components/security-devices/device-document-history';
+import { ControlRoomAlertAccessRequired } from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -127,6 +133,13 @@ type Relationship = {
     type: string;
     port: string | null;
 };
+type HistoricalRelationship = Relationship & {
+    created_at: string | null;
+    created_by: string | null;
+    unlinked_at: string;
+    unlinked_by: string | null;
+    unlink_reason: string;
+};
 
 type TargetEntity = { id: number; name: string; [key: string]: unknown };
 
@@ -170,10 +183,15 @@ type Props = {
         uploaded_at: string | null;
         download_url: string;
     }>;
+    documentHistory: DeviceDocumentHistoryItem[];
     documentCategories: LinkTypeOption[];
     recentEvents: EventItem[];
     maintenanceRecords: MaintenanceItem[];
     relationships: { parents: Relationship[]; children: Relationship[] };
+    relationshipHistory: {
+        parents: HistoricalRelationship[];
+        children: HistoricalRelationship[];
+    };
     can: {
         update: boolean;
         delete: boolean;
@@ -239,14 +257,19 @@ export default function DeviceShow({
     relationshipTypes,
     otherDevices,
     documents,
+    documentHistory,
     documentCategories,
     recentEvents,
     maintenanceRecords,
     relationships,
+    relationshipHistory,
     can,
 }: Props) {
     const totalRelationships =
         relationships.parents.length + relationships.children.length;
+    const totalRelationshipHistory =
+        relationshipHistory.parents.length +
+        relationshipHistory.children.length;
     const [activeSection, setActiveSection] = useState<DeviceProfileSectionKey>(
         profile.sections[0]?.key ?? 'health',
     );
@@ -401,13 +424,22 @@ export default function DeviceShow({
         );
     };
 
-    const submitUnlinkRelationship = (relId: number) => {
+    const submitUnlinkRelationship = (
+        relId: number,
+        reason: string,
+        done: () => void,
+    ) => {
         setUnlinkingRelId(relId);
         router.delete(
             `/security-devices/devices/${device.id}/relationships/${relId}`,
             {
+                data: { reason },
                 preserveScroll: true,
-                onFinish: () => setUnlinkingRelId(null),
+                onSuccess: () => setPendingRelationshipRemoval(null),
+                onFinish: () => {
+                    setUnlinkingRelId(null);
+                    done();
+                },
             },
         );
     };
@@ -480,13 +512,22 @@ export default function DeviceShow({
         );
     };
 
-    const submitDeleteDocument = (docId: number) => {
+    const submitDeleteDocument = (
+        docId: number,
+        reason: string,
+        done: () => void,
+    ) => {
         setDeletingDocId(docId);
         router.delete(
             `/security-devices/devices/${device.id}/documents/${docId}`,
             {
+                data: { reason },
                 preserveScroll: true,
-                onFinish: () => setDeletingDocId(null),
+                onSuccess: () => setPendingDocumentDeletion(null),
+                onFinish: () => {
+                    setDeletingDocId(null);
+                    done();
+                },
             },
         );
     };
@@ -1210,38 +1251,54 @@ export default function DeviceShow({
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
-                                    {profile.controlRoomAlerts.map((alert) => (
-                                        <Link
-                                            key={alert.id}
-                                            href={alert.href}
-                                            className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm transition-colors hover:bg-muted/50"
-                                        >
-                                            <span className="min-w-0">
-                                                <span className="font-medium">
-                                                    {alert.reference}
+                                    {profile.controlRoomAlerts.map((alert) =>
+                                        alert.href &&
+                                        alert.access.state === 'available' ? (
+                                            <Link
+                                                key={alert.id}
+                                                href={alert.href}
+                                                className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm transition-colors hover:bg-muted/50"
+                                            >
+                                                <span className="min-w-0">
+                                                    <span className="font-medium">
+                                                        {alert.reference}
+                                                    </span>
+                                                    <span className="ml-2 text-muted-foreground">
+                                                        {alert.type?.replace(
+                                                            /[._-]+/g,
+                                                            ' ',
+                                                        )}
+                                                    </span>
                                                 </span>
-                                                <span className="ml-2 text-muted-foreground">
-                                                    {alert.type.replace(
-                                                        /[._-]+/g,
-                                                        ' ',
-                                                    )}
+                                                <span className="flex shrink-0 items-center gap-2">
+                                                    {alert.severity ? (
+                                                        <Badge variant="outline">
+                                                            {alert.severity}
+                                                        </Badge>
+                                                    ) : null}
+                                                    {alert.status ? (
+                                                        <Badge variant="secondary">
+                                                            {alert.status}
+                                                        </Badge>
+                                                    ) : null}
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {formatDateTime(
+                                                            alert.triggeredAt,
+                                                        )}
+                                                    </span>
                                                 </span>
-                                            </span>
-                                            <span className="flex shrink-0 items-center gap-2">
-                                                <Badge variant="outline">
-                                                    {alert.severity}
-                                                </Badge>
-                                                <Badge variant="secondary">
-                                                    {alert.status}
-                                                </Badge>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {formatDateTime(
-                                                        alert.triggeredAt,
-                                                    )}
-                                                </span>
-                                            </span>
-                                        </Link>
-                                    ))}
+                                            </Link>
+                                        ) : (
+                                            <div
+                                                key={alert.id}
+                                                className="rounded-md border px-3"
+                                            >
+                                                <ControlRoomAlertAccessRequired
+                                                    label={alert.access.label}
+                                                />
+                                            </div>
+                                        ),
+                                    )}
                                 </CardContent>
                             </Card>
                         )}
@@ -1505,6 +1562,7 @@ export default function DeviceShow({
                                                         >
                                                             <Network className="h-4 w-4 text-muted-foreground" />
                                                             <span className="text-muted-foreground">
+                                                                This device{' '}
                                                                 {r.type.replace(
                                                                     /_/g,
                                                                     ' ',
@@ -1563,12 +1621,6 @@ export default function DeviceShow({
                                                             className="mb-1 flex items-center gap-3 rounded-md border p-3 text-sm"
                                                         >
                                                             <GitBranch className="h-4 w-4 text-muted-foreground" />
-                                                            <span className="text-muted-foreground">
-                                                                {r.type.replace(
-                                                                    /_/g,
-                                                                    ' ',
-                                                                )}
-                                                            </span>
                                                             <Link
                                                                 href={`/security-devices/devices/${r.device_id}`}
                                                                 className="flex-1 truncate text-primary hover:underline"
@@ -1576,6 +1628,13 @@ export default function DeviceShow({
                                                                 {r.device_name ??
                                                                     `Device #${r.device_id}`}
                                                             </Link>
+                                                            <span className="text-muted-foreground">
+                                                                {r.type.replace(
+                                                                    /_/g,
+                                                                    ' ',
+                                                                )}{' '}
+                                                                this device
+                                                            </span>
                                                             {r.port && (
                                                                 <Badge
                                                                     variant="outline"
@@ -1621,6 +1680,97 @@ export default function DeviceShow({
                                         }
                                         variant="compact"
                                     />
+                                )}
+                                {totalRelationshipHistory > 0 && (
+                                    <details className="mt-5 border-t pt-4">
+                                        <summary className="flex min-h-11 cursor-pointer items-center font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none">
+                                            Relationship history (
+                                            {totalRelationshipHistory})
+                                        </summary>
+                                        <p className="mb-3 text-xs text-muted-foreground">
+                                            Removed relationships are retained
+                                            with their operator and reason
+                                            evidence.
+                                        </p>
+                                        <div className="space-y-2">
+                                            {relationshipHistory.parents.map(
+                                                (relationship) => (
+                                                    <div
+                                                        key={relationship.id}
+                                                        className="rounded-md border bg-muted/20 p-3 text-sm"
+                                                    >
+                                                        <p>
+                                                            This device{' '}
+                                                            {relationship.type.replace(
+                                                                /_/g,
+                                                                ' ',
+                                                            )}{' '}
+                                                            <Link
+                                                                href={`/security-devices/devices/${relationship.device_id}`}
+                                                                className="font-medium text-primary hover:underline"
+                                                            >
+                                                                {relationship.device_name ??
+                                                                    `Device #${relationship.device_id}`}
+                                                            </Link>
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-muted-foreground">
+                                                            Removed{' '}
+                                                            {formatDateTime(
+                                                                relationship.unlinked_at,
+                                                            )}
+                                                            {relationship.unlinked_by
+                                                                ? ` by ${relationship.unlinked_by}`
+                                                                : ''}
+                                                            . Reason:{' '}
+                                                            <span className="break-words text-foreground">
+                                                                {
+                                                                    relationship.unlink_reason
+                                                                }
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                ),
+                                            )}
+                                            {relationshipHistory.children.map(
+                                                (relationship) => (
+                                                    <div
+                                                        key={relationship.id}
+                                                        className="rounded-md border bg-muted/20 p-3 text-sm"
+                                                    >
+                                                        <p>
+                                                            <Link
+                                                                href={`/security-devices/devices/${relationship.device_id}`}
+                                                                className="font-medium text-primary hover:underline"
+                                                            >
+                                                                {relationship.device_name ??
+                                                                    `Device #${relationship.device_id}`}
+                                                            </Link>{' '}
+                                                            {relationship.type.replace(
+                                                                /_/g,
+                                                                ' ',
+                                                            )}{' '}
+                                                            this device
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-muted-foreground">
+                                                            Removed{' '}
+                                                            {formatDateTime(
+                                                                relationship.unlinked_at,
+                                                            )}
+                                                            {relationship.unlinked_by
+                                                                ? ` by ${relationship.unlinked_by}`
+                                                                : ''}
+                                                            . Reason:{' '}
+                                                            <span className="break-words text-foreground">
+                                                                {
+                                                                    relationship.unlink_reason
+                                                                }
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    </details>
                                 )}
                             </CardContent>
                         </Card>
@@ -1882,7 +2032,7 @@ export default function DeviceShow({
                                                             size="sm"
                                                             variant="ghost"
                                                             className="min-h-11 min-w-11 px-2 text-status-critical hover:text-status-critical"
-                                                            aria-label={`Delete document ${doc.title}`}
+                                                            aria-label={`Remove document ${doc.title}`}
                                                             onClick={() =>
                                                                 setPendingDocumentDeletion(
                                                                     {
@@ -1895,7 +2045,7 @@ export default function DeviceShow({
                                                                 deletingDocId ===
                                                                 doc.id
                                                             }
-                                                            title="Delete document"
+                                                            title="Remove document"
                                                         >
                                                             <Trash2 className="h-3.5 w-3.5" />
                                                         </Button>
@@ -1908,15 +2058,19 @@ export default function DeviceShow({
                             </CardContent>
                         </Card>
 
+                        <DeviceDocumentHistory items={documentHistory} />
+
                         {/* Upload dialog */}
                         <Dialog open={docOpen} onOpenChange={setDocOpen}>
                             <DialogContent className="sm:max-w-md">
                                 <DialogHeader>
                                     <DialogTitle>Upload document</DialogTitle>
                                     <DialogDescription>
-                                        Max 20 MB. Stored encrypted on the local
-                                        disk. Delete removes both the row and
-                                        the file.
+                                        Max 20 MB. Uploads are staged and
+                                        verified in private storage before they
+                                        become available. Removal is recorded
+                                        first, then recovered automatically if
+                                        quarantine cleanup is interrupted.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4">
@@ -2415,40 +2569,50 @@ export default function DeviceShow({
                     confirmText="Unlink asset"
                 />
 
-                <ConfirmDialog
+                <ReasonDialog
                     open={pendingRelationshipRemoval !== null}
                     onClose={() => setPendingRelationshipRemoval(null)}
-                    onConfirm={() => {
+                    onConfirm={(reason, done) => {
                         if (pendingRelationshipRemoval) {
                             submitUnlinkRelationship(
                                 pendingRelationshipRemoval.id,
+                                reason,
+                                done,
                             );
                         }
                     }}
                     title="Remove device relationship?"
                     description={
                         pendingRelationshipRemoval
-                            ? `Remove the recorded relationship with “${pendingRelationshipRemoval.device_name ?? `Device ${pendingRelationshipRemoval.device_id}`}”? Neither device is deleted.`
+                            ? `Remove the active relationship with “${pendingRelationshipRemoval.device_name ?? `Device ${pendingRelationshipRemoval.device_id}`}”? Neither Device is deleted, and the relationship is retained as history.`
                             : ''
                     }
-                    confirmText="Remove relationship"
+                    label="Reason for removing this relationship"
+                    placeholder="For example: network path replaced during the approved change."
+                    confirmLabel="Remove relationship"
                 />
 
-                <ConfirmDialog
+                <ReasonDialog
                     open={pendingDocumentDeletion !== null}
                     onClose={() => setPendingDocumentDeletion(null)}
-                    onConfirm={() => {
+                    onConfirm={(reason, done) => {
                         if (pendingDocumentDeletion) {
-                            submitDeleteDocument(pendingDocumentDeletion.id);
+                            submitDeleteDocument(
+                                pendingDocumentDeletion.id,
+                                reason,
+                                done,
+                            );
                         }
                     }}
-                    title="Delete device document?"
+                    title="Remove device document?"
                     description={
                         pendingDocumentDeletion
-                            ? `Permanently delete “${pendingDocumentDeletion.title}” and its stored file? This cannot be undone.`
+                            ? `Remove “${pendingDocumentDeletion.title}” from active records? The private file will move through recoverable quarantine before deletion, while its metadata, integrity fingerprint, actor, and reason remain in Document lifecycle history.`
                             : ''
                     }
-                    confirmText="Delete document"
+                    label="Reason for removing this document"
+                    placeholder="For example: superseded by a verified current certificate."
+                    confirmLabel="Remove document"
                 />
 
                 <ConfirmDialog

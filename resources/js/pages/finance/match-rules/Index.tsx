@@ -1,21 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, router } from '@inertiajs/react';
-import { PageHero, PageLayout } from '@/components/page';
 import { BankingTabsFooter, ConfirmDialog } from '@/components/finance';
-import { Button } from '@/components/ui/button';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import {
     Dialog,
     DialogContent,
@@ -25,6 +13,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -32,8 +22,24 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Settings, Plus, Pencil, Trash2, SlidersHorizontal } from 'lucide-react';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/react';
+import {
+    Pencil,
+    Plus,
+    Settings,
+    SlidersHorizontal,
+    Trash2,
+} from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type MatchRule = {
@@ -72,14 +78,15 @@ const ruleTypeLabels: Record<string, string> = {
 
 function CreateRuleDialog() {
     const [open, setOpen] = useState(false);
-    const { data, setData, post, processing, errors, reset } = useForm<MatchRuleFormData>({
-        name: '',
-        priority: 0,
-        rule_type: 'exact_amount',
-        auto_confirm_threshold: 95,
-        is_active: true,
-        conditions: {},
-    });
+    const { data, setData, post, processing, errors, reset } =
+        useForm<MatchRuleFormData>({
+            name: '',
+            priority: 0,
+            rule_type: 'exact_amount',
+            auto_confirm_threshold: 95,
+            is_active: true,
+            conditions: {},
+        });
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
@@ -115,27 +122,47 @@ function CreateRuleDialog() {
                             onChange={(e) => setData('name', e.target.value)}
                             placeholder="e.g. Exact amount match for utilities"
                         />
-                        {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                        {errors.name && (
+                            <p className="text-sm text-destructive">
+                                {errors.name}
+                            </p>
+                        )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <Label htmlFor="rule-type">Rule Type *</Label>
                             <Select
                                 value={data.rule_type}
-                                onValueChange={(value) => setData('rule_type', value)}
+                                onValueChange={(value) =>
+                                    setData('rule_type', value)
+                                }
                             >
                                 <SelectTrigger id="rule-type">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="exact_amount">Exact Amount</SelectItem>
-                                    <SelectItem value="reference_match">Reference Match</SelectItem>
-                                    <SelectItem value="vendor_pattern">Vendor Pattern</SelectItem>
-                                    <SelectItem value="recurring_pattern">Recurring Pattern</SelectItem>
-                                    <SelectItem value="amount_tolerance">Amount Tolerance</SelectItem>
+                                    <SelectItem value="exact_amount">
+                                        Exact Amount
+                                    </SelectItem>
+                                    <SelectItem value="reference_match">
+                                        Reference Match
+                                    </SelectItem>
+                                    <SelectItem value="vendor_pattern">
+                                        Vendor Pattern
+                                    </SelectItem>
+                                    <SelectItem value="recurring_pattern">
+                                        Recurring Pattern
+                                    </SelectItem>
+                                    <SelectItem value="amount_tolerance">
+                                        Amount Tolerance
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
-                            {errors.rule_type && <p className="text-sm text-destructive">{errors.rule_type}</p>}
+                            {errors.rule_type && (
+                                <p className="text-sm text-destructive">
+                                    {errors.rule_type}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="rule-priority">Priority</Label>
@@ -143,40 +170,67 @@ function CreateRuleDialog() {
                                 id="rule-priority"
                                 type="number"
                                 value={data.priority}
-                                onChange={(e) => setData('priority', parseInt(e.target.value) || 0)}
+                                onChange={(e) =>
+                                    setData(
+                                        'priority',
+                                        parseInt(e.target.value) || 0,
+                                    )
+                                }
                                 min={0}
                             />
-                            {errors.priority && <p className="text-sm text-destructive">{errors.priority}</p>}
+                            {errors.priority && (
+                                <p className="text-sm text-destructive">
+                                    {errors.priority}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="space-y-1.5">
-                        <Label htmlFor="rule-threshold">Auto-confirm Threshold (%)</Label>
+                        <Label htmlFor="rule-threshold">
+                            Auto-confirm Threshold (%)
+                        </Label>
                         <Input
                             id="rule-threshold"
                             type="number"
                             value={data.auto_confirm_threshold}
-                            onChange={(e) => setData('auto_confirm_threshold', parseFloat(e.target.value) || 95)}
+                            onChange={(e) =>
+                                setData(
+                                    'auto_confirm_threshold',
+                                    parseFloat(e.target.value) || 95,
+                                )
+                            }
                             min={0}
                             max={100}
                             step={0.01}
                         />
                         <p className="text-xs text-muted-foreground">
-                            Matches above this score will be automatically confirmed.
+                            Matches above this score will be automatically
+                            confirmed.
                         </p>
                         {errors.auto_confirm_threshold && (
-                            <p className="text-sm text-destructive">{errors.auto_confirm_threshold}</p>
+                            <p className="text-sm text-destructive">
+                                {errors.auto_confirm_threshold}
+                            </p>
                         )}
                     </div>
                     <div className="flex items-center gap-2">
                         <Checkbox
                             id="rule-active"
                             checked={data.is_active}
-                            onCheckedChange={(checked) => setData('is_active', checked === true)}
+                            onCheckedChange={(checked) =>
+                                setData('is_active', checked === true)
+                            }
                         />
-                        <Label htmlFor="rule-active" className="font-normal">Active</Label>
+                        <Label htmlFor="rule-active" className="font-normal">
+                            Active
+                        </Label>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>
@@ -191,14 +245,16 @@ function CreateRuleDialog() {
 
 function EditRuleDialog({ rule }: { rule: MatchRule }) {
     const [open, setOpen] = useState(false);
-    const { data, setData, put, processing, errors } = useForm<MatchRuleFormData>({
-        name: rule.name,
-        priority: rule.priority,
-        rule_type: rule.rule_type,
-        auto_confirm_threshold: rule.auto_confirm_threshold,
-        is_active: rule.is_active,
-        conditions: (rule.conditions ?? {}) as MatchRuleFormData['conditions'],
-    });
+    const { data, setData, put, processing, errors } =
+        useForm<MatchRuleFormData>({
+            name: rule.name,
+            priority: rule.priority,
+            rule_type: rule.rule_type,
+            auto_confirm_threshold: rule.auto_confirm_threshold,
+            is_active: rule.is_active,
+            conditions: (rule.conditions ??
+                {}) as MatchRuleFormData['conditions'],
+        });
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
@@ -217,7 +273,9 @@ function EditRuleDialog({ rule }: { rule: MatchRule }) {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Edit Match Rule</DialogTitle>
-                    <DialogDescription>Update match rule configuration.</DialogDescription>
+                    <DialogDescription>
+                        Update match rule configuration.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-1.5">
@@ -227,27 +285,47 @@ function EditRuleDialog({ rule }: { rule: MatchRule }) {
                             value={data.name}
                             onChange={(e) => setData('name', e.target.value)}
                         />
-                        {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                        {errors.name && (
+                            <p className="text-sm text-destructive">
+                                {errors.name}
+                            </p>
+                        )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <Label htmlFor="edit-rule-type">Rule Type *</Label>
                             <Select
                                 value={data.rule_type}
-                                onValueChange={(value) => setData('rule_type', value)}
+                                onValueChange={(value) =>
+                                    setData('rule_type', value)
+                                }
                             >
                                 <SelectTrigger id="edit-rule-type">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="exact_amount">Exact Amount</SelectItem>
-                                    <SelectItem value="reference_match">Reference Match</SelectItem>
-                                    <SelectItem value="vendor_pattern">Vendor Pattern</SelectItem>
-                                    <SelectItem value="recurring_pattern">Recurring Pattern</SelectItem>
-                                    <SelectItem value="amount_tolerance">Amount Tolerance</SelectItem>
+                                    <SelectItem value="exact_amount">
+                                        Exact Amount
+                                    </SelectItem>
+                                    <SelectItem value="reference_match">
+                                        Reference Match
+                                    </SelectItem>
+                                    <SelectItem value="vendor_pattern">
+                                        Vendor Pattern
+                                    </SelectItem>
+                                    <SelectItem value="recurring_pattern">
+                                        Recurring Pattern
+                                    </SelectItem>
+                                    <SelectItem value="amount_tolerance">
+                                        Amount Tolerance
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
-                            {errors.rule_type && <p className="text-sm text-destructive">{errors.rule_type}</p>}
+                            {errors.rule_type && (
+                                <p className="text-sm text-destructive">
+                                    {errors.rule_type}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="edit-rule-priority">Priority</Label>
@@ -255,37 +333,66 @@ function EditRuleDialog({ rule }: { rule: MatchRule }) {
                                 id="edit-rule-priority"
                                 type="number"
                                 value={data.priority}
-                                onChange={(e) => setData('priority', parseInt(e.target.value) || 0)}
+                                onChange={(e) =>
+                                    setData(
+                                        'priority',
+                                        parseInt(e.target.value) || 0,
+                                    )
+                                }
                                 min={0}
                             />
-                            {errors.priority && <p className="text-sm text-destructive">{errors.priority}</p>}
+                            {errors.priority && (
+                                <p className="text-sm text-destructive">
+                                    {errors.priority}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="space-y-1.5">
-                        <Label htmlFor="edit-rule-threshold">Auto-confirm Threshold (%)</Label>
+                        <Label htmlFor="edit-rule-threshold">
+                            Auto-confirm Threshold (%)
+                        </Label>
                         <Input
                             id="edit-rule-threshold"
                             type="number"
                             value={data.auto_confirm_threshold}
-                            onChange={(e) => setData('auto_confirm_threshold', parseFloat(e.target.value) || 95)}
+                            onChange={(e) =>
+                                setData(
+                                    'auto_confirm_threshold',
+                                    parseFloat(e.target.value) || 95,
+                                )
+                            }
                             min={0}
                             max={100}
                             step={0.01}
                         />
                         {errors.auto_confirm_threshold && (
-                            <p className="text-sm text-destructive">{errors.auto_confirm_threshold}</p>
+                            <p className="text-sm text-destructive">
+                                {errors.auto_confirm_threshold}
+                            </p>
                         )}
                     </div>
                     <div className="flex items-center gap-2">
                         <Checkbox
                             id="edit-rule-active"
                             checked={data.is_active}
-                            onCheckedChange={(checked) => setData('is_active', checked === true)}
+                            onCheckedChange={(checked) =>
+                                setData('is_active', checked === true)
+                            }
                         />
-                        <Label htmlFor="edit-rule-active" className="font-normal">Active</Label>
+                        <Label
+                            htmlFor="edit-rule-active"
+                            className="font-normal"
+                        >
+                            Active
+                        </Label>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>
@@ -325,7 +432,8 @@ export default function MatchRulesIndex({ rules }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={SlidersHorizontal}
                         title="Match Rules"
                         description="Configure rules for automatic payment matching and auto-confirmation thresholds"
@@ -344,8 +452,9 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                             <Settings className="h-5 w-5 text-muted-foreground" />
                             <div>
                                 <CardTitle>All Rules</CardTitle>
-                                <p className="text-sm text-muted-foreground mt-0.5">
-                                    Rules are evaluated in priority order during automatic matching
+                                <p className="mt-0.5 text-sm text-muted-foreground">
+                                    Rules are evaluated in priority order during
+                                    automatic matching
                                 </p>
                             </div>
                         </div>
@@ -356,30 +465,49 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                                 <TableRow>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Type</TableHead>
-                                    <TableHead className="text-center">Priority</TableHead>
-                                    <TableHead className="text-center">Threshold</TableHead>
-                                    <TableHead className="text-center">Matches</TableHead>
+                                    <TableHead className="text-center">
+                                        Priority
+                                    </TableHead>
+                                    <TableHead className="text-center">
+                                        Threshold
+                                    </TableHead>
+                                    <TableHead className="text-center">
+                                        Matches
+                                    </TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="text-right">
+                                        Actions
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {rules.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                                            No match rules configured. Create a rule to control automatic matching behaviour.
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            No match rules configured. Create a
+                                            rule to control automatic matching
+                                            behaviour.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     rules.map((rule) => (
                                         <TableRow key={rule.id}>
-                                            <TableCell className="font-medium">{rule.name}</TableCell>
+                                            <TableCell className="font-medium">
+                                                {rule.name}
+                                            </TableCell>
                                             <TableCell>
                                                 <Badge variant="outline">
-                                                    {ruleTypeLabels[rule.rule_type] || rule.rule_type}
+                                                    {ruleTypeLabels[
+                                                        rule.rule_type
+                                                    ] || rule.rule_type}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-center">{rule.priority}</TableCell>
+                                            <TableCell className="text-center">
+                                                {rule.priority}
+                                            </TableCell>
                                             <TableCell className="text-center font-mono tabular-nums">
                                                 {rule.auto_confirm_threshold}%
                                             </TableCell>
@@ -391,21 +519,29 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                                                     variant="outline"
                                                     className={
                                                         rule.is_active
-                                                            ? 'bg-status-success-bg text-status-success border-status-success/30'
-                                                            : 'bg-muted text-muted-foreground border-border'
+                                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                                            : 'border-border bg-muted text-muted-foreground'
                                                     }
                                                 >
-                                                    {rule.is_active ? 'Active' : 'Inactive'}
+                                                    {rule.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <EditRuleDialog rule={rule} />
+                                                    <EditRuleDialog
+                                                        rule={rule}
+                                                    />
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         aria-label={`Delete ${rule.name}`}
-                                                        onClick={() => setDeleteTarget(rule)}
+                                                        onClick={() =>
+                                                            setDeleteTarget(
+                                                                rule,
+                                                            )
+                                                        }
                                                     >
                                                         <Trash2 className="h-4 w-4 text-destructive" />
                                                     </Button>
@@ -427,8 +563,11 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                 description={
                     <>
                         This permanently deletes the match rule{' '}
-                        <span className="font-medium text-foreground">{deleteTarget?.name}</span>.
-                        New bank transactions will no longer be auto-matched by this rule.
+                        <span className="font-medium text-foreground">
+                            {deleteTarget?.name}
+                        </span>
+                        . New bank transactions will no longer be auto-matched
+                        by this rule.
                     </>
                 }
                 confirmLabel="Delete rule"

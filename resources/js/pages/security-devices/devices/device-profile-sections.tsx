@@ -1,3 +1,4 @@
+import { ItChangeDestination } from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +19,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
+import { formatReadableOperationalState } from '@/lib/readable-operational-state';
 import { Link, router } from '@inertiajs/react';
 import {
     Activity,
@@ -666,18 +668,7 @@ export function DeviceManagementSection({
                                         Approved by {command.approvedBy}
                                     </p>
                                 )}
-                                {command.change && (
-                                    <p className="mt-2 text-xs text-muted-foreground">
-                                        IT Change:{' '}
-                                        <Link
-                                            href={`/it/changes/${command.change.id}`}
-                                            className="font-medium underline-offset-4 hover:underline"
-                                        >
-                                            {command.change.reference} ·{' '}
-                                            {command.change.title}
-                                        </Link>
-                                    </p>
-                                )}
+                                <ItChangeDestination change={command.change} />
                                 {command.breakGlass && (
                                     <div
                                         className={`mt-3 rounded-lg border p-3 text-xs ${
@@ -1554,21 +1545,7 @@ function humanise(value: string | null | undefined): string {
 }
 
 function formatSafeState(state: Record<string, unknown>): string {
-    const entries = Object.entries(state);
-    if (entries.length === 0) return 'Not recorded';
-
-    return entries
-        .map(([key, value]) => {
-            const display =
-                value === null || value === undefined
-                    ? 'Not recorded'
-                    : typeof value === 'object'
-                      ? JSON.stringify(value)
-                      : humanise(String(value));
-
-            return `${humanise(key)}: ${display}`;
-        })
-        .join(' · ');
+    return formatReadableOperationalState(state);
 }
 
 function CommandDetail({

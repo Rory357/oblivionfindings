@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -177,15 +177,20 @@ export default function GlobalSiteInspections({
                         title="Inspections & Maintenance"
                         description="All sites"
                         stats={[
-                            { label: 'Schedules', value: filteredSchedules.length },
+                            {
+                                label: 'Schedules',
+                                value: filteredSchedules.length,
+                            },
                             { label: 'Overdue', value: overdueCount },
                             { label: 'Due in 7 days', value: dueSoonCount },
-                            { label: 'Passed records', value: completedPassCount },
+                            {
+                                label: 'Passed records',
+                                value: completedPassCount,
+                            },
                         ]}
                     />
                 }
             >
-
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base">Filters</CardTitle>

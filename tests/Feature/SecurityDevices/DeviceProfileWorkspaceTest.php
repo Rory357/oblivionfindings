@@ -182,6 +182,7 @@ class DeviceProfileWorkspaceTest extends TestCase
             $this->assertSame($ticket->reference, $props['profile']['tickets'][0]['reference']);
             $this->assertSame($controlRoomAlert->reference_number, $props['profile']['controlRoomAlerts'][0]['reference']);
             $this->assertSame("/control-room/alerts/{$controlRoomAlert->id}", $props['profile']['controlRoomAlerts'][0]['href']);
+            $this->assertSame('available', $props['profile']['controlRoomAlerts'][0]['access']['state']);
             $this->assertSame('device.update', $props['profile']['audit'][0]['action']);
             $this->assertSame('Primary WAN edge device for Harbour Care.', $props['profile']['configuration']['registry']['notes']);
             $this->assertSame('Critical network edge', $props['profile']['configuration']['registry']['groups'][0]['name']);
@@ -460,6 +461,49 @@ class DeviceProfileWorkspaceTest extends TestCase
                 ->has('profile.controlRoomAlerts', 0)
                 ->where('profile.sections', fn ($sections): bool => collect($sections)
                     ->every(fn (array $section): bool => ! str_starts_with((string) ($section['href'] ?? ''), '/control-room/alerts/'))));
+    }
+
+    public function test_all_sites_device_access_does_not_bypass_control_room_site_scope(): void
+    {
+        $assignedSite = Site::factory()->create();
+        $unrelatedSite = Site::factory()->create();
+        $viewer = User::factory()->create();
+        $viewer->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+        $permissionIds = Permission::query()
+            ->whereIn('key', [
+                'securityDevices.devices.viewAllSites',
+                'controlRoom.viewAny',
+                'controlRoom.alerts.view',
+            ])
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])
+            ->all();
+        $viewer->permissionOverrides()->syncWithoutDetaching($permissionIds);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $assignedSite->id,
+            'secondary_site_ids' => [],
+        ]);
+        $device = Device::factory()->create();
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $unrelatedSite->id,
+            'assigned_at' => now(),
+        ]);
+        $this->createControlRoomAlert($device, $unrelatedSite);
+
+        $this->actingAs($viewer)
+            ->get("/security-devices/devices/{$device->id}")
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $alert = $page->toArray()['props']['profile']['controlRoomAlerts'][0];
+
+                $this->assertSame('restricted', $alert['access']['state']);
+                $this->assertNull($alert['href']);
+                $this->assertNull($alert['reference']);
+                $this->assertNull($alert['type']);
+            });
     }
 
     public function test_profile_uses_canonical_device_relationships_for_monitor_profile_and_collector_projections(): void

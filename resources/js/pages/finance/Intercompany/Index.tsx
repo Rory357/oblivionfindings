@@ -1,27 +1,7 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, useForm, router } from '@inertiajs/react';
+import { formatMoney } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import {
     Dialog,
     DialogContent,
@@ -31,8 +11,28 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowLeftRight, Plus, Send, Clock, DollarSign } from 'lucide-react';
-import { formatMoney } from '@/components/finance';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/react';
+import { ArrowLeftRight, Clock, DollarSign, Plus, Send } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type Entity = {
@@ -66,7 +66,13 @@ type PageProps = {
     entities: Entity[];
 };
 
-function CreateTransactionDialog({ groupId, entities }: { groupId: number; entities: Entity[] }) {
+function CreateTransactionDialog({
+    groupId,
+    entities,
+}: {
+    groupId: number;
+    entities: Entity[];
+}) {
     const [open, setOpen] = useState(false);
     const { data, setData, post, processing, errors, reset } = useForm({
         from_entity_id: '',
@@ -99,7 +105,9 @@ function CreateTransactionDialog({ groupId, entities }: { groupId: number; entit
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Create Intercompany Transaction</DialogTitle>
-                    <DialogDescription>Record a transaction between two entities in the group.</DialogDescription>
+                    <DialogDescription>
+                        Record a transaction between two entities in the group.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -107,41 +115,63 @@ function CreateTransactionDialog({ groupId, entities }: { groupId: number; entit
                             <Label htmlFor="ict-from">From Entity *</Label>
                             <Select
                                 value={data.from_entity_id}
-                                onValueChange={(val) => setData('from_entity_id', val)}
+                                onValueChange={(val) =>
+                                    setData('from_entity_id', val)
+                                }
                             >
                                 <SelectTrigger id="ict-from">
                                     <SelectValue placeholder="Select entity" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {activeEntities.map((entity) => (
-                                        <SelectItem key={entity.id} value={String(entity.id)}>
+                                        <SelectItem
+                                            key={entity.id}
+                                            value={String(entity.id)}
+                                        >
                                             {entity.entity_name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {errors.from_entity_id && <p className="text-sm text-destructive">{errors.from_entity_id}</p>}
+                            {errors.from_entity_id && (
+                                <p className="text-sm text-destructive">
+                                    {errors.from_entity_id}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="ict-to">To Entity *</Label>
                             <Select
                                 value={data.to_entity_id}
-                                onValueChange={(val) => setData('to_entity_id', val)}
+                                onValueChange={(val) =>
+                                    setData('to_entity_id', val)
+                                }
                             >
                                 <SelectTrigger id="ict-to">
                                     <SelectValue placeholder="Select entity" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {activeEntities
-                                        .filter((e) => String(e.id) !== data.from_entity_id)
+                                        .filter(
+                                            (e) =>
+                                                String(e.id) !==
+                                                data.from_entity_id,
+                                        )
                                         .map((entity) => (
-                                            <SelectItem key={entity.id} value={String(entity.id)}>
+                                            <SelectItem
+                                                key={entity.id}
+                                                value={String(entity.id)}
+                                            >
                                                 {entity.entity_name}
                                             </SelectItem>
                                         ))}
                                 </SelectContent>
                             </Select>
-                            {errors.to_entity_id && <p className="text-sm text-destructive">{errors.to_entity_id}</p>}
+                            {errors.to_entity_id && (
+                                <p className="text-sm text-destructive">
+                                    {errors.to_entity_id}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -151,9 +181,15 @@ function CreateTransactionDialog({ groupId, entities }: { groupId: number; entit
                                 id="ict-date"
                                 type="date"
                                 value={data.transaction_date}
-                                onChange={(e) => setData('transaction_date', e.target.value)}
+                                onChange={(e) =>
+                                    setData('transaction_date', e.target.value)
+                                }
                             />
-                            {errors.transaction_date && <p className="text-sm text-destructive">{errors.transaction_date}</p>}
+                            {errors.transaction_date && (
+                                <p className="text-sm text-destructive">
+                                    {errors.transaction_date}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="ict-amount">Amount *</Label>
@@ -163,10 +199,16 @@ function CreateTransactionDialog({ groupId, entities }: { groupId: number; entit
                                 min="0.01"
                                 step="0.01"
                                 value={data.amount}
-                                onChange={(e) => setData('amount', e.target.value)}
+                                onChange={(e) =>
+                                    setData('amount', e.target.value)
+                                }
                                 placeholder="0.00"
                             />
-                            {errors.amount && <p className="text-sm text-destructive">{errors.amount}</p>}
+                            {errors.amount && (
+                                <p className="text-sm text-destructive">
+                                    {errors.amount}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="space-y-1.5">
@@ -174,13 +216,25 @@ function CreateTransactionDialog({ groupId, entities }: { groupId: number; entit
                         <Input
                             id="ict-description"
                             value={data.description}
-                            onChange={(e) => setData('description', e.target.value)}
+                            onChange={(e) =>
+                                setData('description', e.target.value)
+                            }
                             placeholder="e.g. Management fee for Q1 2026"
                         />
-                        {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
+                        {errors.description && (
+                            <p className="text-sm text-destructive">
+                                {errors.description}
+                            </p>
+                        )}
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Creating...' : 'Create Transaction'}
                         </Button>
@@ -191,7 +245,11 @@ function CreateTransactionDialog({ groupId, entities }: { groupId: number; entit
     );
 }
 
-export default function IntercompanyIndex({ group, transactions, entities }: PageProps) {
+export default function IntercompanyIndex({
+    group,
+    transactions,
+    entities,
+}: PageProps) {
     const [postingId, setPostingId] = useState<number | null>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -201,14 +259,23 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
         { title: 'Intercompany', href: `/finance/intercompany/${group.id}` },
     ];
 
-    const pendingTransactions = transactions.filter((t) => t.status === 'pending');
-    const pendingTotal = pendingTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const pendingTransactions = transactions.filter(
+        (t) => t.status === 'pending',
+    );
+    const pendingTotal = pendingTransactions.reduce(
+        (sum, t) => sum + Number(t.amount),
+        0,
+    );
 
     function handlePost(transactionId: number) {
         setPostingId(transactionId);
-        router.post(`/finance/intercompany/${group.id}/${transactionId}/post`, {}, {
-            onFinish: () => setPostingId(null),
-        });
+        router.post(
+            `/finance/intercompany/${group.id}/${transactionId}/post`,
+            {},
+            {
+                onFinish: () => setPostingId(null),
+            },
+        );
     }
 
     return (
@@ -217,17 +284,29 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={ArrowLeftRight}
                         backHref={`/finance/consolidation/${group.id}`}
                         title="Intercompany Transactions"
                         description={`Manage transactions between entities in ${group.name}`}
                         stats={[
                             { label: 'Total', value: transactions.length },
-                            { label: 'Pending', value: pendingTransactions.length },
-                            { label: 'Pending amount', value: formatMoney(pendingTotal) },
+                            {
+                                label: 'Pending',
+                                value: pendingTransactions.length,
+                            },
+                            {
+                                label: 'Pending amount',
+                                value: formatMoney(pendingTotal),
+                            },
                         ]}
-                        actions={<CreateTransactionDialog groupId={group.id} entities={entities} />}
+                        actions={
+                            <CreateTransactionDialog
+                                groupId={group.id}
+                                entities={entities}
+                            />
+                        }
                     />
                 }
             >
@@ -239,8 +318,12 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                                 <Clock className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Pending Transactions</p>
-                                <p className="text-2xl font-bold">{pendingTransactions.length}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Pending Transactions
+                                </p>
+                                <p className="text-2xl font-bold">
+                                    {pendingTransactions.length}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -250,8 +333,12 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                                 <DollarSign className="h-5 w-5 text-primary" />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Pending Amount</p>
-                                <p className="text-2xl font-bold font-mono tabular-nums">{formatMoney(pendingTotal)}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Pending Amount
+                                </p>
+                                <p className="font-mono text-2xl font-bold tabular-nums">
+                                    {formatMoney(pendingTotal)}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -272,43 +359,67 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                                     <TableHead>From</TableHead>
                                     <TableHead>To</TableHead>
                                     <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
+                                    <TableHead className="text-right">
+                                        Amount
+                                    </TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="text-right">
+                                        Actions
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {transactions.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                                            No intercompany transactions yet. Create your first transaction.
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            No intercompany transactions yet.
+                                            Create your first transaction.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     transactions.map((txn) => (
                                         <TableRow key={txn.id}>
-                                            <TableCell className="text-sm">{txn.transaction_date}</TableCell>
-                                            <TableCell className="font-medium">{txn.from_entity_name}</TableCell>
-                                            <TableCell className="font-medium">{txn.to_entity_name}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                                            <TableCell className="text-sm">
+                                                {txn.transaction_date}
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {txn.from_entity_name}
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {txn.to_entity_name}
+                                            </TableCell>
+                                            <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
                                                 {txn.description}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {formatMoney(Number(txn.amount))}
+                                                {formatMoney(
+                                                    Number(txn.amount),
+                                                )}
                                             </TableCell>
                                             <TableCell>
-                                                <StatusBadge status={txn.status} />
+                                                <StatusBadge
+                                                    status={txn.status}
+                                                />
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 {txn.status === 'pending' && (
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => handlePost(txn.id)}
-                                                        disabled={postingId === txn.id}
+                                                        onClick={() =>
+                                                            handlePost(txn.id)
+                                                        }
+                                                        disabled={
+                                                            postingId === txn.id
+                                                        }
                                                     >
                                                         <Send className="mr-1 h-3 w-3" />
-                                                        {postingId === txn.id ? 'Posting...' : 'Post'}
+                                                        {postingId === txn.id
+                                                            ? 'Posting...'
+                                                            : 'Post'}
                                                     </Button>
                                                 )}
                                             </TableCell>

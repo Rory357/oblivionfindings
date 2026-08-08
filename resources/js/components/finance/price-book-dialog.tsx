@@ -11,10 +11,10 @@ import {
     ReviewRow,
     Segmented,
     StepHead,
+    useWizard,
     WizardShell,
     WizardSuccessPane,
     type WizardStep,
-    useWizard,
 } from './wizard';
 
 /** An existing price book to prefill the wizard with (edit mode). */
@@ -28,12 +28,26 @@ export type EditablePriceBook = {
 };
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Details', blurb: 'Name & effective dates', icon: BookOpen },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ListChecks },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Name & effective dates',
+        icon: BookOpen,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: ListChecks,
+    },
 ];
 
 const fmtDate = (d: string) =>
-    new Date(`${d}T00:00:00`).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(`${d}T00:00:00`).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 
 /**
  * Price Book wizard — create/edit a rate-card price book as a stepper modal
@@ -64,24 +78,35 @@ export function PriceBookDialog({
         effective_from: string;
         effective_to: string;
         is_active: boolean;
-    }>(priceBook ? {
-        name: priceBook.name ?? '',
-        description: priceBook.description ?? '',
-        effective_from: priceBook.effective_from ? String(priceBook.effective_from).slice(0, 10) : '',
-        effective_to: priceBook.effective_to ? String(priceBook.effective_to).slice(0, 10) : '',
-        is_active: priceBook.is_active,
-    } : {
-        name: '',
-        description: '',
-        effective_from: '',
-        effective_to: '',
-        is_active: true,
-    });
+    }>(
+        priceBook
+            ? {
+                  name: priceBook.name ?? '',
+                  description: priceBook.description ?? '',
+                  effective_from: priceBook.effective_from
+                      ? String(priceBook.effective_from).slice(0, 10)
+                      : '',
+                  effective_to: priceBook.effective_to
+                      ? String(priceBook.effective_to).slice(0, 10)
+                      : '',
+                  is_active: priceBook.is_active,
+              }
+            : {
+                  name: '',
+                  description: '',
+                  effective_from: '',
+                  effective_to: '',
+                  is_active: true,
+              },
+    );
     const { data, setData, processing, errors } = form;
 
     // Mirrors the backend `after_or_equal:effective_from` rule so users see the
     // problem before submit (ISO date strings compare lexicographically).
-    const datesValid = !data.effective_from || !data.effective_to || data.effective_to >= data.effective_from;
+    const datesValid =
+        !data.effective_from ||
+        !data.effective_to ||
+        data.effective_to >= data.effective_from;
     const detailsValid = !!data.name.trim() && datesValid;
 
     const close = () => {
@@ -123,7 +148,11 @@ export function PriceBookDialog({
             open={open}
             onClose={close}
             title={isEdit ? 'Edit price book' : 'New price book'}
-            description={isEdit ? 'Update this price book' : 'Create a price book for service rates'}
+            description={
+                isEdit
+                    ? 'Update this price book'
+                    : 'Create a price book for service rates'
+            }
             railIcon={BookOpen}
             railTitle={isEdit ? 'Edit Price Book' : 'New Price Book'}
             railSub="Rates & pricing"
@@ -132,38 +161,62 @@ export function PriceBookDialog({
             onStepClick={goTo}
             pct={detailsValid ? 100 : 40}
             pctLabel="Price book"
-            success={succeeded ? (
-                <WizardSuccessPane
-                    title={isEdit ? 'Price book updated' : `${data.name || 'Price book'} created`}
-                    blurb={isEdit
-                        ? 'The price book details have been saved.'
-                        : 'The price book is ready. Open it to add rate items for your services.'}
-                    actions={
-                        <>
-                            {!isEdit && (
-                                <Button variant="outline" onClick={startAnother}>
-                                    <Plus className="h-4 w-4" /> Add another
-                                </Button>
-                            )}
-                            <Button onClick={close}>Done</Button>
-                        </>
-                    }
-                />
-            ) : undefined}
+            success={
+                succeeded ? (
+                    <WizardSuccessPane
+                        title={
+                            isEdit
+                                ? 'Price book updated'
+                                : `${data.name || 'Price book'} created`
+                        }
+                        blurb={
+                            isEdit
+                                ? 'The price book details have been saved.'
+                                : 'The price book is ready. Open it to add rate items for your services.'
+                        }
+                        actions={
+                            <>
+                                {!isEdit && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={startAnother}
+                                    >
+                                        <Plus className="h-4 w-4" /> Add another
+                                    </Button>
+                                )}
+                                <Button onClick={close}>Done</Button>
+                            </>
+                        }
+                    />
+                ) : undefined
+            }
             footerEnd={
                 <>
                     {!isFirst && (
-                        <Button type="button" variant="outline" onClick={back} disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={back}
+                            disabled={processing}
+                        >
                             Back
                         </Button>
                     )}
                     {!isLast && (
-                        <Button type="button" onClick={next} disabled={!detailsValid}>
+                        <Button
+                            type="button"
+                            onClick={next}
+                            disabled={!detailsValid}
+                        >
                             Continue
                         </Button>
                     )}
                     {isLast && (
-                        <Button type="button" onClick={submit} disabled={processing || !detailsValid}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={processing || !detailsValid}
+                        >
                             {isEdit ? 'Save changes' : 'Create price book'}
                         </Button>
                     )}
@@ -172,45 +225,73 @@ export function PriceBookDialog({
         >
             {index === 0 && (
                 <div>
-                    <StepHead icon={BookOpen} title="Price book details" blurb="Name the rate card and set when it applies." />
+                    <StepHead
+                        icon={BookOpen}
+                        title="Price book details"
+                        blurb="Name the rate card and set when it applies."
+                    />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <Field label="Name" span required error={errors.name}>
                             <Input
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                                 placeholder="e.g. Standard Rate Card 2026"
                             />
                         </Field>
-                        <Field label="Description" span hint="optional" error={errors.description}>
+                        <Field
+                            label="Description"
+                            span
+                            hint="optional"
+                            error={errors.description}
+                        >
                             <Textarea
                                 rows={3}
                                 value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    setData('description', e.target.value)
+                                }
                                 placeholder="Describe this price book…"
                             />
                         </Field>
-                        <Field label="Effective from" hint="optional" error={errors.effective_from}>
+                        <Field
+                            label="Effective from"
+                            hint="optional"
+                            error={errors.effective_from}
+                        >
                             <Input
                                 type="date"
                                 value={data.effective_from}
-                                onChange={(e) => setData('effective_from', e.target.value)}
+                                onChange={(e) =>
+                                    setData('effective_from', e.target.value)
+                                }
                             />
                         </Field>
                         <Field
                             label="Effective to"
                             hint="optional"
-                            error={errors.effective_to ?? (!datesValid ? 'Must be on or after the effective-from date.' : undefined)}
+                            error={
+                                errors.effective_to ??
+                                (!datesValid
+                                    ? 'Must be on or after the effective-from date.'
+                                    : undefined)
+                            }
                         >
                             <Input
                                 type="date"
                                 value={data.effective_to}
-                                onChange={(e) => setData('effective_to', e.target.value)}
+                                onChange={(e) =>
+                                    setData('effective_to', e.target.value)
+                                }
                             />
                         </Field>
                         <Field label="Status" span error={errors.is_active}>
                             <Segmented
                                 value={data.is_active ? 'active' : 'inactive'}
-                                onChange={(v) => setData('is_active', v === 'active')}
+                                onChange={(v) =>
+                                    setData('is_active', v === 'active')
+                                }
                                 options={[
                                     { value: 'active', label: 'Active' },
                                     { value: 'inactive', label: 'Inactive' },
@@ -226,11 +307,20 @@ export function PriceBookDialog({
                     <StepHead
                         icon={ListChecks}
                         title={isEdit ? 'Review & save' : 'Review & create'}
-                        blurb={isEdit ? 'Updates this price book.' : 'Creates the price book — add rate items from its page afterwards.'}
+                        blurb={
+                            isEdit
+                                ? 'Updates this price book.'
+                                : 'Creates the price book — add rate items from its page afterwards.'
+                        }
                     />
                     <ReviewCard icon={BookOpen} title="Price book">
                         <ReviewRow label="Name" value={data.name || '—'} />
-                        {data.description && <ReviewRow label="Description" value={data.description} />}
+                        {data.description && (
+                            <ReviewRow
+                                label="Description"
+                                value={data.description}
+                            />
+                        )}
                         <ReviewRow
                             label="Effective"
                             value={
@@ -239,9 +329,16 @@ export function PriceBookDialog({
                                     : 'Always'
                             }
                         />
-                        <ReviewRow label="Status" value={data.is_active ? 'Active' : 'Inactive'} />
+                        <ReviewRow
+                            label="Status"
+                            value={data.is_active ? 'Active' : 'Inactive'}
+                        />
                     </ReviewCard>
-                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">{isEdit ? 'Saving…' : 'Creating…'}</p>}
+                    {processing && (
+                        <p className="mt-3 text-[13px] text-muted-foreground">
+                            {isEdit ? 'Saving…' : 'Creating…'}
+                        </p>
+                    )}
                 </div>
             )}
         </WizardShell>

@@ -150,6 +150,51 @@ class SiteIntegrationMutationSafetyTest extends TestCase
                 && ($context['failure_category'] ?? null) === 'provider_failure';
         });
     }
+
+    public function test_provider_site_identity_is_canonicalised_without_losing_a_zero_identifier(): void
+    {
+        $route = "/sites/{$this->site->id}/integrations/".self::PROVIDER;
+
+        $this->actingAs($this->manager)->post($route, [
+            'mapped_external_site_id' => '  mapped-site  ',
+        ])->assertRedirect();
+
+        $mapping = IntegrationSiteConfig::query()
+            ->where('site_id', $this->site->id)
+            ->where('provider', self::PROVIDER)
+            ->firstOrFail();
+        $this->assertSame('mapped-site', $mapping->mapped_external_site_id);
+        $this->assertSame(IntegrationSiteConfig::STATUS_HYBRID, $mapping->status);
+        $this->assertTrue($mapping->is_active);
+
+        $this->actingAs($this->manager)->post($route, [
+            'mapped_external_site_id' => '   ',
+        ])->assertRedirect();
+
+        $mapping->refresh();
+        $this->assertNull($mapping->mapped_external_site_id);
+        $this->assertSame(IntegrationSiteConfig::STATUS_LOCAL_ONLY, $mapping->status);
+        $this->assertFalse($mapping->is_active);
+
+        $this->actingAs($this->manager)->post($route, [
+            'mapped_external_site_id' => '0',
+        ])->assertRedirect();
+
+        $mapping->refresh();
+        $this->assertSame('0', $mapping->mapped_external_site_id);
+        $this->assertSame(IntegrationSiteConfig::STATUS_HYBRID, $mapping->status);
+        $this->assertTrue($mapping->is_active);
+    }
+
+    public function test_unknown_provider_cannot_create_an_inert_site_mapping(): void
+    {
+        $this->actingAs($this->manager)->post(
+            "/sites/{$this->site->id}/integrations/unregistered-provider",
+            ['mapped_external_site_id' => 'external-site'],
+        )->assertNotFound();
+
+        $this->assertDatabaseCount('integration_site_configs', 0);
+    }
 }
 
 final class SentinelFailureAdapter implements DeviceSyncCapability, EventCollectionCapability, IntegrationAdapterInterface, InventoryDiscoveryCapability

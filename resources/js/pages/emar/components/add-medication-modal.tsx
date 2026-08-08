@@ -2,6 +2,9 @@
  * Posts to emar.medications.store (EmarController@storeMedication). 4 steps:
  * Medication · Schedule · Safety & supply · Review. */
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     InfoCard,
@@ -9,9 +12,6 @@ import {
     SelectInput,
     StepHead,
 } from '@/components/wizard/primitives';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { router } from '@inertiajs/react';
 import {
     CalendarClock,
@@ -27,14 +27,57 @@ import type { ClientOption } from './report-error-modal';
 
 const STEPS = [
     { key: 'med', label: 'Medication', blurb: 'Drug & dose', icon: Pill },
-    { key: 'schedule', label: 'Schedule', blurb: 'Frequency & start', icon: CalendarClock },
-    { key: 'safety', label: 'Safety & supply', blurb: 'Controls & risk', icon: ShieldAlert },
-    { key: 'review', label: 'Review', blurb: 'Confirm & add', icon: ClipboardCheck },
+    {
+        key: 'schedule',
+        label: 'Schedule',
+        blurb: 'Frequency & start',
+        icon: CalendarClock,
+    },
+    {
+        key: 'safety',
+        label: 'Safety & supply',
+        blurb: 'Controls & risk',
+        icon: ShieldAlert,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & add',
+        icon: ClipboardCheck,
+    },
 ];
 
-const FORMS = ['Tablet', 'Capsule', 'Liquid', 'Injection', 'Patch', 'Cream/ointment', 'Inhaler', 'Drops', 'Other'].map((v) => ({ value: v, label: v }));
-const ROUTES = ['Oral', 'Topical', 'Subcutaneous', 'Intramuscular', 'Inhaled', 'Sublingual', 'Rectal', 'Other'].map((v) => ({ value: v, label: v }));
-const FREQUENCIES = ['Once daily', 'Twice daily', 'Three times daily', 'Four times daily', 'At night', 'In the morning', 'Weekly', 'As required (PRN)'].map((v) => ({ value: v, label: v }));
+const FORMS = [
+    'Tablet',
+    'Capsule',
+    'Liquid',
+    'Injection',
+    'Patch',
+    'Cream/ointment',
+    'Inhaler',
+    'Drops',
+    'Other',
+].map((v) => ({ value: v, label: v }));
+const ROUTES = [
+    'Oral',
+    'Topical',
+    'Subcutaneous',
+    'Intramuscular',
+    'Inhaled',
+    'Sublingual',
+    'Rectal',
+    'Other',
+].map((v) => ({ value: v, label: v }));
+const FREQUENCIES = [
+    'Once daily',
+    'Twice daily',
+    'Three times daily',
+    'Four times daily',
+    'At night',
+    'In the morning',
+    'Weekly',
+    'As required (PRN)',
+].map((v) => ({ value: v, label: v }));
 
 export function AddMedicationModal({
     open,
@@ -123,17 +166,24 @@ export function AddMedicationModal({
         );
     };
 
-    const clientName = clients.find((c) => String(c.id) === clientId)?.name ?? '—';
+    const clientName =
+        clients.find((c) => String(c.id) === clientId)?.name ?? '—';
 
     const footer = (
         <>
-            <Button variant="ghost" onClick={step === 0 ? close : () => setStep((s) => s - 1)} disabled={saving}>
+            <Button
+                variant="ghost"
+                onClick={step === 0 ? close : () => setStep((s) => s - 1)}
+                disabled={saving}
+            >
                 {step === 0 ? 'Cancel' : 'Back'}
             </Button>
             {step < 3 ? (
                 <Button
                     onClick={() => setStep((s) => s + 1)}
-                    disabled={(step === 0 && !step1Ok) || (step === 1 && !step2Ok)}
+                    disabled={
+                        (step === 0 && !step1Ok) || (step === 1 && !step2Ok)
+                    }
                 >
                     Continue
                 </Button>
@@ -162,36 +212,76 @@ export function AddMedicationModal({
         >
             {step === 0 ? (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={Pill} title="Medication" blurb="Who is it for, and what is it?" />
+                    <StepHead
+                        icon={Pill}
+                        title="Medication"
+                        blurb="Who is it for, and what is it?"
+                    />
                     <Field label="Client" required>
                         <SelectInput
                             value={clientId}
                             onChange={setClientId}
                             placeholder="Select client"
-                            options={clients.map((c) => ({ value: String(c.id), label: c.site ? `${c.name} · ${c.site}` : c.name }))}
+                            options={clients.map((c) => ({
+                                value: String(c.id),
+                                label: c.site
+                                    ? `${c.name} · ${c.site}`
+                                    : c.name,
+                            }))}
                         />
                     </Field>
                     <Field label="Medication name" required>
-                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Clozapine" />
+                        <Input
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="e.g. Clozapine"
+                        />
                     </Field>
                     <Field label="Brand name">
-                        <Input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Optional" />
+                        <Input
+                            value={brand}
+                            onChange={(e) => setBrand(e.target.value)}
+                            placeholder="Optional"
+                        />
                     </Field>
                     <Field label="Dose" required hint="e.g. 200 mg">
-                        <Input value={dose} onChange={(e) => setDose(e.target.value)} placeholder="200 mg" />
+                        <Input
+                            value={dose}
+                            onChange={(e) => setDose(e.target.value)}
+                            placeholder="200 mg"
+                        />
                     </Field>
                     <Field label="Form">
-                        <SelectInput value={form} onChange={setForm} placeholder="Select form" options={FORMS} />
+                        <SelectInput
+                            value={form}
+                            onChange={setForm}
+                            placeholder="Select form"
+                            options={FORMS}
+                        />
                     </Field>
                     <Field label="Route">
-                        <SelectInput value={route} onChange={setRoute} placeholder="Select route" options={ROUTES} />
+                        <SelectInput
+                            value={route}
+                            onChange={setRoute}
+                            placeholder="Select route"
+                            options={ROUTES}
+                        />
                     </Field>
                 </div>
             ) : step === 1 ? (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={CalendarClock} title="Schedule" blurb="How often, and from when?" />
+                    <StepHead
+                        icon={CalendarClock}
+                        title="Schedule"
+                        blurb="How often, and from when?"
+                    />
                     <Field label="Frequency" required>
-                        <SelectInput value={frequency} onChange={setFrequency} placeholder="Select frequency" options={FREQUENCIES} />
+                        <SelectInput
+                            value={frequency}
+                            onChange={setFrequency}
+                            placeholder="Select frequency"
+                            options={FREQUENCIES}
+                        />
                     </Field>
                     <Field label="Start date">
                         {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in wizard primitives. */}
@@ -214,13 +304,21 @@ export function AddMedicationModal({
                     </Field>
                     {isPrn === 'yes' ? (
                         <Field label="PRN indication" span>
-                            <Input value={prnReason} onChange={(e) => setPrnReason(e.target.value)} placeholder="e.g. for agitation" />
+                            <Input
+                                value={prnReason}
+                                onChange={(e) => setPrnReason(e.target.value)}
+                                placeholder="e.g. for agitation"
+                            />
                         </Field>
                     ) : null}
                 </div>
             ) : step === 2 ? (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={ShieldAlert} title="Safety & supply" blurb="Controls, witnessing and risk flags." />
+                    <StepHead
+                        icon={ShieldAlert}
+                        title="Safety & supply"
+                        blurb="Controls, witnessing and risk flags."
+                    />
                     <Field label="Controlled drug?" span>
                         <Segmented
                             value={controlled}
@@ -252,34 +350,68 @@ export function AddMedicationModal({
                         />
                     </Field>
                     <Field label="Indication" span>
-                        <Input value={indication} onChange={(e) => setIndication(e.target.value)} placeholder="What it's prescribed for (optional)" />
+                        <Input
+                            value={indication}
+                            onChange={(e) => setIndication(e.target.value)}
+                            placeholder="What it's prescribed for (optional)"
+                        />
                     </Field>
                     <Field label="Administration instructions" span>
-                        <Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={2} placeholder="e.g. with food; check BP first (optional)" />
+                        <Textarea
+                            value={instructions}
+                            onChange={(e) => setInstructions(e.target.value)}
+                            rows={2}
+                            placeholder="e.g. with food; check BP first (optional)"
+                        />
                     </Field>
                     {controlled === 'yes' ? (
                         <InfoCard icon={Info} tone="warn">
-                            Controlled drugs require a witness and a running balance at every administration —
-                            recorded through the CD register.
+                            Controlled drugs require a witness and a running
+                            balance at every administration — recorded through
+                            the CD register.
                         </InfoCard>
                     ) : null}
                 </div>
             ) : (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={ClipboardCheck} title="Review" blurb="Confirm and add to the chart." />
+                    <StepHead
+                        icon={ClipboardCheck}
+                        title="Review"
+                        blurb="Confirm and add to the chart."
+                    />
                     <div className="col-span-full rounded-lg border border-border">
                         <div className="px-4">
                             <SummaryRow label="Client" value={clientName} />
-                            <SummaryRow label="Medication" value={`${name}${brand ? ` (${brand})` : ''} ${dose}`} />
-                            <SummaryRow label="Form / route" value={[form, route].filter(Boolean).join(' · ') || '—'} />
-                            <SummaryRow label="Frequency" value={`${frequency}${isPrn === 'yes' ? ' · PRN' : ''}`} />
-                            <SummaryRow label="Controlled" value={controlled === 'yes' ? 'Yes' : 'No'} tone={controlled === 'yes' ? 'crit' : undefined} />
-                            <SummaryRow label="High risk" value={highRisk === 'yes' ? 'Yes' : 'No'} />
+                            <SummaryRow
+                                label="Medication"
+                                value={`${name}${brand ? ` (${brand})` : ''} ${dose}`}
+                            />
+                            <SummaryRow
+                                label="Form / route"
+                                value={
+                                    [form, route].filter(Boolean).join(' · ') ||
+                                    '—'
+                                }
+                            />
+                            <SummaryRow
+                                label="Frequency"
+                                value={`${frequency}${isPrn === 'yes' ? ' · PRN' : ''}`}
+                            />
+                            <SummaryRow
+                                label="Controlled"
+                                value={controlled === 'yes' ? 'Yes' : 'No'}
+                                tone={controlled === 'yes' ? 'crit' : undefined}
+                            />
+                            <SummaryRow
+                                label="High risk"
+                                value={highRisk === 'yes' ? 'Yes' : 'No'}
+                            />
                         </div>
                     </div>
                     <InfoCard icon={Info}>
-                        Adding creates the chart entry with an audit record. Scheduled doses appear on the
-                        MAR once round times are generated.
+                        Adding creates the chart entry with an audit record.
+                        Scheduled doses appear on the MAR once round times are
+                        generated.
                     </InfoCard>
                 </div>
             )}

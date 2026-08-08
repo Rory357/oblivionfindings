@@ -85,6 +85,14 @@ final class CentralSiteMonitoringReadinessService
                 $fresh = (int) ($freshness['fresh'] ?? 0);
                 $stale = (int) ($freshness['stale'] ?? 0);
                 $never = (int) ($freshness['never_observed'] ?? 0);
+                $durableDirectEvidence = $direct->filter(
+                    fn (Monitor $monitor): bool => $directEvidence->has($monitor->id),
+                )->count();
+                $completeDirectEvidence = $direct->isNotEmpty()
+                    && $durableDirectEvidence === $direct->count()
+                    && $fresh === $direct->count()
+                    && $stale === 0
+                    && $never === 0;
                 $attention = $direct->filter(fn (Monitor $monitor): bool => $this->needsAttention($monitor)
                     || $this->freshness($monitor, $directEvidence->get($monitor->id)) !== 'fresh')->count();
                 $latestEvidence = $direct
@@ -92,10 +100,20 @@ final class CentralSiteMonitoringReadinessService
                     ->filter()
                     ->sortDesc()
                     ->first();
+                $oldestEvidence = $direct
+                    ->map(fn (Monitor $monitor): ?CarbonImmutable => $directEvidence->get($monitor->id))
+                    ->filter()
+                    ->sort()
+                    ->first();
+                $directMonitorFingerprint = hash('sha256', $direct
+                    ->pluck('id')
+                    ->map(fn (mixed $id): int => (int) $id)
+                    ->sort(SORT_NUMERIC)
+                    ->values()
+                    ->implode(','));
                 $topology = $this->topology($latestTopology->get($site->id));
                 $discovery = $this->discovery($directDiscovery->get($site->id));
-                $proofState = $direct->isNotEmpty()
-                    && $fresh > 0
+                $proofState = $completeDirectEvidence
                     && $runtime['state'] === 'available'
                     && $topology['state'] === 'current'
                     && $discovery['state'] === 'current'
@@ -105,7 +123,7 @@ final class CentralSiteMonitoringReadinessService
                     $direct->isEmpty() && $remote->isNotEmpty() => 'remote_only',
                     $direct->isEmpty() => 'not_configured',
                     $runtime['state'] !== 'available' => 'runtime_unavailable',
-                    $fresh === 0 => 'awaiting_evidence',
+                    ! $completeDirectEvidence => 'awaiting_evidence',
                     $topology['state'] !== 'current' || $discovery['state'] !== 'current' => 'evidence_incomplete',
                     $attention > 0 => 'attention',
                     default => 'ready',
@@ -128,15 +146,15 @@ final class CentralSiteMonitoringReadinessService
                     'direct_devices' => $directDeviceIds->count(),
                     'remote_monitors' => $remote->count(),
                     'disabled_monitors' => $siteMonitors->count() - $operational->count(),
-                    'durable_direct_evidence' => $direct->filter(
-                        fn (Monitor $monitor): bool => $directEvidence->has($monitor->id),
-                    )->count(),
+                    'durable_direct_evidence' => $durableDirectEvidence,
                     'fresh' => $fresh,
                     'stale' => $stale,
                     'never_observed' => $never,
                     'attention' => $attention,
                     'evidence_at' => $latestEvidence?->toIso8601String(),
+                    'oldest_evidence_at' => $oldestEvidence?->toIso8601String(),
                     'evidence_age_seconds' => $latestEvidence?->diffInSeconds(now()),
+                    'direct_monitor_fingerprint' => $directMonitorFingerprint,
                     'runtime' => $runtime,
                     'topology' => $topology,
                     'discovery' => $discovery,
@@ -357,7 +375,7 @@ final class CentralSiteMonitoringReadinessService
             'ready' => 'The main application has current direct evidence for this Site; no collector is required.',
             'attention' => "The main application path is proven, with {$attention} direct check(s) needing attention.",
             'runtime_unavailable' => 'Direct checks exist, but the required orchestration, checks, events, and topology workers have not all consumed a current heartbeat.',
-            'awaiting_evidence' => 'The required workers are available, but no configured direct check has a current durable central-runtime observation yet.',
+            'awaiting_evidence' => 'The required workers are available, but one or more configured direct checks do not have a current durable central-runtime observation yet.',
             'evidence_incomplete' => 'The direct check is current, but topology and discovery evidence must also be current before this Site is release-ready.',
             'remote_only' => 'This Site currently depends on a collector. Add at least one direct check to prove the central path over Site connectivity.',
             default => 'No enabled direct or collector-backed checks are configured for visible Devices at this Site.',

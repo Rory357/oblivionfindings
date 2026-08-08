@@ -45,8 +45,12 @@ describe('ResolveAlertWizard', () => {
         );
 
         fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-        expect(screen.getByText('Vehicle recovered and tracker reset.')).toBeVisible();
-        expect(screen.getByRole('button', { name: 'Resolve alert' })).toBeVisible();
+        expect(
+            screen.getByText('Vehicle recovered and tracker reset.'),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('button', { name: 'Resolve alert' }),
+        ).toBeVisible();
 
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
         expect(onClose).toHaveBeenCalledTimes(1);

@@ -1,8 +1,8 @@
+import { PerformanceSatelliteHero } from '@/components/hr/performance/performance-hero';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PerformanceSatelliteHero } from '@/components/hr/performance/performance-hero';
-import { PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {

@@ -15,7 +15,12 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs';
+import {
+    TabsContent,
+    TabsList,
+    TabsRoot,
+    TabsTrigger,
+} from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 export type PageTabItem = {
@@ -94,7 +99,10 @@ export function PageTabs({
         if (!el) return;
         updateScrollState();
         el.addEventListener('scroll', updateScrollState, { passive: true });
-        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateScrollState) : null;
+        const ro =
+            typeof ResizeObserver !== 'undefined'
+                ? new ResizeObserver(updateScrollState)
+                : null;
         ro?.observe(el);
         window.addEventListener('resize', updateScrollState);
         return () => {
@@ -115,11 +123,17 @@ export function PageTabs({
             onValueChange={onValueChange}
             className={cn('space-y-4', className)}
         >
-            <div className={cn('relative', sticky && 'sticky top-0 z-20', sticky && stickyBg)}>
+            <div
+                className={cn(
+                    'relative',
+                    sticky && 'sticky top-0 z-20',
+                    sticky && stickyBg,
+                )}
+            >
                 {canScrollLeft ? (
                     <span
                         className={cn(
-                            'pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r to-transparent',
+                            'pointer-events-none absolute top-0 left-0 z-10 h-full w-6 bg-gradient-to-r to-transparent',
                             fadeFromClass,
                         )}
                     />
@@ -127,7 +141,7 @@ export function PageTabs({
                 {canScrollRight ? (
                     <span
                         className={cn(
-                            'pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l to-transparent',
+                            'pointer-events-none absolute top-0 right-0 z-10 h-full w-6 bg-gradient-to-l to-transparent',
                             fadeFromClassRight,
                         )}
                     />
@@ -152,12 +166,16 @@ export function PageTabs({
                                 className={cn(
                                     triggerBase,
                                     dense && TRIGGER_DENSE_OVERRIDE,
-                                    inOverflowGroup ? 'hidden 2xl:inline-flex' : 'inline-flex',
+                                    inOverflowGroup
+                                        ? 'hidden 2xl:inline-flex'
+                                        : 'inline-flex',
                                 )}
                             >
                                 {Icon ? <Icon className="h-4 w-4" /> : null}
                                 <span>{item.label}</span>
-                                {item.badge != null ? <span className="ml-1">{item.badge}</span> : null}
+                                {item.badge != null ? (
+                                    <span className="ml-1">{item.badge}</span>
+                                ) : null}
                             </TabsTrigger>
                         );
                     })}
@@ -171,14 +189,19 @@ export function PageTabs({
                                         triggerBase,
                                         dense && TRIGGER_DENSE_OVERRIDE,
                                         'inline-flex 2xl:hidden',
-                                        activeOverflow ? overflowActiveBadge : '',
+                                        activeOverflow
+                                            ? overflowActiveBadge
+                                            : '',
                                     )}
                                     aria-label="More tabs"
                                 >
                                     <MoreHorizontal className="h-4 w-4" />
                                     <span>More</span>
                                     {activeOverflow ? (
-                                        <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                                        <Badge
+                                            variant="outline"
+                                            className="ml-1 px-1.5 py-0 text-xs"
+                                        >
                                             {activeOverflow.label}
                                         </Badge>
                                     ) : null}
@@ -190,15 +213,24 @@ export function PageTabs({
                                     return (
                                         <DropdownMenuItem
                                             key={item.value}
-                                            onClick={() => onValueChange(item.value)}
+                                            onClick={() =>
+                                                onValueChange(item.value)
+                                            }
                                             data-test={item['data-test']}
                                             className={cn(
-                                                item.value === value && 'bg-primary/10 text-primary',
+                                                item.value === value &&
+                                                    'bg-primary/10 text-primary',
                                             )}
                                         >
-                                            {Icon ? <Icon className="h-4 w-4" /> : null}
+                                            {Icon ? (
+                                                <Icon className="h-4 w-4" />
+                                            ) : null}
                                             <span>{item.label}</span>
-                                            {item.badge != null ? <span className="ml-auto">{item.badge}</span> : null}
+                                            {item.badge != null ? (
+                                                <span className="ml-auto">
+                                                    {item.badge}
+                                                </span>
+                                            ) : null}
                                         </DropdownMenuItem>
                                     );
                                 })}
@@ -208,7 +240,7 @@ export function PageTabs({
                 </TabsList>
             </div>
 
-            {children ?? (
+            {children ??
                 /*
                  * PageTabs is sometimes used as a pure segmented filter (e.g.
                  * the /my-day resident switcher) with no TabsContent panels of
@@ -227,8 +259,7 @@ export function PageTabs({
                         forceMount
                         className="hidden"
                     />
-                ))
-            )}
+                ))}
         </TabsRoot>
     );
 }

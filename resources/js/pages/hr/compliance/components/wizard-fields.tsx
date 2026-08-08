@@ -1,11 +1,11 @@
 /* Shared input wrappers for the Compliance wizards — thin styled adapters over
  * the shadcn kit so every wizard step looks like the Add-Client reference. */
+import { Button as GuardrailButton } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 /** Multi-select chips with distinct value/label (e.g. role name vs. role label). */
 export function LabeledChipMulti({
@@ -18,13 +18,16 @@ export function LabeledChipMulti({
     options: { value: string; label: string }[];
 }) {
     const toggle = (v: string) =>
-        onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
+        onChange(
+            values.includes(v) ? values.filter((x) => x !== v) : [...values, v],
+        );
     return (
         <div className="flex flex-wrap gap-1.5">
             {options.map((o) => {
                 const active = values.includes(o.value);
                 return (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         key={o.value}
                         type="button"
                         aria-pressed={active}
@@ -46,7 +49,9 @@ export function LabeledChipMulti({
 }
 
 export function WizardGrid({ children }: { children: ReactNode }) {
-    return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>;
+    return (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
+    );
 }
 
 export function TextField({
@@ -105,7 +110,8 @@ export function Toggle({
     label: ReactNode;
 }) {
     return (
-        <GuardrailButton unstyled
+        <GuardrailButton
+            unstyled
             type="button"
             onClick={() => onChange(!checked)}
             aria-pressed={checked}

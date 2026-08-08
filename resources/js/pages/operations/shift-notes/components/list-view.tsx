@@ -4,9 +4,9 @@ import { useMemo } from 'react';
 
 import { cn } from '@/lib/utils';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
 import { type NoteHandlers } from './cards-view';
 import { type ShiftNote, TypeBadge, clientName, fmtShiftChip } from './shared';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 export function ListView({
     notes,
@@ -91,7 +91,8 @@ export function ListView({
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {!n.reviewed_at ? (
-                                    <GuardrailButton unstyled
+                                    <GuardrailButton
+                                        unstyled
                                         type="button"
                                         onClick={() => onReview(n)}
                                         className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold transition-colors hover:bg-accent"
@@ -100,7 +101,8 @@ export function ListView({
                                         Review
                                     </GuardrailButton>
                                 ) : null}
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={() => onFlag(n)}
                                     className={cn(
@@ -113,7 +115,8 @@ export function ListView({
                                     <Flag className="h-3.5 w-3.5" />
                                     {n.is_flagged ? 'Unflag' : 'Flag'}
                                 </GuardrailButton>
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={() => onOpen(n)}
                                     className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

@@ -25,6 +25,15 @@ final class CollectorApplication
 {
     public const string VERSION = '0.1.0';
 
+    /**
+     * @param  null|\Closure(string, string, string, string, string): array<string, mixed>  $enrolmentTransport
+     * @param  null|\Closure(string, mixed): void  $output
+     */
+    public function __construct(
+        private readonly ?\Closure $enrolmentTransport = null,
+        private readonly ?\Closure $output = null,
+    ) {}
+
     /** @param list<string> $arguments */
     public function run(array $arguments): int
     {
@@ -37,6 +46,7 @@ final class CollectorApplication
                 'doctor' => $this->doctor($options),
                 'enrol' => $this->enrol($options),
                 'run' => $this->collect($options),
+                'verify-transport' => $this->verifyTransport($options),
                 default => $this->usage(),
             };
         } catch (\Throwable $exception) {
@@ -100,7 +110,9 @@ final class CollectorApplication
         $publicKey = sodium_crypto_sign_publickey($keyPair);
         $secretKey = sodium_crypto_sign_secretkey($keyPair);
         try {
-            $response = (new HttpsCentralApi($centralUrl, $tlsPin))->enrol($token, $collectorId, $publicKey);
+            $response = $this->enrolmentTransport === null
+                ? (new HttpsCentralApi($centralUrl, $tlsPin))->enrol($token, $collectorId, $publicKey)
+                : ($this->enrolmentTransport)($centralUrl, $tlsPin, $token, $collectorId, $publicKey);
         } finally {
             sodium_memzero($token);
         }
@@ -123,6 +135,7 @@ final class CollectorApplication
         $privateKey = openssl_pkey_get_private($clientPrivateKey);
         $actualFingerprint = $certificate === false ? false : openssl_x509_fingerprint($certificate, 'sha256');
         if ($certificate === false || $privateKey === false || ! is_string($actualFingerprint)
+            || ! openssl_x509_check_private_key($certificate, $privateKey)
             || ! hash_equals($certificateFingerprint, strtolower($actualFingerprint))) {
             sodium_memzero($secretKey);
             throw new CentralApiFailure('Collector mTLS enrolment identity is invalid.');
@@ -283,6 +296,44 @@ final class CollectorApplication
         $this->write('collection: '.($uploadError === null ? 'complete' : 'buffered').PHP_EOL);
 
         return $uploadError === null ? 0 : 2;
+    }
+
+    /** @param array<string, string|bool> $options */
+    private function verifyTransport(array $options): int
+    {
+        $identityPath = $this->requiredPath($options, 'identity');
+        $expectedState = $this->requiredString($options, 'expect');
+        if (! in_array($expectedState, ['active', 'revoked'], true)) {
+            throw new RuntimeException('Collector --expect must be active or revoked.');
+        }
+        $samplesOption = $options['samples'] ?? '5';
+        if (! is_string($samplesOption) || ! ctype_digit($samplesOption)) {
+            throw new RuntimeException('Collector --samples must be an integer between 1 and 20.');
+        }
+        $samples = (int) $samplesOption;
+        if ($samples < 1 || $samples > 20) {
+            throw new RuntimeException('Collector --samples must be an integer between 1 and 20.');
+        }
+        $identity = $this->identity($identityPath, requireRuntime: true);
+        $secretKey = base64_decode($identity['request_signing_secret_key'], true);
+        if (! is_string($secretKey) || strlen($secretKey) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) {
+            throw new RuntimeException('Collector request signing key is invalid.');
+        }
+        try {
+            $evidence = (new HttpsCentralApi(
+                $identity['central_url'],
+                $identity['tls_public_key_pin'],
+                $secretKey,
+                $identity['client_certificate_file'],
+                $identity['client_private_key_file'],
+            ))->verifyTransport($identity['collector_id'], $expectedState, $samples);
+        } finally {
+            sodium_memzero($secretKey);
+        }
+
+        $this->write(json_encode($evidence, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES).PHP_EOL);
+
+        return 0;
     }
 
     private function flush(HttpsCentralApi $central, string $collectorId, EncryptedSpool $spool): ?string
@@ -464,7 +515,7 @@ final class CollectorApplication
 
     private function usage(): int
     {
-        $this->write("Usage: oblivion-collector enrol|run|doctor|version [--name=value]\n", STDERR);
+        $this->write("Usage: oblivion-collector enrol|run|doctor|verify-transport|version [--name=value]\n", STDERR);
 
         return 64;
     }
@@ -479,6 +530,12 @@ final class CollectorApplication
     /** @param resource $stream */
     private function write(string $message, $stream = STDOUT): void
     {
+        if ($this->output !== null) {
+            ($this->output)($message, $stream);
+
+            return;
+        }
+
         fwrite($stream, $message);
     }
 }

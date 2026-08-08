@@ -31,16 +31,48 @@ type Props = {
 };
 
 const STATUS_CELL: Record<DoseStatus, { label: string; className: string }> = {
-    given: { label: 'Given', className: 'border-status-success/40 bg-status-success-bg text-status-success' },
-    refused: { label: 'Refused', className: 'border-status-warning/40 bg-status-warning-bg text-status-warning' },
-    withheld: { label: 'Withheld', className: 'border-status-warning/40 bg-status-warning-bg text-status-warning' },
-    missed: { label: 'Missed', className: 'border-status-critical/40 bg-status-critical-bg text-status-critical' },
-    overdue: { label: 'Overdue', className: 'border-status-critical/40 bg-status-critical-bg text-status-critical' },
-    due: { label: 'Due', className: 'border-dashed border-border bg-card text-foreground' },
-    upcoming: { label: 'Due', className: 'border-border/70 bg-muted/40 text-muted-foreground' },
+    given: {
+        label: 'Given',
+        className:
+            'border-status-success/40 bg-status-success-bg text-status-success',
+    },
+    refused: {
+        label: 'Refused',
+        className:
+            'border-status-warning/40 bg-status-warning-bg text-status-warning',
+    },
+    withheld: {
+        label: 'Withheld',
+        className:
+            'border-status-warning/40 bg-status-warning-bg text-status-warning',
+    },
+    missed: {
+        label: 'Missed',
+        className:
+            'border-status-critical/40 bg-status-critical-bg text-status-critical',
+    },
+    overdue: {
+        label: 'Overdue',
+        className:
+            'border-status-critical/40 bg-status-critical-bg text-status-critical',
+    },
+    due: {
+        label: 'Due',
+        className: 'border-dashed border-border bg-card text-foreground',
+    },
+    upcoming: {
+        label: 'Due',
+        className: 'border-border/70 bg-muted/40 text-muted-foreground',
+    },
 };
 
-function MedFlag({ label, tone }: { label: string; tone: 'cd' | 'risk' | 'inr' | 'obs' }) {
+function MedFlag({
+    label,
+    tone,
+}: {
+    label: string;
+    tone: 'cd' | 'risk' | 'inr' | 'obs';
+}) {
     const toneClass =
         tone === 'cd'
             ? 'bg-status-critical-bg text-status-critical'
@@ -50,13 +82,24 @@ function MedFlag({ label, tone }: { label: string; tone: 'cd' | 'risk' | 'inr' |
                 ? 'bg-status-info-bg text-status-info'
                 : 'bg-accent text-accent-foreground';
     return (
-        <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide', toneClass)}>
+        <span
+            className={cn(
+                'rounded px-1.5 py-0.5 text-[9.5px] font-bold tracking-wide uppercase',
+                toneClass,
+            )}
+        >
             {label}
         </span>
     );
 }
 
-function LegendItem({ label, className }: { label: string; className: string }) {
+function LegendItem({
+    label,
+    className,
+}: {
+    label: string;
+    className: string;
+}) {
     return (
         <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <span className={cn('h-3 w-3 rounded border', className)} />
@@ -65,9 +108,16 @@ function LegendItem({ label, className }: { label: string; className: string }) 
     );
 }
 
-export default function MarGrid({ meds, schedule, onRecord, onContext }: Props) {
+export default function MarGrid({
+    meds,
+    schedule,
+    onRecord,
+    onContext,
+}: Props) {
     // Columns = the sorted union of every scheduled dose time on the chart.
-    const times = Array.from(new Set(meds.flatMap((m) => m.dose_times))).sort((a, b) => a.localeCompare(b));
+    const times = Array.from(new Set(meds.flatMap((m) => m.dose_times))).sort(
+        (a, b) => a.localeCompare(b),
+    );
 
     // Slot lookup: `${medicationId}|${HH:MM}` → the ScheduleRow for that cell.
     const slots = new Map<string, ScheduleRow>();
@@ -83,17 +133,33 @@ export default function MarGrid({ meds, schedule, onRecord, onContext }: Props) 
                         <Pill className="h-4 w-4" />
                     </span>
                     <div>
-                        <div className="text-[15px] font-bold leading-tight">Scheduled medications</div>
+                        <div className="text-[15px] leading-tight font-bold">
+                            Scheduled medications
+                        </div>
                         <div className="text-xs text-muted-foreground">
-                            {meds.length} active order{meds.length === 1 ? '' : 's'} · tap a cell to record · right-click for quick actions
+                            {meds.length} active order
+                            {meds.length === 1 ? '' : 's'} · tap a cell to
+                            record · right-click for quick actions
                         </div>
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    <LegendItem label="Given" className="border-status-success/40 bg-status-success-bg" />
-                    <LegendItem label="Due" className="border-dashed border-border bg-card" />
-                    <LegendItem label="Overdue" className="border-status-critical/40 bg-status-critical-bg" />
-                    <LegendItem label="Not given" className="border-status-warning/40 bg-status-warning-bg" />
+                    <LegendItem
+                        label="Given"
+                        className="border-status-success/40 bg-status-success-bg"
+                    />
+                    <LegendItem
+                        label="Due"
+                        className="border-dashed border-border bg-card"
+                    />
+                    <LegendItem
+                        label="Overdue"
+                        className="border-status-critical/40 bg-status-critical-bg"
+                    />
+                    <LegendItem
+                        label="Not given"
+                        className="border-status-warning/40 bg-status-warning-bg"
+                    />
                 </div>
             </div>
 
@@ -106,13 +172,13 @@ export default function MarGrid({ meds, schedule, onRecord, onContext }: Props) 
                     <table className="w-full border-collapse">
                         <thead>
                             <tr className="border-b">
-                                <th className="sticky left-0 z-10 bg-card px-5 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <th className="sticky left-0 z-10 bg-card px-5 py-2.5 text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                                     Medication
                                 </th>
                                 {times.map((time) => (
                                     <th
                                         key={time}
-                                        className="px-2 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                                        className="px-2 py-2.5 text-center text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
                                     >
                                         {time}
                                     </th>
@@ -121,42 +187,83 @@ export default function MarGrid({ meds, schedule, onRecord, onContext }: Props) 
                         </thead>
                         <tbody>
                             {meds.map((med) => (
-                                <tr key={med.id} className="border-b last:border-b-0">
+                                <tr
+                                    key={med.id}
+                                    className="border-b last:border-b-0"
+                                >
                                     <td className="sticky left-0 z-10 max-w-[260px] bg-card px-5 py-3 align-top">
                                         <div className="flex flex-wrap items-center gap-1.5">
-                                            <span className="text-[13.5px] font-bold leading-tight">{med.name}</span>
-                                            {med.controlled_drug && <MedFlag label="CD" tone="cd" />}
-                                            {med.high_risk && <MedFlag label="High-risk" tone="risk" />}
-                                            {med.is_inr && <MedFlag label="INR" tone="inr" />}
-                                            {med.requires_observation && <MedFlag label="Obs" tone="obs" />}
+                                            <span className="text-[13.5px] leading-tight font-bold">
+                                                {med.name}
+                                            </span>
+                                            {med.controlled_drug && (
+                                                <MedFlag label="CD" tone="cd" />
+                                            )}
+                                            {med.high_risk && (
+                                                <MedFlag
+                                                    label="High-risk"
+                                                    tone="risk"
+                                                />
+                                            )}
+                                            {med.is_inr && (
+                                                <MedFlag
+                                                    label="INR"
+                                                    tone="inr"
+                                                />
+                                            )}
+                                            {med.requires_observation && (
+                                                <MedFlag
+                                                    label="Obs"
+                                                    tone="obs"
+                                                />
+                                            )}
                                         </div>
                                         <div className="mt-0.5 text-xs text-muted-foreground">
-                                            {[med.dosage, med.route, med.frequency].filter(Boolean).join(' · ')}
+                                            {[
+                                                med.dosage,
+                                                med.route,
+                                                med.frequency,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' · ')}
                                         </div>
                                         {med.instructions && (
-                                            <div className="mt-0.5 text-[11.5px] italic text-muted-foreground">
+                                            <div className="mt-0.5 text-[11.5px] text-muted-foreground italic">
                                                 {med.instructions}
                                             </div>
                                         )}
                                     </td>
                                     {times.map((time) => {
-                                        const row = slots.get(`${med.id}|${time}`);
+                                        const row = slots.get(
+                                            `${med.id}|${time}`,
+                                        );
                                         if (!row) {
                                             return (
-                                                <td key={time} className="px-2 py-3 text-center text-muted-foreground/40">
+                                                <td
+                                                    key={time}
+                                                    className="px-2 py-3 text-center text-muted-foreground/40"
+                                                >
                                                     ·
                                                 </td>
                                             );
                                         }
                                         const cell = STATUS_CELL[row.status];
-                                        const recordedTime = row.recorded?.time ?? row.time;
+                                        const recordedTime =
+                                            row.recorded?.time ?? row.time;
                                         return (
-                                            <td key={time} className="px-2 py-2 text-center">
+                                            <td
+                                                key={time}
+                                                className="px-2 py-2 text-center"
+                                            >
                                                 <button
                                                     type="button"
                                                     data-cell={`${med.id}|${time}`}
-                                                    onClick={() => onRecord(row)}
-                                                    onContextMenu={(event) => onContext(event, row)}
+                                                    onClick={() =>
+                                                        onRecord(row)
+                                                    }
+                                                    onContextMenu={(event) =>
+                                                        onContext(event, row)
+                                                    }
                                                     title={`${med.name} — ${cell.label} ${recordedTime}`}
                                                     aria-label={`${med.name}, ${cell.label} at ${recordedTime} — record dose (right-click for quick actions)`}
                                                     className={cn(
@@ -165,7 +272,9 @@ export default function MarGrid({ meds, schedule, onRecord, onContext }: Props) 
                                                     )}
                                                 >
                                                     <span>{cell.label}</span>
-                                                    <span className="text-[10px] font-normal opacity-80">{recordedTime}</span>
+                                                    <span className="text-[10px] font-normal opacity-80">
+                                                        {recordedTime}
+                                                    </span>
                                                 </button>
                                             </td>
                                         );

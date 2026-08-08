@@ -2,6 +2,7 @@
 
 use App\Services\Queclink\AckBuilder;
 use App\Services\Queclink\AtTrackProtocolParser;
+use App\Services\Queclink\Exceptions\IntakeRejected;
 
 beforeEach(function () {
     $this->parser = new AtTrackProtocolParser;
@@ -31,10 +32,31 @@ it('buffers a partial trailing frame for the next read', function () {
         ->and($buffer)->toBe('');
 });
 
-it('discards empty or whitespace-only frames', function () {
+it('returns empty delimiters so the listener can count them as invalid intake', function () {
     $buffer = '';
     $frames = $this->parser->splitFrames("\$\r\n\$", $buffer);
-    expect($frames)->toBeEmpty();
+    expect($frames)->toBe(['$', '$'])
+        ->and($buffer)->toBe('');
+});
+
+it('rejects and clears an unterminated frame before the buffer can grow beyond its cap', function () {
+    $buffer = str_repeat('A', 15);
+
+    expect(function () use (&$buffer): void {
+        $this->parser->splitFrames('BB', $buffer, 16, 16);
+    })
+        ->toThrow(IntakeRejected::class)
+        ->and($buffer)->toBe('');
+});
+
+it('rejects an oversized terminated frame without returning partial intake', function () {
+    $buffer = '';
+
+    expect(function () use (&$buffer): void {
+        $this->parser->splitFrames(str_repeat('A', 16).'$', $buffer, 32, 16);
+    })
+        ->toThrow(IntakeRejected::class)
+        ->and($buffer)->toBe('');
 });
 
 // ─── Heartbeat parsing + ACK building ────────────────────────────────
@@ -49,6 +71,26 @@ it('parses a heartbeat frame and IMEI', function () {
         ->and($frame->protocolVersion)->toBe('8020090100')
         ->and($frame->countNumber)->toBe('09CF')
         ->and($frame->isHeartbeat())->toBeTrue();
+});
+
+it('rejects protocol fields that cannot fit their governed persistence columns', function () {
+    $command = $this->parser->parse(
+        '+RESP:GTTOOLONG12,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+    );
+    $protocol = $this->parser->parse(
+        '+RESP:GTHBD,80200901000,864696060004173,GV500CG,20230811075652,09CF$',
+    );
+    $name = $this->parser->parse(
+        '+RESP:GTHBD,8020090100,864696060004173,'.str_repeat('D', 51).',20230811075652,09CF$',
+    );
+    $count = $this->parser->parse(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CFF$',
+    );
+
+    expect($command->isValid())->toBeFalse()
+        ->and($protocol->isValid())->toBeFalse()
+        ->and($name->isValid())->toBeFalse()
+        ->and($count->isValid())->toBeFalse();
 });
 
 it('builds a +SACK:GTHBD response that echoes the heartbeat count number', function () {

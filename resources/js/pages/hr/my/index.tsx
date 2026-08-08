@@ -3,7 +3,10 @@
  * worklist rows sized to the design handoff; the shadcn <Button> can't express
  * these on-tint layouts. Every colour maps to a semantic token or a decorative
  * identity hue, as elsewhere in My HR. */
-import { ApplicableProceduresPanel, type ApplicableProcedure } from '@/components/health-safety/applicable-procedures-panel';
+import {
+    ApplicableProceduresPanel,
+    type ApplicableProcedure,
+} from '@/components/health-safety/applicable-procedures-panel';
 import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -26,7 +29,6 @@ import {
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { LeaveRequestDialog } from '@/components/hr/leave-request-dialog';
 import {
     MyHrAroundModal,
     MyHrShell,
@@ -40,6 +42,7 @@ import {
     type MyHrShellData,
     type MyHrShoutout,
 } from '@/components/hr';
+import { LeaveRequestDialog } from '@/components/hr/leave-request-dialog';
 import {
     ShiftContextMenu,
     type ShiftCtxState,
@@ -207,20 +210,25 @@ function shiftTypeLabel(shift: TodayShift): string {
 
 function categoryLabel(category: string | null): string {
     if (!category) return 'General';
-    return category
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+    return category.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function dueLabel(t: OnboardingTaskItem): string | null {
     if (!t.due_date) return null;
     const d = new Date(t.due_date);
     if (Number.isNaN(d.getTime())) return null;
-    const label = d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+    const label = d.toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+    });
     return t.overdue ? `Was due ${label}` : `Due ${label}`;
 }
 
-function GettingStartedCard({ onboarding }: { onboarding: OnboardingChecklist }) {
+function GettingStartedCard({
+    onboarding,
+}: {
+    onboarding: OnboardingChecklist;
+}) {
     const [busy, setBusy] = useState<number | null>(null);
     const pct = Math.max(0, Math.min(100, onboarding.progress.percent));
 
@@ -236,7 +244,10 @@ function GettingStartedCard({ onboarding }: { onboarding: OnboardingChecklist })
                     toast.success('Task done ✓', {
                         description: t.title,
                     });
-                    if (onboarding.progress.completed + 1 >= onboarding.progress.total) {
+                    if (
+                        onboarding.progress.completed + 1 >=
+                        onboarding.progress.total
+                    ) {
                         fireConfetti();
                     }
                 },
@@ -267,8 +278,9 @@ function GettingStartedCard({ onboarding }: { onboarding: OnboardingChecklist })
                         handle the rest 🌱
                     </p>
                 </div>
-                <span className="ml-auto text-[12px] font-bold tabular-nums text-muted-foreground">
-                    {onboarding.progress.completed}/{onboarding.progress.total} done
+                <span className="ml-auto text-[12px] font-bold text-muted-foreground tabular-nums">
+                    {onboarding.progress.completed}/{onboarding.progress.total}{' '}
+                    done
                 </span>
             </div>
 
@@ -304,7 +316,7 @@ function GettingStartedCard({ onboarding }: { onboarding: OnboardingChecklist })
                             <div className="min-w-0 flex-1">
                                 <div
                                     className={cn(
-                                        'truncate text-[13px] font-semibold leading-tight',
+                                        'truncate text-[13px] leading-tight font-semibold',
                                         t.completed &&
                                             'text-muted-foreground line-through decoration-muted-foreground/50',
                                     )}
@@ -336,7 +348,8 @@ function GettingStartedCard({ onboarding }: { onboarding: OnboardingChecklist })
                                     disabled={busy !== null}
                                     className={cn(
                                         'shrink-0 rounded-lg border border-status-success/40 bg-card px-2.5 py-1.5 text-xs font-semibold text-status-success transition-colors hover:bg-status-success-bg',
-                                        busy !== null && 'cursor-not-allowed opacity-50',
+                                        busy !== null &&
+                                            'cursor-not-allowed opacity-50',
                                     )}
                                 >
                                     {busy === t.id ? 'Saving…' : 'Mark done'}
@@ -384,8 +397,9 @@ function NextShiftCard({
     const nowPct = hasWindow
         ? Math.max(0, Math.min(100, ((now - start!) / (end! - start!)) * 100))
         : 0;
-    const midIso =
-        hasWindow ? new Date(start! + (end! - start!) / 2).toISOString() : null;
+    const midIso = hasWindow
+        ? new Date(start! + (end! - start!) / 2).toISOString()
+        : null;
 
     const durationH = hasWindow
         ? Math.round(((end! - start!) / 3_600_000) * 10) / 10
@@ -408,7 +422,7 @@ function NextShiftCard({
                     <MapPin className="h-4 w-4" />
                 </span>
                 <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                    <div className="text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
                         Your day
                     </div>
                     <h2 className="mt-px truncate text-[16px] font-bold">
@@ -430,7 +444,7 @@ function NextShiftCard({
             {shift && hasWindow ? (
                 <>
                     <div className="mt-4 flex items-baseline gap-3">
-                        <div className="text-[30px] font-bold tabular-nums tracking-tight">
+                        <div className="text-[30px] font-bold tracking-tight tabular-nums">
                             {fmt12(shift.starts_at)} – {fmt12(shift.ends_at)}
                         </div>
                         <div className="text-[13px] font-semibold text-muted-foreground">
@@ -468,7 +482,8 @@ function NextShiftCard({
                                         {fmt12(shift.starts_at)}
                                     </div>
                                     <div className="text-[10.5px] text-muted-foreground">
-                                        Clock in {clockedIn || now >= start! ? '✓' : ''}
+                                        Clock in{' '}
+                                        {clockedIn || now >= start! ? '✓' : ''}
                                     </div>
                                 </div>
                                 <div className="absolute left-1/2 -translate-x-1/2 text-center">
@@ -493,9 +508,12 @@ function NextShiftCard({
                         <p className="mt-3 text-[12.5px] text-muted-foreground">
                             Starts{' '}
                             {shift.starts_at
-                                ? new Date(shift.starts_at).toLocaleDateString('en-NZ', {
-                                      weekday: 'long',
-                                  })
+                                ? new Date(shift.starts_at).toLocaleDateString(
+                                      'en-NZ',
+                                      {
+                                          weekday: 'long',
+                                      },
+                                  )
                                 : 'soon'}
                             .
                         </p>
@@ -539,7 +557,8 @@ function NextShiftCard({
                                 href={`/hr/my/time/shifts/${shift.id}/calendar`}
                                 className="inline-flex items-center gap-1.5 rounded-[10px] border border-border bg-card px-3 py-2 text-[12.5px] font-semibold transition-colors hover:bg-muted"
                             >
-                                <CalendarPlus className="h-3.5 w-3.5" /> Add to calendar
+                                <CalendarPlus className="h-3.5 w-3.5" /> Add to
+                                calendar
                             </a>
                             <button
                                 type="button"
@@ -598,7 +617,9 @@ export default function MyHrIndex({
     const [aroundView, setAroundView] = useState<AroundView | null>(null);
     const [leaveOpen, setLeaveOpen] = useState(false);
 
-    const visibleAttention = overview.attention.filter((a) => !cleared.has(a.id));
+    const visibleAttention = overview.attention.filter(
+        (a) => !cleared.has(a.id),
+    );
 
     function clearAttention(id: string) {
         setCleared((prev) => {
@@ -732,7 +753,9 @@ export default function MyHrIndex({
         >
             <div className="flex flex-col gap-5">
                 {/* ── Getting started (new hires with an active checklist) ── */}
-                {onboarding ? <GettingStartedCard onboarding={onboarding} /> : null}
+                {onboarding ? (
+                    <GettingStartedCard onboarding={onboarding} />
+                ) : null}
 
                 {/* ── Row 1 · Your day ── */}
                 <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
@@ -759,7 +782,10 @@ export default function MyHrIndex({
                         </div>
                         <div className="mt-3.5 flex items-center gap-[18px]">
                             <div className="relative h-24 w-24 shrink-0">
-                                <svg viewBox="0 0 96 96" className="h-24 w-24 -rotate-90">
+                                <svg
+                                    viewBox="0 0 96 96"
+                                    className="h-24 w-24 -rotate-90"
+                                >
                                     <circle
                                         cx="48"
                                         cy="48"
@@ -777,12 +803,14 @@ export default function MyHrIndex({
                                         strokeWidth="9"
                                         strokeLinecap="round"
                                         strokeDasharray={ringCirc}
-                                        strokeDashoffset={ringCirc * (1 - workedPct / 100)}
+                                        strokeDashoffset={
+                                            ringCirc * (1 - workedPct / 100)
+                                        }
                                         className="transition-[stroke-dashoffset] duration-700"
                                     />
                                 </svg>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-xl font-bold leading-none">
+                                    <span className="text-xl leading-none font-bold">
                                         {weekly.total_hours.toFixed(1)}
                                     </span>
                                     <span className="text-[10px] text-muted-foreground">
@@ -799,7 +827,8 @@ export default function MyHrIndex({
                                     <span className="h-2 w-2 rounded-full bg-muted" />
                                     {Math.max(
                                         0,
-                                        weekly.target_hours - weekly.total_hours,
+                                        weekly.target_hours -
+                                            weekly.total_hours,
                                     ).toFixed(1)}
                                     h remaining
                                 </div>
@@ -822,7 +851,7 @@ export default function MyHrIndex({
                 <div className="grid gap-4 lg:grid-cols-[1.55fr_1fr]">
                     {/* Needs your attention */}
                     <div className="overflow-hidden rounded-[20px] border border-border bg-card shadow-[0_2px_14px_-8px_rgba(40,30,70,0.18)]">
-                        <div className="flex items-center gap-2.5 px-[18px] pb-3 pt-4">
+                        <div className="flex items-center gap-2.5 px-[18px] pt-4 pb-3">
                             <span className="grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-accent text-primary">
                                 <Bell className="h-4 w-4" />
                             </span>
@@ -840,7 +869,7 @@ export default function MyHrIndex({
                         </div>
 
                         {visibleAttention.length === 0 ? (
-                            <div className="px-[18px] pb-9 pt-6 text-center">
+                            <div className="px-[18px] pt-6 pb-9 text-center">
                                 <div className="mx-auto mb-3 grid h-[52px] w-[52px] place-items-center rounded-full bg-status-success-bg text-status-success">
                                     <CheckCircle2 className="h-6 w-6" />
                                 </div>
@@ -848,7 +877,8 @@ export default function MyHrIndex({
                                     Inbox zero — ka pai!
                                 </div>
                                 <div className="mt-0.5 text-[12.5px] text-muted-foreground">
-                                    Nothing needs you right now. Go enjoy your shift.
+                                    Nothing needs you right now. Go enjoy your
+                                    shift.
                                 </div>
                             </div>
                         ) : (
@@ -859,7 +889,9 @@ export default function MyHrIndex({
                                     return (
                                         <div
                                             key={a.id}
-                                            onContextMenu={(e) => openAttentionCtx(e, a)}
+                                            onContextMenu={(e) =>
+                                                openAttentionCtx(e, a)
+                                            }
                                             className="flex items-center gap-3 rounded-[11px] px-2.5 py-2.5 transition-colors hover:bg-muted"
                                         >
                                             <span
@@ -871,7 +903,7 @@ export default function MyHrIndex({
                                                 <Icon className="h-4 w-4" />
                                             </span>
                                             <div className="min-w-0 flex-1">
-                                                <div className="text-[13px] font-semibold leading-tight">
+                                                <div className="text-[13px] leading-tight font-semibold">
                                                     {a.label}
                                                 </div>
                                                 <div className="text-[11.5px] text-muted-foreground">
@@ -887,14 +919,21 @@ export default function MyHrIndex({
                                             </StatusBadge>
                                             <button
                                                 type="button"
-                                                onClick={() => router.visit(a.href ?? `/hr/my/${a.go}`)}
+                                                onClick={() =>
+                                                    router.visit(
+                                                        a.href ??
+                                                            `/hr/my/${a.go}`,
+                                                    )
+                                                }
                                                 className="shrink-0 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-accent"
                                             >
                                                 {a.cta}
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => clearAttention(a.id)}
+                                                onClick={() =>
+                                                    clearAttention(a.id)
+                                                }
                                                 aria-label="Dismiss"
                                                 title="Dismiss"
                                                 className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted"
@@ -929,7 +968,9 @@ export default function MyHrIndex({
                             >
                                 <Leaf className="h-4 w-4" />
                             </span>
-                            <h2 className="text-[15px] font-bold">Leave balance</h2>
+                            <h2 className="text-[15px] font-bold">
+                                Leave balance
+                            </h2>
                             <button
                                 type="button"
                                 onClick={() => setLeaveOpen(true)}
@@ -958,7 +999,10 @@ export default function MyHrIndex({
                                                 <span className="font-bold text-foreground">
                                                     {l.remaining_days}
                                                 </span>{' '}
-                                                {l.remaining_days === 1 ? 'day' : 'days'} left
+                                                {l.remaining_days === 1
+                                                    ? 'day'
+                                                    : 'days'}{' '}
+                                                left
                                             </span>
                                         </div>
                                         <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
@@ -1018,7 +1062,10 @@ export default function MyHrIndex({
                                             key={c.id}
                                             className="flex items-center gap-2.5 py-1.5"
                                         >
-                                            <Avatar id={c.user_id} initials={c.initials} />
+                                            <Avatar
+                                                id={c.user_id}
+                                                initials={c.initials}
+                                            />
                                             <div className="min-w-0 flex-1">
                                                 <div className="truncate text-[12px] font-semibold">
                                                     {c.name}
@@ -1038,7 +1085,9 @@ export default function MyHrIndex({
                                                         : 'border-primary bg-card text-primary hover:bg-accent',
                                                 )}
                                             >
-                                                {done ? 'Sent ✓' : 'Congratulate'}
+                                                {done
+                                                    ? 'Sent ✓'
+                                                    : 'Congratulate'}
                                             </button>
                                         </div>
                                     );
@@ -1064,7 +1113,10 @@ export default function MyHrIndex({
                                             key={`${w.user_id}-${w.range}`}
                                             className="flex items-center gap-2.5 py-1.5"
                                         >
-                                            <Avatar id={w.user_id} initials={w.initials} />
+                                            <Avatar
+                                                id={w.user_id}
+                                                initials={w.initials}
+                                            />
                                             <div className="min-w-0 flex-1">
                                                 <div className="truncate text-[12px] font-semibold">
                                                     {w.name}
@@ -1073,7 +1125,10 @@ export default function MyHrIndex({
                                                     {w.range}
                                                 </div>
                                             </div>
-                                            <StatusBadge variant={badge.variant} size="sm">
+                                            <StatusBadge
+                                                variant={badge.variant}
+                                                size="sm"
+                                            >
                                                 {badge.label}
                                             </StatusBadge>
                                         </div>
@@ -1094,7 +1149,8 @@ export default function MyHrIndex({
                                 <Empty>All caught up.</Empty>
                             ) : (
                                 announcements.slice(0, 2).map((a) => {
-                                    const seen = acked.has(a.id) || a.acknowledged;
+                                    const seen =
+                                        acked.has(a.id) || a.acknowledged;
                                     return (
                                         <div
                                             key={a.id}
@@ -1102,7 +1158,7 @@ export default function MyHrIndex({
                                         >
                                             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-live" />
                                             <div className="min-w-0 flex-1">
-                                                <div className="truncate text-[12px] font-semibold leading-tight">
+                                                <div className="truncate text-[12px] leading-tight font-semibold">
                                                     {a.title}
                                                 </div>
                                                 <div className="truncate text-[11px] text-muted-foreground">
@@ -1111,7 +1167,9 @@ export default function MyHrIndex({
                                             </div>
                                             <button
                                                 type="button"
-                                                onClick={() => acknowledge(a.id)}
+                                                onClick={() =>
+                                                    acknowledge(a.id)
+                                                }
                                                 disabled={seen}
                                                 className={cn(
                                                     'shrink-0 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors',
@@ -1120,7 +1178,9 @@ export default function MyHrIndex({
                                                         : 'border-border bg-card hover:bg-muted',
                                                 )}
                                             >
-                                                {seen ? 'Seen ✓' : 'Acknowledge'}
+                                                {seen
+                                                    ? 'Seen ✓'
+                                                    : 'Acknowledge'}
                                             </button>
                                         </div>
                                     );
@@ -1139,7 +1199,9 @@ export default function MyHrIndex({
                 ) : null}
             </div>
 
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
 
             <MyHrAroundModal
                 view={aroundView}
@@ -1189,7 +1251,9 @@ function Avatar({ id, initials }: { id: number; initials: string }) {
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-    return <p className="py-1.5 text-[12px] text-muted-foreground">{children}</p>;
+    return (
+        <p className="py-1.5 text-[12px] text-muted-foreground">{children}</p>
+    );
 }
 
 function AroundColumn({
@@ -1215,7 +1279,7 @@ function AroundColumn({
             )}
         >
             <div className="mb-2 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-[0.07em] text-muted-foreground uppercase">
                     {icon} {label}
                 </span>
                 <button
@@ -1240,7 +1304,9 @@ function leaveTone(type: string): { label: string; variant: StatusVariant } {
     };
     return (
         map[type] ?? {
-            label: type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+            label: type
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase()),
             variant: 'neutral',
         }
     );

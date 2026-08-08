@@ -87,6 +87,7 @@ export function SiteProfileVendors({
                 </Button>
             </div>
 
+            {/* eslint-disable-next-line no-restricted-syntax -- This compact segmented tab rail is navigation, not a content Card. */}
             <div className="inline-flex rounded-xl border bg-card p-1">
                 {data.can.vendors ? (
                     <Button
@@ -142,9 +143,10 @@ export function SiteProfileVendors({
                     <CardContent>
                         <div className="divide-y rounded-xl border">
                             {data.vendors.map((vendor) => (
-                                <button
+                                <Button
                                     key={vendor.id}
                                     type="button"
+                                    unstyled
                                     onClick={() =>
                                         setVendorDialog({
                                             mode: 'show',
@@ -182,7 +184,7 @@ export function SiteProfileVendors({
                                         </div>
                                     </div>
                                     <Eye className="mt-1 h-4 w-4 text-muted-foreground" />
-                                </button>
+                                </Button>
                             ))}
                             {!data.vendors.length ? (
                                 <p className="p-8 text-center text-sm text-muted-foreground">
@@ -219,9 +221,10 @@ export function SiteProfileVendors({
                     <CardContent>
                         <div className="divide-y rounded-xl border">
                             {data.credentials.map((credential) => (
-                                <button
+                                <Button
                                     key={credential.id}
                                     type="button"
+                                    unstyled
                                     onClick={() =>
                                         setCredentialDialog({
                                             mode: 'show',
@@ -254,7 +257,7 @@ export function SiteProfileVendors({
                                             ? 'Reveal securely'
                                             : 'View metadata'}
                                     </Badge>
-                                </button>
+                                </Button>
                             ))}
                             {!data.credentials.length ? (
                                 <p className="p-8 text-center text-sm text-muted-foreground">

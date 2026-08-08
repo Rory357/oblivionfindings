@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Bell, ChevronRight, type LucideIcon } from 'lucide-react';
 
@@ -28,12 +29,13 @@ export function SiteProfileAlertRibbon({
             {alerts.map((alert) => {
                 const Icon = alert.icon;
                 return (
-                    <button
+                    <Button
                         key={alert.id}
                         type="button"
+                        unstyled
                         onClick={alert.onSelect}
                         className={cn(
-                            'group inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:shadow-sm',
+                            'group inline-flex min-h-11 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:shadow-sm',
                             alert.tone === 'critical'
                                 ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
                                 : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
@@ -45,7 +47,7 @@ export function SiteProfileAlertRibbon({
                             <span className="opacity-60">· {alert.detail}</span>
                         ) : null}
                         <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-70" />
-                    </button>
+                    </Button>
                 );
             })}
         </div>

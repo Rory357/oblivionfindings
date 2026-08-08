@@ -82,17 +82,12 @@ export function BroadcastDialog({
                         <div className="text-xs text-muted-foreground">
                             {shift.site ? `Site: ${shift.site}` : null}
                             {shift.site && shift.client ? ' · ' : ''}
-                            {shift.client
-                                ? `Client: ${shift.client}`
-                                : null}
+                            {shift.client ? `Client: ${shift.client}` : null}
                         </div>
                     ) : null}
                 </div>
                 <DialogFooter>
-                    <Button
-                        variant="ghost"
-                        onClick={() => onOpenChange(false)}
-                    >
+                    <Button variant="ghost" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
                     <Button

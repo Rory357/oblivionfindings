@@ -1,9 +1,10 @@
 import { useForm } from '@inertiajs/react';
 import { Building2, ListChecks } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
+import type { AccountOption } from './new-bill-dialog';
 import {
     Field,
     ReviewCard,
@@ -14,7 +15,6 @@ import {
     type WizardStep,
     useWizard,
 } from './wizard';
-import type { AccountOption } from './new-bill-dialog';
 
 const VENDOR_TYPES = [
     { value: 'supplier', label: 'Supplier' },
@@ -25,8 +25,18 @@ const VENDOR_TYPES = [
 ];
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Details', blurb: 'Name & contact', icon: Building2 },
-    { key: 'review', label: 'Terms & review', blurb: 'Payment terms & confirm', icon: ListChecks },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Name & contact',
+        icon: Building2,
+    },
+    {
+        key: 'review',
+        label: 'Terms & review',
+        blurb: 'Payment terms & confirm',
+        icon: ListChecks,
+    },
 ];
 
 /**
@@ -67,9 +77,16 @@ export function NewVendorDialog({
     });
     const { data, setData, processing, errors } = form;
 
-    const accountOptions = expenseAccounts.map((a) => ({ value: String(a.id), label: `${a.code} · ${a.name}` }));
-    const typeLabel = VENDOR_TYPES.find((t) => t.value === data.vendor_type)?.label ?? data.vendor_type;
-    const accountLabel = expenseAccounts.find((a) => String(a.id) === data.default_expense_account_id);
+    const accountOptions = expenseAccounts.map((a) => ({
+        value: String(a.id),
+        label: `${a.code} · ${a.name}`,
+    }));
+    const typeLabel =
+        VENDOR_TYPES.find((t) => t.value === data.vendor_type)?.label ??
+        data.vendor_type;
+    const accountLabel = expenseAccounts.find(
+        (a) => String(a.id) === data.default_expense_account_id,
+    );
 
     const detailsValid = !!data.name.trim() && !!data.vendor_type;
 
@@ -88,7 +105,10 @@ export function NewVendorDialog({
             phone: d.phone || null,
             gst_number: d.gst_number || null,
             notes: d.notes || null,
-            payment_terms_days: d.payment_terms_days === '' ? null : Number(d.payment_terms_days),
+            payment_terms_days:
+                d.payment_terms_days === ''
+                    ? null
+                    : Number(d.payment_terms_days),
             default_expense_account_id: d.default_expense_account_id || null,
         }));
         form.post('/finance/vendors', {
@@ -115,17 +135,30 @@ export function NewVendorDialog({
             footerEnd={
                 <>
                     {!isFirst && (
-                        <Button type="button" variant="outline" onClick={back} disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={back}
+                            disabled={processing}
+                        >
                             Back
                         </Button>
                     )}
                     {!isLast && (
-                        <Button type="button" onClick={next} disabled={!detailsValid}>
+                        <Button
+                            type="button"
+                            onClick={next}
+                            disabled={!detailsValid}
+                        >
                             Continue
                         </Button>
                     )}
                     {isLast && (
-                        <Button type="button" onClick={submit} disabled={processing || !detailsValid}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={processing || !detailsValid}
+                        >
                             Create vendor
                         </Button>
                     )}
@@ -134,10 +167,20 @@ export function NewVendorDialog({
         >
             {index === 0 && (
                 <div>
-                    <StepHead icon={Building2} title="Vendor details" blurb="Who they are and how to reach them." />
+                    <StepHead
+                        icon={Building2}
+                        title="Vendor details"
+                        blurb="Who they are and how to reach them."
+                    />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <Field label="Name" span required error={errors.name}>
-                            <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Acme Supplies Ltd" />
+                            <Input
+                                value={data.name}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
+                                placeholder="e.g. Acme Supplies Ltd"
+                            />
                         </Field>
                         <Field label="Type" required error={errors.vendor_type}>
                             <SelectInput
@@ -147,14 +190,43 @@ export function NewVendorDialog({
                                 options={VENDOR_TYPES}
                             />
                         </Field>
-                        <Field label="GST number" hint="optional" error={errors.gst_number}>
-                            <Input value={data.gst_number} onChange={(e) => setData('gst_number', e.target.value)} placeholder="123-456-789" />
+                        <Field
+                            label="GST number"
+                            hint="optional"
+                            error={errors.gst_number}
+                        >
+                            <Input
+                                value={data.gst_number}
+                                onChange={(e) =>
+                                    setData('gst_number', e.target.value)
+                                }
+                                placeholder="123-456-789"
+                            />
                         </Field>
-                        <Field label="Email" hint="optional" error={errors.email}>
-                            <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} />
+                        <Field
+                            label="Email"
+                            hint="optional"
+                            error={errors.email}
+                        >
+                            <Input
+                                type="email"
+                                value={data.email}
+                                onChange={(e) =>
+                                    setData('email', e.target.value)
+                                }
+                            />
                         </Field>
-                        <Field label="Phone" hint="optional" error={errors.phone}>
-                            <Input value={data.phone} onChange={(e) => setData('phone', e.target.value)} />
+                        <Field
+                            label="Phone"
+                            hint="optional"
+                            error={errors.phone}
+                        >
+                            <Input
+                                value={data.phone}
+                                onChange={(e) =>
+                                    setData('phone', e.target.value)
+                                }
+                            />
                         </Field>
                     </div>
                 </div>
@@ -162,37 +234,83 @@ export function NewVendorDialog({
 
             {index === 1 && (
                 <div>
-                    <StepHead icon={ListChecks} title="Terms & review" blurb="Default payment terms and account, then confirm." />
+                    <StepHead
+                        icon={ListChecks}
+                        title="Terms & review"
+                        blurb="Default payment terms and account, then confirm."
+                    />
                     <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Payment terms (days)" hint="optional" error={errors.payment_terms_days}>
+                        <Field
+                            label="Payment terms (days)"
+                            hint="optional"
+                            error={errors.payment_terms_days}
+                        >
                             <Input
                                 type="number"
                                 min="0"
                                 value={data.payment_terms_days}
-                                onChange={(e) => setData('payment_terms_days', e.target.value)}
+                                onChange={(e) =>
+                                    setData(
+                                        'payment_terms_days',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="e.g. 30"
                             />
                         </Field>
-                        <Field label="Default expense account" hint="optional" error={errors.default_expense_account_id}>
+                        <Field
+                            label="Default expense account"
+                            hint="optional"
+                            error={errors.default_expense_account_id}
+                        >
                             <SelectInput
                                 value={data.default_expense_account_id}
-                                onChange={(v) => setData('default_expense_account_id', v)}
+                                onChange={(v) =>
+                                    setData('default_expense_account_id', v)
+                                }
                                 placeholder="None"
                                 options={accountOptions}
                             />
                         </Field>
-                        <Field label="Notes" span hint="optional" error={errors.notes}>
-                            <Textarea rows={2} value={data.notes} onChange={(e) => setData('notes', e.target.value)} />
+                        <Field
+                            label="Notes"
+                            span
+                            hint="optional"
+                            error={errors.notes}
+                        >
+                            <Textarea
+                                rows={2}
+                                value={data.notes}
+                                onChange={(e) =>
+                                    setData('notes', e.target.value)
+                                }
+                            />
                         </Field>
                     </div>
                     <ReviewCard icon={Building2} title="Vendor">
                         <ReviewRow label="Name" value={data.name || '—'} />
                         <ReviewRow label="Type" value={typeLabel} />
-                        {data.email && <ReviewRow label="Email" value={data.email} />}
-                        {data.payment_terms_days && <ReviewRow label="Payment terms" value={`${data.payment_terms_days} days`} />}
-                        {accountLabel && <ReviewRow label="Default account" value={`${accountLabel.code} · ${accountLabel.name}`} />}
+                        {data.email && (
+                            <ReviewRow label="Email" value={data.email} />
+                        )}
+                        {data.payment_terms_days && (
+                            <ReviewRow
+                                label="Payment terms"
+                                value={`${data.payment_terms_days} days`}
+                            />
+                        )}
+                        {accountLabel && (
+                            <ReviewRow
+                                label="Default account"
+                                value={`${accountLabel.code} · ${accountLabel.name}`}
+                            />
+                        )}
                     </ReviewCard>
-                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">Creating…</p>}
+                    {processing && (
+                        <p className="mt-3 text-[13px] text-muted-foreground">
+                            Creating…
+                        </p>
+                    )}
                 </div>
             )}
         </WizardShell>

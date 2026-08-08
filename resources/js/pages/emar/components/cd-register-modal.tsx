@@ -2,15 +2,15 @@
  * Posts to emar.controlled.entries.store with the idempotency envelope
  * (client_request_uuid). Witness is mandatory and must differ from the signer. */
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     InfoCard,
     SelectInput,
     StepHead,
 } from '@/components/wizard/primitives';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { router } from '@inertiajs/react';
 import { ClipboardCheck, Info, Lock, UserCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -29,8 +29,18 @@ export type WitnessOption = { id: number; name: string };
 
 const STEPS = [
     { key: 'entry', label: 'Entry', blurb: 'Type & quantity', icon: Lock },
-    { key: 'witness', label: 'Witness & balance', blurb: 'Counter-sign', icon: UserCheck },
-    { key: 'review', label: 'Review', blurb: 'Sign to register', icon: ClipboardCheck },
+    {
+        key: 'witness',
+        label: 'Witness & balance',
+        blurb: 'Counter-sign',
+        icon: UserCheck,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Sign to register',
+        icon: ClipboardCheck,
+    },
 ];
 
 const ENTRY_TYPES = [
@@ -47,9 +57,12 @@ const labelOf = (opts: { value: string; label: string }[], v: string) =>
     opts.find((o) => o.value === v)?.label ?? '—';
 
 function newUuid(): string {
-    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+        return crypto.randomUUID();
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = (Math.floor(Date.now() / 1000) + Math.floor(performance.now())) % 16;
+        const r =
+            (Math.floor(Date.now() / 1000) + Math.floor(performance.now())) %
+            16;
         const v = c === 'x' ? r : (r % 4) + 8;
         return v.toString(16);
     });
@@ -75,7 +88,9 @@ export function CdRegisterModal({
     const [step, setStep] = useState(0);
     const [saving, setSaving] = useState(false);
     const [uuid, setUuid] = useState('');
-    const [clientId, setClientId] = useState(initialClientId ? String(initialClientId) : '');
+    const [clientId, setClientId] = useState(
+        initialClientId ? String(initialClientId) : '',
+    );
     const [medName, setMedName] = useState('');
     const [entryType, setEntryType] = useState('');
     const [quantity, setQuantity] = useState('');
@@ -144,7 +159,9 @@ export function CdRegisterModal({
             {
                 preserveScroll: true,
                 onSuccess: () => {
-                    toast.success('Controlled-drug entry signed to the register');
+                    toast.success(
+                        'Controlled-drug entry signed to the register',
+                    );
                     close();
                 },
                 onError: () => toast.error('Could not sign the CD entry'),
@@ -153,19 +170,27 @@ export function CdRegisterModal({
         );
     };
 
-    const clientName = clients.find((c) => String(c.id) === clientId)?.name ?? '—';
-    const witnessName = witnesses.find((w) => String(w.id) === witnessedBy)?.name ?? '—';
+    const clientName =
+        clients.find((c) => String(c.id) === clientId)?.name ?? '—';
+    const witnessName =
+        witnesses.find((w) => String(w.id) === witnessedBy)?.name ?? '—';
     const eligibleWitnesses = witnesses.filter((w) => w.id !== currentUserId);
 
     const footer = (
         <>
-            <Button variant="ghost" onClick={step === 0 ? close : () => setStep((s) => s - 1)} disabled={saving}>
+            <Button
+                variant="ghost"
+                onClick={step === 0 ? close : () => setStep((s) => s - 1)}
+                disabled={saving}
+            >
                 {step === 0 ? 'Cancel' : 'Back'}
             </Button>
             {step < 2 ? (
                 <Button
                     onClick={() => setStep((s) => s + 1)}
-                    disabled={(step === 0 && !step1Ok) || (step === 1 && !step2Ok)}
+                    disabled={
+                        (step === 0 && !step1Ok) || (step === 1 && !step2Ok)
+                    }
                 >
                     Continue
                 </Button>
@@ -194,7 +219,11 @@ export function CdRegisterModal({
         >
             {step === 0 ? (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={Lock} title="Register entry" blurb="What moved, and how much?" />
+                    <StepHead
+                        icon={Lock}
+                        title="Register entry"
+                        blurb="What moved, and how much?"
+                    />
                     <Field label="Client" required>
                         <SelectInput
                             value={clientId}
@@ -203,7 +232,12 @@ export function CdRegisterModal({
                                 setMedName('');
                             }}
                             placeholder="Select client"
-                            options={clients.map((c) => ({ value: String(c.id), label: c.site ? `${c.name} · ${c.site}` : c.name }))}
+                            options={clients.map((c) => ({
+                                value: String(c.id),
+                                label: c.site
+                                    ? `${c.name} · ${c.site}`
+                                    : c.name,
+                            }))}
                         />
                     </Field>
                     <Field label="Controlled drug" required>
@@ -212,45 +246,101 @@ export function CdRegisterModal({
                                 value={medName}
                                 onChange={(v) => {
                                     setMedName(v);
-                                    const m = clientControlledMeds.find((x) => x.name === v);
+                                    const m = clientControlledMeds.find(
+                                        (x) => x.name === v,
+                                    );
                                     if (m?.unit) setUnit(m.unit);
                                 }}
                                 placeholder="Select medication"
-                                options={clientControlledMeds.map((m) => ({ value: m.name, label: m.name }))}
+                                options={clientControlledMeds.map((m) => ({
+                                    value: m.name,
+                                    label: m.name,
+                                }))}
                             />
                         ) : (
-                            <Input value={medName} onChange={(e) => setMedName(e.target.value)} placeholder="Medication name" />
+                            <Input
+                                value={medName}
+                                onChange={(e) => setMedName(e.target.value)}
+                                placeholder="Medication name"
+                            />
                         )}
                     </Field>
                     <Field label="Entry type" required span>
-                        <SelectInput value={entryType} onChange={setEntryType} placeholder="Select entry type" options={ENTRY_TYPES} />
+                        <SelectInput
+                            value={entryType}
+                            onChange={setEntryType}
+                            placeholder="Select entry type"
+                            options={ENTRY_TYPES}
+                        />
                     </Field>
                     <Field label="Quantity" required>
-                        <Input type="number" inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" />
+                        <Input
+                            type="number"
+                            inputMode="decimal"
+                            value={quantity}
+                            onChange={(e) => setQuantity(e.target.value)}
+                            placeholder="0"
+                        />
                     </Field>
                     <Field label="Unit">
-                        <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g. tablets, mg" />
+                        <Input
+                            value={unit}
+                            onChange={(e) => setUnit(e.target.value)}
+                            placeholder="e.g. tablets, mg"
+                        />
                     </Field>
                 </div>
             ) : step === 1 ? (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={UserCheck} title="Witness & balance" blurb="Counter-signature and running balance." />
+                    <StepHead
+                        icon={UserCheck}
+                        title="Witness & balance"
+                        blurb="Counter-signature and running balance."
+                    />
                     <Field label="Balance before">
-                        <Input type="number" inputMode="decimal" value={onHandBefore} onChange={(e) => setOnHandBefore(e.target.value)} placeholder="On hand before" />
+                        <Input
+                            type="number"
+                            inputMode="decimal"
+                            value={onHandBefore}
+                            onChange={(e) => setOnHandBefore(e.target.value)}
+                            placeholder="On hand before"
+                        />
                     </Field>
                     <Field label="Balance after">
-                        <Input type="number" inputMode="decimal" value={onHandAfter} onChange={(e) => setOnHandAfter(e.target.value)} placeholder="On hand after" />
+                        <Input
+                            type="number"
+                            inputMode="decimal"
+                            value={onHandAfter}
+                            onChange={(e) => setOnHandAfter(e.target.value)}
+                            placeholder="On hand after"
+                        />
                     </Field>
-                    <Field label="Witness" required hint="must differ from you" span>
+                    <Field
+                        label="Witness"
+                        required
+                        hint="must differ from you"
+                        span
+                    >
                         <SelectInput
                             value={witnessedBy}
                             onChange={setWitnessedBy}
-                            placeholder={eligibleWitnesses.length ? 'Select witness' : 'No eligible witnesses'}
-                            options={eligibleWitnesses.map((w) => ({ value: String(w.id), label: w.name }))}
+                            placeholder={
+                                eligibleWitnesses.length
+                                    ? 'Select witness'
+                                    : 'No eligible witnesses'
+                            }
+                            options={eligibleWitnesses.map((w) => ({
+                                value: String(w.id),
+                                label: w.name,
+                            }))}
                         />
                     </Field>
                     <Field label="Batch number">
-                        <Input value={batch} onChange={(e) => setBatch(e.target.value)} placeholder="Optional" />
+                        <Input
+                            value={batch}
+                            onChange={(e) => setBatch(e.target.value)}
+                            placeholder="Optional"
+                        />
                     </Field>
                     <Field label="Expiry date">
                         {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in wizard primitives. */}
@@ -262,32 +352,56 @@ export function CdRegisterModal({
                         />
                     </Field>
                     <InfoCard icon={Info} tone="warn">
-                        Controlled-drug entries are witnessed and immutable. The running balance is the legal
-                        record — count carefully.
+                        Controlled-drug entries are witnessed and immutable. The
+                        running balance is the legal record — count carefully.
                     </InfoCard>
                 </div>
             ) : (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={ClipboardCheck} title="Review & sign" blurb="Confirm the register entry." />
+                    <StepHead
+                        icon={ClipboardCheck}
+                        title="Review & sign"
+                        blurb="Confirm the register entry."
+                    />
                     <Field label="Notes" span>
-                        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Optional context for the register entry" />
+                        <Textarea
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            rows={2}
+                            placeholder="Optional context for the register entry"
+                        />
                     </Field>
                     <div className="col-span-full rounded-lg border border-border">
                         <div className="px-4">
                             <SummaryRow label="Client" value={clientName} />
                             <SummaryRow label="Drug" value={medName || '—'} />
-                            <SummaryRow label="Entry" value={labelOf(ENTRY_TYPES, entryType)} />
-                            <SummaryRow label="Quantity" value={`${quantity}${unit ? ` ${unit}` : ''}`} />
+                            <SummaryRow
+                                label="Entry"
+                                value={labelOf(ENTRY_TYPES, entryType)}
+                            />
+                            <SummaryRow
+                                label="Quantity"
+                                value={`${quantity}${unit ? ` ${unit}` : ''}`}
+                            />
                             <SummaryRow
                                 label="Balance"
-                                value={onHandBefore || onHandAfter ? `${onHandBefore || '—'} → ${onHandAfter || '—'}` : '—'}
+                                value={
+                                    onHandBefore || onHandAfter
+                                        ? `${onHandBefore || '—'} → ${onHandAfter || '—'}`
+                                        : '—'
+                                }
                             />
-                            <SummaryRow label="Witness" value={witnessName} tone="success" />
+                            <SummaryRow
+                                label="Witness"
+                                value={witnessName}
+                                tone="success"
+                            />
                         </div>
                     </div>
                     <InfoCard icon={Info}>
-                        Signing records this to the controlled-drug register with an audit entry. The entry is
-                        idempotent — a retried submit won't double-post.
+                        Signing records this to the controlled-drug register
+                        with an audit entry. The entry is idempotent — a retried
+                        submit won't double-post.
                     </InfoCard>
                 </div>
             )}

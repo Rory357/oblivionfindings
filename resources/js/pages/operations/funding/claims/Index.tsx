@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { CalendarDays, FileCheck, FileText, Plus } from 'lucide-react';
@@ -29,7 +29,11 @@ type ClaimRow = {
     period_end?: string | null;
     items_count?: number;
     client?: { id: number; first_name: string; last_name: string } | null;
-    service_agreement?: { id: number; title: string; reference_number?: string | null } | null;
+    service_agreement?: {
+        id: number;
+        title: string;
+        reference_number?: string | null;
+    } | null;
     submitter?: { id: number; name: string } | null;
 };
 
@@ -63,13 +67,17 @@ export default function FundingClaimsIndex({
     const rows = claims?.data ?? [];
 
     const updateFilters = (key: string, value: string | null) => {
-        router.get('/operations/funding/claims', {
-            ...filters,
-            [key]: value,
-        }, {
-            preserveState: true,
-            replace: true,
-        });
+        router.get(
+            '/operations/funding/claims',
+            {
+                ...filters,
+                [key]: value,
+            },
+            {
+                preserveState: true,
+                replace: true,
+            },
+        );
     };
 
     return (
@@ -83,11 +91,13 @@ export default function FundingClaimsIndex({
                     { label: 'Total claims', value: rows.length },
                     {
                         label: 'Submitted',
-                        value: rows.filter((c) => c.status === 'submitted').length,
+                        value: rows.filter((c) => c.status === 'submitted')
+                            .length,
                     },
                     {
                         label: 'Approved',
-                        value: rows.filter((c) => c.status === 'approved').length,
+                        value: rows.filter((c) => c.status === 'approved')
+                            .length,
                     },
                     {
                         label: 'Paid',
@@ -100,7 +110,10 @@ export default function FundingClaimsIndex({
                     <Select
                         value={filters?.status ?? ANY}
                         onValueChange={(value) =>
-                            updateFilters('status', value === ANY ? null : value)
+                            updateFilters(
+                                'status',
+                                value === ANY ? null : value,
+                            )
                         }
                     >
                         <SelectTrigger className="h-9 w-[160px] text-xs">
@@ -108,7 +121,13 @@ export default function FundingClaimsIndex({
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value={ANY}>All Statuses</SelectItem>
-                            {['draft', 'submitted', 'approved', 'rejected', 'paid'].map((status) => (
+                            {[
+                                'draft',
+                                'submitted',
+                                'approved',
+                                'rejected',
+                                'paid',
+                            ].map((status) => (
                                 <SelectItem key={status} value={status}>
                                     {status}
                                 </SelectItem>
@@ -119,7 +138,10 @@ export default function FundingClaimsIndex({
                     <Select
                         value={filters?.client_id ?? ANY}
                         onValueChange={(value) =>
-                            updateFilters('client_id', value === ANY ? null : value)
+                            updateFilters(
+                                'client_id',
+                                value === ANY ? null : value,
+                            )
                         }
                     >
                         <SelectTrigger className="h-9 w-[220px] text-xs">
@@ -128,7 +150,10 @@ export default function FundingClaimsIndex({
                         <SelectContent>
                             <SelectItem value={ANY}>All Clients</SelectItem>
                             {clients.map((client) => (
-                                <SelectItem key={client.id} value={String(client.id)}>
+                                <SelectItem
+                                    key={client.id}
+                                    value={String(client.id)}
+                                >
                                     {client.first_name} {client.last_name}
                                 </SelectItem>
                             ))}
@@ -154,7 +179,8 @@ export default function FundingClaimsIndex({
                                     No Funding Claims
                                 </h2>
                                 <p className="mt-1 text-sm text-muted-foreground/80">
-                                    Draft claims will appear here once a funding period is assembled.
+                                    Draft claims will appear here once a funding
+                                    period is assembled.
                                 </p>
                             </CardContent>
                         </Card>
@@ -169,22 +195,33 @@ export default function FundingClaimsIndex({
                                             href={`/operations/funding/claims/${claim.id}`}
                                             className="text-sm font-semibold hover:underline"
                                         >
-                                            {claim.claim_reference || `Claim #${claim.id}`}
+                                            {claim.claim_reference ||
+                                                `Claim #${claim.id}`}
                                         </Link>
-                                        <Badge variant="outline" className="h-4 px-1.5 text-[9px] capitalize">
+                                        <Badge
+                                            variant="outline"
+                                            className="h-4 px-1.5 text-[9px] capitalize"
+                                        >
                                             {claim.status}
                                         </Badge>
                                     </div>
                                     <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                                         {claim.client && (
-                                            <span>{claim.client.first_name} {claim.client.last_name}</span>
+                                            <span>
+                                                {claim.client.first_name}{' '}
+                                                {claim.client.last_name}
+                                            </span>
                                         )}
                                         <span className="inline-flex items-center gap-1">
                                             <CalendarDays className="h-3 w-3" />
-                                            {formatDate(claim.period_start)} - {formatDate(claim.period_end)}
+                                            {formatDate(
+                                                claim.period_start,
+                                            )} - {formatDate(claim.period_end)}
                                         </span>
                                         {claim.service_agreement?.title && (
-                                            <span>{claim.service_agreement.title}</span>
+                                            <span>
+                                                {claim.service_agreement.title}
+                                            </span>
                                         )}
                                     </div>
                                 </div>
@@ -196,7 +233,9 @@ export default function FundingClaimsIndex({
                                 </p>
                                 <div className="flex justify-end">
                                     <Button asChild size="sm" variant="outline">
-                                        <Link href={`/operations/funding/claims/${claim.id}`}>
+                                        <Link
+                                            href={`/operations/funding/claims/${claim.id}`}
+                                        >
                                             Open
                                         </Link>
                                     </Button>

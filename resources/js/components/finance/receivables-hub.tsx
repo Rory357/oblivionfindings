@@ -48,14 +48,70 @@ type ReceivablesTabDef = FinanceTabItem & {
 const arView = (c: CanTree) => !!c?.finance?.ar?.view;
 
 export const RECEIVABLES_TABS: ReceivablesTabDef[] = [
-    { id: 'invoices', label: 'Invoices', icon: Receipt, tone: 'primary', href: '/finance/invoices', requires: arView },
-    { id: 'quotes', label: 'Quotes', icon: FileText, tone: 'info', href: '/finance/quotes', requires: arView },
-    { id: 'recurring-charges', label: 'Recurring charges', icon: RefreshCw, tone: 'violet', href: '/finance/recurring-charges', requires: arView },
-    { id: 'billing', label: 'Billing', icon: DollarSign, tone: 'success', href: '/finance/billing', requires: arView },
-    { id: 'aged-ar', label: 'Aged AR', icon: CalendarRange, tone: 'warning', href: '/finance/receivables', requires: arView },
-    { id: 'statements', label: 'Statements', icon: Coins, tone: 'info', href: '/finance/receivables/statements', requires: arView },
-    { id: 'price-books', label: 'Price books', icon: BookOpen, tone: 'primary', href: '/finance/price-books', requires: arView },
-    { id: 'allocations', label: 'Allocations', icon: ArrowLeftRight, tone: 'violet', href: '/finance/payment-allocations', requires: arView },
+    {
+        id: 'invoices',
+        label: 'Invoices',
+        icon: Receipt,
+        tone: 'primary',
+        href: '/finance/invoices',
+        requires: arView,
+    },
+    {
+        id: 'quotes',
+        label: 'Quotes',
+        icon: FileText,
+        tone: 'info',
+        href: '/finance/quotes',
+        requires: arView,
+    },
+    {
+        id: 'recurring-charges',
+        label: 'Recurring charges',
+        icon: RefreshCw,
+        tone: 'violet',
+        href: '/finance/recurring-charges',
+        requires: arView,
+    },
+    {
+        id: 'billing',
+        label: 'Billing',
+        icon: DollarSign,
+        tone: 'success',
+        href: '/finance/billing',
+        requires: arView,
+    },
+    {
+        id: 'aged-ar',
+        label: 'Aged AR',
+        icon: CalendarRange,
+        tone: 'warning',
+        href: '/finance/receivables',
+        requires: arView,
+    },
+    {
+        id: 'statements',
+        label: 'Statements',
+        icon: Coins,
+        tone: 'info',
+        href: '/finance/receivables/statements',
+        requires: arView,
+    },
+    {
+        id: 'price-books',
+        label: 'Price books',
+        icon: BookOpen,
+        tone: 'primary',
+        href: '/finance/price-books',
+        requires: arView,
+    },
+    {
+        id: 'allocations',
+        label: 'Allocations',
+        icon: ArrowLeftRight,
+        tone: 'violet',
+        href: '/finance/payment-allocations',
+        requires: arView,
+    },
 ];
 
 /**
@@ -66,14 +122,20 @@ export const RECEIVABLES_TABS: ReceivablesTabDef[] = [
  * can open (the active tab is always shown). Drop into every AR Index page:
  * `<PageHero … footer={<ReceivablesTabsFooter active="…" />} />`.
  */
-export function ReceivablesTabsFooter({ active }: { active: ReceivablesTabId }) {
+export function ReceivablesTabsFooter({
+    active,
+}: {
+    active: ReceivablesTabId;
+}) {
     const page = usePage();
     const can = (page.props as { auth?: { can?: CanTree } })?.auth?.can;
     const counts =
         (page.props as { financeHubCounts?: FinanceHubCounts | null })
             .financeHubCounts?.['receivables'] ?? {};
 
-    const visible = RECEIVABLES_TABS.filter((t) => t.id === active || t.requires(can));
+    const visible = RECEIVABLES_TABS.filter(
+        (t) => t.id === active || t.requires(can),
+    );
 
     const handleTab = (id: string) => {
         if (id === active) return;

@@ -2,6 +2,8 @@
 
 namespace App\Models\Queclink;
 
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -36,6 +38,9 @@ class QueclinkRawFrame extends Model
 
     protected $fillable = [
         'queclink_device_id',
+        'canonical_device_id',
+        'device_assignment_id',
+        'binding_uuid',
         'imei',
         'direction',
         'frame_type',
@@ -57,6 +62,7 @@ class QueclinkRawFrame extends Model
         'encrypted_parsed_payload',
         'remote_address',
         'session_id',
+        'binding_uuid',
     ];
 
     protected $casts = [
@@ -64,6 +70,13 @@ class QueclinkRawFrame extends Model
         'parse_ok' => 'boolean',
         'created_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(function (): never {
+            throw new RuntimeException('Queclink raw frame evidence is immutable.');
+        });
+    }
 
     protected function rawFrame(): Attribute
     {
@@ -97,6 +110,16 @@ class QueclinkRawFrame extends Model
     public function device(): BelongsTo
     {
         return $this->belongsTo(QueclinkDevice::class, 'queclink_device_id');
+    }
+
+    public function canonicalDevice(): BelongsTo
+    {
+        return $this->belongsTo(Device::class, 'canonical_device_id');
+    }
+
+    public function deviceAssignment(): BelongsTo
+    {
+        return $this->belongsTo(DeviceAssignment::class, 'device_assignment_id');
     }
 
     public function scopeInbound(Builder $q): Builder

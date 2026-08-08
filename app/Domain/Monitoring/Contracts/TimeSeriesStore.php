@@ -10,7 +10,11 @@ interface TimeSeriesStore
     /** @param list<TimeSeriesPoint> $points */
     public function writePoints(array $points): void;
 
-    /** @return list<TimeSeriesPoint> */
+    /**
+     * Read the half-open interval [from, to).
+     *
+     * @return list<TimeSeriesPoint>
+     */
     public function range(
         string $externalKey,
         string $tier,
@@ -18,6 +22,7 @@ interface TimeSeriesStore
         CarbonImmutable $to,
     ): array;
 
+    /** Delete the half-open interval [from, to). */
     public function deleteRange(
         string $externalKey,
         string $tier,

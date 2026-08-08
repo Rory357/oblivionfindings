@@ -1,18 +1,24 @@
-import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { Head } from '@inertiajs/react';
+import axios from 'axios';
 import { Landmark, RefreshCw } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
-import AppLayout from '@/layouts/app-layout';
-import { data as dashboardData } from '@/routes/governance/dashboard';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { data as dashboardData } from '@/routes/governance/dashboard';
 import { PageProps } from '@/types';
 
-import { CockpitLayout, type CockpitPayload } from './Cockpit/CockpitLayout';
-import { CockpitSkeleton } from '@/components/governance/CockpitSkeleton';
 import type { WorkflowAction } from '@/components/governance/BoardPriorityCard';
+import { CockpitSkeleton } from '@/components/governance/CockpitSkeleton';
+import { CockpitLayout, type CockpitPayload } from './Cockpit/CockpitLayout';
 
 interface DashboardPayload {
     snapshot_id: number | null;
@@ -36,7 +42,11 @@ const formatLabel = (value: string) => value.replace(/_/g, ' ');
  * inside `CockpitLayout` to keep this file focused on page chrome + data
  * fetch.
  */
-export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: Props) {
+export default function GovernanceDashboard({
+    auth,
+    isBoardMember,
+    boardRole,
+}: Props) {
     const [period, setPeriod] = useState('month');
     const [payload, setPayload] = useState<DashboardPayload | null>(null);
     const [loading, setLoading] = useState(true);
@@ -44,7 +54,9 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(dashboardData.url(), { params: { period } });
+            const response = await axios.get(dashboardData.url(), {
+                params: { period },
+            });
             setPayload(response.data);
         } finally {
             setLoading(false);
@@ -56,7 +68,9 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
         const load = async () => {
             setLoading(true);
             try {
-                const response = await axios.get(dashboardData.url(), { params: { period } });
+                const response = await axios.get(dashboardData.url(), {
+                    params: { period },
+                });
                 if (!cancelled) setPayload(response.data);
             } finally {
                 if (!cancelled) setLoading(false);
@@ -70,7 +84,9 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
 
     const workflow = payload?.workflow;
     const cockpit = payload?.cockpit;
-    const permissions = (auth as { can?: { governance?: Record<string, unknown> } })?.can?.governance ?? null;
+    const permissions =
+        (auth as { can?: { governance?: Record<string, unknown> } })?.can
+            ?.governance ?? null;
 
     const stats = workflow
         ? [
@@ -81,7 +97,12 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
         : undefined;
 
     return (
-        <AppLayout user={auth.user} breadcrumbs={[{ title: 'Governance', href: '/governance/dashboard' }]}>
+        <AppLayout
+            user={auth.user}
+            breadcrumbs={[
+                { title: 'Governance', href: '/governance/dashboard' },
+            ]}
+        >
             <Head title="Governance Dashboard" />
 
             <PageLayout
@@ -89,15 +110,24 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                     <PageHero
                         category="governance"
                         icon={Landmark}
-                        title={<span dusk="governance-cockpit-heading">Executive &amp; Board Cockpit</span>}
+                        title={
+                            <span dusk="governance-cockpit-heading">
+                                Executive &amp; Board Cockpit
+                            </span>
+                        }
                         description="Your central hub for meetings, decisions, risks, compliance, and financial governance."
                         stats={stats}
                         badges={
-                            isBoardMember && boardRole ? [{ label: formatLabel(boardRole) }] : undefined
+                            isBoardMember && boardRole
+                                ? [{ label: formatLabel(boardRole) }]
+                                : undefined
                         }
                         actions={
                             <div className="flex items-center gap-2">
-                                <Select value={period} onValueChange={setPeriod}>
+                                <Select
+                                    value={period}
+                                    onValueChange={setPeriod}
+                                >
                                     <SelectTrigger
                                         className="w-36 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm"
                                         aria-label="Reporting period"
@@ -105,10 +135,18 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="today">Today</SelectItem>
-                                        <SelectItem value="week">This Week</SelectItem>
-                                        <SelectItem value="month">This Month</SelectItem>
-                                        <SelectItem value="year">This Year</SelectItem>
+                                        <SelectItem value="today">
+                                            Today
+                                        </SelectItem>
+                                        <SelectItem value="week">
+                                            This Week
+                                        </SelectItem>
+                                        <SelectItem value="month">
+                                            This Month
+                                        </SelectItem>
+                                        <SelectItem value="year">
+                                            This Year
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <Button
@@ -118,8 +156,17 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                     aria-label="Refresh dashboard"
                                 >
-                                    <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} aria-hidden="true" />
-                                    <span className="ml-2">{loading ? 'Refreshing' : 'Refresh'}</span>
+                                    <RefreshCw
+                                        className={
+                                            loading
+                                                ? 'h-4 w-4 animate-spin'
+                                                : 'h-4 w-4'
+                                        }
+                                        aria-hidden="true"
+                                    />
+                                    <span className="ml-2">
+                                        {loading ? 'Refreshing' : 'Refresh'}
+                                    </span>
                                 </Button>
                             </div>
                         }
@@ -135,7 +182,10 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                         permissions={permissions}
                         currentUserName={auth.user?.name ?? null}
                         boardRole={boardRole ?? null}
-                        userRole={(auth.user as { role?: string } | undefined)?.role ?? null}
+                        userRole={
+                            (auth.user as { role?: string } | undefined)
+                                ?.role ?? null
+                        }
                     />
                 ) : (
                     <CockpitSkeleton />

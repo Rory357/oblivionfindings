@@ -3,7 +3,13 @@
  * collapses medium/high into one colour, so the RA module ships its own with the 4-band
  * tone scale and a clickable capture mode. */
 import { cn } from '@/lib/utils';
-import { CONSEQUENCE_LABELS, LIKELIHOOD_LABELS, levelTone, scoreLevel, type RaTone } from './ra-kit';
+import {
+    CONSEQUENCE_LABELS,
+    LIKELIHOOD_LABELS,
+    levelTone,
+    scoreLevel,
+    type RaTone,
+} from './ra-kit';
 
 const CELL_BG: Record<RaTone, string> = {
     success: 'bg-status-success-bg',
@@ -37,8 +43,11 @@ export function RaMatrix({
     compact?: boolean;
 }) {
     const interactive = !!onSelect;
-    const cellSize = compact ? 'h-[26px] w-[26px] text-[11px]' : 'h-[34px] w-[34px] text-xs';
-    const hasResidual = residualLikelihood != null && residualConsequence != null;
+    const cellSize = compact
+        ? 'h-[26px] w-[26px] text-[11px]'
+        : 'h-[34px] w-[34px] text-xs';
+    const hasResidual =
+        residualLikelihood != null && residualConsequence != null;
 
     return (
         <div className="inline-flex flex-col gap-1">
@@ -64,15 +73,23 @@ export function RaMatrix({
                                 {COLS.map((c) => {
                                     const score = l * c;
                                     const tone = levelTone(scoreLevel(score));
-                                    const active = l === likelihood && c === consequence;
-                                    const resid = hasResidual && l === residualLikelihood && c === residualConsequence;
+                                    const active =
+                                        l === likelihood && c === consequence;
+                                    const resid =
+                                        hasResidual &&
+                                        l === residualLikelihood &&
+                                        c === residualConsequence;
                                     const cls = cn(
-                                        'flex items-center justify-center rounded font-semibold tabular-nums text-foreground',
+                                        'flex items-center justify-center rounded font-semibold text-foreground tabular-nums',
                                         cellSize,
                                         CELL_BG[tone],
-                                        active && 'relative z-10 ring-2 ring-ring ring-offset-2 ring-offset-card',
-                                        !active && resid && 'relative z-10 outline outline-2 outline-dashed outline-primary -outline-offset-2',
-                                        interactive && 'cursor-pointer transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                                        active &&
+                                            'relative z-10 ring-2 ring-ring ring-offset-2 ring-offset-card',
+                                        !active &&
+                                            resid &&
+                                            'relative z-10 outline outline-2 -outline-offset-2 outline-primary outline-dashed',
+                                        interactive &&
+                                            'cursor-pointer transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                                     );
                                     return interactive ? (
                                         <button
@@ -99,7 +116,10 @@ export function RaMatrix({
                         {COLS.map((c) => (
                             <div
                                 key={c}
-                                className={cn('text-center text-[8.5px] leading-tight text-muted-foreground', compact ? 'w-[26px]' : 'w-[34px]')}
+                                className={cn(
+                                    'text-center text-[8.5px] leading-tight text-muted-foreground',
+                                    compact ? 'w-[26px]' : 'w-[34px]',
+                                )}
                             >
                                 {CONSEQUENCE_LABELS[c - 1]}
                             </div>
@@ -111,10 +131,12 @@ export function RaMatrix({
             {hasResidual ? (
                 <div className="mt-2 flex gap-3.5 text-[10px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
-                        <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted ring-2 ring-ring" /> Inherent
+                        <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted ring-2 ring-ring" />{' '}
+                        Inherent
                     </span>
                     <span className="inline-flex items-center gap-1.5">
-                        <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted outline outline-2 outline-dashed outline-primary" /> Residual
+                        <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted outline outline-2 outline-primary outline-dashed" />{' '}
+                        Residual
                     </span>
                 </div>
             ) : null}

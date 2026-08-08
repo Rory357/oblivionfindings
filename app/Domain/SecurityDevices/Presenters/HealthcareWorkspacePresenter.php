@@ -37,6 +37,7 @@ class HealthcareWorkspacePresenter
     {
         $canViewClientContext = $viewer->canDo('clients.viewAny')
             || $viewer->canDo('clients.viewAssigned');
+        $canViewClinicalMonitoring = $viewer->canDo('clinical.monitoring.viewAny');
         $canViewMaintenance = $viewer->canDo('securityDevices.maintenance.view');
         $canViewIt = $viewer->canDo('it.view');
         $restricted = $this->restricted($viewer, $activeTab);
@@ -64,6 +65,7 @@ class HealthcareWorkspacePresenter
             : collect();
         $mappedDevices = $activeDevices
             ->map(fn (Device $device) => $this->mapDevice(
+                $viewer,
                 $device,
                 $context,
                 $ticketMap,
@@ -74,13 +76,16 @@ class HealthcareWorkspacePresenter
         return [
             'permissions' => [
                 'clientContext' => $canViewClientContext,
+                'clinicalMonitoring' => $canViewClinicalMonitoring,
                 'maintenance' => $canViewMaintenance,
                 'it' => $canViewIt,
             ],
             'boundary' => [
                 'title' => 'Technical device operations only',
                 'description' => 'Clinical readings, thresholds, diagnoses, medications, and clinical review stay in Client Health Monitoring.',
-                'clinicalHref' => '/health-clinical/health-monitoring',
+                'clinicalHref' => $canViewClinicalMonitoring
+                    ? '/health-clinical/health-monitoring'
+                    : null,
             ],
             'overview' => $this->overview(
                 clone $healthcareScope,
@@ -192,7 +197,7 @@ class HealthcareWorkspacePresenter
                     'Offline healthcare devices',
                     $offline,
                     'Investigate devices whose canonical state is offline.',
-                    '/security-devices/healthcare?tab=data-flow&flow=offline',
+                    '/security-devices/devices?domain=iot_healthcare&status=offline',
                 ),
                 $this->action(
                     'data_flow_issues',
@@ -206,14 +211,14 @@ class HealthcareWorkspacePresenter
                     'Overdue calibration',
                     $overdueCalibration,
                     'Complete overdue calibration recorded in the canonical maintenance history.',
-                    '/security-devices/healthcare?tab=calibration-maintenance&status=overdue&type=calibration',
+                    '/security-devices/maintenance?status=overdue&type=calibration&domain=iot_healthcare',
                 ),
                 $this->action(
                     'maintenance_due',
                     'Open maintenance work',
                     $maintenanceDue,
                     'Review scheduled and in-progress technical maintenance.',
-                    '/security-devices/healthcare?tab=calibration-maintenance',
+                    '/security-devices/maintenance?status=open&domain=iot_healthcare',
                 ),
             ])->filter()->values(),
         ];
@@ -283,7 +288,7 @@ class HealthcareWorkspacePresenter
             : Site::query()
                 ->whereIn('id', $siteIds)
                 ->with('primaryContact:id,name')
-                ->get(['id', 'name', 'primary_contact_user_id'])
+                ->get(['id', 'name', 'type', 'primary_contact_user_id'])
                 ->keyBy('id');
         $rooms = $roomIds->isEmpty()
             ? collect()
@@ -316,6 +321,7 @@ class HealthcareWorkspacePresenter
     }
 
     private function mapDevice(
+        User $viewer,
         Device $device,
         array $context,
         Collection $ticketMap,
@@ -329,6 +335,8 @@ class HealthcareWorkspacePresenter
         $room = $assignment?->assignable_type === DeviceAssignment::TARGET_ROOM
             ? $context['rooms']->get($assignment->assignable_id)
             : null;
+        $canViewSiteProfile = $site !== null
+            && Gate::forUser($viewer)->allows('view', $site);
         $openMaintenance = $canViewMaintenance ? $device->maintenanceRecords : collect();
 
         return [
@@ -350,7 +358,13 @@ class HealthcareWorkspacePresenter
                 'site' => [
                     'id' => $site->id,
                     'name' => $site->name,
-                    'href' => "/sites/{$site->id}",
+                    'href' => $canViewSiteProfile ? "/sites/{$site->id}" : null,
+                    'access' => [
+                        'state' => $canViewSiteProfile ? 'available' : 'restricted',
+                        'label' => $canViewSiteProfile
+                            ? 'Open Site profile'
+                            : 'Site profile access required',
+                    ],
                 ],
                 'room' => $room ? [
                     'id' => $room->id,

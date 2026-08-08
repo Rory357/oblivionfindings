@@ -1,3 +1,4 @@
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,7 +21,6 @@ import {
 import { toast } from 'sonner';
 import { DoorSymbol } from './_door';
 import {
-    ROOM_EDGE_WALL_PREFIX,
     inferSwingDirection,
     openingCentreFromTopLeft,
     resolveAttachedOpening,
@@ -59,7 +59,6 @@ import {
     type Interaction,
     type LayerKey,
 } from './_use-plan-editor';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Props = {
     layout: PlanLayout;
@@ -283,14 +282,12 @@ function refsInsideMarquee(
                 x: normalised.x + normalised.width / 2,
                 y: normalised.y,
             };
-            if (inside(centre))
-                result.push({ type: 'door', id: door.id });
+            if (inside(centre)) result.push({ type: 'door', id: door.id });
         }
         for (const win of layout.windows) {
             const w = win.width ?? 0.1;
             const centre = { x: win.x + w / 2, y: win.y };
-            if (inside(centre))
-                result.push({ type: 'window', id: win.id });
+            if (inside(centre)) result.push({ type: 'window', id: win.id });
         }
         for (const label of layout.labels) {
             if (inside({ x: label.x, y: label.y }))
@@ -1191,9 +1188,7 @@ export default function PlanCanvas(props: Props) {
                         });
                         for (const edge of edgeWalls) {
                             if (
-                                layout.walls.some(
-                                    (wall) => wall.id === edge.id,
-                                )
+                                layout.walls.some((wall) => wall.id === edge.id)
                             ) {
                                 dispatch({
                                     type: 'update_wall',
@@ -1443,7 +1438,8 @@ export default function PlanCanvas(props: Props) {
                 const dlxPx = dxPx * Math.cos(theta) + dyPx * Math.sin(theta);
                 const dlxNorm = dlxPx / canvasWidth;
                 const baseWidth = normaliseDoor(drag.base).width;
-                const delta = drag.side === 'right' ? 2 * dlxNorm : -2 * dlxNorm;
+                const delta =
+                    drag.side === 'right' ? 2 * dlxNorm : -2 * dlxNorm;
                 // Match the geometry clamp in `_geometry.openingWidth`.
                 const newWidth = clamp(baseWidth + delta, 0.02, 0.4);
                 dispatch({
@@ -1642,7 +1638,8 @@ export default function PlanCanvas(props: Props) {
     }
 
     return (
-        <GuardrailCard unstyled
+        <GuardrailCard
+            unstyled
             className="relative h-full min-h-[420px] overflow-hidden rounded-md border bg-white"
             data-test="site-plan-canvas"
         >
@@ -1729,11 +1726,12 @@ export default function PlanCanvas(props: Props) {
                         // visible boundary — don't paint the rect border too,
                         // or it would close door openings the walls have cut.
                         const hasEdgeWalls = roomsWithEdgeWalls.has(room.id);
-                        const stroke = selected || pending
-                            ? '#2563eb'
-                            : hasEdgeWalls
-                              ? 'transparent'
-                              : '#334155';
+                        const stroke =
+                            selected || pending
+                                ? '#2563eb'
+                                : hasEdgeWalls
+                                  ? 'transparent'
+                                  : '#334155';
                         return (
                             <g
                                 key={room.id}
@@ -2925,7 +2923,10 @@ export default function PlanCanvas(props: Props) {
             </svg>
 
             <div className="pointer-events-none absolute right-2 bottom-2 flex flex-col items-end gap-1">
-                <GuardrailCard unstyled className="rounded-md border bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow-sm">
+                <GuardrailCard
+                    unstyled
+                    className="rounded-md border bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow-sm"
+                >
                     Scale: 1 m ≈ {(1 / mpu).toFixed(0)} units · grid{' '}
                     {layout.grid?.size ?? 10}
                     {layout.grid?.snap === false
@@ -2992,7 +2993,7 @@ export default function PlanCanvas(props: Props) {
                         align="start"
                         data-test="site-plan-context-menu"
                     >
-                            <DropdownMenuLabel className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                        <DropdownMenuLabel className="text-[10px] tracking-wider text-muted-foreground uppercase">
                             {contextMenu.ref.type === 'pin'
                                 ? 'Pin'
                                 : contextMenu.ref.type.charAt(0).toUpperCase() +
@@ -3057,7 +3058,7 @@ export default function PlanCanvas(props: Props) {
                                 setContextMenu(null);
                             }}
                         >
-                                    <Lucide.Trash2 className="mr-2 h-4 w-4 text-status-critical" />
+                            <Lucide.Trash2 className="mr-2 h-4 w-4 text-status-critical" />
                             Delete
                         </DropdownMenuItem>
                     </DropdownMenuContent>

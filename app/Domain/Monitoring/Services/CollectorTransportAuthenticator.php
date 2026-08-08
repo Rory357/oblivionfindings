@@ -58,8 +58,12 @@ final readonly class CollectorTransportAuthenticator
             throw new DomainException('collector_authentication_failed');
         }
         $store = (string) config('monitoring.collector.replay_store', 'redis');
-        if (app()->environment('testing') && $store === 'array'
-            && ! config('monitoring.collector.allow_local_replay_store_for_tests')) {
+        $driver = config("cache.stores.{$store}.driver");
+        $allowLocalTestStore = app()->environment('testing')
+            && $store === 'array'
+            && $driver === 'array'
+            && (bool) config('monitoring.collector.allow_local_replay_store_for_tests', false);
+        if ($driver !== 'redis' && ! $allowLocalTestStore) {
             throw new DomainException('collector_authentication_failed');
         }
         $replayKey = 'monitoring:collector:request:'.hash('sha256', $collector->id.':'.$nonce);

@@ -62,8 +62,24 @@ final class CollectorHealthService
             }
             $wasUnavailable = $locked->status === 'unavailable';
             $checkpoint = $locked->checkpoint ?? CollectorCheckpoint::query()->create(['collector_id' => $locked->id]);
-            $hasGap = $checkpoint->gap_from !== null || (int) $locked->gap_count > 0;
-            $nextStatus = $wasUnavailable && $hasGap
+            $hasGap = $checkpoint->gap_from !== null
+                || $checkpoint->gap_to !== null
+                || (int) $locked->gap_count > 0;
+            $checkpointIsContiguous = (int) $checkpoint->acknowledged_source_sequence
+                    === (int) $checkpoint->highest_seen_source_sequence
+                && (int) $locked->acknowledged_source_sequence
+                    === (int) $locked->highest_seen_source_sequence
+                && (int) $checkpoint->acknowledged_source_sequence
+                    === (int) $locked->acknowledged_source_sequence
+                && (int) $checkpoint->highest_seen_source_sequence
+                    === (int) $locked->highest_seen_source_sequence;
+            $recoveryReady = ! $hasGap
+                && $checkpointIsContiguous
+                && $heartbeat['state'] === 'writable'
+                && $heartbeat['spool_items'] === 0
+                && $heartbeat['spool_bytes'] === 0
+                && $heartbeat['corrupted_frames'] === 0;
+            $nextStatus = $wasUnavailable && ! $recoveryReady
                 ? 'unavailable'
                 : ($heartbeat['state'] === 'buffer_full' ? 'degraded' : 'online');
             $locked->forceFill([
@@ -77,9 +93,9 @@ final class CollectorHealthService
                 'runtime_status' => $heartbeat['runtime'],
                 'backlog_oldest_at' => $heartbeat['oldest_spool_item_at'],
                 'last_clock_drift_seconds' => $receivedAt->diffInSeconds($heartbeat['reported_at'], false) * -1,
-                'last_recovered_at' => $wasUnavailable && ! $hasGap ? $receivedAt : $locked->last_recovered_at,
+                'last_recovered_at' => $wasUnavailable && $recoveryReady ? $receivedAt : $locked->last_recovered_at,
             ])->save();
-            if ($wasUnavailable && ! $hasGap) {
+            if ($wasUnavailable && $recoveryReady) {
                 DB::table('monitors')->where('collector_id', $locked->id)->where('is_enabled', true)->update([
                     'effective_state' => DB::raw('current_state'),
                     'suppression_reason' => null,

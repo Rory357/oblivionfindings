@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SiteRoom extends Model
 {
@@ -40,6 +41,12 @@ class SiteRoom extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    /** Residential occupancy extension, when this physical space is residential. */
+    public function residentialRoom(): HasOne
+    {
+        return $this->hasOne(SiteHouseRoom::class, 'site_room_id');
     }
 
     /** @deprecated Use DeviceAssignment where assignable_type='room' instead. LocationHardware remains only as a compatibility shadow / historical bridge. */
@@ -97,10 +104,32 @@ class SiteRoom extends Model
      */
     public function linkedRoom(): ?Model
     {
+        if ($this->linked_room_type === null || $this->linked_room_id === null) {
+            return null;
+        }
+
+        $linkCount = self::query()
+            ->where('linked_room_type', $this->linked_room_type)
+            ->where('linked_room_id', $this->linked_room_id)
+            ->count();
+        if ($linkCount !== 1) {
+            return null;
+        }
+
         return match ($this->linked_room_type) {
-            'house_room' => SiteHouseRoom::find($this->linked_room_id),
-            'ho_resource' => SiteHoResource::find($this->linked_room_id),
-            'facility_zone' => SiteFacilityZone::find($this->linked_room_id),
+            'house_room' => SiteHouseRoom::query()
+                ->whereKey($this->linked_room_id)
+                ->where('site_id', $this->site_id)
+                ->where('site_room_id', $this->id)
+                ->first(),
+            'ho_resource' => SiteHoResource::query()
+                ->whereKey($this->linked_room_id)
+                ->where('site_id', $this->site_id)
+                ->first(),
+            'facility_zone' => SiteFacilityZone::query()
+                ->whereKey($this->linked_room_id)
+                ->where('site_id', $this->site_id)
+                ->first(),
             default => null,
         };
     }

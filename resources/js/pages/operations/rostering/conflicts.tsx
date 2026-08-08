@@ -201,7 +201,9 @@ export default function RosteringConflicts(props: ConflictsProps) {
         options?: { openShift?: boolean; repeatWeekly?: boolean },
     ) => {
         if (!gap.starts_at || !gap.ends_at) {
-            createShiftLauncher.openWith(buildCoverageCreateParams(gap, options));
+            createShiftLauncher.openWith(
+                buildCoverageCreateParams(gap, options),
+            );
             return;
         }
         try {

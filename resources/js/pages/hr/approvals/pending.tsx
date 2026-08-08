@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +18,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
@@ -123,7 +123,8 @@ export default function PendingApprovals({
             <Head title="Pending Approvals" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={CheckCircle2}
                         title="Pending Approvals"
                         description="Review and action pending approval requests."
@@ -132,7 +133,10 @@ export default function PendingApprovals({
                                 label: 'Pending',
                                 value: instances.total + nativeApprovals.length,
                             },
-                            { label: 'Native queues', value: nativeApprovals.length },
+                            {
+                                label: 'Native queues',
+                                value: nativeApprovals.length,
+                            },
                         ]}
                         actions={
                             can.manage ? (
@@ -169,230 +173,256 @@ export default function PendingApprovals({
                     </Card>
                 ) : (
                     <>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Native workflow approvals</CardTitle>
-                        <CardDescription>
-                            These requests keep their existing approval flow.
-                            Open the owning HR area to review and action them.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Request</TableHead>
-                                    <TableHead>Requested by</TableHead>
-                                    <TableHead>Details</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead className="w-36">Review</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {nativeApprovals.map((approval) => {
-                                    const typeConfig =
-                                        processTypeConfig[approval.type] ||
-                                        processTypeConfig.leave;
-
-                                    return (
-                                        <TableRow
-                                            key={`${approval.type}-${approval.id}`}
-                                        >
-                                            <TableCell>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={`capitalize ${typeConfig.className}`}
-                                                >
-                                                    {approval.type}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="font-medium">
-                                                {approval.title}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {approval.requester}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {approval.summary}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {formatDateTimeLong(approval.submitted_at)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button
-                                                    asChild
-                                                    size="sm"
-                                                    variant="outline"
-                                                >
-                                                    <Link href={approval.url}>
-                                                        Review
-                                                        <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
-                                                    </Link>
-                                                </Button>
-                                            </TableCell>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Native workflow approvals</CardTitle>
+                                <CardDescription>
+                                    These requests keep their existing approval
+                                    flow. Open the owning HR area to review and
+                                    action them.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead>Request</TableHead>
+                                            <TableHead>Requested by</TableHead>
+                                            <TableHead>Details</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead className="w-36">
+                                                Review
+                                            </TableHead>
                                         </TableRow>
-                                    );
-                                })}
-                                {nativeApprovals.length === 0 && (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={6}
-                                            className="py-8 text-center text-muted-foreground"
-                                        >
-                                            No native workflow approvals.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {nativeApprovals.map((approval) => {
+                                            const typeConfig =
+                                                processTypeConfig[
+                                                    approval.type
+                                                ] || processTypeConfig.leave;
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Approval chains</CardTitle>
-                        <CardDescription>
-                            Requests managed by the configured approval chain
-                            service.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Process</TableHead>
-                                    <TableHead>Chain</TableHead>
-                                    <TableHead>Item</TableHead>
-                                    <TableHead>Progress</TableHead>
-                                    <TableHead>Initiated By</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead className="w-48">
-                                        Actions
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {instances.data.map((instance) => {
-                                    const ptConfig =
-                                        processTypeConfig[
-                                            instance.process_type
-                                        ] || processTypeConfig.leave;
-                                    return (
-                                        <TableRow key={instance.id}>
-                                            <TableCell>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={`capitalize ${ptConfig.className}`}
+                                            return (
+                                                <TableRow
+                                                    key={`${approval.type}-${approval.id}`}
                                                 >
-                                                    {instance.process_type}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="font-medium">
-                                                {instance.chain_name}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {instance.item_label}
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className="text-sm">
-                                                    Step {instance.current_step}{' '}
-                                                    of {instance.total_steps}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {instance.initiated_by}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {formatDateTimeLong(instance.initiated_at)}
-                                            </TableCell>
-                                            <TableCell>
-                                                {actionInstanceId ===
-                                                instance.id ? (
-                                                    <div className="space-y-2">
-                                                        <Textarea
-                                                            placeholder="Notes (optional)..."
-                                                            value={actionNotes}
-                                                            onChange={(e) =>
-                                                                setActionNotes(
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            className="h-16 text-xs"
-                                                        />
-                                                        <div className="flex gap-1">
-                                                            <Button
-                                                                size="sm"
-                                                                variant="default"
-                                                                onClick={() =>
-                                                                    handleAction(
-                                                                        instance.id,
-                                                                        'approved',
-                                                                    )
-                                                                }
-                                                            >
-                                                                Approve
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="destructive"
-                                                                onClick={() =>
-                                                                    handleAction(
-                                                                        instance.id,
-                                                                        'rejected',
-                                                                    )
-                                                                }
-                                                            >
-                                                                Reject
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                onClick={() =>
-                                                                    setActionInstanceId(
-                                                                        null,
-                                                                    )
-                                                                }
-                                                            >
-                                                                Cancel
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex gap-1">
+                                                    <TableCell>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={`capitalize ${typeConfig.className}`}
+                                                        >
+                                                            {approval.type}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="font-medium">
+                                                        {approval.title}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {approval.requester}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {approval.summary}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {formatDateTimeLong(
+                                                            approval.submitted_at,
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
                                                         <Button
+                                                            asChild
                                                             size="sm"
                                                             variant="outline"
-                                                            onClick={() =>
-                                                                setActionInstanceId(
-                                                                    instance.id,
-                                                                )
-                                                            }
                                                         >
-                                                            <Check className="mr-1 h-3 w-3" />
-                                                            Review
+                                                            <Link
+                                                                href={
+                                                                    approval.url
+                                                                }
+                                                            >
+                                                                Review
+                                                                <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                                                            </Link>
                                                         </Button>
-                                                    </div>
-                                                )}
-                                            </TableCell>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                        {nativeApprovals.length === 0 && (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={6}
+                                                    className="py-8 text-center text-muted-foreground"
+                                                >
+                                                    No native workflow
+                                                    approvals.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Approval chains</CardTitle>
+                                <CardDescription>
+                                    Requests managed by the configured approval
+                                    chain service.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Process</TableHead>
+                                            <TableHead>Chain</TableHead>
+                                            <TableHead>Item</TableHead>
+                                            <TableHead>Progress</TableHead>
+                                            <TableHead>Initiated By</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead className="w-48">
+                                                Actions
+                                            </TableHead>
                                         </TableRow>
-                                    );
-                                })}
-                                {instances.data.length === 0 && (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={7}
-                                            className="py-8 text-center text-muted-foreground"
-                                        >
-                                            No pending chain approvals.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {instances.data.map((instance) => {
+                                            const ptConfig =
+                                                processTypeConfig[
+                                                    instance.process_type
+                                                ] || processTypeConfig.leave;
+                                            return (
+                                                <TableRow key={instance.id}>
+                                                    <TableCell>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={`capitalize ${ptConfig.className}`}
+                                                        >
+                                                            {
+                                                                instance.process_type
+                                                            }
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="font-medium">
+                                                        {instance.chain_name}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {instance.item_label}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-sm">
+                                                            Step{' '}
+                                                            {
+                                                                instance.current_step
+                                                            }{' '}
+                                                            of{' '}
+                                                            {
+                                                                instance.total_steps
+                                                            }
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {instance.initiated_by}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {formatDateTimeLong(
+                                                            instance.initiated_at,
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {actionInstanceId ===
+                                                        instance.id ? (
+                                                            <div className="space-y-2">
+                                                                <Textarea
+                                                                    placeholder="Notes (optional)..."
+                                                                    value={
+                                                                        actionNotes
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
+                                                                        setActionNotes(
+                                                                            e
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                    className="h-16 text-xs"
+                                                                />
+                                                                <div className="flex gap-1">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="default"
+                                                                        onClick={() =>
+                                                                            handleAction(
+                                                                                instance.id,
+                                                                                'approved',
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Approve
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="destructive"
+                                                                        onClick={() =>
+                                                                            handleAction(
+                                                                                instance.id,
+                                                                                'rejected',
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Reject
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        onClick={() =>
+                                                                            setActionInstanceId(
+                                                                                null,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Cancel
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex gap-1">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={() =>
+                                                                        setActionInstanceId(
+                                                                            instance.id,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Check className="mr-1 h-3 w-3" />
+                                                                    Review
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                        {instances.data.length === 0 && (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={7}
+                                                    className="py-8 text-center text-muted-foreground"
+                                                >
+                                                    No pending chain approvals.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
                     </>
                 )}
 

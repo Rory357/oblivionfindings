@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Sites;
 
 use App\Domain\SecurityDevices\Models\Device;
-use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
@@ -12,10 +11,9 @@ use App\Models\SiteTypePlan;
 use App\Models\SiteTypePlanPin;
 use App\Services\Integration\UnifiOperationalBridgeService;
 use App\Services\Sites\Profile\SiteProfileOperationsPresenter;
+use App\Services\Sites\SitePhysicalRoomService;
 use App\Services\Sites\SiteTypePlanService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use UnexpectedValueException;
 
 class SiteHardwareController extends Controller
@@ -24,6 +22,7 @@ class SiteHardwareController extends Controller
         private readonly DeviceRegistryService $registry,
         private readonly SiteTypePlanService $typePlans,
         private readonly SiteProfileOperationsPresenter $profileOperations,
+        private readonly SitePhysicalRoomService $physicalRooms,
     ) {}
 
     public function index(Request $request, Site $site)
@@ -103,18 +102,7 @@ class SiteHardwareController extends Controller
                     'name' => ['required', 'string', 'max:255', 'not_regex:/^\s*$/'],
                 ]);
 
-                DB::transaction(function () use ($site, $validated): void {
-                    $site = $this->lockedSite($site);
-                    $name = trim($validated['name']);
-                    $this->ensureRoomNameAvailable($site, $name);
-                    $maxSort = SiteRoom::query()->where('site_id', $site->id)->max('sort_order') ?? 0;
-
-                    SiteRoom::create([
-                        'site_id' => $site->id,
-                        'name' => $name,
-                        'sort_order' => $maxSort + 1,
-                    ]);
-                });
+                $this->physicalRooms->createCanonicalRoom($site, $validated['name']);
 
                 return redirect()->back()->with('success', 'Room added successfully.');
 
@@ -124,13 +112,10 @@ class SiteHardwareController extends Controller
                     'name' => ['required', 'string', 'max:255', 'not_regex:/^\s*$/'],
                 ]);
 
-                DB::transaction(function () use ($site, $validated): void {
-                    $site = $this->lockedSite($site);
-                    $room = $this->lockedRoom($site, (int) $validated['room_id']);
-                    $name = trim($validated['name']);
-                    $this->ensureRoomNameAvailable($site, $name, $room->id);
-                    $room->update(['name' => $name]);
-                });
+                $room = SiteRoom::query()
+                    ->where('site_id', $site->id)
+                    ->findOrFail((int) $validated['room_id']);
+                $this->physicalRooms->renameCanonicalRoom($site, $room, $validated['name']);
 
                 return redirect()->back()->with('success', 'Room renamed successfully.');
 
@@ -141,21 +126,7 @@ class SiteHardwareController extends Controller
                     'rooms.*.sort_order' => ['required', 'integer', 'min:0', 'distinct'],
                 ]);
 
-                DB::transaction(function () use ($site, $validated): void {
-                    $site = $this->lockedSite($site);
-                    $roomIds = collect($validated['rooms'])->pluck('id')->map(fn ($id) => (int) $id)->all();
-                    $rooms = SiteRoom::query()
-                        ->where('site_id', $site->id)
-                        ->whereKey($roomIds)
-                        ->lockForUpdate()
-                        ->get()
-                        ->keyBy('id');
-                    abort_unless($rooms->count() === count($roomIds), 404);
-
-                    foreach ($validated['rooms'] as $roomData) {
-                        $rooms->get((int) $roomData['id'])->update(['sort_order' => $roomData['sort_order']]);
-                    }
-                });
+                $this->physicalRooms->reorderCanonicalRooms($site, $validated['rooms']);
 
                 return redirect()->back()->with('success', 'Rooms reordered successfully.');
 
@@ -164,19 +135,10 @@ class SiteHardwareController extends Controller
                     'room_id' => ['required', 'integer'],
                 ]);
 
-                DB::transaction(function () use ($site, $validated): void {
-                    $site = $this->lockedSite($site);
-                    $room = $this->lockedRoom($site, (int) $validated['room_id']);
-                    $hasDevices = DeviceAssignment::query()
-                        ->where('assignable_type', DeviceAssignment::TARGET_ROOM)
-                        ->where('assignable_id', $room->id)
-                        ->whereNull('released_at')
-                        ->lockForUpdate()
-                        ->exists();
-                    abort_if($hasDevices, 409, 'Move devices out of this room before deleting it.');
-
-                    $room->delete();
-                });
+                $room = SiteRoom::query()
+                    ->where('site_id', $site->id)
+                    ->findOrFail((int) $validated['room_id']);
+                $this->physicalRooms->deleteCanonicalRoom($site, $room);
 
                 return redirect()->back()->with('success', 'Room deleted successfully.');
         }
@@ -267,34 +229,5 @@ class SiteHardwareController extends Controller
         abort_unless($this->typePlans->currentPublished($site), 409, 'Build a plan before pinning hardware.');
 
         return $this->typePlans->cloneToDraft($site, $userId);
-    }
-
-    private function lockedSite(Site $site): Site
-    {
-        return Site::query()->whereKey($site->id)->lockForUpdate()->firstOrFail();
-    }
-
-    private function lockedRoom(Site $site, int $roomId): SiteRoom
-    {
-        return SiteRoom::query()
-            ->where('site_id', $site->id)
-            ->whereKey($roomId)
-            ->lockForUpdate()
-            ->firstOrFail();
-    }
-
-    private function ensureRoomNameAvailable(Site $site, string $name, ?int $ignoreRoomId = null): void
-    {
-        $exists = SiteRoom::query()
-            ->where('site_id', $site->id)
-            ->where('name', $name)
-            ->when($ignoreRoomId, fn ($query) => $query->whereKeyNot($ignoreRoomId))
-            ->exists();
-
-        if ($exists) {
-            throw ValidationException::withMessages([
-                'name' => 'A hardware room with this name already exists at the Site.',
-            ]);
-        }
     }
 }

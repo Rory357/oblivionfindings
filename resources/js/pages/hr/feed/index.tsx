@@ -1,14 +1,21 @@
 /* eslint-disable no-restricted-syntax -- The composer bar + filter tabs are
  * bespoke on-page surfaces (raw <button>/<input>) styled with semantic tokens. */
 import {
+    AnnouncementWizard,
+    type AnnouncementSegments,
+} from '@/components/hr/announcement-wizard';
+import {
+    FeedHero,
+    type FeedCelebration,
+    type FeedMetrics,
+} from '@/components/hr/feed-hero';
+import { PageLayout } from '@/components/page';
+import {
     ComposeWizard,
     RecognitionInsightsDialog,
     RecognitionWizard,
 } from '@/components/recognition';
-import { AnnouncementWizard, type AnnouncementSegments } from '@/components/hr/announcement-wizard';
 import { type RecognitionDefaults } from '@/components/recognition/recognition-wizard';
-import { FeedHero, type FeedCelebration, type FeedMetrics } from '@/components/hr/feed-hero';
-import { PageLayout } from '@/components/page';
 import { Input } from '@/components/ui/input';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
@@ -69,9 +76,12 @@ const TABS = [
 ];
 
 function congratsMessage(kind: string): string {
-    if (kind === 'anniversary') return 'Happy work anniversary! 🎉 Thank you for everything you bring to the team.';
-    if (kind === 'birthday') return 'Happy birthday! 🎂 Hope you have a wonderful day.';
-    if (kind === 'new_hire') return 'Welcome to the team! 👋 So glad to have you with us.';
+    if (kind === 'anniversary')
+        return 'Happy work anniversary! 🎉 Thank you for everything you bring to the team.';
+    if (kind === 'birthday')
+        return 'Happy birthday! 🎂 Hope you have a wonderful day.';
+    if (kind === 'new_hire')
+        return 'Welcome to the team! 👋 So glad to have you with us.';
     return '';
 }
 
@@ -91,7 +101,9 @@ export default function FeedIndex({
     can,
 }: Props) {
     const [recogOpen, setRecogOpen] = useState(false);
-    const [recogDefaults, setRecogDefaults] = useState<RecognitionDefaults | undefined>(undefined);
+    const [recogDefaults, setRecogDefaults] = useState<
+        RecognitionDefaults | undefined
+    >(undefined);
     const [composeOpen, setComposeOpen] = useState(false);
     const [announceOpen, setAnnounceOpen] = useState(false);
     const [insightsOpen, setInsightsOpen] = useState(false);
@@ -118,7 +130,11 @@ export default function FeedIndex({
     );
 
     const allMilestones = useMemo<Milestone[]>(
-        () => [...milestones.anniversaries, ...milestones.birthdays, ...milestones.new_hires],
+        () => [
+            ...milestones.anniversaries,
+            ...milestones.birthdays,
+            ...milestones.new_hires,
+        ],
         [milestones],
     );
 
@@ -140,7 +156,10 @@ export default function FeedIndex({
                     user_id: m.user_id,
                     user_name: m.user_name,
                     kind: 'birthday',
-                    sublabel: m.days_away === 0 ? 'Birthday today' : `Birthday · ${m.date}`,
+                    sublabel:
+                        m.days_away === 0
+                            ? 'Birthday today'
+                            : `Birthday · ${m.date}`,
                 });
             }
         }
@@ -150,7 +169,9 @@ export default function FeedIndex({
                     user_id: m.user_id,
                     user_name: m.user_name,
                     kind: 'new_hire',
-                    sublabel: m.position ? `New hire · ${m.position}` : 'New hire',
+                    sublabel: m.position
+                        ? `New hire · ${m.position}`
+                        : 'New hire',
                 });
             }
         }
@@ -165,7 +186,10 @@ export default function FeedIndex({
     };
 
     const onFilter = (type: string | null) => {
-        router.get('/hr/feed', query(type, search), { preserveState: true, preserveScroll: true });
+        router.get('/hr/feed', query(type, search), {
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
 
     // Debounced server-side wall search (across all posts + announcements, not
@@ -202,7 +226,8 @@ export default function FeedIndex({
     // only the tab-driven announcements/posts split stays client-side.
     const visiblePosts = posts.data;
     const visibleAnnouncements = showAnnouncements ? announcements : [];
-    const wallEmpty = visiblePosts.length === 0 && visibleAnnouncements.length === 0;
+    const wallEmpty =
+        visiblePosts.length === 0 && visibleAnnouncements.length === 0;
     const isSearching = (filters.search ?? '') !== '';
 
     return (
@@ -283,7 +308,7 @@ export default function FeedIndex({
                                 })}
                             </div>
                             <div className="relative sm:w-56">
-                                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                 <Input
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
@@ -295,7 +320,11 @@ export default function FeedIndex({
 
                         {/* Wall */}
                         {visibleAnnouncements.map((a) => (
-                            <AnnouncementCard key={`a-${a.id}`} announcement={a} employeeById={employeeById} />
+                            <AnnouncementCard
+                                key={`a-${a.id}`}
+                                announcement={a}
+                                employeeById={employeeById}
+                            />
                         ))}
 
                         {visiblePosts.map((post) =>
@@ -303,8 +332,14 @@ export default function FeedIndex({
                                 <KudosCard
                                     key={`p-${post.id}`}
                                     post={post}
-                                    categoryLabel={kudosCategories[post.kudos.category] ?? post.kudos.category}
-                                    impactLabel={kudosImpacts[post.kudos.impact] ?? post.kudos.impact}
+                                    categoryLabel={
+                                        kudosCategories[post.kudos.category] ??
+                                        post.kudos.category
+                                    }
+                                    impactLabel={
+                                        kudosImpacts[post.kudos.impact] ??
+                                        post.kudos.impact
+                                    }
                                     employeeById={employeeById}
                                     canModerate={can.moderate}
                                 />
@@ -329,7 +364,9 @@ export default function FeedIndex({
                             />
                         ) : null}
 
-                        {posts.links?.length > 3 ? <LaravelPagination links={posts.links} /> : null}
+                        {posts.links?.length > 3 ? (
+                            <LaravelPagination links={posts.links} />
+                        ) : null}
                     </div>
 
                     {/* Right sidebar */}
@@ -337,7 +374,9 @@ export default function FeedIndex({
                         <TopRecognised leaderboard={leaderboard} />
                         <CelebrationsCard
                             milestones={allMilestones}
-                            onCongratulate={(m) => congratulate(m.user_id, m.type)}
+                            onCongratulate={(m) =>
+                                congratulate(m.user_id, m.type)
+                            }
                         />
                     </div>
                 </div>
@@ -351,14 +390,22 @@ export default function FeedIndex({
                 kudosImpacts={kudosImpacts}
                 defaults={recogDefaults}
             />
-            <ComposeWizard open={composeOpen} onClose={() => setComposeOpen(false)} sites={sites} />
+            <ComposeWizard
+                open={composeOpen}
+                onClose={() => setComposeOpen(false)}
+                sites={sites}
+            />
             <AnnouncementWizard
                 open={announceOpen}
                 onClose={() => setAnnounceOpen(false)}
                 segments={
                     {
                         all_count: 0,
-                        sites: sites.map((s) => ({ key: String(s.id), label: s.name, count: 0 })),
+                        sites: sites.map((s) => ({
+                            key: String(s.id),
+                            label: s.name,
+                            count: 0,
+                        })),
                         departments: [],
                         roles: [],
                     } satisfies AnnouncementSegments

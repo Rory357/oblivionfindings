@@ -2,9 +2,24 @@
    (border-l rail + absolute status dots) reusing the timesheets/view-timesheet
    idiom; all colours are semantic tokens. */
 import { cn } from '@/lib/utils';
-import { Activity, AlertTriangle, Ban, Check, CheckCircle2, Hand, Play, UserRound, Zap } from 'lucide-react';
+import {
+    Activity,
+    AlertTriangle,
+    Ban,
+    Check,
+    CheckCircle2,
+    Hand,
+    Play,
+    UserRound,
+    Zap,
+} from 'lucide-react';
 import type { ComponentType } from 'react';
-import { doseStatusMeta, type RoundCell, type RoundItem, type RoundSummary } from './types';
+import {
+    doseStatusMeta,
+    type RoundCell,
+    type RoundItem,
+    type RoundSummary,
+} from './types';
 
 export interface AuditAdminEntry {
     status: string;
@@ -47,7 +62,9 @@ const STATUS_ICON: Record<string, ComponentType<{ className?: string }>> = {
 function fmtTime(iso: string | null): string {
     if (!iso) return '';
     const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+    return Number.isNaN(d.getTime())
+        ? ''
+        : d.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
 }
 
 /** Flatten round cells → actioned audit entries (skips still-due doses). */
@@ -115,17 +132,34 @@ function TimelineRow({
 }) {
     return (
         <li className="relative">
-            <span className={cn('absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full text-white shadow', DOT_BG[tone] ?? DOT_BG.muted)}>
+            <span
+                className={cn(
+                    'absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full text-white shadow',
+                    DOT_BG[tone] ?? DOT_BG.muted,
+                )}
+            >
                 <Icon className="h-2.5 w-2.5" />
             </span>
             <div className="text-[12.5px] font-semibold">{title}</div>
-            {meta ? <div className="text-[11px] text-muted-foreground">{meta}</div> : null}
-            {note ? <div className="mt-1 rounded-md bg-muted px-2 py-1 text-[11.5px] text-foreground">{note}</div> : null}
+            {meta ? (
+                <div className="text-[11px] text-muted-foreground">{meta}</div>
+            ) : null}
+            {note ? (
+                <div className="mt-1 rounded-md bg-muted px-2 py-1 text-[11.5px] text-foreground">
+                    {note}
+                </div>
+            ) : null}
         </li>
     );
 }
 
-export default function RoundAuditTimeline({ meta, entries }: { meta: RoundAuditMeta; entries: AuditAdminEntry[] }) {
+export default function RoundAuditTimeline({
+    meta,
+    entries,
+}: {
+    meta: RoundAuditMeta;
+    entries: AuditAdminEntry[];
+}) {
     const hasCompleted = Boolean(meta.completed_at);
 
     return (
@@ -136,9 +170,21 @@ export default function RoundAuditTimeline({ meta, entries }: { meta: RoundAudit
                 title="Round generated from template"
                 meta={`${meta.template_name ?? 'Template'}${meta.created_at ? ` · ${fmtTime(meta.created_at)}` : ''}`}
             />
-            {meta.assignee ? <TimelineRow tone="muted" icon={UserRound} title={`Assigned to ${meta.assignee}`} meta="Roster" /> : null}
+            {meta.assignee ? (
+                <TimelineRow
+                    tone="muted"
+                    icon={UserRound}
+                    title={`Assigned to ${meta.assignee}`}
+                    meta="Roster"
+                />
+            ) : null}
             {meta.started_at ? (
-                <TimelineRow tone="muted" icon={Play} title="Round started" meta={`${meta.started_by ?? 'Staff'} · ${fmtTime(meta.started_at)}`} />
+                <TimelineRow
+                    tone="muted"
+                    icon={Play}
+                    title="Round started"
+                    meta={`${meta.started_by ?? 'Staff'} · ${fmtTime(meta.started_at)}`}
+                />
             ) : null}
 
             {entries.map((e, i) => {
@@ -146,7 +192,9 @@ export default function RoundAuditTimeline({ meta, entries }: { meta: RoundAudit
                 const Icon = STATUS_ICON[e.status] ?? Activity;
                 const detail = [
                     e.witnessed_by ? `Witness: ${e.witnessed_by}` : null,
-                    e.blood_glucose_level != null ? `BG ${e.blood_glucose_level} mmol/L` : null,
+                    e.blood_glucose_level != null
+                        ? `BG ${e.blood_glucose_level} mmol/L`
+                        : null,
                     e.pulse_bpm != null ? `Pulse ${e.pulse_bpm} bpm` : null,
                     e.reason ? `“${e.reason}”` : null,
                 ].filter(Boolean) as string[];
@@ -156,7 +204,9 @@ export default function RoundAuditTimeline({ meta, entries }: { meta: RoundAudit
                         tone={dm.tone}
                         icon={Icon}
                         title={`${dm.label} — ${e.medication_name}${e.dose ? ` ${e.dose}` : ''}`}
-                        meta={[e.resident_name, e.staff, fmtTime(e.at)].filter(Boolean).join(' · ')}
+                        meta={[e.resident_name, e.staff, fmtTime(e.at)]
+                            .filter(Boolean)
+                            .join(' · ')}
                         note={detail.length ? detail.join('   ·   ') : null}
                     />
                 );

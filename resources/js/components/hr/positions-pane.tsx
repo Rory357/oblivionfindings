@@ -14,8 +14,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 
-import { StatusBadge } from './status-badge';
 import type { PositionRow } from './position-dialog';
+import { StatusBadge } from './status-badge';
 
 export interface PositionListRow extends PositionRow {
     current_headcount: number;
@@ -109,7 +109,9 @@ export function PositionsPane({
                             <SelectValue placeholder="All departments" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value={NONE}>All departments</SelectItem>
+                            <SelectItem value={NONE}>
+                                All departments
+                            </SelectItem>
                             {departments.map((d) => (
                                 <SelectItem key={d.id} value={String(d.id)}>
                                     {d.name}
@@ -204,14 +206,16 @@ export function PositionsPane({
                                                         <Users className="h-3.5 w-3.5 text-muted-foreground" />
                                                         {p.current_headcount}/
                                                         {p.headcount_budget}
-                                                        {p.actionable_vacancies > 0 ? (
+                                                        {p.actionable_vacancies >
+                                                        0 ? (
                                                             <StatusBadge
                                                                 status="action_required"
                                                                 tone="warning"
                                                                 label={`${p.actionable_vacancies} to hire`}
                                                                 className="ml-1"
                                                             />
-                                                        ) : p.open_requisition_openings > 0 &&
+                                                        ) : p.open_requisition_openings >
+                                                              0 &&
                                                           p.vacancies > 0 ? (
                                                             <StatusBadge
                                                                 status="recruiting"

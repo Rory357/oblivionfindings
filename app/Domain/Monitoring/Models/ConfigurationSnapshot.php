@@ -10,6 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class ConfigurationSnapshot extends Model
 {
+    private const array STORAGE_STATES = [
+        'available',
+        'integrity_failed',
+        'missing',
+        'unavailable',
+        'deleted',
+    ];
+
     protected $table = 'monitoring_configuration_snapshots';
 
     protected $fillable = [
@@ -45,6 +53,66 @@ final class ConfigurationSnapshot extends Model
         'payload_deleted_at' => 'immutable_datetime',
         'diff_summary' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        self::updating(function (self $snapshot): void {
+            $changed = array_values(array_diff(
+                array_keys($snapshot->getDirty()),
+                ['updated_at'],
+            ));
+            $unexpected = array_diff($changed, ['storage_state', 'payload_deleted_at']);
+            if ($unexpected !== []) {
+                throw new \UnexpectedValueException('Configuration snapshot evidence is immutable.');
+            }
+
+            if ($snapshot->getRawOriginal('storage_state') === 'deleted'
+                || $snapshot->getRawOriginal('payload_deleted_at') !== null) {
+                throw new \UnexpectedValueException('Deleted configuration snapshot history is immutable.');
+            }
+
+            if ($changed === []) {
+                throw new \UnexpectedValueException(
+                    'Configuration snapshot updates require a storage lifecycle transition.',
+                );
+            }
+
+            $state = (string) $snapshot->storage_state;
+            if (! in_array($state, self::STORAGE_STATES, true)) {
+                throw new \UnexpectedValueException('Configuration snapshot storage state is invalid.');
+            }
+
+            if ($state === 'deleted') {
+                if ($snapshot->getRawOriginal('storage_state') !== 'available'
+                    || ! $snapshot->isDirty('storage_state')
+                    || ! $snapshot->isDirty('payload_deleted_at')
+                    || $snapshot->payload_deleted_at === null
+                    || $snapshot->payload_deleted_at->lessThan($snapshot->captured_at)) {
+                    throw new \UnexpectedValueException(
+                        'Configuration snapshot retention deletion is invalid.',
+                    );
+                }
+
+                return;
+            }
+
+            if ($snapshot->payload_deleted_at !== null || $snapshot->isDirty('payload_deleted_at')) {
+                throw new \UnexpectedValueException(
+                    'Configuration snapshot payload deletion requires the deleted state.',
+                );
+            }
+
+            if (! $snapshot->isDirty('storage_state')) {
+                throw new \UnexpectedValueException(
+                    'Configuration snapshot updates require a storage lifecycle transition.',
+                );
+            }
+        });
+
+        self::deleting(function (): void {
+            throw new \UnexpectedValueException('Configuration snapshot evidence cannot be deleted.');
+        });
+    }
 
     public function site(): BelongsTo
     {

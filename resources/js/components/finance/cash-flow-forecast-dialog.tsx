@@ -22,8 +22,18 @@ const PERIOD_TYPES = [
 ];
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'parameters', label: 'Parameters', blurb: 'Range & granularity', icon: CalendarRange },
-    { key: 'review', label: 'Review', blurb: 'Confirm & generate', icon: ListChecks },
+    {
+        key: 'parameters',
+        label: 'Parameters',
+        blurb: 'Range & granularity',
+        icon: CalendarRange,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & generate',
+        icon: ListChecks,
+    },
 ];
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -34,7 +44,11 @@ const plusMonths = (months: number) => {
 };
 
 const fmtDate = (d: string) =>
-    new Date(`${d}T00:00:00`).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(`${d}T00:00:00`).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 
 /**
  * Cash Flow Forecast wizard — pick a range and granularity as a stepper modal
@@ -65,9 +79,18 @@ export function CashFlowForecastDialog({
     const { data, setData, processing, errors } = form;
 
     // Mirrors the backend `after:period_start` rule (strictly after).
-    const rangeValid = !data.period_start || !data.period_end || data.period_end > data.period_start;
-    const parametersValid = !!data.period_start && !!data.period_end && !!data.period_type && rangeValid;
-    const periodTypeLabel = PERIOD_TYPES.find((t) => t.value === data.period_type)?.label ?? data.period_type;
+    const rangeValid =
+        !data.period_start ||
+        !data.period_end ||
+        data.period_end > data.period_start;
+    const parametersValid =
+        !!data.period_start &&
+        !!data.period_end &&
+        !!data.period_type &&
+        rangeValid;
+    const periodTypeLabel =
+        PERIOD_TYPES.find((t) => t.value === data.period_type)?.label ??
+        data.period_type;
 
     const close = () => {
         reset();
@@ -102,17 +125,30 @@ export function CashFlowForecastDialog({
             footerEnd={
                 <>
                     {!isFirst && (
-                        <Button type="button" variant="outline" onClick={back} disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={back}
+                            disabled={processing}
+                        >
                             Back
                         </Button>
                     )}
                     {!isLast && (
-                        <Button type="button" onClick={next} disabled={!parametersValid}>
+                        <Button
+                            type="button"
+                            onClick={next}
+                            disabled={!parametersValid}
+                        >
                             Continue
                         </Button>
                     )}
                     {isLast && (
-                        <Button type="button" onClick={submit} disabled={processing || !parametersValid}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={processing || !parametersValid}
+                        >
                             {processing ? 'Generating…' : 'Generate forecast'}
                         </Button>
                     )}
@@ -121,24 +157,41 @@ export function CashFlowForecastDialog({
         >
             {index === 0 && (
                 <div>
-                    <StepHead icon={CalendarRange} title="Forecast parameters" blurb="Define the date range and period granularity." />
+                    <StepHead
+                        icon={CalendarRange}
+                        title="Forecast parameters"
+                        blurb="Define the date range and period granularity."
+                    />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Period start" required error={errors.period_start}>
+                        <Field
+                            label="Period start"
+                            required
+                            error={errors.period_start}
+                        >
                             <Input
                                 type="date"
                                 value={data.period_start}
-                                onChange={(e) => setData('period_start', e.target.value)}
+                                onChange={(e) =>
+                                    setData('period_start', e.target.value)
+                                }
                             />
                         </Field>
                         <Field
                             label="Period end"
                             required
-                            error={errors.period_end ?? (!rangeValid ? 'Must be after the start date.' : undefined)}
+                            error={
+                                errors.period_end ??
+                                (!rangeValid
+                                    ? 'Must be after the start date.'
+                                    : undefined)
+                            }
                         >
                             <Input
                                 type="date"
                                 value={data.period_end}
-                                onChange={(e) => setData('period_end', e.target.value)}
+                                onChange={(e) =>
+                                    setData('period_end', e.target.value)
+                                }
                             />
                         </Field>
                         <Field
@@ -149,15 +202,24 @@ export function CashFlowForecastDialog({
                             error={errors.period_type}
                         >
                             <Segmented
-                                value={data.period_type as 'weekly' | 'fortnightly' | 'monthly'}
+                                value={
+                                    data.period_type as
+                                        | 'weekly'
+                                        | 'fortnightly'
+                                        | 'monthly'
+                                }
                                 onChange={(v) => setData('period_type', v)}
                                 options={PERIOD_TYPES}
                             />
                         </Field>
                         <InfoCard icon={Info}>
-                            <span className="font-medium">What will be included:</span> current bank balances as the
-                            opening position, outstanding invoice receipts (AR), upcoming bill payments (AP),
-                            recurring journal entries, GST payment obligations, and three scenarios — Base,
+                            <span className="font-medium">
+                                What will be included:
+                            </span>{' '}
+                            current bank balances as the opening position,
+                            outstanding invoice receipts (AR), upcoming bill
+                            payments (AP), recurring journal entries, GST
+                            payment obligations, and three scenarios — Base,
                             Best and Worst Case.
                         </InfoCard>
                     </div>
@@ -166,16 +228,34 @@ export function CashFlowForecastDialog({
 
             {index === 1 && (
                 <div>
-                    <StepHead icon={ListChecks} title="Review & generate" blurb="Generates the forecast and opens it with scenario comparison." />
+                    <StepHead
+                        icon={ListChecks}
+                        title="Review & generate"
+                        blurb="Generates the forecast and opens it with scenario comparison."
+                    />
                     <ReviewCard icon={TrendingUp} title="Cash flow forecast">
                         <ReviewRow
                             label="Period"
-                            value={data.period_start && data.period_end ? `${fmtDate(data.period_start)} — ${fmtDate(data.period_end)}` : '—'}
+                            value={
+                                data.period_start && data.period_end
+                                    ? `${fmtDate(data.period_start)} — ${fmtDate(data.period_end)}`
+                                    : '—'
+                            }
                         />
-                        <ReviewRow label="Granularity" value={periodTypeLabel} />
-                        <ReviewRow label="Scenarios" value="Base · Best · Worst Case" />
+                        <ReviewRow
+                            label="Granularity"
+                            value={periodTypeLabel}
+                        />
+                        <ReviewRow
+                            label="Scenarios"
+                            value="Base · Best · Worst Case"
+                        />
                     </ReviewCard>
-                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">Generating forecast…</p>}
+                    {processing && (
+                        <p className="mt-3 text-[13px] text-muted-foreground">
+                            Generating forecast…
+                        </p>
+                    )}
                 </div>
             )}
         </WizardShell>

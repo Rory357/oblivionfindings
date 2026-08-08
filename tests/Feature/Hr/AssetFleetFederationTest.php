@@ -77,7 +77,7 @@ test('S2 seam: an HR asset linked to a Fleet asset reads THROUGH to the canonica
     expect($hrAsset->fleetAsset->name)->toBe('Fleet Van 7');
 });
 
-test('S2 seam: bulk-retire skips Fleet-linked rows — Fleet owns disposal, HR must not retire it', function () {
+test('S2 seam: a bulk mutation containing a Fleet-linked row fails closed without partial HR writes', function () {
     $fleetVehicle = Asset::factory()->create([
         'site_id' => $this->site->id,
         'category' => 'vehicle',
@@ -93,9 +93,9 @@ test('S2 seam: bulk-retire skips Fleet-linked rows — Fleet owns disposal, HR m
     ]);
 
     $hrOwned = HrAsset::query()->create([
-        'asset_tag' => 'LAP-1',
-        'name' => 'MacBook',
-        'category' => 'laptop',
+        'asset_tag' => 'UNI-1',
+        'name' => 'Winter uniform',
+        'category' => 'uniform',
         'status' => 'available',
         'qr_token' => (string) Str::uuid(),
     ]);
@@ -105,9 +105,9 @@ test('S2 seam: bulk-retire skips Fleet-linked rows — Fleet owns disposal, HR m
             'action' => 'retire',
             'ids' => [$fleetLinked->id, $hrOwned->id],
         ])
-        ->assertSessionHas('success');
+        ->assertSessionHas('error');
 
-    // Fleet-linked row untouched (Fleet owns disposal); the HR-owned one retires.
+    // The complete bulk operation rolls back instead of partially mutating HR stock.
     expect($fleetLinked->fresh()->status)->toBe('available');
-    expect($hrOwned->fresh()->status)->toBe('retired');
+    expect($hrOwned->fresh()->status)->toBe('available');
 });

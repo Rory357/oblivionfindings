@@ -75,9 +75,18 @@ const RAILS: {
 ];
 
 const STATUS_PILL: Record<string, { label: string; cls: string }> = {
-    expired: { label: 'Expired', cls: 'bg-status-critical-bg text-status-critical' },
-    expiring_soon: { label: 'Expiring soon', cls: 'bg-status-warning-bg text-status-warning' },
-    probation: { label: 'On probation', cls: 'bg-status-info-bg text-status-info' },
+    expired: {
+        label: 'Expired',
+        cls: 'bg-status-critical-bg text-status-critical',
+    },
+    expiring_soon: {
+        label: 'Expiring soon',
+        cls: 'bg-status-warning-bg text-status-warning',
+    },
+    probation: {
+        label: 'On probation',
+        cls: 'bg-status-info-bg text-status-info',
+    },
     pending: { label: 'Not signed in', cls: 'bg-muted text-muted-foreground' },
 };
 
@@ -160,8 +169,7 @@ export function NeedsTriageDialog({
             case 'probation':
                 return {
                     label: 'View everyone on probation',
-                    onClick: () =>
-                        router.visit('/hr/people?probation=1'),
+                    onClick: () => router.visit('/hr/people?probation=1'),
                 };
             case 'invites':
                 return {
@@ -182,14 +190,15 @@ export function NeedsTriageDialog({
                         Needs attention
                     </DialogTitle>
                     <DialogDescription>
-                        Your cross-cutting action queue — work through compliance,
-                        probation and pending invites without leaving the page.
+                        Your cross-cutting action queue — work through
+                        compliance, probation and pending invites without
+                        leaving the page.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex min-h-0 flex-col sm:flex-row">
                     {/* ── left rail ── */}
-                    <nav className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-border p-3 sm:w-52 sm:flex-col sm:overflow-visible sm:border-b-0 sm:border-r">
+                    <nav className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-border p-3 sm:w-52 sm:flex-col sm:overflow-visible sm:border-r sm:border-b-0">
                         {RAILS.map((r) => {
                             const Icon = r.icon;
                             const isActive = r.key === rail;
@@ -225,7 +234,9 @@ export function NeedsTriageDialog({
                     {/* ── list ── */}
                     <div className="flex min-w-0 flex-1 flex-col">
                         <div className="border-b border-border px-5 py-3">
-                            <p className="text-sm font-semibold">{active.label}</p>
+                            <p className="text-sm font-semibold">
+                                {active.label}
+                            </p>
                             <p className="text-xs text-muted-foreground">
                                 {active.blurb}
                             </p>
@@ -306,7 +317,9 @@ export function NeedsTriageDialog({
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        disabled={!row.profile_id}
+                                                        disabled={
+                                                            !row.profile_id
+                                                        }
                                                         onClick={() =>
                                                             viewProfile(
                                                                 row.profile_id,
@@ -341,7 +354,11 @@ export function NeedsTriageDialog({
                                 <ExternalLink className="h-3.5 w-3.5" />
                                 {footer.label}
                             </Button>
-                            <Button variant="outline" size="sm" onClick={onClose}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={onClose}
+                            >
                                 Done
                             </Button>
                         </div>

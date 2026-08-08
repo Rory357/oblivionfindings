@@ -40,7 +40,12 @@ class PullIntegrationHealthJob implements ShouldQueue
         $siteConfigs = IntegrationSiteConfig::query()
             ->forProvider($this->provider)
             ->active()
-            ->whereHas('site')
+            ->whereNotNull('mapped_external_site_id')
+            ->where('mapped_external_site_id', '<>', '')
+            ->whereHas('site', fn ($site) => $site
+                ->where('is_active', true)
+                ->where(fn ($operational) => $operational->whereNull('archived')->orWhere('archived', false))
+                ->whereNull('archived_at'))
             ->when($this->siteId, fn ($q) => $q->where('site_id', $this->siteId))
             ->get();
 

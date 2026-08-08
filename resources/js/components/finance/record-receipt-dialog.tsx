@@ -26,12 +26,24 @@ export type ReceiptInvoice = {
 };
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'receipt', label: 'Receipt', blurb: 'Amount & date received', icon: Wallet },
-    { key: 'review', label: 'Review & post', blurb: 'Confirm and post', icon: ListChecks },
+    {
+        key: 'receipt',
+        label: 'Receipt',
+        blurb: 'Amount & date received',
+        icon: Wallet,
+    },
+    {
+        key: 'review',
+        label: 'Review & post',
+        blurb: 'Confirm and post',
+        icon: ListChecks,
+    },
 ];
 
 const money = (n: number | string, currency = 'NZD') =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(Number(n));
+    new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(
+        Number(n),
+    );
 
 /**
  * Record Receipt wizard — record a (partial or full) payment received against an
@@ -107,23 +119,39 @@ export function RecordReceiptDialog({
             pctLabel="Receipt"
             footerStart={
                 <span className="text-[13px] text-muted-foreground">
-                    Outstanding <span className="font-semibold text-foreground">{money(due, currency)}</span>
+                    Outstanding{' '}
+                    <span className="font-semibold text-foreground">
+                        {money(due, currency)}
+                    </span>
                 </span>
             }
             footerEnd={
                 <>
                     {!isFirst && (
-                        <Button type="button" variant="outline" onClick={back} disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={back}
+                            disabled={processing}
+                        >
                             Back
                         </Button>
                     )}
                     {!isLast && (
-                        <Button type="button" onClick={next} disabled={amountNum <= 0 || overpay}>
+                        <Button
+                            type="button"
+                            onClick={next}
+                            disabled={amountNum <= 0 || overpay}
+                        >
                             Continue
                         </Button>
                     )}
                     {isLast && (
-                        <Button type="button" onClick={submit} disabled={processing || amountNum <= 0 || overpay}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={processing || amountNum <= 0 || overpay}
+                        >
                             Post receipt
                         </Button>
                     )}
@@ -132,31 +160,57 @@ export function RecordReceiptDialog({
         >
             {index === 0 && (
                 <div>
-                    <StepHead icon={Wallet} title="Receipt details" blurb="How much was received, and when." />
-                    {typeof errors.invoice_id === 'string' && <FieldErr>{errors.invoice_id}</FieldErr>}
+                    <StepHead
+                        icon={Wallet}
+                        title="Receipt details"
+                        blurb="How much was received, and when."
+                    />
+                    {typeof errors.invoice_id === 'string' && (
+                        <FieldErr>{errors.invoice_id}</FieldErr>
+                    )}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Amount received" required error={errors.amount}>
+                        <Field
+                            label="Amount received"
+                            required
+                            error={errors.amount}
+                        >
                             <AmountField
                                 value={data.amount}
                                 onValueChange={(v) => setData('amount', v)}
                                 aria-label="Amount received"
                             />
                             {overpay && (
-                                <FieldErr>Amount exceeds the outstanding balance of {money(due, currency)}.</FieldErr>
+                                <FieldErr>
+                                    Amount exceeds the outstanding balance of{' '}
+                                    {money(due, currency)}.
+                                </FieldErr>
                             )}
                         </Field>
-                        <Field label="Date received" required error={errors.payment_date}>
+                        <Field
+                            label="Date received"
+                            required
+                            error={errors.payment_date}
+                        >
                             <Input
                                 type="date"
                                 value={data.payment_date}
-                                onChange={(e) => setData('payment_date', e.target.value)}
+                                onChange={(e) =>
+                                    setData('payment_date', e.target.value)
+                                }
                             />
                         </Field>
-                        <Field label="Notes" span hint="optional" error={errors.notes}>
+                        <Field
+                            label="Notes"
+                            span
+                            hint="optional"
+                            error={errors.notes}
+                        >
                             <Textarea
                                 rows={2}
                                 value={data.notes}
-                                onChange={(e) => setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    setData('notes', e.target.value)
+                                }
                                 placeholder="e.g. bank transfer ref 88421"
                             />
                         </Field>
@@ -176,19 +230,43 @@ export function RecordReceiptDialog({
 
             {index === 1 && (
                 <div>
-                    <StepHead icon={ListChecks} title="Review & post" blurb="Posts DR Bank / CR Accounts Receivable and records the allocation." />
+                    <StepHead
+                        icon={ListChecks}
+                        title="Review & post"
+                        blurb="Posts DR Bank / CR Accounts Receivable and records the allocation."
+                    />
                     <ReviewCard icon={Wallet} title="Receipt">
-                        <ReviewRow label="Invoice" value={invoice.invoice_number} />
-                        <ReviewRow label="Client" value={invoice.client_name ?? '—'} />
-                        <ReviewRow label="Invoice total" value={money(invoice.total_amount, currency)} />
-                        <ReviewRow label="Amount received" value={money(amountNum, currency)} />
+                        <ReviewRow
+                            label="Invoice"
+                            value={invoice.invoice_number}
+                        />
+                        <ReviewRow
+                            label="Client"
+                            value={invoice.client_name ?? '—'}
+                        />
+                        <ReviewRow
+                            label="Invoice total"
+                            value={money(invoice.total_amount, currency)}
+                        />
+                        <ReviewRow
+                            label="Amount received"
+                            value={money(amountNum, currency)}
+                        />
                         <ReviewRow label="Date" value={data.payment_date} />
                         <ReviewRow
                             label="Remaining after"
-                            value={remaining <= 0 ? 'Paid in full' : money(remaining, currency)}
+                            value={
+                                remaining <= 0
+                                    ? 'Paid in full'
+                                    : money(remaining, currency)
+                            }
                         />
                     </ReviewCard>
-                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">Posting…</p>}
+                    {processing && (
+                        <p className="mt-3 text-[13px] text-muted-foreground">
+                            Posting…
+                        </p>
+                    )}
                 </div>
             )}
         </WizardShell>

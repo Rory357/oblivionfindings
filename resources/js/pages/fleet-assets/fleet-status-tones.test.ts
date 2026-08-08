@@ -13,16 +13,15 @@ const incidents = readFileSync(
 
 describe('Fleet semantic status tones', () => {
     it('treats unchecked daily checks as due, while failed checks remain critical', () => {
-        expect(dailyCheck).toContain(
-            "tone={summary.unchecked > 0 ? 'warning' : 'success'}",
+        expect(dailyCheck).toMatch(
+            /tone=\{\s*summary\.unchecked\s*>\s*0\s*\?\s*'warning'\s*:\s*'success'\s*}/,
         );
-        expect(dailyCheck).toContain(
-            "'border-status-warning/30 bg-status-warning-bg'",
+        expect(dailyCheck).toMatch(
+            /vehicle\.checked_today\s*\?\s*vehicle\.check_result\s*===\s*'good'\s*\?\s*'border-primary\/30 bg-primary\/5 dark:bg-primary\/10'\s*:\s*'border-status-critical\/30 bg-status-critical-bg'\s*:\s*'border-status-warning\/30 bg-status-warning-bg'/,
         );
-        expect(dailyCheck).toContain(
-            "'border-status-critical/30 bg-status-critical-bg'",
+        expect(dailyCheck).toMatch(
+            /<Clock\b[^>]*className="(?=[^"]*\bshrink-0\b)(?=[^"]*\btext-status-warning\b)[^"]*"[^>]*\/>/,
         );
-        expect(dailyCheck).toContain('text-status-warning shrink-0');
     });
 
     it('maps incident severity to neutral, warning, and critical semantics', () => {

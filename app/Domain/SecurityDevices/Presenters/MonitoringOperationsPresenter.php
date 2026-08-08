@@ -31,6 +31,7 @@ use App\Models\ItTicket;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use Illuminate\Support\Collection;
 use Throwable;
 
@@ -46,6 +47,7 @@ class MonitoringOperationsPresenter
         private readonly ItWorkAccessService $itAccess,
         private readonly MonitoringReplayService $replay,
         private readonly MonitoringCollectorAvailabilityService $collectorAvailability,
+        private readonly ControlRoomAlertAccessService $controlRoomAccess,
     ) {}
 
     /** @param array<string, mixed> $filters @return array<string, mixed> */
@@ -109,7 +111,7 @@ class MonitoringOperationsPresenter
         $filtered = $this->filterRows($mapped, $filters);
         $shown = $filtered->take(self::ROW_LIMIT)->values();
         $dependencies = $this->dependencies($allMonitors, $mapped);
-        $storage = $this->storage($deviceIds);
+        $storage = $this->storage($deviceIds, collect($accessibleSiteIds));
         $runtime = $this->runtimeHealth->present($viewer);
         $directSiteReadiness = $this->centralReadiness->assess(
             $accessibleSites,
@@ -132,8 +134,11 @@ class MonitoringOperationsPresenter
             'boundary' => [
                 'title' => 'Oblivion native monitoring',
                 'description' => 'The main application monitors SD-WAN reachable sites directly. Hardened collectors extend coverage only where a remote path requires local collection.',
-                'privacy_note' => 'Probe targets, credentials, configuration, raw messages, and observation metrics are never projected into this workspace.',
+                'privacy_note' => 'Probe targets, credentials, configuration, raw messages, and metric dimensions are never projected into this workspace. Only bounded retained summaries and aggregate capacity projections are shown.',
                 'control_room_note' => 'This workspace explains technical evidence and coverage. Control Room remains the operational triage and escalation destination.',
+            ],
+            'can' => [
+                'view_control_room' => $viewer->canDo('controlRoom.viewAny'),
             ],
             'summary' => [
                 'total_devices' => $visibleDevices->count(),
@@ -525,6 +530,7 @@ class MonitoringOperationsPresenter
         $alerts = $canViewControlRoom
             ? ControlRoomAlert::query()->whereKey($alertIds)->get(['id', 'reference_number', 'status'])->keyBy('id')
             : collect();
+        $readableAlertIds = $this->controlRoomAccess->readableIds($alerts, $viewer);
         $tickets = collect();
         if ($canViewIt) {
             $tickets = $this->itAccess
@@ -547,7 +553,7 @@ class MonitoringOperationsPresenter
                 }, collect());
         }
 
-        return $monitors->mapWithKeys(function (Monitor $monitor) use ($alerts, $keysByRoot, $signals, $tickets): array {
+        return $monitors->mapWithKeys(function (Monitor $monitor) use ($alerts, $keysByRoot, $readableAlertIds, $signals, $tickets): array {
             $rootId = (int) ($monitor->root_cause_monitor_id ?? $monitor->id);
             $key = $keysByRoot->get($rootId);
             /** @var Signal|null $signal */
@@ -557,13 +563,20 @@ class MonitoringOperationsPresenter
             $alert = $alertId ? $alerts->get($alertId) : null;
             /** @var ItTicket|null $ticket */
             $ticket = $alertId ? $tickets->get($alertId) : null;
+            $readableAlert = $alert !== null && $readableAlertIds->contains((int) $alert->id);
 
             return [$monitor->id => [
                 'control_room' => $alert ? [
                     'id' => $alert->id,
-                    'reference' => $alert->reference_number,
-                    'status' => $alert->status,
-                    'href' => "/control-room/alerts/{$alert->id}",
+                    'reference' => $readableAlert ? $alert->reference_number : null,
+                    'status' => $readableAlert ? $alert->status : null,
+                    'href' => $readableAlert ? "/control-room/alerts/{$alert->id}" : null,
+                    'access' => [
+                        'state' => $readableAlert ? 'available' : 'restricted',
+                        'label' => $readableAlert
+                            ? 'Open Control Room alert'
+                            : 'Control Room alert access required',
+                    ],
                 ] : null,
                 'it_incident' => $ticket ? [
                     'id' => $ticket->id,
@@ -672,33 +685,53 @@ class MonitoringOperationsPresenter
         ];
     }
 
-    /** @param Collection<int, int> $deviceIds @return array<string, mixed> */
-    private function storage(Collection $deviceIds): array
+    /** @param Collection<int, int> $deviceIds @param Collection<int, int> $accessibleSiteIds @return array<string, mixed> */
+    private function storage(Collection $deviceIds, Collection $accessibleSiteIds): array
     {
-        $series = $deviceIds->isEmpty()
+        $hasSeriesScope = $deviceIds->isNotEmpty() && $accessibleSiteIds->isNotEmpty();
+        $seriesQuery = MetricSeries::query()
+            ->whereIn('device_id', $deviceIds)
+            ->whereIn('site_id', $accessibleSiteIds);
+        $seriesTotal = $hasSeriesScope ? (clone $seriesQuery)->count() : 0;
+        $stateCounts = ! $hasSeriesScope
             ? collect()
-            : MetricSeries::query()
-                ->whereIn('device_id', $deviceIds)
+            : MetricCurrentSummary::query()
+                ->whereIn('series_id', (clone $seriesQuery)->select('id'))
+                ->selectRaw('storage_state, COUNT(*) AS aggregate')
+                ->groupBy('storage_state')
+                ->pluck('aggregate', 'storage_state')
+                ->map(fn (mixed $count): int => (int) $count);
+        $summarisedSeries = $stateCounts->sum();
+        if ($seriesTotal > $summarisedSeries) {
+            $stateCounts->put('unknown', $seriesTotal - $summarisedSeries);
+        }
+        $series = ! $hasSeriesScope
+            ? collect()
+            : (clone $seriesQuery)
                 ->with(['currentSummary', 'device:id,name'])
                 ->orderByDesc('last_point_at')
                 ->limit(self::ROW_LIMIT)
                 ->get();
-        $siteIds = $series->pluck('site_id')->filter()->unique()->values();
-        $states = $series->map(fn (MetricSeries $metric): string => $metric->currentSummary?->storage_state ?? 'unknown')->countBy();
+        $seriesSiteIds = ! $hasSeriesScope
+            ? collect()
+            : (clone $seriesQuery)
+                ->whereNotNull('site_id')
+                ->distinct()
+                ->pluck('site_id');
         $state = match (true) {
-            (int) ($states['unavailable'] ?? 0) > 0 => 'unavailable',
-            (int) ($states['missing'] ?? 0) > 0 => 'degraded',
-            $series->isNotEmpty() && (int) ($states['available'] ?? 0) === $series->count() => 'available',
-            $series->isNotEmpty() => 'unknown',
+            (int) ($stateCounts['unavailable'] ?? 0) > 0 => 'unavailable',
+            (int) ($stateCounts['missing'] ?? 0) > 0 => 'degraded',
+            $seriesTotal > 0 && (int) ($stateCounts['available'] ?? 0) === $seriesTotal => 'available',
+            $seriesTotal > 0 => 'unknown',
             blank(config('monitoring.storage.timeseries.url')) => 'not_configured',
             default => 'not_observed',
         };
         $policies = MonitoringRetentionPolicy::query()
             ->where('is_active', true)
-            ->where(function ($query) use ($deviceIds, $siteIds): void {
+            ->where(function ($query) use ($deviceIds, $seriesSiteIds): void {
                 $query->where('scope_kind', 'application');
-                if ($siteIds->isNotEmpty()) {
-                    $query->orWhereIn('site_id', $siteIds);
+                if ($seriesSiteIds->isNotEmpty()) {
+                    $query->orWhereIn('site_id', $seriesSiteIds);
                 }
                 if ($deviceIds->isNotEmpty()) {
                     $query->orWhereIn('device_id', $deviceIds);
@@ -722,10 +755,12 @@ class MonitoringOperationsPresenter
         return [
             'time_series' => [
                 'state' => $state,
-                'series' => $series->count(),
-                'available' => (int) ($states['available'] ?? 0),
-                'missing' => (int) ($states['missing'] ?? 0),
-                'unavailable' => (int) ($states['unavailable'] ?? 0),
+                'series' => $seriesTotal,
+                'series_shown' => $series->count(),
+                'series_truncated' => $seriesTotal > $series->count(),
+                'available' => (int) ($stateCounts['available'] ?? 0),
+                'missing' => (int) ($stateCounts['missing'] ?? 0),
+                'unavailable' => (int) ($stateCounts['unavailable'] ?? 0),
                 'capacity_evidence' => $series->map(function (MetricSeries $metric): array {
                     /** @var MetricCurrentSummary|null $summary */
                     $summary = $metric->currentSummary;

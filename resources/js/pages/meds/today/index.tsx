@@ -82,7 +82,11 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 
-import { DayPickerChip, addDays, parseYmd } from '@/components/meds/day-picker-chip';
+import {
+    DayPickerChip,
+    addDays,
+    parseYmd,
+} from '@/components/meds/day-picker-chip';
 import { PrnEffectDialog } from './components/prn-effect-dialog';
 import { PrnWizard } from './components/prn-wizard';
 import { RecordDoseWizard } from './components/record-dose-wizard';
@@ -222,7 +226,10 @@ function DoseRow({
                             {row.client_name}
                         </Link>
                         <div className="truncate text-[11px] text-muted-foreground">
-                            {[client?.site_name, client?.nhi ? `NHI ${client.nhi}` : null]
+                            {[
+                                client?.site_name,
+                                client?.nhi ? `NHI ${client.nhi}` : null,
+                            ]
                                 .filter(Boolean)
                                 .join(' · ')}
                         </div>
@@ -255,7 +262,9 @@ function DoseRow({
                 {actionable ? (
                     <Button
                         size="sm"
-                        variant={row.status === 'overdue' ? 'default' : 'outline'}
+                        variant={
+                            row.status === 'overdue' ? 'default' : 'outline'
+                        }
                         onClick={() => onRecord(row)}
                         aria-label={`Record ${row.medication_name} for ${row.client_name}`}
                     >
@@ -315,10 +324,7 @@ function ScheduleCard({
 
     const filtered = useMemo(() => {
         return rows.filter((row) => {
-            if (
-                status === 'due' &&
-                !['due', 'overdue'].includes(row.status)
-            )
+            if (status === 'due' && !['due', 'overdue'].includes(row.status))
                 return false;
             if (status === 'later' && row.status !== 'upcoming') return false;
             if (status === 'given' && row.recorded === null) return false;
@@ -341,11 +347,7 @@ function ScheduleCard({
     const from = filtered.length === 0 ? 0 : safePage * perPage + 1;
     const to = Math.min(filtered.length, (safePage + 1) * perPage);
 
-    const segment = (
-        value: typeof status,
-        label: string,
-        count: number,
-    ) => (
+    const segment = (value: typeof status, label: string, count: number) => (
         // eslint-disable-next-line no-restricted-syntax -- segmented status filter (wizard Segmented idiom with count badges), not a shadcn Button.
         <button
             key={value}
@@ -419,12 +421,16 @@ function ScheduleCard({
                             <th className="py-2.5 pr-3 pl-5 font-semibold">
                                 Time
                             </th>
-                            <th className="py-2.5 pr-3 font-semibold">Client</th>
+                            <th className="py-2.5 pr-3 font-semibold">
+                                Client
+                            </th>
                             <th className="py-2.5 pr-3 font-semibold">
                                 Medication
                             </th>
                             <th className="py-2.5 pr-3 font-semibold">Route</th>
-                            <th className="py-2.5 pr-3 font-semibold">Status</th>
+                            <th className="py-2.5 pr-3 font-semibold">
+                                Status
+                            </th>
                             <th className="py-2.5 pr-5 text-right font-semibold">
                                 Record
                             </th>
@@ -495,7 +501,7 @@ function ScheduleCard({
                         >
                             <ChevronLeft className="h-4 w-4" />
                         </Button>
-                        <span className="px-1.5 text-xs tabular-nums text-muted-foreground">
+                        <span className="px-1.5 text-xs text-muted-foreground tabular-nums">
                             {safePage + 1} / {pageCount}
                         </span>
                         <Button
@@ -586,7 +592,9 @@ function FollowUpsCard({
                         >
                             <div className="min-w-0">
                                 <div className="truncate text-[13px] font-semibold">
-                                    {client?.preferred ?? client?.name ?? 'Client'}{' '}
+                                    {client?.preferred ??
+                                        client?.name ??
+                                        'Client'}{' '}
                                     — {f.medication_name ?? 'PRN'}
                                 </div>
                                 <div className="text-[11px] text-muted-foreground">
@@ -645,8 +653,8 @@ function RoundsCard({ rounds }: { rounds: RoundInfo[] }) {
                                 </div>
                                 <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
                                     <Clock className="h-3 w-3" />
-                                    {clockLabel(r.scheduled_time)} · {r.completed}{' '}
-                                    of {r.total} done
+                                    {clockLabel(r.scheduled_time)} ·{' '}
+                                    {r.completed} of {r.total} done
                                 </div>
                                 {!isDone ? (
                                     <Progress
@@ -712,7 +720,12 @@ function StockAlertRow({
                 </div>
             </div>
             {canManage ? (
-                <Button size="sm" variant="outline" className="bg-card/70" asChild>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-card/70"
+                    asChild
+                >
                     <Link href="/emar/stock">{actionLabel}</Link>
                 </Button>
             ) : null}
@@ -763,9 +776,7 @@ function ActivityList({
     activity: ActivityItem[];
     limit?: number;
 }) {
-    const iconFor = (
-        kind: string,
-    ): [typeof Check, string] =>
+    const iconFor = (kind: string): [typeof Check, string] =>
         kind === 'refused'
             ? [Hand, 'bg-status-critical-bg text-status-critical']
             : kind === 'cd'
@@ -872,7 +883,8 @@ function RoundsTab({
                     const isDone = r.status === 'completed';
                     const verb = isActive ? 'Resume' : 'Start';
                     const roundDoses = schedule.filter(
-                        (d) => d.round_label === bucketForTime(r.scheduled_time),
+                        (d) =>
+                            d.round_label === bucketForTime(r.scheduled_time),
                     );
                     return (
                         <div
@@ -922,8 +934,8 @@ function RoundsTab({
                                         ) : null}
                                     </div>
                                     <div className="mt-0.5 text-xs text-muted-foreground">
-                                        Scheduled {clockLabel(r.scheduled_time)} ·{' '}
-                                        {r.completed} of {r.total} done
+                                        Scheduled {clockLabel(r.scheduled_time)}{' '}
+                                        · {r.completed} of {r.total} done
                                     </div>
                                     <Progress
                                         value={r.percent}
@@ -933,7 +945,9 @@ function RoundsTab({
                                 {!isDone ? (
                                     <Button
                                         size="sm"
-                                        variant={isActive ? 'default' : 'outline'}
+                                        variant={
+                                            isActive ? 'default' : 'outline'
+                                        }
                                         asChild
                                     >
                                         <Link
@@ -960,7 +974,9 @@ function RoundsTab({
                                             />
                                             {clientById.get(d.client_id)
                                                 ?.preferred ??
-                                                d.client_name.split(' ')[0]}{' '}
+                                                d.client_name.split(
+                                                    ' ',
+                                                )[0]}{' '}
                                             · {d.time}
                                             <StatusPill status={d.status} />
                                         </span>
@@ -1002,8 +1018,8 @@ function PrnTab({
                         As-needed (PRN) medications
                     </CardTitle>
                     <CardDescription>
-                        Everything prescribed PRN for the clients on your shift —
-                        with limits and last-given times.
+                        Everything prescribed PRN for the clients on your shift
+                        — with limits and last-given times.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2">
@@ -1280,7 +1296,9 @@ export default function MedsToday(props: MedsTodayProps) {
                 icon: <User className="h-3.5 w-3.5" />,
                 label: `View ${preferred}'s profile`,
                 onClick: () =>
-                    router.visit(`/operations/clients/${row.client_id}?tab=mar`),
+                    router.visit(
+                        `/operations/clients/${row.client_id}?tab=mar`,
+                    ),
             },
             ...(client?.nhi
                 ? [
@@ -1622,8 +1640,8 @@ export default function MedsToday(props: MedsTodayProps) {
                                 {board.total} dose
                                 {board.total === 1 ? '' : 's'} across{' '}
                                 {sites.length} site
-                                {sites.length === 1 ? '' : 's'}.{' '}
-                                {board.dueNow} due now
+                                {sites.length === 1 ? '' : 's'}. {board.dueNow}{' '}
+                                due now
                                 {board.overdue > 0
                                     ? ` (${board.overdue} overdue)`
                                     : ''}
@@ -1778,7 +1796,9 @@ export default function MedsToday(props: MedsTodayProps) {
                         canManage={board_can.view_emar}
                     />
                 ) : null}
-                {tab === 'activity' ? <ActivityTab activity={activity} /> : null}
+                {tab === 'activity' ? (
+                    <ActivityTab activity={activity} />
+                ) : null}
 
                 <footer className="mt-2 border-t border-border pt-4">
                     <div className="flex flex-wrap items-center justify-between gap-3 pb-1">

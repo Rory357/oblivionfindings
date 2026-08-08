@@ -1,8 +1,11 @@
 import { Badge } from '@/components/ui/badge';
-import { FileEdit, Send, RotateCcw, CheckCircle2, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { CheckCircle2, FileEdit, RotateCcw, Send, XCircle } from 'lucide-react';
 
-const config: Record<string, { label: string; className: string; icon: LucideIcon }> = {
+const config: Record<
+    string,
+    { label: string; className: string; icon: LucideIcon }
+> = {
     draft: {
         label: 'Draft',
         className: 'border-border text-muted-foreground bg-muted',
@@ -10,22 +13,26 @@ const config: Record<string, { label: string; className: string; icon: LucideIco
     },
     submitted: {
         label: 'Submitted',
-        className: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         icon: Send,
     },
     returned: {
         label: 'Returned',
-        className: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         icon: RotateCcw,
     },
     approved: {
         label: 'Approved',
-        className: 'border-status-success/30 text-status-success bg-status-success-bg',
+        className:
+            'border-status-success/30 text-status-success bg-status-success-bg',
         icon: CheckCircle2,
     },
     rejected: {
         label: 'Rejected',
-        className: 'border-status-critical/30 text-status-critical bg-status-critical-bg',
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical-bg',
         icon: XCircle,
     },
 };
@@ -36,8 +43,16 @@ interface TimesheetStatusBadgeProps {
     className?: string;
 }
 
-export function TimesheetStatusBadge({ status, showIcon = false, className = '' }: TimesheetStatusBadgeProps) {
-    const c = config[status] ?? { label: status, className: '', icon: FileEdit };
+export function TimesheetStatusBadge({
+    status,
+    showIcon = false,
+    className = '',
+}: TimesheetStatusBadgeProps) {
+    const c = config[status] ?? {
+        label: status,
+        className: '',
+        icon: FileEdit,
+    };
     const Icon = c.icon;
 
     return (

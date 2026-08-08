@@ -42,15 +42,24 @@ const PLAN_TYPE_CONFIG: Record<
     { label: string; icon: typeof PiggyBank; accent: string }
 > = {
     kiwisaver: { label: 'KiwiSaver', icon: PiggyBank, accent: '#10b981' },
-    health_insurance: { label: 'Health Insurance', icon: Shield, accent: '#0ea5e9' },
-    life_insurance: { label: 'Life Insurance', icon: HeartHandshake, accent: '#8b5cf6' },
+    health_insurance: {
+        label: 'Health Insurance',
+        icon: Shield,
+        accent: '#0ea5e9',
+    },
+    life_insurance: {
+        label: 'Life Insurance',
+        icon: HeartHandshake,
+        accent: '#8b5cf6',
+    },
     other: { label: 'Other benefit', icon: Sparkles, accent: '#f59e0b' },
 };
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
     active: {
         label: 'Active',
-        className: 'border-status-success/30 bg-status-success-bg text-status-success',
+        className:
+            'border-status-success/30 bg-status-success-bg text-status-success',
     },
     opted_out: {
         label: 'Opted out',
@@ -58,11 +67,13 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
     },
     suspended: {
         label: 'Suspended',
-        className: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+        className:
+            'border-status-warning/30 bg-status-warning-bg text-status-warning',
     },
     terminated: {
         label: 'Ended',
-        className: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
+        className:
+            'border-status-critical/30 bg-status-critical-bg text-status-critical',
     },
 };
 
@@ -88,7 +99,8 @@ export default function MyBenefits({ myHr, enrolments = [] }: Props) {
                     My benefits
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                    {enrolments.length} enrolment{enrolments.length !== 1 ? 's' : ''}
+                    {enrolments.length} enrolment
+                    {enrolments.length !== 1 ? 's' : ''}
                 </p>
             </div>
 
@@ -97,10 +109,13 @@ export default function MyBenefits({ myHr, enrolments = [] }: Props) {
                     <CardContent className="flex flex-col items-center gap-3 py-12">
                         <HeartHandshake className="h-10 w-10 text-muted-foreground/30" />
                         <div className="text-center">
-                            <p className="font-medium">No benefit enrolments yet</p>
+                            <p className="font-medium">
+                                No benefit enrolments yet
+                            </p>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                KiwiSaver and other benefits will appear here once HR
-                                enrols you. Questions? Contact your HR team.
+                                KiwiSaver and other benefits will appear here
+                                once HR enrols you. Questions? Contact your HR
+                                team.
                             </p>
                         </div>
                     </CardContent>
@@ -109,9 +124,11 @@ export default function MyBenefits({ myHr, enrolments = [] }: Props) {
                 <div className="space-y-3">
                     {enrolments.map((e) => {
                         const config =
-                            PLAN_TYPE_CONFIG[e.plan_type] ?? PLAN_TYPE_CONFIG.other;
+                            PLAN_TYPE_CONFIG[e.plan_type] ??
+                            PLAN_TYPE_CONFIG.other;
                         const Icon = config.icon;
-                        const status = STATUS_BADGE[e.status] ?? STATUS_BADGE.active;
+                        const status =
+                            STATUS_BADGE[e.status] ?? STATUS_BADGE.active;
 
                         return (
                             <Card
@@ -141,7 +158,9 @@ export default function MyBenefits({ myHr, enrolments = [] }: Props) {
                                                         {e.plan_name}
                                                     </h3>
                                                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                                                        <span>{config.label}</span>
+                                                        <span>
+                                                            {config.label}
+                                                        </span>
                                                         {e.provider ? (
                                                             <span className="flex items-center gap-1">
                                                                 <Building2 className="h-3 w-3" />
@@ -165,32 +184,46 @@ export default function MyBenefits({ myHr, enrolments = [] }: Props) {
                                             ) : null}
 
                                             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-                                                {e.employee_contribution_rate !== null ? (
+                                                {e.employee_contribution_rate !==
+                                                null ? (
                                                     <span className="flex items-center gap-1">
                                                         <Percent className="h-3 w-3" />
                                                         You contribute{' '}
                                                         <span className="font-semibold text-foreground">
-                                                            {e.employee_contribution_rate}%
+                                                            {
+                                                                e.employee_contribution_rate
+                                                            }
+                                                            %
                                                         </span>
                                                     </span>
                                                 ) : null}
-                                                {e.employer_contribution_rate !== null ? (
+                                                {e.employer_contribution_rate !==
+                                                null ? (
                                                     <span className="flex items-center gap-1">
                                                         <Percent className="h-3 w-3" />
                                                         Employer contributes{' '}
                                                         <span className="font-semibold text-foreground">
-                                                            {e.employer_contribution_rate}%
+                                                            {
+                                                                e.employer_contribution_rate
+                                                            }
+                                                            %
                                                         </span>
                                                     </span>
                                                 ) : null}
                                                 <span className="flex items-center gap-1">
                                                     <Calendar className="h-3 w-3" />
-                                                    Since {formatDate(e.enrollment_date)}
+                                                    Since{' '}
+                                                    {formatDate(
+                                                        e.enrollment_date,
+                                                    )}
                                                 </span>
                                                 {e.opt_out_date ? (
                                                     <span className="flex items-center gap-1">
                                                         <Calendar className="h-3 w-3" />
-                                                        Opted out {formatDate(e.opt_out_date)}
+                                                        Opted out{' '}
+                                                        {formatDate(
+                                                            e.opt_out_date,
+                                                        )}
                                                     </span>
                                                 ) : null}
                                             </div>
@@ -204,8 +237,8 @@ export default function MyBenefits({ myHr, enrolments = [] }: Props) {
             )}
 
             <p className="mt-4 text-xs text-muted-foreground">
-                Benefits are read-only here — to change a contribution rate or opt
-                in/out, contact your HR team.
+                Benefits are read-only here — to change a contribution rate or
+                opt in/out, contact your HR team.
             </p>
         </MyHrShell>
     );

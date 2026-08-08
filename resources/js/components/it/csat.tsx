@@ -16,7 +16,13 @@ import { toast } from 'sonner';
 const LIT = { color: 'var(--status-warning)', fill: 'var(--status-warning)' };
 
 /** Read-only star row for a score already given (the rail / row chip). */
-export function CsatStars({ score, size = 'h-4 w-4' }: { score: number; size?: string }) {
+export function CsatStars({
+    score,
+    size = 'h-4 w-4',
+}: {
+    score: number;
+    size?: string;
+}) {
     return (
         <span
             className="inline-flex items-center gap-0.5"
@@ -27,7 +33,9 @@ export function CsatStars({ score, size = 'h-4 w-4' }: { score: number; size?: s
                 <Star
                     key={n}
                     aria-hidden
-                    className={n <= score ? size : `${size} text-muted-foreground/40`}
+                    className={
+                        n <= score ? size : `${size} text-muted-foreground/40`
+                    }
                     style={n <= score ? LIT : undefined}
                 />
             ))}
@@ -71,7 +79,8 @@ export function CsatRater({
                     if (picked === 5) fireConfetti();
                     onDone?.();
                 },
-                onError: () => toast.error('Could not save your rating — try again.'),
+                onError: () =>
+                    toast.error('Could not save your rating — try again.'),
                 onFinish: () => setSaving(false),
             },
         );
@@ -100,7 +109,11 @@ export function CsatRater({
                         className="rounded p-0.5 transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none motion-reduce:transition-none motion-reduce:hover:scale-100"
                     >
                         <Star
-                            className={n <= shown ? 'h-6 w-6' : 'h-6 w-6 text-muted-foreground/40'}
+                            className={
+                                n <= shown
+                                    ? 'h-6 w-6'
+                                    : 'h-6 w-6 text-muted-foreground/40'
+                            }
                             style={n <= shown ? LIT : undefined}
                         />
                     </button>

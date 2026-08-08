@@ -2,8 +2,19 @@
  * banner (rostering week-stepper idiom) with a calendar popover; colours are
  * semantic tokens throughout. */
 import { cn } from '@/lib/utils';
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import {
+    CalendarDays,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+} from 'lucide-react';
+import {
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+    type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 /** Parse a Y-m-d string into a local Date without timezone surprises. */
@@ -92,7 +103,8 @@ export function DayPickerChip({
         if (!open) return;
         const onDown = (e: MouseEvent) => {
             const t = e.target as Node;
-            if (btnRef.current?.contains(t) || popRef.current?.contains(t)) return;
+            if (btnRef.current?.contains(t) || popRef.current?.contains(t))
+                return;
             setOpen(false);
         };
         const onKey = (e: KeyboardEvent) => {
@@ -146,7 +158,11 @@ export function DayPickerChip({
                 aria-expanded={open}
                 onClick={() => {
                     setMonth(
-                        new Date(selected.getFullYear(), selected.getMonth(), 1),
+                        new Date(
+                            selected.getFullYear(),
+                            selected.getMonth(),
+                            1,
+                        ),
                     );
                     setOpen((v) => !v);
                 }}
@@ -182,7 +198,9 @@ export function DayPickerChip({
                               >
                                   <ChevronLeft className="h-4 w-4" />
                               </button>
-                              <span className="text-sm font-bold">{monthLabel}</span>
+                              <span className="text-sm font-bold">
+                                  {monthLabel}
+                              </span>
                               <button
                                   type="button"
                                   aria-label="Next month"
@@ -230,12 +248,16 @@ export function DayPickerChip({
                                                   key={d}
                                                   type="button"
                                                   aria-current={
-                                                      isSelected ? 'date' : undefined
+                                                      isSelected
+                                                          ? 'date'
+                                                          : undefined
                                                   }
                                                   onClick={() => {
                                                       setOpen(false);
                                                       if (!isSelected)
-                                                          onPick(toYmd(cellDate));
+                                                          onPick(
+                                                              toYmd(cellDate),
+                                                          );
                                                   }}
                                                   className={cn(
                                                       'grid h-8 place-items-center rounded-md text-[13px] tabular-nums transition-colors',
@@ -246,7 +268,10 @@ export function DayPickerChip({
                                                           isPast &&
                                                           'text-muted-foreground',
                                                       !isSelected &&
-                                                          sameDay(cellDate, today) &&
+                                                          sameDay(
+                                                              cellDate,
+                                                              today,
+                                                          ) &&
                                                           'font-bold text-primary',
                                                   )}
                                               >

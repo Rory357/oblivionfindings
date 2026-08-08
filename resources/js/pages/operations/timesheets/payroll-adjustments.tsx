@@ -34,7 +34,10 @@ type Props = {
     };
 };
 
-function formatChanges(original: Record<string, unknown>, proposed: Record<string, unknown>): string {
+function formatChanges(
+    original: Record<string, unknown>,
+    proposed: Record<string, unknown>,
+): string {
     const parts: string[] = [];
     for (const key of Object.keys(proposed)) {
         const from = original[key] ?? '(empty)';
@@ -48,12 +51,20 @@ function formatChanges(original: Record<string, unknown>, proposed: Record<strin
 
 export default function PayrollAdjustmentsPending({ amendments }: Props) {
     const handleMarkProcessed = (amendmentId: number) => {
-        if (!confirm('Mark this payroll adjustment as processed? This confirms the correction has been applied in your payroll system.')) {
+        if (
+            !confirm(
+                'Mark this payroll adjustment as processed? This confirms the correction has been applied in your payroll system.',
+            )
+        ) {
             return;
         }
-        router.post(`/operations/timesheets/amendments/${amendmentId}/mark-processed`, {}, {
-            preserveScroll: true,
-        });
+        router.post(
+            `/operations/timesheets/amendments/${amendmentId}/mark-processed`,
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
     };
 
     return (
@@ -65,7 +76,9 @@ export default function PayrollAdjustmentsPending({ amendments }: Props) {
             >
                 {amendments.data.length === 0 ? (
                     <EmptyList
-                        icon={<Check className="h-10 w-10 text-status-success" />}
+                        icon={
+                            <Check className="h-10 w-10 text-status-success" />
+                        }
                         title="No pending payroll adjustments"
                         heading="No pending payroll adjustments"
                         description="All approved amendments have been processed."
@@ -73,48 +86,98 @@ export default function PayrollAdjustmentsPending({ amendments }: Props) {
                 ) : (
                     <div className="space-y-4">
                         <div className="text-sm text-muted-foreground">
-                            {amendments.total} adjustment{amendments.total !== 1 ? 's' : ''} pending payroll processing
+                            {amendments.total} adjustment
+                            {amendments.total !== 1 ? 's' : ''} pending payroll
+                            processing
                         </div>
 
                         <div className="overflow-x-auto rounded-lg border">
                             <table className="w-full text-sm">
                                 <thead className="border-b bg-muted/50">
                                     <tr>
-                                        <th className="px-4 py-3 text-left font-medium">Staff</th>
-                                        <th className="px-4 py-3 text-left font-medium">Work Date</th>
-                                        <th className="px-4 py-3 text-left font-medium">Site</th>
-                                        <th className="px-4 py-3 text-left font-medium">Changes</th>
-                                        <th className="px-4 py-3 text-left font-medium">Reason</th>
-                                        <th className="px-4 py-3 text-left font-medium">Approved</th>
-                                        <th className="px-4 py-3 text-left font-medium">Payroll Ref</th>
-                                        <th className="px-4 py-3 text-right font-medium">Actions</th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Staff
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Work Date
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Site
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Changes
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Reason
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Approved
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Payroll Ref
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Actions
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
                                     {amendments.data.map((a) => (
-                                        <tr key={a.id} className="hover:bg-muted/30">
-                                            <td className="px-4 py-3 font-medium">{a.staff_name}</td>
-                                            <td className="px-4 py-3 text-muted-foreground">{a.work_date ?? '-'}</td>
-                                            <td className="px-4 py-3 text-muted-foreground">{a.site_name || '-'}</td>
-                                            <td className="max-w-xs truncate px-4 py-3 text-xs text-muted-foreground">
-                                                {formatChanges(a.original_values ?? {}, a.proposed_values ?? {})}
+                                        <tr
+                                            key={a.id}
+                                            className="hover:bg-muted/30"
+                                        >
+                                            <td className="px-4 py-3 font-medium">
+                                                {a.staff_name}
                                             </td>
-                                            <td className="max-w-[200px] truncate px-4 py-3 text-xs">{a.reason || '-'}</td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {a.work_date ?? '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {a.site_name || '-'}
+                                            </td>
+                                            <td className="max-w-xs truncate px-4 py-3 text-xs text-muted-foreground">
+                                                {formatChanges(
+                                                    a.original_values ?? {},
+                                                    a.proposed_values ?? {},
+                                                )}
+                                            </td>
+                                            <td className="max-w-[200px] truncate px-4 py-3 text-xs">
+                                                {a.reason || '-'}
+                                            </td>
                                             <td className="px-4 py-3 text-xs text-muted-foreground">
-                                                {a.reviewed_at ? new Date(a.reviewed_at).toLocaleDateString() : '-'}
-                                                {a.reviewed_by ? ` by ${a.reviewed_by}` : ''}
+                                                {a.reviewed_at
+                                                    ? new Date(
+                                                          a.reviewed_at,
+                                                      ).toLocaleDateString()
+                                                    : '-'}
+                                                {a.reviewed_by
+                                                    ? ` by ${a.reviewed_by}`
+                                                    : ''}
                                             </td>
                                             <td className="px-4 py-3">
                                                 {a.payroll_reference ? (
-                                                    <Badge variant="outline">{a.payroll_reference}</Badge>
+                                                    <Badge variant="outline">
+                                                        {a.payroll_reference}
+                                                    </Badge>
                                                 ) : (
-                                                    <span className="text-xs text-muted-foreground">-</span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        -
+                                                    </span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <Button variant="ghost" size="sm" asChild>
-                                                        <Link href={a.timesheet_url}>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={
+                                                                a.timesheet_url
+                                                            }
+                                                        >
                                                             <ExternalLink className="mr-1 h-3.5 w-3.5" />
                                                             View
                                                         </Link>
@@ -122,7 +185,11 @@ export default function PayrollAdjustmentsPending({ amendments }: Props) {
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => handleMarkProcessed(a.id)}
+                                                        onClick={() =>
+                                                            handleMarkProcessed(
+                                                                a.id,
+                                                            )
+                                                        }
                                                     >
                                                         <Check className="mr-1 h-3.5 w-3.5" />
                                                         Processed
@@ -140,11 +207,17 @@ export default function PayrollAdjustmentsPending({ amendments }: Props) {
                                 {amendments.links.map((link, i) => (
                                     <Button
                                         key={i}
-                                        variant={link.active ? 'default' : 'outline'}
+                                        variant={
+                                            link.active ? 'default' : 'outline'
+                                        }
                                         size="sm"
                                         disabled={!link.url}
-                                        onClick={() => link.url && router.visit(link.url)}
-                                        dangerouslySetInnerHTML={{ __html: link.label }}
+                                        onClick={() =>
+                                            link.url && router.visit(link.url)
+                                        }
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label,
+                                        }}
                                     />
                                 ))}
                             </div>

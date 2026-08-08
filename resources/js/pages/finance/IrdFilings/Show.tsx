@@ -1,13 +1,13 @@
+import { ConfirmDialog, formatMoney } from '@/components/finance';
+import { PageHero, PageLayout } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { useState } from 'react';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle, FileText, Send, Shield } from 'lucide-react';
-import { ConfirmDialog, formatMoney } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
+import { useState } from 'react';
 
 type GstReturn = {
     id: number;
@@ -40,7 +40,11 @@ type PageProps = {
 };
 
 const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(dateStr).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 
 const formatDateTime = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', {
@@ -93,7 +97,8 @@ export default function IrdFilingShow({ filing }: PageProps) {
     ];
 
     const canValidate = filing.status === 'draft';
-    const canSubmit = filing.status === 'validated' || filing.status === 'error';
+    const canSubmit =
+        filing.status === 'validated' || filing.status === 'error';
     const amount = Number(filing.total_amount);
     const isRefund = amount < 0;
 
@@ -105,31 +110,40 @@ export default function IrdFilingShow({ filing }: PageProps) {
     }
 
     function handleSubmit() {
-        router.post(`/finance/ird-filings/${filing.id}/submit`, {}, {
-            onStart: () => setSubmitting(true),
-            onFinish: () => setSubmitting(false),
-            onSuccess: () => setConfirmSubmit(false),
-        });
+        router.post(
+            `/finance/ird-filings/${filing.id}/submit`,
+            {},
+            {
+                onStart: () => setSubmitting(true),
+                onFinish: () => setSubmitting(false),
+                onSuccess: () => setConfirmSubmit(false),
+            },
+        );
     }
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`IRD Filing - ${filingTypeLabels[filing.filing_type]}`} />
+            <Head
+                title={`IRD Filing - ${filingTypeLabels[filing.filing_type]}`}
+            />
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/ird-filings"
                         title={
                             <span className="flex flex-wrap items-center gap-3">
-                                {filingTypeLabels[filing.filing_type] ?? filing.filing_type}
+                                {filingTypeLabels[filing.filing_type] ??
+                                    filing.filing_type}
                                 <StatusBadge status={filing.status} />
                             </span>
                         }
                         description={
                             <>
-                                {formatDate(filing.period_from)} &ndash; {formatDate(filing.period_to)}
+                                {formatDate(filing.period_from)} &ndash;{' '}
+                                {formatDate(filing.period_to)}
                                 {filing.created_by && (
                                     <span className="mt-1 block text-sm">
                                         Created by {filing.created_by.name}
@@ -140,13 +154,18 @@ export default function IrdFilingShow({ filing }: PageProps) {
                         actions={
                             <>
                                 {canValidate && (
-                                    <Button variant="outline" onClick={handleValidate}>
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleValidate}
+                                    >
                                         <CheckCircle className="mr-2 h-4 w-4" />
                                         Validate
                                     </Button>
                                 )}
                                 {canSubmit && (
-                                    <Button onClick={() => setConfirmSubmit(true)}>
+                                    <Button
+                                        onClick={() => setConfirmSubmit(true)}
+                                    >
                                         <Send className="mr-2 h-4 w-4" />
                                         Submit to IRD
                                     </Button>
@@ -160,10 +179,14 @@ export default function IrdFilingShow({ filing }: PageProps) {
                 {filing.error_message && (
                     <Card className="border-destructive/50 bg-destructive/5">
                         <CardContent className="flex items-start gap-3 py-4">
-                            <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
                             <div>
-                                <p className="font-medium text-destructive">Submission Error</p>
-                                <p className="text-sm text-destructive/80">{filing.error_message}</p>
+                                <p className="font-medium text-destructive">
+                                    Submission Error
+                                </p>
+                                <p className="text-sm text-destructive/80">
+                                    {filing.error_message}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -173,13 +196,22 @@ export default function IrdFilingShow({ filing }: PageProps) {
                 {filing.submitted_at && (
                     <Card className="border-status-success/30 bg-status-success">
                         <CardContent className="flex items-start gap-3 py-4">
-                            <CheckCircle className="h-5 w-5 text-status-success shrink-0 mt-0.5" />
+                            <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-success" />
                             <div>
-                                <p className="font-medium text-status-success dark:text-status-success">Submitted to IRD</p>
+                                <p className="font-medium text-status-success dark:text-status-success">
+                                    Submitted to IRD
+                                </p>
                                 <p className="text-sm text-status-success dark:text-status-success">
-                                    Submitted on {formatDateTime(filing.submitted_at)}
+                                    Submitted on{' '}
+                                    {formatDateTime(filing.submitted_at)}
                                     {filing.ird_reference && (
-                                        <> | Reference: <span className="font-mono">{filing.ird_reference}</span></>
+                                        <>
+                                            {' '}
+                                            | Reference:{' '}
+                                            <span className="font-mono">
+                                                {filing.ird_reference}
+                                            </span>
+                                        </>
                                     )}
                                 </p>
                             </div>
@@ -198,27 +230,42 @@ export default function IrdFilingShow({ filing }: PageProps) {
                     <CardContent>
                         <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
                             <div>
-                                <p className="text-sm text-muted-foreground">Filing Type</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Filing Type
+                                </p>
                                 <p className="font-medium">
-                                    {filingTypeLabels[filing.filing_type] ?? filing.filing_type}
+                                    {filingTypeLabels[filing.filing_type] ??
+                                        filing.filing_type}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Period</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Period
+                                </p>
                                 <p className="font-medium">
-                                    {formatDate(filing.period_from)} &ndash; {formatDate(filing.period_to)}
+                                    {formatDate(filing.period_from)} &ndash;{' '}
+                                    {formatDate(filing.period_to)}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Amount</p>
-                                <p className={`font-mono font-semibold tabular-nums ${isRefund ? 'text-status-success' : 'text-status-critical'}`}>
+                                <p className="text-sm text-muted-foreground">
+                                    Amount
+                                </p>
+                                <p
+                                    className={`font-mono font-semibold tabular-nums ${isRefund ? 'text-status-success' : 'text-status-critical'}`}
+                                >
                                     {formatMoney(Math.abs(amount))}
                                     {isRefund ? ' (Refund)' : ''}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">IRD Reference</p>
-                                <p className="font-mono">{filing.ird_reference ?? 'Not yet submitted'}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    IRD Reference
+                                </p>
+                                <p className="font-mono">
+                                    {filing.ird_reference ??
+                                        'Not yet submitted'}
+                                </p>
                             </div>
                         </div>
                     </CardContent>
@@ -240,42 +287,70 @@ export default function IrdFilingShow({ filing }: PageProps) {
                             <div className="space-y-6">
                                 {/* Monetary Fields */}
                                 <div>
-                                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                                    <h3 className="mb-3 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
                                         Return Data
                                     </h3>
                                     <div className="space-y-2">
                                         {Object.entries(filing.filing_data)
-                                            .filter(([key]) => key in filingDataLabels)
+                                            .filter(
+                                                ([key]) =>
+                                                    key in filingDataLabels,
+                                            )
                                             .map(([key, value]) => {
                                                 const isMonetary = [
-                                                    'total_sales', 'zero_rated_supplies', 'taxable_sales',
-                                                    'gst_collected', 'output_adjustments', 'total_gst_collected',
-                                                    'total_purchases', 'gst_paid', 'input_adjustments',
-                                                    'total_gst_credit', 'gst_payable',
+                                                    'total_sales',
+                                                    'zero_rated_supplies',
+                                                    'taxable_sales',
+                                                    'gst_collected',
+                                                    'output_adjustments',
+                                                    'total_gst_collected',
+                                                    'total_purchases',
+                                                    'gst_paid',
+                                                    'input_adjustments',
+                                                    'total_gst_credit',
+                                                    'gst_payable',
                                                 ].includes(key);
 
-                                                const isHighlight = key === 'gst_payable';
+                                                const isHighlight =
+                                                    key === 'gst_payable';
 
                                                 return (
                                                     <div
                                                         key={key}
                                                         className={`flex items-center justify-between rounded-lg border p-3 ${
-                                                            isHighlight ? 'border-primary bg-primary/5' : ''
+                                                            isHighlight
+                                                                ? 'border-primary bg-primary/5'
+                                                                : ''
                                                         }`}
                                                     >
                                                         <span className="text-sm text-foreground">
-                                                            {filingDataLabels[key] ?? key}
+                                                            {filingDataLabels[
+                                                                key
+                                                            ] ?? key}
                                                         </span>
-                                                        <span className={`font-mono text-sm tabular-nums ${
-                                                            isHighlight ? 'font-semibold' : ''
-                                                        } ${
-                                                            isMonetary && isHighlight
-                                                                ? Number(value) >= 0
-                                                                    ? 'text-status-critical'
-                                                                    : 'text-status-success'
-                                                                : ''
-                                                        }`}>
-                                                            {isMonetary ? formatMoney(Number(value)) : String(value)}
+                                                        <span
+                                                            className={`font-mono text-sm tabular-nums ${
+                                                                isHighlight
+                                                                    ? 'font-semibold'
+                                                                    : ''
+                                                            } ${
+                                                                isMonetary &&
+                                                                isHighlight
+                                                                    ? Number(
+                                                                          value,
+                                                                      ) >= 0
+                                                                        ? 'text-status-critical'
+                                                                        : 'text-status-success'
+                                                                    : ''
+                                                            }`}
+                                                        >
+                                                            {isMonetary
+                                                                ? formatMoney(
+                                                                      Number(
+                                                                          value,
+                                                                      ),
+                                                                  )
+                                                                : String(value)}
                                                         </span>
                                                     </div>
                                                 );
@@ -284,7 +359,9 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                 </div>
                             </div>
                         ) : (
-                            <p className="py-4 text-center text-muted-foreground">No filing data available.</p>
+                            <p className="py-4 text-center text-muted-foreground">
+                                No filing data available.
+                            </p>
                         )}
                     </CardContent>
                 </Card>
@@ -297,17 +374,21 @@ export default function IrdFilingShow({ filing }: PageProps) {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                {Object.entries(filing.ird_response).map(([key, value]) => (
-                                    <div
-                                        key={key}
-                                        className="flex items-center justify-between rounded-lg border p-3"
-                                    >
-                                        <span className="text-sm capitalize text-foreground">
-                                            {key.replace(/_/g, ' ')}
-                                        </span>
-                                        <span className="font-mono text-sm">{String(value)}</span>
-                                    </div>
-                                ))}
+                                {Object.entries(filing.ird_response).map(
+                                    ([key, value]) => (
+                                        <div
+                                            key={key}
+                                            className="flex items-center justify-between rounded-lg border p-3"
+                                        >
+                                            <span className="text-sm text-foreground capitalize">
+                                                {key.replace(/_/g, ' ')}
+                                            </span>
+                                            <span className="font-mono text-sm">
+                                                {String(value)}
+                                            </span>
+                                        </div>
+                                    ),
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -323,19 +404,33 @@ export default function IrdFilingShow({ filing }: PageProps) {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="font-medium">
-                                        Period: {formatDate(filing.gst_return.period_start)} &ndash;{' '}
-                                        {formatDate(filing.gst_return.period_end)}
+                                        Period:{' '}
+                                        {formatDate(
+                                            filing.gst_return.period_start,
+                                        )}{' '}
+                                        &ndash;{' '}
+                                        {formatDate(
+                                            filing.gst_return.period_end,
+                                        )}
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                        IRD Period: {filing.gst_return.ird_period} | GST Payable:{' '}
-                                        {formatMoney(Number(filing.gst_return.gst_payable))}
+                                        IRD Period:{' '}
+                                        {filing.gst_return.ird_period} | GST
+                                        Payable:{' '}
+                                        {formatMoney(
+                                            Number(
+                                                filing.gst_return.gst_payable,
+                                            ),
+                                        )}
                                     </p>
                                 </div>
                                 <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() =>
-                                        router.visit(`/finance/gst-returns/${filing.gst_return!.id}`)
+                                        router.visit(
+                                            `/finance/gst-returns/${filing.gst_return!.id}`,
+                                        )
                                     }
                                 >
                                     View Return

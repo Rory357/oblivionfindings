@@ -1,10 +1,10 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { BarChart3, Home, Building2, Warehouse } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link } from '@inertiajs/react';
+import { BarChart3, Building2, Home, Warehouse } from 'lucide-react';
 
 type Site = {
     id: number;
@@ -20,13 +20,14 @@ type Props = {
 const typeColors = {
     head_office: 'bg-status-info-bg text-status-info border-status-info/30',
     house: 'bg-status-success-bg text-status-success border-status-success/30',
-    facility: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    facility:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 export default function SiteReportsIndex({ sites }: Props) {
-    const houseCount = sites.filter(s => s.type === 'house').length;
-    const facilityCount = sites.filter(s => s.type === 'facility').length;
-    const officeCount = sites.filter(s => s.type === 'head_office').length;
+    const houseCount = sites.filter((s) => s.type === 'house').length;
+    const facilityCount = sites.filter((s) => s.type === 'facility').length;
+    const officeCount = sites.filter((s) => s.type === 'head_office').length;
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Reports', href: '/sites/reports' }]}>
@@ -50,23 +51,29 @@ export default function SiteReportsIndex({ sites }: Props) {
                 {/* Report Packs */}
                 <div className="grid gap-4 sm:grid-cols-3">
                     {/* Houses Report Pack */}
-                    <Card className="hover:bg-muted/50 transition-colors">
+                    <Card className="transition-colors hover:bg-muted/50">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Home className="w-5 h-5 text-status-success" />
-                                    <CardTitle className="text-base">Houses</CardTitle>
+                                    <Home className="h-5 w-5 text-status-success" />
+                                    <CardTitle className="text-base">
+                                        Houses
+                                    </CardTitle>
                                 </div>
-                                <Badge variant="outline" className={typeColors.house}>
+                                <Badge
+                                    variant="outline"
+                                    className={typeColors.house}
+                                >
                                     {houseCount} sites
                                 </Badge>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <p className="text-sm text-muted-foreground">
-                                Quality home checks, bedroom occupancy, hazard trends, and maintenance reports.
+                                Quality home checks, bedroom occupancy, hazard
+                                trends, and maintenance reports.
                             </p>
-                            <ul className="text-sm space-y-1 text-muted-foreground">
+                            <ul className="space-y-1 text-sm text-muted-foreground">
                                 <li>- Hazards by severity & time-to-close</li>
                                 <li>- Checklist compliance rates</li>
                                 <li>- Bedroom occupancy reports</li>
@@ -81,23 +88,29 @@ export default function SiteReportsIndex({ sites }: Props) {
                     </Card>
 
                     {/* Facilities Report Pack */}
-                    <Card className="hover:bg-muted/50 transition-colors">
+                    <Card className="transition-colors hover:bg-muted/50">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Warehouse className="w-5 h-5 text-status-warning" />
-                                    <CardTitle className="text-base">Facilities</CardTitle>
+                                    <Warehouse className="h-5 w-5 text-status-warning" />
+                                    <CardTitle className="text-base">
+                                        Facilities
+                                    </CardTitle>
                                 </div>
-                                <Badge variant="outline" className={typeColors.facility}>
+                                <Badge
+                                    variant="outline"
+                                    className={typeColors.facility}
+                                >
                                     {facilityCount} sites
                                 </Badge>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <p className="text-sm text-muted-foreground">
-                                Equipment-focused safety reports, zone utilization, and facility compliance.
+                                Equipment-focused safety reports, zone
+                                utilization, and facility compliance.
                             </p>
-                            <ul className="text-sm space-y-1 text-muted-foreground">
+                            <ul className="space-y-1 text-sm text-muted-foreground">
                                 <li>- Equipment hazard register</li>
                                 <li>- Safety walkthrough compliance</li>
                                 <li>- Equipment condition summary</li>
@@ -112,23 +125,29 @@ export default function SiteReportsIndex({ sites }: Props) {
                     </Card>
 
                     {/* Head Office Report Pack */}
-                    <Card className="hover:bg-muted/50 transition-colors">
+                    <Card className="transition-colors hover:bg-muted/50">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Building2 className="w-5 h-5 text-status-info" />
-                                    <CardTitle className="text-base">Head Office</CardTitle>
+                                    <Building2 className="h-5 w-5 text-status-info" />
+                                    <CardTitle className="text-base">
+                                        Head Office
+                                    </CardTitle>
                                 </div>
-                                <Badge variant="outline" className={typeColors.head_office}>
+                                <Badge
+                                    variant="outline"
+                                    className={typeColors.head_office}
+                                >
                                     {officeCount} sites
                                 </Badge>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <p className="text-sm text-muted-foreground">
-                                Room booking utilization, safety compliance, and IT asset reports.
+                                Room booking utilization, safety compliance, and
+                                IT asset reports.
                             </p>
-                            <ul className="text-sm space-y-1 text-muted-foreground">
+                            <ul className="space-y-1 text-sm text-muted-foreground">
                                 <li>- Room booking utilization</li>
                                 <li>- Safety & facilities compliance</li>
                                 <li>- IT/Network asset summary</li>
@@ -146,25 +165,43 @@ export default function SiteReportsIndex({ sites }: Props) {
                 {/* Quick Stats */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-sm">All Sites Overview</CardTitle>
+                        <CardTitle className="text-sm">
+                            All Sites Overview
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-4 sm:grid-cols-4">
                             <div className="text-center">
-                                <div className="text-2xl font-bold">{sites.length}</div>
-                                <div className="text-sm text-muted-foreground">Total Sites</div>
+                                <div className="text-2xl font-bold">
+                                    {sites.length}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Total Sites
+                                </div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-status-success">{houseCount}</div>
-                                <div className="text-sm text-muted-foreground">Houses</div>
+                                <div className="text-2xl font-bold text-status-success">
+                                    {houseCount}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Houses
+                                </div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-status-warning">{facilityCount}</div>
-                                <div className="text-sm text-muted-foreground">Facilities</div>
+                                <div className="text-2xl font-bold text-status-warning">
+                                    {facilityCount}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Facilities
+                                </div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-status-info">{officeCount}</div>
-                                <div className="text-sm text-muted-foreground">Head Offices</div>
+                                <div className="text-2xl font-bold text-status-info">
+                                    {officeCount}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Head Offices
+                                </div>
                             </div>
                         </div>
                     </CardContent>

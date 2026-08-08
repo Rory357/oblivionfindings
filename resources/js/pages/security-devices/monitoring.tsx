@@ -10,6 +10,11 @@ import {
     type NativeMonitorManagement,
     type NativeMonitorTarget,
 } from '@/components/security-devices/native-monitor-dialogs';
+import {
+    ControlRoomAlertAccessRequired,
+    ControlRoomDestination,
+    type ControlRoomAlertAccess,
+} from '@/components/security-devices/permission-destinations';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -62,8 +67,9 @@ export type MonitorRow = {
         control_room: {
             id: number;
             reference: string | null;
-            status: string;
-            href: string;
+            status: string | null;
+            href: string | null;
+            access: ControlRoomAlertAccess;
         } | null;
         it_incident: {
             id: number;
@@ -162,6 +168,9 @@ export type MonitoringWorkspace = {
         description: string;
         privacy_note: string;
         control_room_note: string;
+    };
+    can: {
+        view_control_room: boolean;
     };
     summary: {
         total_devices: number;
@@ -305,6 +314,8 @@ export type MonitoringWorkspace = {
         time_series: {
             state: string;
             series: number;
+            series_shown: number;
+            series_truncated: boolean;
             available: number;
             missing: number;
             unavailable: number;
@@ -681,7 +692,9 @@ export function MonitorCard({
             monitor.correlation?.it_incident ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-muted p-3 text-xs">
                     <span className="font-medium">Operational correlation</span>
-                    {monitor.correlation.control_room ? (
+                    {monitor.correlation.control_room?.href &&
+                    monitor.correlation.control_room.access.state ===
+                        'available' ? (
                         <Link
                             href={monitor.correlation.control_room.href}
                             className="text-primary hover:underline"
@@ -690,6 +703,13 @@ export function MonitorCard({
                             {monitor.correlation.control_room.reference ??
                                 `#${monitor.correlation.control_room.id}`}
                         </Link>
+                    ) : monitor.correlation.control_room ? (
+                        <ControlRoomAlertAccessRequired
+                            label={
+                                monitor.correlation.control_room.access.label
+                            }
+                            className="min-h-0"
+                        />
                     ) : null}
                     {monitor.correlation.it_incident ? (
                         <Link
@@ -759,6 +779,13 @@ function ExternalHistoryCard({
                         {storage.time_series.series} retained series
                     </span>
                 </div>
+                {storage.time_series.series_truncated ? (
+                    <p className="text-sm text-muted-foreground">
+                        Showing the {storage.time_series.series_shown} most
+                        recently active series below. Availability totals cover
+                        all {storage.time_series.series} retained series.
+                    </p>
+                ) : null}
                 {storage.time_series.capacity_evidence.map((series) => (
                     <article
                         key={series.series_id}
@@ -790,6 +817,14 @@ function ExternalHistoryCard({
                                 ? ` · ${series.projection.sample_count} history points · ${Math.round(series.projection.confidence * 100)}% confidence`
                                 : ''}
                         </p>
+                        {series.projection.measured_from &&
+                        series.projection.measured_to ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Measured history:{' '}
+                                {when(series.projection.measured_from)} to{' '}
+                                {when(series.projection.measured_to)}
+                            </p>
+                        ) : null}
                     </article>
                 ))}
                 {storage.retention.policies.map((policy) => (
@@ -1471,12 +1506,9 @@ export default function Monitoring({
                                     Create direct monitor
                                 </Button>
                             ) : null}
-                            <Button asChild variant="outline">
-                                <Link href="/control-room">
-                                    <AlertTriangle className="mr-2 h-4 w-4" />
-                                    Open Control Room
-                                </Link>
-                            </Button>
+                            <ControlRoomDestination
+                                canView={workspace.can.view_control_room}
+                            />
                         </div>
                     }
                 />

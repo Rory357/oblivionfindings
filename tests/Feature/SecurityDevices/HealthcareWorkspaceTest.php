@@ -10,6 +10,7 @@ use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
 use App\Models\Client;
 use App\Models\ItTicket;
 use App\Models\ItTicketLink;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -51,7 +52,7 @@ class HealthcareWorkspaceTest extends TestCase
 
     public function test_overview_reconciles_authorised_client_shared_and_unassigned_healthcare_devices(): void
     {
-        $site = Site::factory()->create(['name' => 'Kauri House']);
+        $site = Site::factory()->create(['name' => 'Kauri House', 'type' => 'house']);
         $client = Client::factory()->create([
 
             'site_id' => $site->id,
@@ -74,6 +75,11 @@ class HealthcareWorkspaceTest extends TestCase
             ->assertInertia(function ($page) use ($unrelatedDevice): void {
                 $healthcare = $page->toArray()['props']['healthcareWorkspace'];
 
+                $this->assertTrue($healthcare['permissions']['clinicalMonitoring']);
+                $this->assertSame(
+                    '/health-clinical/health-monitoring',
+                    $healthcare['boundary']['clinicalHref'],
+                );
                 $this->assertSame([
                     'total' => 4,
                     'client_assigned' => 1,
@@ -306,6 +312,28 @@ class HealthcareWorkspaceTest extends TestCase
             });
     }
 
+    public function test_healthcare_workspace_does_not_offer_clinical_handoff_without_exact_permission(): void
+    {
+        $viewer = $this->viewerWithRole('health_safety_officer');
+
+        $this->assertTrue($viewer->canDo('securityDevices.devices.view'));
+        $this->assertFalse($viewer->canDo('clinical.monitoring.viewAny'));
+
+        $this->actingAs($viewer)
+            ->get('/security-devices/healthcare')
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $healthcare = $page->toArray()['props']['healthcareWorkspace'];
+
+                $this->assertFalse($healthcare['permissions']['clinicalMonitoring']);
+                $this->assertNull($healthcare['boundary']['clinicalHref']);
+            });
+
+        $this->actingAs($viewer)
+            ->get('/health-clinical/health-monitoring')
+            ->assertForbidden();
+    }
+
     public function test_integration_management_does_not_bypass_client_context_permission(): void
     {
         $viewer = $this->viewerWithRole('it_manager');
@@ -357,6 +385,7 @@ class HealthcareWorkspaceTest extends TestCase
         ]);
         $site = Site::factory()->create([
             'name' => 'Kauri House',
+            'type' => 'house',
             'primary_contact_user_id' => $siteLead->id,
         ]);
         $shared = $this->healthcareDevice('Shared occupancy sensor');
@@ -374,11 +403,60 @@ class HealthcareWorkspaceTest extends TestCase
                     'id' => $site->id,
                     'name' => 'Kauri House',
                     'href' => "/sites/{$site->id}",
+                    'access' => [
+                        'state' => 'available',
+                        'label' => 'Open Site profile',
+                    ],
                 ], $row['location']['site']);
                 $this->assertSame('Shared at Kauri House', $row['assignment']['label']);
                 $this->assertSame('Kauri Site Lead', $row['supportContact']['name']);
                 $this->assertSame('site primary contact', $row['supportContact']['role']);
             });
+    }
+
+    public function test_site_profile_destination_requires_both_exact_permission_and_canonical_site_access(): void
+    {
+        $assignedSite = Site::factory()->create();
+        $unrelatedSite = Site::factory()->create(['name' => 'Restricted Healthcare Site']);
+        $device = $this->healthcareDevice('Restricted shared sensor');
+        $this->assign($device, DeviceAssignment::TARGET_SITE, $unrelatedSite->id, 'shared');
+
+        $permissionDenied = $this->viewerWithRole('support_worker');
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $permissionDenied->id,
+            'primary_site_id' => $unrelatedSite->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+        $permissionDenied->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'sites.viewAny')->value('id') => ['allowed' => false],
+        ]);
+
+        $siteDenied = $this->viewerWithRole('support_worker');
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $siteDenied->id,
+            'primary_site_id' => $assignedSite->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+        $siteDenied->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'securityDevices.devices.viewAllSites')->value('id') => ['allowed' => true],
+        ]);
+
+        foreach ([$permissionDenied, $siteDenied] as $viewer) {
+            $this->actingAs($viewer)
+                ->get('/security-devices/healthcare?tab=shared-site-devices')
+                ->assertOk()
+                ->assertInertia(function ($page) use ($device): void {
+                    $row = collect($page->toArray()['props']['healthcareWorkspace']['activeTab']['devices'])
+                        ->firstWhere('id', $device->id);
+
+                    $this->assertSame('Restricted Healthcare Site', $row['location']['site']['name']);
+                    $this->assertSame('restricted', $row['location']['site']['access']['state']);
+                    $this->assertSame('Site profile access required', $row['location']['site']['access']['label']);
+                    $this->assertNull($row['location']['site']['href']);
+                });
+        }
     }
 
     public function test_connectivity_and_data_flow_use_explicit_evidence_and_never_infer_healthy(): void

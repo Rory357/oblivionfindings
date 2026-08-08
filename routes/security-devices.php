@@ -151,10 +151,6 @@ Route::middleware([
         ->middleware('permission:securityDevices.devices.assign')
         ->name('security-devices.devices.release');
 
-    Route::get('/devices/{device}/assignments', [DeviceAssignmentController::class, 'history'])
-        ->middleware('permission:securityDevices.devices.view')
-        ->name('security-devices.devices.assignments');
-
     // ── Device <-> Asset links ───────────────────────────────────
     // Polymorphic: a device can be a primary asset, installed inside an
     // asset (e.g., tracker in a vehicle), or an accessory.

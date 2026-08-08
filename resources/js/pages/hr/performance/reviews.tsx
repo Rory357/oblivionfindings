@@ -1,3 +1,15 @@
+import { PerformanceTabs } from '@/components/hr';
+import {
+    ProbationDialog,
+    type ExistingProbationReview,
+} from '@/components/hr/performance/probation-dialog';
+import {
+    ReviewWizardDialog,
+    type ExistingReview,
+    type ReviewStaff,
+    type ReviewTypeOption,
+} from '@/components/hr/performance/review-wizard-dialog';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,21 +31,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    ProbationDialog,
-    type ExistingProbationReview,
-} from '@/components/hr/performance/probation-dialog';
-import {
-    ReviewWizardDialog,
-    type ExistingReview,
-    type ReviewStaff,
-    type ReviewTypeOption,
-} from '@/components/hr/performance/review-wizard-dialog';
-import { PageHero, PageLayout } from '@/components/page';
-import { PerformanceTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
 import {
     AlertTriangle,
     CheckCircle,
@@ -46,6 +45,7 @@ import {
     TrendingUp,
 } from 'lucide-react';
 import type { ReactElement } from 'react';
+import { useState } from 'react';
 import {
     Bar,
     BarChart,
@@ -243,7 +243,8 @@ export default function PerformanceReviews({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={TrendingUp}
                         title="Performance Reviews"
                         description="Track and manage staff performance reviews."
@@ -251,8 +252,14 @@ export default function PerformanceReviews({
                             stats
                                 ? [
                                       { label: 'Total', value: stats.total },
-                                      { label: 'Completed', value: stats.completed },
-                                      { label: 'Overdue', value: stats.overdue },
+                                      {
+                                          label: 'Completed',
+                                          value: stats.completed,
+                                      },
+                                      {
+                                          label: 'Overdue',
+                                          value: stats.overdue,
+                                      },
                                       { label: 'Drafts', value: stats.draft },
                                   ]
                                 : undefined
@@ -276,7 +283,8 @@ export default function PerformanceReviews({
                                             setCreateOpen(true);
                                         }}
                                     >
-                                        <Plus className="mr-1.5 h-4 w-4" /> New Review
+                                        <Plus className="mr-1.5 h-4 w-4" /> New
+                                        Review
                                     </Button>
                                 )}
                             </>
@@ -731,7 +739,9 @@ export default function PerformanceReviews({
                                             <TableHead>Review #</TableHead>
                                             <TableHead>Date</TableHead>
                                             <TableHead>Status</TableHead>
-                                            <TableHead>Recommendation</TableHead>
+                                            <TableHead>
+                                                Recommendation
+                                            </TableHead>
                                             <TableHead className="w-16"></TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -739,10 +749,12 @@ export default function PerformanceReviews({
                                         {probationReviews.map((pr) => (
                                             <TableRow key={pr.id}>
                                                 <TableCell className="font-medium">
-                                                    {pr.employee?.name ?? 'Unknown'}
+                                                    {pr.employee?.name ??
+                                                        'Unknown'}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {pr.reviewer?.name ?? 'Unknown'}
+                                                    {pr.reviewer?.name ??
+                                                        'Unknown'}
                                                 </TableCell>
                                                 <TableCell>
                                                     #{pr.review_number}

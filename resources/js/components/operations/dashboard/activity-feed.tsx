@@ -17,9 +17,9 @@ import {
 
 import { cn } from '@/lib/utils';
 
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { PulseDot } from './hover-popover';
 import type { ActivityItem } from './types';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 type TypeStyle = {
     icon: LucideIcon;
@@ -40,16 +40,18 @@ const TYPE_STYLES: Record<string, TypeStyle> = {
                 {item.status === 'in_progress'
                     ? ' clocked in'
                     : item.status === 'completed'
-                    ? ' completed shift'
-                    : ` ${item.status?.replace(/_/g, ' ')}`}
+                      ? ' completed shift'
+                      : ` ${item.status?.replace(/_/g, ' ')}`}
                 {item.client ? (
                     <>
-                        {' '}for <span className="font-medium">{item.client}</span>
+                        {' '}
+                        for <span className="font-medium">{item.client}</span>
                     </>
                 ) : null}
             </span>
         ),
-        detail: (item) => `Shift · ${item.status?.replace(/_/g, ' ') ?? 'updated'}`,
+        detail: (item) =>
+            `Shift · ${item.status?.replace(/_/g, ' ') ?? 'updated'}`,
     },
     timesheet: {
         icon: ClipboardCheck,
@@ -58,12 +60,14 @@ const TYPE_STYLES: Record<string, TypeStyle> = {
         text: (item) => (
             <span>
                 <span className="font-semibold">Timesheet</span>{' '}
-                {item.status === 'submitted' ? 'submitted by' : item.status} {' '}
+                {item.status === 'submitted' ? 'submitted by' : item.status}{' '}
                 <span className="font-medium">{item.staff ?? '—'}</span>
             </span>
         ),
         detail: (item) =>
-            item.work_date ? `Work date ${item.work_date} · awaiting approval` : 'Timesheet update',
+            item.work_date
+                ? `Work date ${item.work_date} · awaiting approval`
+                : 'Timesheet update',
     },
     incident: {
         icon: AlertTriangle,
@@ -85,8 +89,11 @@ const TYPE_STYLES: Record<string, TypeStyle> = {
         text: (item) => (
             <span>
                 New client{' '}
-                <span className="font-semibold">{item.client ?? '—'}</span> moved to{' '}
-                <span className="font-medium capitalize">{item.status?.replace(/_/g, ' ')}</span>
+                <span className="font-semibold">{item.client ?? '—'}</span>{' '}
+                moved to{' '}
+                <span className="font-medium capitalize">
+                    {item.status?.replace(/_/g, ' ')}
+                </span>
             </span>
         ),
         detail: () => 'Onboarding milestone',
@@ -116,7 +123,8 @@ const TYPE_STYLES: Record<string, TypeStyle> = {
         fg: 'var(--status-success)',
         text: (item) => (
             <span>
-                Roster <span className="font-semibold">published</span> for {item.title ?? '—'}
+                Roster <span className="font-semibold">published</span> for{' '}
+                {item.title ?? '—'}
             </span>
         ),
         detail: () => 'All assigned',
@@ -139,7 +147,8 @@ const TYPE_STYLES: Record<string, TypeStyle> = {
         fg: 'var(--status-warning)',
         text: (item) => (
             <span>
-                <span className="font-semibold">Compliance expiring</span> · {item.staff ?? '—'}
+                <span className="font-semibold">Compliance expiring</span> ·{' '}
+                {item.staff ?? '—'}
             </span>
         ),
         detail: () => 'Auto-reminder sent · compliance impact: low',
@@ -150,7 +159,8 @@ const TYPE_STYLES: Record<string, TypeStyle> = {
         fg: 'var(--primary)',
         text: (item) => (
             <span>
-                <span className="font-semibold">Handover</span> · {item.title ?? 'shift'}
+                <span className="font-semibold">Handover</span> ·{' '}
+                {item.title ?? 'shift'}
             </span>
         ),
         detail: () => 'All notes complete',
@@ -169,13 +179,19 @@ const TYPE_STYLES: Record<string, TypeStyle> = {
 };
 
 function fallback(item: ActivityItem): TypeStyle {
-    return TYPE_STYLES[item.type] ?? {
-        icon: Check,
-        bg: 'var(--accent)',
-        fg: 'var(--primary)',
-        text: () => <span className="font-medium capitalize">{item.type.replace(/_/g, ' ')}</span>,
-        detail: () => item.status ?? '',
-    };
+    return (
+        TYPE_STYLES[item.type] ?? {
+            icon: Check,
+            bg: 'var(--accent)',
+            fg: 'var(--primary)',
+            text: () => (
+                <span className="font-medium capitalize">
+                    {item.type.replace(/_/g, ' ')}
+                </span>
+            ),
+            detail: () => item.status ?? '',
+        }
+    );
 }
 
 function formatRelative(iso?: string): string {
@@ -195,7 +211,8 @@ type Props = {
 
 export function ActivityFeed({ items, totalEventsToday }: Props) {
     return (
-        <GuardrailCard unstyled
+        <GuardrailCard
+            unstyled
             className="flex flex-col rounded-xl border bg-card lg:col-span-2"
             style={{ borderColor: 'var(--border)' }}
         >
@@ -228,7 +245,10 @@ export function ActivityFeed({ items, totalEventsToday }: Props) {
                         No recent activity.
                     </div>
                 ) : (
-                    <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                    <ul
+                        className="divide-y"
+                        style={{ borderColor: 'var(--border)' }}
+                    >
                         {items.slice(0, 10).map((item) => {
                             const style = fallback(item);
                             const Icon = style.icon;
@@ -241,17 +261,22 @@ export function ActivityFeed({ items, totalEventsToday }: Props) {
                                 >
                                     <div
                                         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
-                                        style={{ background: style.bg, color: style.fg }}
+                                        style={{
+                                            background: style.bg,
+                                            color: style.fg,
+                                        }}
                                     >
                                         <Icon className="h-3.5 w-3.5" />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="text-[12px]">{style.text(item)}</div>
+                                        <div className="text-[12px]">
+                                            {style.text(item)}
+                                        </div>
                                         <div className="truncate text-[10.5px] text-muted-foreground">
                                             {style.detail(item)}
                                         </div>
                                     </div>
-                                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                                    <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
                                         {formatRelative(item.updated_at)}
                                     </span>
                                 </li>
@@ -265,7 +290,8 @@ export function ActivityFeed({ items, totalEventsToday }: Props) {
                 style={{ borderColor: 'var(--border)' }}
             >
                 <div className="text-[10.5px] text-muted-foreground">
-                    Showing last {Math.min(10, items.length)} of {totalEventsToday ?? items.length} events today
+                    Showing last {Math.min(10, items.length)} of{' '}
+                    {totalEventsToday ?? items.length} events today
                 </div>
                 <button
                     type="button"

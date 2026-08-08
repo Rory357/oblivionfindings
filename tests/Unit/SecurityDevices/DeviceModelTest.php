@@ -14,6 +14,7 @@ use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Models\Asset;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -172,6 +173,7 @@ class DeviceModelTest extends TestCase
 
     public function test_device_relationships(): void
     {
+        $actor = User::factory()->create();
         $camera = Device::factory()->security()->create(['name' => 'Camera']);
         $nvr = Device::factory()->security()->create(['name' => 'NVR']);
 
@@ -179,6 +181,7 @@ class DeviceModelTest extends TestCase
             'parent_device_id' => $nvr->id,
             'child_device_id' => $camera->id,
             'relationship_type' => 'records_to',
+            'created_by_user_id' => $actor->id,
         ]);
 
         $this->assertCount(1, $camera->parentRelationships);

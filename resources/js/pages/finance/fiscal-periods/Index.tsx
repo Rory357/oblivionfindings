@@ -1,20 +1,12 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, router } from '@inertiajs/react';
-import { ConfirmDialog, LedgerTabsFooter, useRowContextMenu, type RowCtxItem } from '@/components/finance';
+import {
+    ConfirmDialog,
+    LedgerTabsFooter,
+    useRowContextMenu,
+    type RowCtxItem,
+} from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import {
     Dialog,
     DialogContent,
@@ -24,7 +16,20 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { CalendarDays, Plus, Lock, Pencil, CalendarRange } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, useForm } from '@inertiajs/react';
+import { CalendarDays, CalendarRange, Lock, Pencil, Plus } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type FiscalPeriod = {
@@ -70,7 +75,9 @@ function CreatePeriodDialog() {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Create Fiscal Period</DialogTitle>
-                    <DialogDescription>Add a new fiscal period for your organisation.</DialogDescription>
+                    <DialogDescription>
+                        Add a new fiscal period for your organisation.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-1.5">
@@ -81,7 +88,11 @@ function CreatePeriodDialog() {
                             onChange={(e) => setData('name', e.target.value)}
                             placeholder="e.g. FY 2025-26 Q1"
                         />
-                        {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                        {errors.name && (
+                            <p className="text-sm text-destructive">
+                                {errors.name}
+                            </p>
+                        )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
@@ -90,9 +101,15 @@ function CreatePeriodDialog() {
                                 id="period-start"
                                 type="date"
                                 value={data.start_date}
-                                onChange={(e) => setData('start_date', e.target.value)}
+                                onChange={(e) =>
+                                    setData('start_date', e.target.value)
+                                }
                             />
-                            {errors.start_date && <p className="text-sm text-destructive">{errors.start_date}</p>}
+                            {errors.start_date && (
+                                <p className="text-sm text-destructive">
+                                    {errors.start_date}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="period-end">End Date *</Label>
@@ -100,13 +117,25 @@ function CreatePeriodDialog() {
                                 id="period-end"
                                 type="date"
                                 value={data.end_date}
-                                onChange={(e) => setData('end_date', e.target.value)}
+                                onChange={(e) =>
+                                    setData('end_date', e.target.value)
+                                }
                             />
-                            {errors.end_date && <p className="text-sm text-destructive">{errors.end_date}</p>}
+                            {errors.end_date && (
+                                <p className="text-sm text-destructive">
+                                    {errors.end_date}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Creating...' : 'Create Period'}
                         </Button>
@@ -135,14 +164,20 @@ function EditPeriodDialog({ period }: { period: FiscalPeriod }) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" disabled={period.status !== 'open'}>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={period.status !== 'open'}
+                >
                     <Pencil className="h-4 w-4" />
                 </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Edit Fiscal Period</DialogTitle>
-                    <DialogDescription>Update the fiscal period details.</DialogDescription>
+                    <DialogDescription>
+                        Update the fiscal period details.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-1.5">
@@ -152,7 +187,11 @@ function EditPeriodDialog({ period }: { period: FiscalPeriod }) {
                             value={data.name}
                             onChange={(e) => setData('name', e.target.value)}
                         />
-                        {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                        {errors.name && (
+                            <p className="text-sm text-destructive">
+                                {errors.name}
+                            </p>
+                        )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
@@ -161,9 +200,15 @@ function EditPeriodDialog({ period }: { period: FiscalPeriod }) {
                                 id="edit-start"
                                 type="date"
                                 value={data.start_date}
-                                onChange={(e) => setData('start_date', e.target.value)}
+                                onChange={(e) =>
+                                    setData('start_date', e.target.value)
+                                }
                             />
-                            {errors.start_date && <p className="text-sm text-destructive">{errors.start_date}</p>}
+                            {errors.start_date && (
+                                <p className="text-sm text-destructive">
+                                    {errors.start_date}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="edit-end">End Date *</Label>
@@ -171,13 +216,25 @@ function EditPeriodDialog({ period }: { period: FiscalPeriod }) {
                                 id="edit-end"
                                 type="date"
                                 value={data.end_date}
-                                onChange={(e) => setData('end_date', e.target.value)}
+                                onChange={(e) =>
+                                    setData('end_date', e.target.value)
+                                }
                             />
-                            {errors.end_date && <p className="text-sm text-destructive">{errors.end_date}</p>}
+                            {errors.end_date && (
+                                <p className="text-sm text-destructive">
+                                    {errors.end_date}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Saving...' : 'Save Changes'}
                         </Button>
@@ -200,10 +257,14 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
     function handleClose() {
         if (!closeTarget) return;
         setClosingId(closeTarget.id);
-        router.post(`/finance/fiscal-periods/${closeTarget.id}/close`, {}, {
-            onFinish: () => setClosingId(null),
-            onSuccess: () => setCloseTarget(null),
-        });
+        router.post(
+            `/finance/fiscal-periods/${closeTarget.id}/close`,
+            {},
+            {
+                onFinish: () => setClosingId(null),
+                onSuccess: () => setCloseTarget(null),
+            },
+        );
     }
 
     const openCount = periods.filter((p) => p.status === 'open').length;
@@ -215,7 +276,12 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
     const rowMenuItems = (period: FiscalPeriod): RowCtxItem[] => {
         const items: RowCtxItem[] = [];
         if (period.status === 'open') {
-            items.push({ kind: 'item', label: 'Close', icon: Lock, onSelect: () => setCloseTarget(period) });
+            items.push({
+                kind: 'item',
+                label: 'Close',
+                icon: Lock,
+                onSelect: () => setCloseTarget(period),
+            });
         }
         return items;
     };
@@ -226,7 +292,8 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         footer={<LedgerTabsFooter active="fiscal-periods" />}
                         icon={CalendarRange}
                         title="Fiscal Periods"
@@ -257,50 +324,84 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                                     <TableHead>End Date</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Closed By</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="text-right">
+                                        Actions
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {periods.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                                            No fiscal periods defined yet. Create your first period to get started.
+                                        <TableCell
+                                            colSpan={6}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            No fiscal periods defined yet.
+                                            Create your first period to get
+                                            started.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     periods.map((period) => {
                                         const menuItems = rowMenuItems(period);
                                         return (
-                                        <TableRow
-                                            key={period.id}
-                                            onContextMenu={menuItems.length ? rowMenu.open(menuItems) : undefined}
-                                        >
-                                            <TableCell className="font-medium">{period.name}</TableCell>
-                                            <TableCell>{period.start_date}</TableCell>
-                                            <TableCell>{period.end_date}</TableCell>
-                                            <TableCell>
-                                                <StatusBadge status={period.status} />
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
-                                                {period.closed_by || '-'}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <EditPeriodDialog period={period} />
-                                                    {period.status === 'open' && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => setCloseTarget(period)}
-                                                            disabled={closingId === period.id}
-                                                        >
-                                                            <Lock className="mr-1 h-3 w-3" />
-                                                            {closingId === period.id ? 'Closing...' : 'Close'}
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
+                                            <TableRow
+                                                key={period.id}
+                                                onContextMenu={
+                                                    menuItems.length
+                                                        ? rowMenu.open(
+                                                              menuItems,
+                                                          )
+                                                        : undefined
+                                                }
+                                            >
+                                                <TableCell className="font-medium">
+                                                    {period.name}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {period.start_date}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {period.end_date}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <StatusBadge
+                                                        status={period.status}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    {period.closed_by || '-'}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <EditPeriodDialog
+                                                            period={period}
+                                                        />
+                                                        {period.status ===
+                                                            'open' && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    setCloseTarget(
+                                                                        period,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    closingId ===
+                                                                    period.id
+                                                                }
+                                                            >
+                                                                <Lock className="mr-1 h-3 w-3" />
+                                                                {closingId ===
+                                                                period.id
+                                                                    ? 'Closing...'
+                                                                    : 'Close'}
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
                                         );
                                     })
                                 )}
@@ -320,11 +421,16 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                     <>
                         This closes{' '}
                         <span className="font-medium text-foreground">
-                            {closeTarget?.name} ({closeTarget?.start_date} – {closeTarget?.end_date})
+                            {closeTarget?.name} ({closeTarget?.start_date} –{' '}
+                            {closeTarget?.end_date})
                         </span>
-                        . Once closed, <span className="font-medium text-foreground">no further journals can be posted</span>{' '}
-                        to this period — invoices, bills, payments and manual journals dated inside it will be rejected.
-                        Make sure the period is fully reconciled first.
+                        . Once closed,{' '}
+                        <span className="font-medium text-foreground">
+                            no further journals can be posted
+                        </span>{' '}
+                        to this period — invoices, bills, payments and manual
+                        journals dated inside it will be rejected. Make sure the
+                        period is fully reconciled first.
                     </>
                 }
                 confirmLabel="Close period"

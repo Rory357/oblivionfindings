@@ -1,7 +1,7 @@
-import { Check, CloudOff } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import { formatRelative, formatTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
+import { Check, CloudOff } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 /* -------------------------------------------------------------------------- */
 /*  Shared autosave indicator                                                 */
@@ -53,13 +53,22 @@ export default function DraftSavedIndicator({
         >
             {saving ? (
                 <>
-                    <CloudOff className="h-3.5 w-3.5 animate-pulse" aria-hidden />
+                    <CloudOff
+                        className="h-3.5 w-3.5 animate-pulse"
+                        aria-hidden
+                    />
                     <span>Saving draft…</span>
                 </>
             ) : savedAt ? (
                 <>
-                    <Check className="h-3.5 w-3.5 text-status-success" aria-hidden />
-                    <span>Draft saved on this device · {formatSavedLabel(savedAt, now)}</span>
+                    <Check
+                        className="h-3.5 w-3.5 text-status-success"
+                        aria-hidden
+                    />
+                    <span>
+                        Draft saved on this device ·{' '}
+                        {formatSavedLabel(savedAt, now)}
+                    </span>
                 </>
             ) : null}
         </div>

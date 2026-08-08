@@ -70,6 +70,100 @@ it('reports a clean empty restored runtime without exposing payloads or endpoint
         ]);
 });
 
+it('verifies process-scoped restore configuration before reading any restored store', function (): void {
+    $probe = new class implements RestoreDependencyProbe
+    {
+        public int $healthChecks = 0;
+
+        public function health(): array
+        {
+            $this->healthChecks++;
+
+            return [
+                'redis' => true,
+                'timeseries' => true,
+                'snapshots' => true,
+                'secret_manager' => true,
+            ];
+        }
+    };
+    app()->instance(RestoreDependencyProbe::class, $probe);
+
+    $processValues = [
+        'DB_URL' => 'mysql://restore-user:RESTORE-PASSWORD-SENTINEL@127.0.0.1/restore-copy',
+        'REDIS_URL' => 'redis://:RESTORE-REDIS-SENTINEL@127.0.0.1:6379/9',
+        'MONITORING_TIMESERIES_URL' => 'http://influx.restore.test:8086',
+        'MONITORING_SNAPSHOT_DISK' => 'monitoring-restore',
+        'MONITORING_CREDENTIAL_DRIVER' => 'vault',
+        'MONITORING_VAULT_URL' => 'https://vault.restore.test',
+    ];
+    $configuredValues = [
+        'app.debug' => false,
+        'database.default' => 'mysql',
+        'database.connections.mysql.url' => $processValues['DB_URL'],
+        'database.redis.default.url' => $processValues['REDIS_URL'],
+        'monitoring.storage.timeseries.url' => $processValues['MONITORING_TIMESERIES_URL'],
+        'monitoring.storage.snapshots.disk' => $processValues['MONITORING_SNAPSHOT_DISK'],
+        'monitoring.credentials.driver' => 'vault',
+        'monitoring.credentials.vault.url' => $processValues['MONITORING_VAULT_URL'],
+    ];
+    $previousEnvironment = app()->environment();
+    $previousProcessValues = [];
+    $previousConfiguredValues = [];
+
+    try {
+        app()->instance('env', 'restore-verification');
+        foreach ($processValues as $key => $value) {
+            $previousProcessValues[$key] = getenv($key);
+            putenv("{$key}={$value}");
+            $_ENV[$key] = $value;
+            $_SERVER[$key] = $value;
+        }
+        foreach ($configuredValues as $key => $value) {
+            $previousConfiguredValues[$key] = config($key);
+            config()->set($key, $value);
+        }
+
+        expect(Artisan::call('monitoring:reconcile-restore', [
+            '--assert-process-config' => true,
+            '--config-only' => true,
+        ]))->toBe(0)
+            ->and(Artisan::output())->toContain('process configuration matched')
+            ->and($probe->healthChecks)->toBe(0);
+        foreach ($processValues as $value) {
+            expect(Artisan::output())->not->toContain($value);
+        }
+
+        config()->set('monitoring.storage.timeseries.url', 'http://stale-config.invalid');
+        expect(Artisan::call('monitoring:reconcile-restore', [
+            '--assert-process-config' => true,
+            '--config-only' => true,
+        ]))->toBe(1)
+            ->and(Artisan::output())->toContain('process configuration was not applied')
+            ->and(Artisan::output())->not->toContain(
+                $processValues['MONITORING_TIMESERIES_URL'],
+                'http://stale-config.invalid',
+            )
+            ->and($probe->healthChecks)->toBe(0);
+    } finally {
+        app()->instance('env', $previousEnvironment);
+        foreach ($previousConfiguredValues as $key => $value) {
+            config()->set($key, $value);
+        }
+        foreach ($previousProcessValues as $key => $value) {
+            if ($value === false) {
+                putenv($key);
+                unset($_ENV[$key], $_SERVER[$key]);
+
+                continue;
+            }
+            putenv("{$key}={$value}");
+            $_ENV[$key] = $value;
+            $_SERVER[$key] = $value;
+        }
+    }
+});
+
 it('fails a healthy restore when a retained MySQL series pointer is missing from InfluxDB', function (): void {
     $site = Site::factory()->create();
     $device = Device::factory()->create();

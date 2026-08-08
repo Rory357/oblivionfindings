@@ -1,15 +1,14 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
+import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeftRight, TrendingDown, TrendingUp } from 'lucide-react';
-import { PageHero, PageLayout } from '@/components/page';
-import { formatMoney } from '@/components/finance/money';
 import { useState } from 'react';
-import { router } from '@inertiajs/react';
 
 type PreviewItem = {
     type: string;
@@ -57,7 +56,11 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
     function handleDateChange(newDate: string) {
         setRevalDate(newDate);
         setData('date', newDate);
-        router.get('/finance/fx-revaluations/create', { date: newDate }, { preserveState: true });
+        router.get(
+            '/finance/fx-revaluations/create',
+            { date: newDate },
+            { preserveState: true },
+        );
     }
 
     function handleSubmit(e: React.FormEvent) {
@@ -76,7 +79,8 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/fx-revaluations"
                         title="New FX Revaluation"
@@ -99,10 +103,16 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                                     id="reval-date"
                                     type="date"
                                     value={revalDate}
-                                    onChange={(e) => handleDateChange(e.target.value)}
+                                    onChange={(e) =>
+                                        handleDateChange(e.target.value)
+                                    }
                                     className="w-48"
                                 />
-                                {errors.date && <p className="text-sm text-destructive">{errors.date}</p>}
+                                {errors.date && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.date}
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </CardContent>
@@ -121,12 +131,21 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                                     <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
                                 )}
                                 <CardTitle>
-                                    Unrealised FX {isGain ? 'Gain' : isLoss ? 'Loss' : 'Gain/Loss'}
+                                    Unrealised FX{' '}
+                                    {isGain
+                                        ? 'Gain'
+                                        : isLoss
+                                          ? 'Loss'
+                                          : 'Gain/Loss'}
                                 </CardTitle>
                             </div>
                             <div
-                                className={`text-2xl font-bold font-mono tabular-nums ${
-                                    isGain ? 'text-status-success' : isLoss ? 'text-status-critical' : 'text-foreground'
+                                className={`font-mono text-2xl font-bold tabular-nums ${
+                                    isGain
+                                        ? 'text-status-success'
+                                        : isLoss
+                                          ? 'text-status-critical'
+                                          : 'text-foreground'
                                 }`}
                             >
                                 {isLoss ? '(' : ''}
@@ -137,24 +156,43 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                     </CardHeader>
                     <CardContent>
                         {!hasItems ? (
-                            <p className="text-center text-muted-foreground py-4">
-                                No foreign-currency items found for this date. There are no open foreign-currency bills
-                                or bank account balances to revalue.
+                            <p className="py-4 text-center text-muted-foreground">
+                                No foreign-currency items found for this date.
+                                There are no open foreign-currency bills or bank
+                                account balances to revalue.
                             </p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b text-left text-muted-foreground">
-                                            <th className="pb-3 pr-4 font-medium">Type</th>
-                                            <th className="pb-3 pr-4 font-medium">Reference</th>
-                                            <th className="pb-3 pr-4 font-medium">Currency</th>
-                                            <th className="pb-3 pr-4 font-medium text-right">Foreign Amount</th>
-                                            <th className="pb-3 pr-4 font-medium text-right">Booked Rate</th>
-                                            <th className="pb-3 pr-4 font-medium text-right">Current Rate</th>
-                                            <th className="pb-3 pr-4 font-medium text-right">Booked NZD</th>
-                                            <th className="pb-3 pr-4 font-medium text-right">Current NZD</th>
-                                            <th className="pb-3 font-medium text-right">Gain / Loss</th>
+                                            <th className="pr-4 pb-3 font-medium">
+                                                Type
+                                            </th>
+                                            <th className="pr-4 pb-3 font-medium">
+                                                Reference
+                                            </th>
+                                            <th className="pr-4 pb-3 font-medium">
+                                                Currency
+                                            </th>
+                                            <th className="pr-4 pb-3 text-right font-medium">
+                                                Foreign Amount
+                                            </th>
+                                            <th className="pr-4 pb-3 text-right font-medium">
+                                                Booked Rate
+                                            </th>
+                                            <th className="pr-4 pb-3 text-right font-medium">
+                                                Current Rate
+                                            </th>
+                                            <th className="pr-4 pb-3 text-right font-medium">
+                                                Booked NZD
+                                            </th>
+                                            <th className="pr-4 pb-3 text-right font-medium">
+                                                Current NZD
+                                            </th>
+                                            <th className="pb-3 text-right font-medium">
+                                                Gain / Loss
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -163,26 +201,45 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                                             const itemLoss = item.gain_loss < 0;
 
                                             return (
-                                                <tr key={i} className="border-b last:border-0">
+                                                <tr
+                                                    key={i}
+                                                    className="border-b last:border-0"
+                                                >
                                                     <td className="py-3 pr-4">
-                                                        {typeLabels[item.type] ?? item.type}
+                                                        {typeLabels[
+                                                            item.type
+                                                        ] ?? item.type}
                                                     </td>
-                                                    <td className="py-3 pr-4 font-medium">{item.reference}</td>
-                                                    <td className="py-3 pr-4 font-mono">{item.currency_code}</td>
-                                                    <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {item.foreign_amount.toFixed(2)}
+                                                    <td className="py-3 pr-4 font-medium">
+                                                        {item.reference}
                                                     </td>
-                                                    <td className="py-3 pr-4 text-right font-mono tabular-nums text-muted-foreground">
-                                                        {formatRate(item.booked_rate)}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-right font-mono tabular-nums text-muted-foreground">
-                                                        {formatRate(item.current_rate)}
+                                                    <td className="py-3 pr-4 font-mono">
+                                                        {item.currency_code}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatMoney(item.booked_base_value)}
+                                                        {item.foreign_amount.toFixed(
+                                                            2,
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3 pr-4 text-right font-mono text-muted-foreground tabular-nums">
+                                                        {formatRate(
+                                                            item.booked_rate,
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3 pr-4 text-right font-mono text-muted-foreground tabular-nums">
+                                                        {formatRate(
+                                                            item.current_rate,
+                                                        )}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatMoney(item.current_base_value)}
+                                                        {formatMoney(
+                                                            item.booked_base_value,
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3 pr-4 text-right font-mono tabular-nums">
+                                                        {formatMoney(
+                                                            item.current_base_value,
+                                                        )}
                                                     </td>
                                                     <td
                                                         className={`py-3 text-right font-mono font-semibold tabular-nums ${
@@ -194,7 +251,11 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                                                         }`}
                                                     >
                                                         {itemLoss ? '(' : ''}
-                                                        {formatMoney(Math.abs(item.gain_loss))}
+                                                        {formatMoney(
+                                                            Math.abs(
+                                                                item.gain_loss,
+                                                            ),
+                                                        )}
                                                         {itemLoss ? ')' : ''}
                                                     </td>
                                                 </tr>
@@ -212,20 +273,30 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                         <Card>
                             <CardContent className="pt-6">
                                 <div className="space-y-2">
-                                    <Label htmlFor="reval-notes">Notes (optional)</Label>
+                                    <Label htmlFor="reval-notes">
+                                        Notes (optional)
+                                    </Label>
                                     <Input
                                         id="reval-notes"
                                         value={data.notes}
-                                        onChange={(e) => setData('notes', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('notes', e.target.value)
+                                        }
                                         placeholder="Optional notes about this revaluation..."
                                     />
                                 </div>
                             </CardContent>
                         </Card>
                         <div className="flex justify-end">
-                            <Button type="submit" disabled={processing} size="lg">
+                            <Button
+                                type="submit"
+                                disabled={processing}
+                                size="lg"
+                            >
                                 <ArrowLeftRight className="mr-2 h-4 w-4" />
-                                {processing ? 'Creating...' : 'Create Draft Revaluation'}
+                                {processing
+                                    ? 'Creating...'
+                                    : 'Create Draft Revaluation'}
                             </Button>
                         </div>
                     </form>

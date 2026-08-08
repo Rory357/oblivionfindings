@@ -4,8 +4,8 @@ import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     InfoCard,
-    SelectInput,
     Segmented,
+    SelectInput,
     StepHead,
     SubHead,
     TilePicker,
@@ -57,10 +57,30 @@ export type LogObligationForm = {
 };
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'obligation', label: 'Obligation', blurb: 'Framework & title', icon: ShieldCheck },
-    { key: 'details', label: 'Details', blurb: 'What it requires', icon: ClipboardList },
-    { key: 'schedule', label: 'Schedule', blurb: 'Cadence, owner & priority', icon: CalendarClock },
-    { key: 'review', label: 'Review & create', blurb: 'Confirm and save', icon: CheckCircle2 },
+    {
+        key: 'obligation',
+        label: 'Obligation',
+        blurb: 'Framework & title',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'What it requires',
+        icon: ClipboardList,
+    },
+    {
+        key: 'schedule',
+        label: 'Schedule',
+        blurb: 'Cadence, owner & priority',
+        icon: CalendarClock,
+    },
+    {
+        key: 'review',
+        label: 'Review & create',
+        blurb: 'Confirm and save',
+        icon: CheckCircle2,
+    },
 ];
 
 const FREQUENCIES = [
@@ -137,7 +157,10 @@ export function LogObligationDialog({
         [frameworks, data.framework],
     );
 
-    const set = <K extends keyof LogObligationForm>(k: K, v: LogObligationForm[K]) =>
+    const set = <K extends keyof LogObligationForm>(
+        k: K,
+        v: LogObligationForm[K],
+    ) =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setData(k, v as any);
 
@@ -150,15 +173,18 @@ export function LogObligationDialog({
             if (!data.framework) e.framework = 'Choose a framework';
             if (!data.title.trim()) e.title = 'A title is required';
             if (data.obligation_reference.length > 50)
-                e.obligation_reference = 'Reference must be 50 characters or fewer';
+                e.obligation_reference =
+                    'Reference must be 50 characters or fewer';
         }
         if (idx === 1) {
-            if (!data.description.trim()) e.description = 'Describe the obligation';
+            if (!data.description.trim())
+                e.description = 'Describe the obligation';
         }
         return e;
     };
 
-    const goTo = (idx: number) => setStepIndex(Math.max(0, Math.min(idx, STEPS.length - 1)));
+    const goTo = (idx: number) =>
+        setStepIndex(Math.max(0, Math.min(idx, STEPS.length - 1)));
 
     const next = () => {
         const e = validateStep(stepIndex);
@@ -220,8 +246,9 @@ export function LogObligationDialog({
                         title="Obligation added to the register"
                         blurb={
                             <>
-                                <strong>{data.title}</strong> ({frameworkLabel}) is now tracked.
-                                Reminders have been scheduled for its owner.
+                                <strong>{data.title}</strong> ({frameworkLabel})
+                                is now tracked. Reminders have been scheduled
+                                for its owner.
                             </>
                         }
                         actions={
@@ -231,7 +258,8 @@ export function LogObligationDialog({
                                 </Button>
                                 <Button asChild>
                                     <a href="/governance/compliance">
-                                        <ShieldCheck className="h-4 w-4" /> Open register
+                                        <ShieldCheck className="h-4 w-4" /> Open
+                                        register
                                     </a>
                                 </Button>
                             </>
@@ -256,7 +284,11 @@ export function LogObligationDialog({
             onStepClick={goTo}
             footerStart={
                 stepIndex > 0 ? (
-                    <Button type="button" variant="ghost" onClick={() => goTo(stepIndex - 1)}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => goTo(stepIndex - 1)}
+                    >
                         <ChevronLeft className="h-4 w-4" /> Back
                     </Button>
                 ) : null
@@ -281,14 +313,20 @@ export function LogObligationDialog({
                                 )}
                                 Save & add another
                             </Button>
-                            <Button type="button" onClick={() => submit(false)} disabled={processing}>
+                            <Button
+                                type="button"
+                                onClick={() => submit(false)}
+                                disabled={processing}
+                            >
                                 {processing ? (
                                     <>
-                                        <Loader2 className="h-4 w-4 animate-spin" /> Creating…
+                                        <Loader2 className="h-4 w-4 animate-spin" />{' '}
+                                        Creating…
                                     </>
                                 ) : (
                                     <>
-                                        <Check className="h-4 w-4" /> Create obligation
+                                        <Check className="h-4 w-4" /> Create
+                                        obligation
                                     </>
                                 )}
                             </Button>
@@ -309,7 +347,11 @@ export function LogObligationDialog({
                         blurb="Pick the regulatory framework and name the obligation you're tracking."
                     />
                     <div className="grid gap-4">
-                        <Field label="Framework" required error={fieldErr('framework')}>
+                        <Field
+                            label="Framework"
+                            required
+                            error={fieldErr('framework')}
+                        >
                             <TilePicker
                                 value={data.framework}
                                 onChange={(v) => set('framework', v)}
@@ -330,7 +372,9 @@ export function LogObligationDialog({
                             >
                                 <Input
                                     value={data.title}
-                                    onChange={(e) => set('title', e.target.value)}
+                                    onChange={(e) =>
+                                        set('title', e.target.value)
+                                    }
                                     placeholder="e.g. Annual Ngā Paerewa self-assessment"
                                     aria-invalid={!!fieldErr('title')}
                                 />
@@ -343,7 +387,10 @@ export function LogObligationDialog({
                                 <Input
                                     value={data.obligation_reference}
                                     onChange={(e) =>
-                                        set('obligation_reference', e.target.value.slice(0, 50))
+                                        set(
+                                            'obligation_reference',
+                                            e.target.value.slice(0, 50),
+                                        )
                                     }
                                     placeholder="e.g. NP-4.1.1"
                                 />
@@ -361,11 +408,17 @@ export function LogObligationDialog({
                         blurb="Describe the obligation and the evidence needed to satisfy it."
                     />
                     <div className="grid gap-4">
-                        <Field label="Description" required error={fieldErr('description')}>
+                        <Field
+                            label="Description"
+                            required
+                            error={fieldErr('description')}
+                        >
                             <Textarea
                                 rows={3}
                                 value={data.description}
-                                onChange={(e) => set('description', e.target.value)}
+                                onChange={(e) =>
+                                    set('description', e.target.value)
+                                }
                                 placeholder="What this obligation covers and why it matters."
                                 aria-invalid={!!fieldErr('description')}
                             />
@@ -378,14 +431,17 @@ export function LogObligationDialog({
                             <Textarea
                                 rows={3}
                                 value={data.requirements}
-                                onChange={(e) => set('requirements', e.target.value)}
+                                onChange={(e) =>
+                                    set('requirements', e.target.value)
+                                }
                                 placeholder="e.g. Board-approved self-assessment uploaded as evidence each year."
                             />
                         </Field>
                         <InfoCard icon={FileText}>
-                            Evidence (documents, audit reports, attestations) is attached after
-                            creation via <strong>Record evidence</strong> — each obligation keeps its
-                            own evidence trail for audits.
+                            Evidence (documents, audit reports, attestations) is
+                            attached after creation via{' '}
+                            <strong>Record evidence</strong> — each obligation
+                            keeps its own evidence trail for audits.
                         </InfoCard>
                     </div>
                 </WizardStepPane>
@@ -408,11 +464,16 @@ export function LogObligationDialog({
                                     options={FREQUENCIES}
                                 />
                             </Field>
-                            <Field label="Next due date" error={fieldErr('due_date')}>
+                            <Field
+                                label="Next due date"
+                                error={fieldErr('due_date')}
+                            >
                                 <Input
                                     type="date"
                                     value={data.due_date}
-                                    onChange={(e) => set('due_date', e.target.value)}
+                                    onChange={(e) =>
+                                        set('due_date', e.target.value)
+                                    }
                                 />
                             </Field>
                             <Field label="Priority">
@@ -454,34 +515,66 @@ export function LogObligationDialog({
                         blurb="Confirm the obligation before adding it to the register."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={ShieldCheck} title="Obligation" onEdit={() => goTo(0)}>
-                            <ReviewRow label="Framework" value={frameworkLabel} />
+                        <ReviewCard
+                            icon={ShieldCheck}
+                            title="Obligation"
+                            onEdit={() => goTo(0)}
+                        >
+                            <ReviewRow
+                                label="Framework"
+                                value={frameworkLabel}
+                            />
                             <ReviewRow label="Title" value={data.title} />
-                            <ReviewRow label="Reference" value={data.obligation_reference} />
+                            <ReviewRow
+                                label="Reference"
+                                value={data.obligation_reference}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={CalendarClock} title="Schedule" onEdit={() => goTo(2)}>
+                        <ReviewCard
+                            icon={CalendarClock}
+                            title="Schedule"
+                            onEdit={() => goTo(2)}
+                        >
                             <ReviewRow
                                 label="Frequency"
                                 value={
-                                    FREQUENCIES.find((f) => f.value === data.frequency)?.label
+                                    FREQUENCIES.find(
+                                        (f) => f.value === data.frequency,
+                                    )?.label
                                 }
                             />
                             <ReviewRow label="Due" value={data.due_date} />
                             <ReviewRow
                                 label="Priority"
-                                value={PRIORITIES.find((p) => p.value === data.priority)?.label}
+                                value={
+                                    PRIORITIES.find(
+                                        (p) => p.value === data.priority,
+                                    )?.label
+                                }
                             />
                             <ReviewRow
                                 label="Owner"
                                 value={
-                                    owners.find((o) => String(o.id) === data.owner_id)?.name ??
-                                    'You'
+                                    owners.find(
+                                        (o) => String(o.id) === data.owner_id,
+                                    )?.name ?? 'You'
                                 }
                             />
                         </ReviewCard>
-                        <ReviewCard icon={ClipboardList} title="Details" span onEdit={() => goTo(1)}>
-                            <ReviewRow label="Description" value={data.description} />
-                            <ReviewRow label="Requirements" value={data.requirements} />
+                        <ReviewCard
+                            icon={ClipboardList}
+                            title="Details"
+                            span
+                            onEdit={() => goTo(1)}
+                        >
+                            <ReviewRow
+                                label="Description"
+                                value={data.description}
+                            />
+                            <ReviewRow
+                                label="Requirements"
+                                value={data.requirements}
+                            />
                         </ReviewCard>
                     </div>
                 </WizardStepPane>

@@ -72,17 +72,90 @@ export const HC_GROUPS: { key: HcGroupKey; label: string }[] = [
 
 export const HC_TABS: HcTab[] = [
     // ── Monitor ──────────────────────────────────────────────────────────
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, tone: 'primary', group: 'monitor', href: '/health-clinical', requires: (c) => !!c.dashboard },
-    { id: 'observations', label: 'Observations', icon: Activity, tone: 'primary', group: 'monitor', href: '/health-clinical/observations', requires: (c) => !!c.observationsViewAny },
-    { id: 'clinical_events', label: 'Clinical Events', icon: Stethoscope, tone: 'warning', group: 'monitor', href: '/health-clinical/events', requires: (c) => !!c.eventsViewAny },
-    { id: 'health_monitoring', label: 'Health Monitoring', icon: HeartPulse, tone: 'info', group: 'monitor', href: '/health-clinical/health-monitoring', requires: (c) => !!c.monitoringViewAny },
+    {
+        id: 'overview',
+        label: 'Overview',
+        icon: LayoutDashboard,
+        tone: 'primary',
+        group: 'monitor',
+        href: '/health-clinical',
+        requires: (c) => !!c.dashboard,
+    },
+    {
+        id: 'observations',
+        label: 'Observations',
+        icon: Activity,
+        tone: 'primary',
+        group: 'monitor',
+        href: '/health-clinical/observations',
+        requires: (c) => !!c.observationsViewAny,
+    },
+    {
+        id: 'clinical_events',
+        label: 'Clinical Events',
+        icon: Stethoscope,
+        tone: 'warning',
+        group: 'monitor',
+        href: '/health-clinical/events',
+        requires: (c) => !!c.eventsViewAny,
+    },
+    {
+        id: 'health_monitoring',
+        label: 'Health Monitoring',
+        icon: HeartPulse,
+        tone: 'info',
+        group: 'monitor',
+        href: '/health-clinical/health-monitoring',
+        requires: (c) => !!c.monitoringViewAny,
+    },
     // ── Plan ─────────────────────────────────────────────────────────────
-    { id: 'care_plans', label: 'Care Plans', icon: ClipboardList, tone: 'success', group: 'plan', href: '/health-clinical/care-plans', requires: (c) => !!c.dashboard },
-    { id: 'protocols', label: 'Protocols', icon: Workflow, tone: 'primary', group: 'plan', href: '/health-clinical/protocols', requires: (c) => !!(c.protocolsViewAny || c.protocolsManage) },
-    { id: 'assessments', label: 'Assessments & Risk', icon: AlertTriangle, tone: 'critical', group: 'plan', href: '/health-clinical/assessments', requires: (c) => !!c.assessmentsViewAny },
+    {
+        id: 'care_plans',
+        label: 'Care Plans',
+        icon: ClipboardList,
+        tone: 'success',
+        group: 'plan',
+        href: '/health-clinical/care-plans',
+        requires: (c) => !!c.dashboard,
+    },
+    {
+        id: 'protocols',
+        label: 'Protocols',
+        icon: Workflow,
+        tone: 'primary',
+        group: 'plan',
+        href: '/health-clinical/protocols',
+        requires: (c) => !!(c.protocolsViewAny || c.protocolsManage),
+    },
+    {
+        id: 'assessments',
+        label: 'Assessments & Risk',
+        icon: AlertTriangle,
+        tone: 'critical',
+        group: 'plan',
+        href: '/health-clinical/assessments',
+        requires: (c) => !!c.assessmentsViewAny,
+    },
     // ── Analyse ──────────────────────────────────────────────────────────
-    { id: 'behaviour', label: 'Behaviour', icon: Brain, tone: 'violet', group: 'analyse', href: '/health-clinical/behaviour', requires: (c) => !!c.behaviourViewAny },
-    { id: 'trends', label: 'Trends', icon: TrendingUp, tone: 'info', group: 'analyse', href: '/health-clinical/trends', requires: (c) => !!(c.observationsViewAny || c.observationsViewAssigned) },
+    {
+        id: 'behaviour',
+        label: 'Behaviour',
+        icon: Brain,
+        tone: 'violet',
+        group: 'analyse',
+        href: '/health-clinical/behaviour',
+        requires: (c) => !!c.behaviourViewAny,
+    },
+    {
+        id: 'trends',
+        label: 'Trends',
+        icon: TrendingUp,
+        tone: 'info',
+        group: 'analyse',
+        href: '/health-clinical/trends',
+        requires: (c) =>
+            !!(c.observationsViewAny || c.observationsViewAssigned),
+    },
 ];
 
 export function tabById(id: HcTabId): HcTab | undefined {
@@ -98,13 +171,21 @@ export function groupForTab(id: HcTabId): HcGroupKey {
  * provided, tabs the user cannot open (per their `requires` predicate) are
  * filtered out so the UI never offers a tab that 403s on click.
  */
-export function builtTabsForGroup(group: HcGroupKey, can?: ClinicalCan): HcTab[] {
+export function builtTabsForGroup(
+    group: HcGroupKey,
+    can?: ClinicalCan,
+): HcTab[] {
     return HC_TABS.filter(
-        (t) => t.group === group && t.href && (!can || !t.requires || t.requires(can)),
+        (t) =>
+            t.group === group &&
+            t.href &&
+            (!can || !t.requires || t.requires(can)),
     );
 }
 
 /** Groups that currently have at least one built (and permitted) tab. */
-export function groupsWithBuiltTabs(can?: ClinicalCan): { key: HcGroupKey; label: string }[] {
+export function groupsWithBuiltTabs(
+    can?: ClinicalCan,
+): { key: HcGroupKey; label: string }[] {
     return HC_GROUPS.filter((g) => builtTabsForGroup(g.key, can).length > 0);
 }

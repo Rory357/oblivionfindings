@@ -1,3 +1,5 @@
+import type { ControlRoomAlertAccess } from '@/components/security-devices/permission-destinations';
+
 export type DeviceProfileSectionKey =
     | 'health'
     | 'monitors'
@@ -182,12 +184,13 @@ export type DeviceProfile = {
     }>;
     controlRoomAlerts: Array<{
         id: number;
-        reference: string;
-        type: string;
-        severity: string;
-        status: string;
+        reference: string | null;
+        type: string | null;
+        severity: string | null;
+        status: string | null;
         triggeredAt: string | null;
-        href: string;
+        href: string | null;
+        access: ControlRoomAlertAccess;
     }>;
     audit: Array<{
         id: number;

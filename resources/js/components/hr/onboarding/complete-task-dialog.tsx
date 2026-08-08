@@ -55,7 +55,8 @@ export function CompleteTaskDialog({
         const fd = new FormData();
         if (file) fd.append('evidence', file);
         if (notes.trim()) fd.append('notes', notes.trim());
-        if (task.sign_off_required && signOff) fd.append('signed_off_by', String(currentUserId));
+        if (task.sign_off_required && signOff)
+            fd.append('signed_off_by', String(currentUserId));
 
         setProcessing(true);
         router.post(`/hr/onboarding/tasks/${task.id}/complete`, fd, {
@@ -74,7 +75,9 @@ export function CompleteTaskDialog({
                 <DialogHeader className="border-b border-border px-6 py-4">
                     <DialogTitle>Complete task</DialogTitle>
                     <DialogDescription>
-                        {task.sign_off_required ? 'Sign-off required — attach evidence.' : 'Optionally attach evidence and a note.'}
+                        {task.sign_off_required
+                            ? 'Sign-off required — attach evidence.'
+                            : 'Optionally attach evidence and a note.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -82,14 +85,20 @@ export function CompleteTaskDialog({
                     <div className="rounded-lg bg-muted px-3.5 py-3 text-sm font-semibold">
                         {task.title}
                         {task.employee ? (
-                            <span className="font-normal text-muted-foreground"> — {task.employee}</span>
+                            <span className="font-normal text-muted-foreground">
+                                {' '}
+                                — {task.employee}
+                            </span>
                         ) : null}
                     </div>
 
                     <div className="space-y-1.5">
                         <Label>Evidence</Label>
                         {file ? (
-                            <StagedFileCard file={file} onRemove={() => setFile(null)} />
+                            <StagedFileCard
+                                file={file}
+                                onRemove={() => setFile(null)}
+                            />
                         ) : (
                             <FileDropzone
                                 multiple={false}
@@ -113,7 +122,10 @@ export function CompleteTaskDialog({
 
                     {task.sign_off_required && (
                         <label className="flex items-center gap-2.5 text-sm font-medium">
-                            <Checkbox checked={signOff} onCheckedChange={(c) => setSignOff(Boolean(c))} />
+                            <Checkbox
+                                checked={signOff}
+                                onCheckedChange={(c) => setSignOff(Boolean(c))}
+                            />
                             Sign off as me
                         </label>
                     )}
@@ -124,7 +136,11 @@ export function CompleteTaskDialog({
                         Cancel
                     </Button>
                     <Button onClick={submit} disabled={disabled}>
-                        {processing ? 'Saving…' : task.sign_off_required ? 'Complete & sign off' : 'Complete task'}
+                        {processing
+                            ? 'Saving…'
+                            : task.sign_off_required
+                              ? 'Complete & sign off'
+                              : 'Complete task'}
                     </Button>
                 </div>
             </DialogContent>

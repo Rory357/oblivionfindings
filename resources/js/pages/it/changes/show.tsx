@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
 import { ItModuleShell } from '@/components/it/it-module-shell';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -194,295 +194,300 @@ export default function ItChangeShow({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${ticket.reference} · Change`} />
             <ItModuleShell>
-            <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
-                <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <Link
-                        href="/it/changes"
-                        className="frontline-focus inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground"
-                    >
-                        <ArrowLeft className="h-4 w-4" aria-hidden="true" />{' '}
-                        Back to changes
-                    </Link>
-                    <div className="mt-2 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-                        <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-mono text-sm font-bold text-primary">
-                                    {ticket.reference}
-                                </span>
-                                <StatusBadge
-                                    variant={
-                                        changeStateVariant[
-                                            ticket.workflow_state
-                                        ] ?? 'neutral'
-                                    }
-                                >
-                                    {changeLabel(ticket.workflow_state)}
-                                </StatusBadge>
-                                <StatusBadge
-                                    variant={
-                                        change.risk_level === 'critical' ||
-                                        change.risk_level === 'high'
-                                            ? 'critical'
-                                            : 'info'
-                                    }
-                                >
-                                    {changeLabel(change.risk_level)} risk
-                                </StatusBadge>
-                                {change.is_restricted ? (
-                                    <StatusBadge variant="critical">
-                                        Restricted
+                <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
+                    <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                        <Link
+                            href="/it/changes"
+                            className="frontline-focus inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground"
+                        >
+                            <ArrowLeft className="h-4 w-4" aria-hidden="true" />{' '}
+                            Back to changes
+                        </Link>
+                        <div className="mt-2 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-mono text-sm font-bold text-primary">
+                                        {ticket.reference}
+                                    </span>
+                                    <StatusBadge
+                                        variant={
+                                            changeStateVariant[
+                                                ticket.workflow_state
+                                            ] ?? 'neutral'
+                                        }
+                                    >
+                                        {changeLabel(ticket.workflow_state)}
                                     </StatusBadge>
+                                    <StatusBadge
+                                        variant={
+                                            change.risk_level === 'critical' ||
+                                            change.risk_level === 'high'
+                                                ? 'critical'
+                                                : 'info'
+                                        }
+                                    >
+                                        {changeLabel(change.risk_level)} risk
+                                    </StatusBadge>
+                                    {change.is_restricted ? (
+                                        <StatusBadge variant="critical">
+                                            Restricted
+                                        </StatusBadge>
+                                    ) : null}
+                                </div>
+                                <h1 className="mt-3 text-2xl font-bold tracking-tight">
+                                    {ticket.title}
+                                </h1>
+                                <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
+                                    {ticket.description ||
+                                        'No change description recorded.'}
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="min-h-11"
+                                >
+                                    <Link href={ticket.href}>
+                                        Open canonical ticket workspace{' '}
+                                        <ExternalLink
+                                            className="h-4 w-4"
+                                            aria-hidden="true"
+                                        />
+                                    </Link>
+                                </Button>
+                                {can.manage ? (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setEditing(true)}
+                                    >
+                                        Edit change
+                                    </Button>
+                                ) : null}
+                                {can.manage &&
+                                nextStates[ticket.workflow_state]?.length ? (
+                                    <Button
+                                        onClick={() => setTransitioning(true)}
+                                    >
+                                        Update state
+                                    </Button>
                                 ) : null}
                             </div>
-                            <h1 className="mt-3 text-2xl font-bold tracking-tight">
-                                {ticket.title}
-                            </h1>
-                            <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
-                                {ticket.description ||
-                                    'No change description recorded.'}
-                            </p>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="min-h-11"
-                            >
-                                <Link href={ticket.href}>
-                                    Open canonical ticket workspace{' '}
-                                    <ExternalLink
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />
-                                </Link>
-                            </Button>
-                            {can.manage ? (
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setEditing(true)}
-                                >
-                                    Edit change
-                                </Button>
-                            ) : null}
-                            {can.manage &&
-                            nextStates[ticket.workflow_state]?.length ? (
-                                <Button onClick={() => setTransitioning(true)}>
-                                    Update state
-                                </Button>
-                            ) : null}
-                        </div>
-                    </div>
-                </header>
+                    </header>
 
-                <section
-                    className="grid gap-4 md:grid-cols-3"
-                    aria-label="Change controls"
-                >
-                    <SummaryCard
-                        icon={<CalendarClock />}
-                        title="Maintenance window"
+                    <section
+                        className="grid gap-4 md:grid-cols-3"
+                        aria-label="Change controls"
                     >
-                        <p className="font-semibold">
-                            {changeLabel(change.maintenance_state)}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {windowText(
-                                change.maintenance_starts_at,
-                                change.maintenance_ends_at,
-                            )}
-                        </p>
-                    </SummaryCard>
-                    <SummaryCard icon={<ShieldCheck />} title="Approval">
-                        <p className="font-semibold">
-                            {ticket.requires_approval
-                                ? changeLabel(
-                                      ticket.approval?.status ??
-                                          'not requested',
-                                  )
-                                : 'Pre-authorized standard'}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {ticket.approval?.approver
-                                ? `Decision by ${ticket.approval.approver.name}`
-                                : ticket.approval?.reason ||
-                                  'Approval follows the shared ticket workflow.'}
-                        </p>
-                    </SummaryCard>
-                    <SummaryCard icon={<FileCheck2 />} title="Next action">
-                        <p className="font-semibold">
-                            {ticket.next_action ||
-                                'Set the next accountable action'}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {changeLabel(change.change_type)} change · SLA{' '}
-                            {changeLabel(ticket.sla_state)}
-                        </p>
-                    </SummaryCard>
-                </section>
+                        <SummaryCard
+                            icon={<CalendarClock />}
+                            title="Maintenance window"
+                        >
+                            <p className="font-semibold">
+                                {changeLabel(change.maintenance_state)}
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {windowText(
+                                    change.maintenance_starts_at,
+                                    change.maintenance_ends_at,
+                                )}
+                            </p>
+                        </SummaryCard>
+                        <SummaryCard icon={<ShieldCheck />} title="Approval">
+                            <p className="font-semibold">
+                                {ticket.requires_approval
+                                    ? changeLabel(
+                                          ticket.approval?.status ??
+                                              'not requested',
+                                      )
+                                    : 'Pre-authorized standard'}
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {ticket.approval?.approver
+                                    ? `Decision by ${ticket.approval.approver.name}`
+                                    : ticket.approval?.reason ||
+                                      'Approval follows the shared ticket workflow.'}
+                            </p>
+                        </SummaryCard>
+                        <SummaryCard icon={<FileCheck2 />} title="Next action">
+                            <p className="font-semibold">
+                                {ticket.next_action ||
+                                    'Set the next accountable action'}
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {changeLabel(change.change_type)} change · SLA{' '}
+                                {changeLabel(ticket.sla_state)}
+                            </p>
+                        </SummaryCard>
+                    </section>
 
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
-                    <div className="space-y-6">
-                        <Panel
-                            title="Risk, impact, and plans"
-                            description="The approved execution contract stays readable throughout the change."
-                        >
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <KnowledgeBlock
-                                    title="Expected impact"
-                                    value={change.impact_summary}
-                                />
-                                <KnowledgeBlock
-                                    title="Implementation plan"
-                                    value={change.implementation_plan}
-                                />
-                                <KnowledgeBlock
-                                    title="Validation plan"
-                                    value={change.validation_plan}
-                                />
-                                <KnowledgeBlock
-                                    title="Backout plan"
-                                    value={change.backout_plan}
-                                />
-                            </div>
-                        </Panel>
-                        <Panel
-                            title="Implementation outcome"
-                            description="Observed results, independent validation, backout evidence, and post-implementation review."
-                        >
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <KnowledgeBlock
-                                    title="Actual outcome"
-                                    value={change.actual_outcome}
-                                />
-                                <KnowledgeBlock
-                                    title="Independent validation"
-                                    value={change.validation_summary}
-                                    meta={
-                                        change.validated_by
-                                            ? `${changeLabel(change.validation_result ?? 'pending')} · ${change.validated_by.name}`
-                                            : changeLabel(
-                                                  change.validation_result ??
-                                                      'pending',
-                                              )
-                                    }
-                                />
-                                <KnowledgeBlock
-                                    title="Backout outcome"
-                                    value={change.backout_summary}
-                                />
-                                <KnowledgeBlock
-                                    title="Post-implementation review"
-                                    value={change.pir_summary}
-                                    meta={change.reviewed_by?.name}
-                                />
-                            </div>
-                        </Panel>
-                        <Panel
-                            title="Affected services and records"
-                            description="One scoped view of operational impact without copying source-system data."
-                        >
-                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                <LinkGroup
-                                    title="Services"
-                                    items={links.services.map(
-                                        (item) => item.name,
-                                    )}
-                                />
-                                <LinkGroup
-                                    title="Sites"
-                                    items={links.sites.map((item) => item.name)}
-                                />
-                                <LinkGroup
-                                    title="Devices"
-                                    items={links.devices.map(
-                                        (item) => item.name,
-                                    )}
-                                />
-                                <LinkGroup
-                                    title="Monitoring alerts"
-                                    items={links.alerts.map(
-                                        (item) => item.reference || item.title,
-                                    )}
-                                />
-                                <TicketLinkGroup
-                                    title="Incidents"
-                                    items={links.incidents}
-                                />
-                                <TicketLinkGroup
-                                    title="Problems"
-                                    items={links.problems}
-                                />
-                            </div>
-                        </Panel>
-                    </div>
-
-                    <aside className="space-y-6">
-                        <Panel
-                            title="Shared work record"
-                            description="Conversation and evidence remain on the canonical ticket."
-                        >
-                            <dl className="grid grid-cols-2 gap-3 text-sm">
-                                <Count
-                                    label="Comments"
-                                    value={ticket.comments_count}
-                                />
-                                <Count
-                                    label="Tasks"
-                                    value={ticket.tasks_count}
-                                />
-                                <Count
-                                    label="Approvals"
-                                    value={ticket.approvals_count}
-                                />
-                                <Count
-                                    label="Attachments"
-                                    value={ticket.attachments_count}
-                                />
-                                <Count
-                                    label="Timeline events"
-                                    value={ticket.events_count}
-                                    className="col-span-2"
-                                />
-                            </dl>
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="mt-4 w-full"
+                    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+                        <div className="space-y-6">
+                            <Panel
+                                title="Risk, impact, and plans"
+                                description="The approved execution contract stays readable throughout the change."
                             >
-                                <Link href={ticket.href}>
-                                    Open shared work{' '}
-                                    <ExternalLink
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <KnowledgeBlock
+                                        title="Expected impact"
+                                        value={change.impact_summary}
                                     />
-                                </Link>
-                            </Button>
-                        </Panel>
-                        <Panel
-                            title="Accountability"
-                            description="Execution and validation actors are explicit."
-                        >
-                            <dl className="space-y-3 text-sm">
-                                <Detail
-                                    label="Implemented by"
-                                    value={change.implemented_by?.name}
-                                    date={change.implemented_at}
-                                />
-                                <Detail
-                                    label="Validated by"
-                                    value={change.validated_by?.name}
-                                    date={change.validated_at}
-                                />
-                                <Detail
-                                    label="Reviewed by"
-                                    value={change.reviewed_by?.name}
-                                    date={change.reviewed_at}
-                                />
-                            </dl>
-                        </Panel>
-                    </aside>
-                </div>
-            </main>
+                                    <KnowledgeBlock
+                                        title="Implementation plan"
+                                        value={change.implementation_plan}
+                                    />
+                                    <KnowledgeBlock
+                                        title="Validation plan"
+                                        value={change.validation_plan}
+                                    />
+                                    <KnowledgeBlock
+                                        title="Backout plan"
+                                        value={change.backout_plan}
+                                    />
+                                </div>
+                            </Panel>
+                            <Panel
+                                title="Implementation outcome"
+                                description="Observed results, independent validation, backout evidence, and post-implementation review."
+                            >
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <KnowledgeBlock
+                                        title="Actual outcome"
+                                        value={change.actual_outcome}
+                                    />
+                                    <KnowledgeBlock
+                                        title="Independent validation"
+                                        value={change.validation_summary}
+                                        meta={
+                                            change.validated_by
+                                                ? `${changeLabel(change.validation_result ?? 'pending')} · ${change.validated_by.name}`
+                                                : changeLabel(
+                                                      change.validation_result ??
+                                                          'pending',
+                                                  )
+                                        }
+                                    />
+                                    <KnowledgeBlock
+                                        title="Backout outcome"
+                                        value={change.backout_summary}
+                                    />
+                                    <KnowledgeBlock
+                                        title="Post-implementation review"
+                                        value={change.pir_summary}
+                                        meta={change.reviewed_by?.name}
+                                    />
+                                </div>
+                            </Panel>
+                            <Panel
+                                title="Affected services and records"
+                                description="One scoped view of operational impact without copying source-system data."
+                            >
+                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    <LinkGroup
+                                        title="Services"
+                                        items={links.services.map(
+                                            (item) => item.name,
+                                        )}
+                                    />
+                                    <LinkGroup
+                                        title="Sites"
+                                        items={links.sites.map(
+                                            (item) => item.name,
+                                        )}
+                                    />
+                                    <LinkGroup
+                                        title="Devices"
+                                        items={links.devices.map(
+                                            (item) => item.name,
+                                        )}
+                                    />
+                                    <LinkGroup
+                                        title="Monitoring alerts"
+                                        items={links.alerts.map(
+                                            (item) =>
+                                                item.reference || item.title,
+                                        )}
+                                    />
+                                    <TicketLinkGroup
+                                        title="Incidents"
+                                        items={links.incidents}
+                                    />
+                                    <TicketLinkGroup
+                                        title="Problems"
+                                        items={links.problems}
+                                    />
+                                </div>
+                            </Panel>
+                        </div>
+
+                        <aside className="space-y-6">
+                            <Panel
+                                title="Shared work record"
+                                description="Conversation and evidence remain on the canonical ticket."
+                            >
+                                <dl className="grid grid-cols-2 gap-3 text-sm">
+                                    <Count
+                                        label="Comments"
+                                        value={ticket.comments_count}
+                                    />
+                                    <Count
+                                        label="Tasks"
+                                        value={ticket.tasks_count}
+                                    />
+                                    <Count
+                                        label="Approvals"
+                                        value={ticket.approvals_count}
+                                    />
+                                    <Count
+                                        label="Attachments"
+                                        value={ticket.attachments_count}
+                                    />
+                                    <Count
+                                        label="Timeline events"
+                                        value={ticket.events_count}
+                                        className="col-span-2"
+                                    />
+                                </dl>
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="mt-4 w-full"
+                                >
+                                    <Link href={ticket.href}>
+                                        Open shared work{' '}
+                                        <ExternalLink
+                                            className="h-4 w-4"
+                                            aria-hidden="true"
+                                        />
+                                    </Link>
+                                </Button>
+                            </Panel>
+                            <Panel
+                                title="Accountability"
+                                description="Execution and validation actors are explicit."
+                            >
+                                <dl className="space-y-3 text-sm">
+                                    <Detail
+                                        label="Implemented by"
+                                        value={change.implemented_by?.name}
+                                        date={change.implemented_at}
+                                    />
+                                    <Detail
+                                        label="Validated by"
+                                        value={change.validated_by?.name}
+                                        date={change.validated_at}
+                                    />
+                                    <Detail
+                                        label="Reviewed by"
+                                        value={change.reviewed_by?.name}
+                                        date={change.reviewed_at}
+                                    />
+                                </dl>
+                            </Panel>
+                        </aside>
+                    </div>
+                </main>
             </ItModuleShell>
 
             <Dialog open={editing} onOpenChange={setEditing}>

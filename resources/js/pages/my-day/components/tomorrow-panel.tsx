@@ -1,9 +1,9 @@
 import { Link } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
 
+import HandoverReadCard from '@/components/handover-read-card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import HandoverReadCard from '@/components/handover-read-card';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 
 import { residentHue, residentInitials } from '../lib/resident-hue';
@@ -22,7 +22,9 @@ export function TomorrowPanel({ briefing, heading }: TomorrowPanelProps) {
 
     const start = formatTime(briefing.starts_at);
     const end = formatTime(briefing.ends_at);
-    const dayLabel = new Date(briefing.starts_at).toLocaleDateString([], { weekday: 'short' });
+    const dayLabel = new Date(briefing.starts_at).toLocaleDateString([], {
+        weekday: 'short',
+    });
     const client = briefing.client;
 
     // The MyShiftResource client payload only carries `name` + `photo_url`. We
@@ -42,7 +44,7 @@ export function TomorrowPanel({ briefing, heading }: TomorrowPanelProps) {
             className="rounded-2xl border border-border bg-gradient-to-b from-card to-background p-4"
         >
             <div className="mb-2.5 flex items-center gap-2">
-                <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-text-faint">
+                <div className="text-[10.5px] font-bold tracking-[0.12em] text-text-faint uppercase">
                     {resolvedHeading}
                 </div>
                 <span className="text-[11px] text-muted-foreground">
@@ -51,7 +53,9 @@ export function TomorrowPanel({ briefing, heading }: TomorrowPanelProps) {
             </div>
             <div className="mb-2.5 flex items-center gap-2.5">
                 <Avatar className="h-9 w-9">
-                    {client?.photo_url ? <AvatarImage src={client.photo_url} alt={fullName} /> : null}
+                    {client?.photo_url ? (
+                        <AvatarImage src={client.photo_url} alt={fullName} />
+                    ) : null}
                     <AvatarFallback
                         className="text-sm font-semibold"
                         style={{
@@ -126,7 +130,11 @@ function collectBriefingLines(briefing: MyDayPreShiftBriefing): string[] {
 
 function formatTime(iso: string): string {
     const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    return d.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    });
 }
 
 export default TomorrowPanel;

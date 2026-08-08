@@ -6,26 +6,26 @@ import { useCallback, useMemo, useState } from 'react';
 // visually identical across modules. (This re-exports the shared
 // components/wizard kit directly — it is NOT a fork of HR's wrapper.)
 export {
-    WizardShell,
-    WizardStepPane,
-    WizardSuccessPane,
-    ReviewCard,
-    ReviewRow,
-} from '@/components/wizard/shell';
-export type { WizardStep } from '@/components/wizard/shell';
-export {
+    ChipMulti,
     Field,
     FieldErr,
+    InfoCard,
+    Ring,
     Segmented,
-    ChipMulti,
-    TilePicker,
     SelectInput,
     StepHead,
     SubHead,
-    InfoCard,
-    Ring,
+    TilePicker,
 } from '@/components/wizard/primitives';
 export type { IconType } from '@/components/wizard/primitives';
+export {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+} from '@/components/wizard/shell';
+export type { WizardStep } from '@/components/wizard/shell';
 
 /**
  * Step state machine for Finance wizards built on WizardShell — keeps Back /

@@ -37,7 +37,8 @@ const HERO_STYLE: CSSProperties = {
     ['--hr-amber' as string]: 'oklch(0.86 0.13 90)',
     background:
         'linear-gradient(120deg, color-mix(in oklch, var(--primary) 72%, black 22%), var(--primary) 60%, color-mix(in oklch, var(--primary) 92%, white 6%))',
-    boxShadow: '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
+    boxShadow:
+        '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
 };
 
 function greetingFor(hour: number): string {
@@ -89,14 +90,20 @@ export function FeedHero({
     onCongratulate: (celebration: FeedCelebration) => void;
 }) {
     const now = new Date();
-    const eyebrow = `${greetingFor(now.getHours())} · ${now.toLocaleDateString('en-NZ', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-    })}`;
+    const eyebrow = `${greetingFor(now.getHours())} · ${now.toLocaleDateString(
+        'en-NZ',
+        {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+        },
+    )}`;
 
     return (
-        <div style={HERO_STYLE} className="relative overflow-hidden rounded-[24px] text-primary-foreground">
+        <div
+            style={HERO_STYLE}
+            className="relative overflow-hidden rounded-[24px] text-primary-foreground"
+        >
             {/* decorative orb */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
                 <div className="absolute -top-24 right-[18%] h-72 w-72 rounded-full bg-primary-foreground/[0.06]" />
@@ -108,34 +115,65 @@ export function FeedHero({
                         <Sparkles className="h-7 w-7 text-[color:var(--hr-amber)]" />
                     </span>
                     <div className="min-w-0">
-                        <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-foreground/60">
+                        <div className="text-[11px] font-bold tracking-[0.12em] text-primary-foreground/60 uppercase">
                             {eyebrow}
                         </div>
-                        <h1 className="mt-1 text-[28px] font-bold leading-[1.05] tracking-tight">
+                        <h1 className="mt-1 text-[28px] leading-[1.05] font-bold tracking-tight">
                             Community &amp; Recognition
                         </h1>
                         <p className="mt-1.5 text-[13.5px] text-primary-foreground/80">
-                            🎉 Celebrate wins, share updates and keep the team connected.
+                            🎉 Celebrate wins, share updates and keep the team
+                            connected.
                         </p>
                     </div>
                 </div>
 
                 {/* KPIs */}
-                <div className="-ml-3 mt-6 flex flex-wrap gap-0.5">
-                    <HeroStat label="Kudos this month" value={metrics.kudos_this_month} />
-                    <HeroStat label="Participation" value={`${metrics.participation}%`} amber />
-                    <HeroStat label="Celebrations" value={metrics.celebrations} />
-                    <HeroStat label="Posts this week" value={metrics.posts_this_week} />
+                <div className="mt-6 -ml-3 flex flex-wrap gap-0.5">
+                    <HeroStat
+                        label="Kudos this month"
+                        value={metrics.kudos_this_month}
+                    />
+                    <HeroStat
+                        label="Participation"
+                        value={`${metrics.participation}%`}
+                        amber
+                    />
+                    <HeroStat
+                        label="Celebrations"
+                        value={metrics.celebrations}
+                    />
+                    <HeroStat
+                        label="Posts this week"
+                        value={metrics.posts_this_week}
+                    />
                 </div>
 
                 {/* quick actions */}
                 <div className="mt-6 flex flex-wrap gap-2.5">
-                    <HeroAction icon={Heart} label="Give recognition" onClick={onGiveRecognition} primary />
-                    <HeroAction icon={Sparkles} label="Post update" onClick={onPostUpdate} />
+                    <HeroAction
+                        icon={Heart}
+                        label="Give recognition"
+                        onClick={onGiveRecognition}
+                        primary
+                    />
+                    <HeroAction
+                        icon={Sparkles}
+                        label="Post update"
+                        onClick={onPostUpdate}
+                    />
                     {canAnnounce ? (
-                        <HeroAction icon={Megaphone} label="Make announcement" onClick={onMakeAnnouncement} />
+                        <HeroAction
+                            icon={Megaphone}
+                            label="Make announcement"
+                            onClick={onMakeAnnouncement}
+                        />
                     ) : null}
-                    <HeroAction icon={BarChart3} label="View insights" onClick={onViewInsights} />
+                    <HeroAction
+                        icon={BarChart3}
+                        label="View insights"
+                        onClick={onViewInsights}
+                    />
                 </div>
             </div>
 
@@ -143,7 +181,7 @@ export function FeedHero({
             {celebrations.length > 0 ? (
                 <div className="relative border-t border-primary-foreground/15 bg-black/[0.1] px-[26px] py-4">
                     <div className="mb-2.5 flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-primary-foreground/55">
+                        <span className="text-[10px] font-bold tracking-[0.12em] text-primary-foreground/55 uppercase">
                             This week&apos;s celebrations
                         </span>
                         <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary-foreground/20 px-1 text-[11px] font-bold">
@@ -160,7 +198,9 @@ export function FeedHero({
                                     {initials(c.user_name)}
                                 </span>
                                 <div className="min-w-0 flex-1">
-                                    <div className="truncate text-[13px] font-semibold">{c.user_name}</div>
+                                    <div className="truncate text-[13px] font-semibold">
+                                        {c.user_name}
+                                    </div>
                                     <div className="truncate text-[11.5px] text-primary-foreground/70">
                                         {CELEBRATION_ICON[c.kind]} {c.sublabel}
                                     </div>
@@ -194,7 +234,7 @@ function HeroStat({
 }) {
     return (
         <div className="flex flex-col items-start gap-0.5 rounded-[10px] px-3 py-2">
-            <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.09em] text-primary-foreground/60">
+            <span className="text-[10px] font-bold tracking-[0.09em] whitespace-nowrap text-primary-foreground/60 uppercase">
                 {label}
             </span>
             <span

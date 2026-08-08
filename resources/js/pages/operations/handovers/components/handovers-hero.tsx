@@ -101,7 +101,10 @@ export function HandoversHero({
     }${counts.openIncoming > 0 ? `, ${counts.openIncoming} with an open incoming shift` : ''}.`;
 
     const meta = [
-        { icon: CalendarRange, label: `Wk ${weekNumberISO(weekStart)} · Mon–Sun` },
+        {
+            icon: CalendarRange,
+            label: `Wk ${weekNumberISO(weekStart)} · Mon–Sun`,
+        },
         { icon: LayoutGrid, label: `${catalogue.sites.length} houses` },
         { icon: Users, label: `${catalogue.staff.length} staff on roster` },
     ];
@@ -188,7 +191,7 @@ export function HandoversHero({
             {/* Search + filters */}
             <div className="flex flex-wrap items-center gap-2">
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
+                    <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
                     <input
                         value={search}
                         onChange={(e) => onSearch(e.target.value)}

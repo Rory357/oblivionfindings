@@ -312,6 +312,25 @@ test('ticket intake exposes and links only canonical visible Security and Device
         ->and($creationAudit->meta['device_id'] ?? null)->toBeNull();
 });
 
+test('ticket Device linking advertises the exact Security and Devices permission', function () {
+    $site = Site::factory()->create();
+    $agent = itControllerAccessActor(['it.view', 'it.manage'], $site);
+    $ticket = ItTicket::factory()->create([
+        'site_id' => $site->id,
+        'requester_user_id' => $agent->id,
+        'work_type' => 'incident',
+        'status' => 'open',
+    ]);
+
+    $this->actingAs($agent)
+        ->get(route('it.tickets.show', $ticket))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('can.manage', true)
+            ->where('can.linkDevices', false)
+            ->has('deviceOptions', 0));
+});
+
 test('ticket intake refuses a visible Device from a different approved Site', function () {
     $ticketSite = Site::factory()->create();
     $otherApprovedSite = Site::factory()->create();

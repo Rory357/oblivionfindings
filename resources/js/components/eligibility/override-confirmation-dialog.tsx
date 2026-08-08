@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -8,9 +7,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { AlertTriangle, ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
 
 export interface OverrideableWarning {
     rule: string;
@@ -74,7 +74,10 @@ export function OverrideConfirmationDialog({
                     <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 dark:border-status-warning/30">
                         <ul className="space-y-1.5">
                             {warnings.map((w, i) => (
-                                <li key={i} className="flex items-start gap-2 text-sm text-status-warning dark:text-status-warning">
+                                <li
+                                    key={i}
+                                    className="flex items-start gap-2 text-sm text-status-warning dark:text-status-warning"
+                                >
                                     <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-status-warning dark:text-status-warning" />
                                     <span>{w.message}</span>
                                 </li>
@@ -84,20 +87,31 @@ export function OverrideConfirmationDialog({
 
                     {/* Reason input */}
                     <div className="space-y-1.5">
-                        <Label htmlFor="override-reason" className="text-sm font-medium">
-                            Reason for override <span className="text-destructive">*</span>
+                        <Label
+                            htmlFor="override-reason"
+                            className="text-sm font-medium"
+                        >
+                            Reason for override{' '}
+                            <span className="text-destructive">*</span>
                         </Label>
                         <Textarea
                             id="override-reason"
                             placeholder="Explain why this override is appropriate..."
                             value={reason}
-                            onChange={e => setReason(e.target.value)}
+                            onChange={(e) => setReason(e.target.value)}
                             onBlur={() => setTouched(true)}
                             rows={3}
-                            className={touched && reason.trim().length === 0 ? 'border-destructive' : ''}
+                            className={
+                                touched && reason.trim().length === 0
+                                    ? 'border-destructive'
+                                    : ''
+                            }
                         />
                         {touched && reason.trim().length === 0 && (
-                            <p className="text-xs text-destructive">A reason is required when overriding eligibility warnings.</p>
+                            <p className="text-xs text-destructive">
+                                A reason is required when overriding eligibility
+                                warnings.
+                            </p>
                         )}
                     </div>
                 </div>

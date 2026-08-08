@@ -18,7 +18,12 @@ import {
 } from '@/pages/hr/compliance/components/compliance-bits';
 import { HrTabs, type HrTabItem } from './hr-tabs';
 
-export type ComplianceTab = 'overview' | 'matrix' | 'calendar' | 'vetting' | 'drivers';
+export type ComplianceTab =
+    | 'overview'
+    | 'matrix'
+    | 'calendar'
+    | 'vetting'
+    | 'drivers';
 
 const TAB_URLS: Record<ComplianceTab, string> = {
     overview: '/hr/compliance',
@@ -50,7 +55,8 @@ export function ComplianceTabs({
     active: ComplianceTab;
     counts?: Partial<Record<ComplianceTab, number>>;
 }) {
-    const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth?.can?.hr;
+    const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth
+        ?.can?.hr;
     const { ctx, open, close } = useContextMenu();
 
     const [defaultTab, setDefaultTab] = useState<string>('overview');
@@ -94,23 +100,53 @@ export function ComplianceTabs({
 
     const all: Array<{ item: HrTabItem; show: boolean }> = [
         {
-            item: { id: 'overview', label: 'Overview', icon: ShieldCheck, tone: 'primary', badge: counts?.overview },
+            item: {
+                id: 'overview',
+                label: 'Overview',
+                icon: ShieldCheck,
+                tone: 'primary',
+                badge: counts?.overview,
+            },
             show: !!hr?.compliance?.view,
         },
         {
-            item: { id: 'matrix', label: 'Matrix', icon: LayoutGrid, tone: 'info', badge: counts?.matrix },
+            item: {
+                id: 'matrix',
+                label: 'Matrix',
+                icon: LayoutGrid,
+                tone: 'info',
+                badge: counts?.matrix,
+            },
             show: !!hr?.compliance?.manage,
         },
         {
-            item: { id: 'calendar', label: 'Renewals', icon: CalendarDays, tone: 'violet', badge: counts?.calendar },
+            item: {
+                id: 'calendar',
+                label: 'Renewals',
+                icon: CalendarDays,
+                tone: 'violet',
+                badge: counts?.calendar,
+            },
             show: !!hr?.compliance?.view,
         },
         {
-            item: { id: 'vetting', label: 'Vetting', icon: UserCheck, tone: 'warning', badge: counts?.vetting },
+            item: {
+                id: 'vetting',
+                label: 'Vetting',
+                icon: UserCheck,
+                tone: 'warning',
+                badge: counts?.vetting,
+            },
             show: !!hr?.vetting?.view,
         },
         {
-            item: { id: 'drivers', label: 'Drivers', icon: Car, tone: 'critical', badge: counts?.drivers },
+            item: {
+                id: 'drivers',
+                label: 'Drivers',
+                icon: Car,
+                tone: 'critical',
+                badge: counts?.drivers,
+            },
             show: !!hr?.driver?.view,
         },
     ];
@@ -122,9 +158,13 @@ export function ComplianceTabs({
     const decorations: Record<string, React.ReactNode> = {};
     for (const { item } of all) {
         if (defaultTab === item.id) {
-            decorations[item.id] = <Star className="h-3 w-3 fill-[color:var(--hr-amber)] text-[color:var(--hr-amber)]" />;
+            decorations[item.id] = (
+                <Star className="h-3 w-3 fill-[color:var(--hr-amber)] text-[color:var(--hr-amber)]" />
+            );
         } else if (pinned[item.id]) {
-            decorations[item.id] = <Pin className="h-3 w-3 text-muted-foreground" />;
+            decorations[item.id] = (
+                <Pin className="h-3 w-3 text-muted-foreground" />
+            );
         }
     }
 
@@ -137,8 +177,16 @@ export function ComplianceTabs({
                 decorations={decorations}
                 onItemContextMenu={(id, event) =>
                     open(event, [
-                        { icon: ChevronRight, label: 'Open', onClick: () => navigate(id) },
-                        { icon: Star, label: 'Set as default view', onClick: () => setAsDefault(id) },
+                        {
+                            icon: ChevronRight,
+                            label: 'Open',
+                            onClick: () => navigate(id),
+                        },
+                        {
+                            icon: Star,
+                            label: 'Set as default view',
+                            onClick: () => setAsDefault(id),
+                        },
                         {
                             icon: Pin,
                             label: pinned[id] ? 'Unpin' : 'Pin',

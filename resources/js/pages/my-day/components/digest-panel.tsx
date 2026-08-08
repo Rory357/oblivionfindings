@@ -66,10 +66,25 @@ interface OpenItem {
  * i18n hook at render time (since hooks can't run inside this module-level
  * map), so this carries only the i18n key.
  */
-const KIND_META: Record<OpenItemKind, { labelKey: 'digest_alert' | 'digest_incident' | 'digest_followup'; tone: 'critical' | 'warning' | 'info'; icon: LucideIcon }> = {
+const KIND_META: Record<
+    OpenItemKind,
+    {
+        labelKey: 'digest_alert' | 'digest_incident' | 'digest_followup';
+        tone: 'critical' | 'warning' | 'info';
+        icon: LucideIcon;
+    }
+> = {
     alert: { labelKey: 'digest_alert', tone: 'critical', icon: AlertTriangle },
-    incident: { labelKey: 'digest_incident', tone: 'warning', icon: ShieldCheck },
-    followup: { labelKey: 'digest_followup', tone: 'info', icon: ClipboardList },
+    incident: {
+        labelKey: 'digest_incident',
+        tone: 'warning',
+        icon: ShieldCheck,
+    },
+    followup: {
+        labelKey: 'digest_followup',
+        tone: 'info',
+        icon: ClipboardList,
+    },
 };
 
 const TONE_TILE: Record<'critical' | 'warning' | 'info', string> = {
@@ -79,8 +94,10 @@ const TONE_TILE: Record<'critical' | 'warning' | 'info', string> = {
 };
 
 const TONE_BADGE: Record<'critical' | 'warning' | 'info', string> = {
-    critical: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
-    warning: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    critical:
+        'border-status-critical/30 bg-status-critical-bg text-status-critical',
+    warning:
+        'border-status-warning/30 bg-status-warning-bg text-status-warning',
     info: 'border-status-info/30 bg-status-info-bg text-status-info',
 };
 
@@ -96,7 +113,10 @@ export function DigestPanel({
     onConfirmHandoverRead,
 }: DigestPanelProps) {
     const t = useMyDayLabels();
-    const openItems = useMemo(() => combineOpenItems(alertTasks, incidents), [alertTasks, incidents]);
+    const openItems = useMemo(
+        () => combineOpenItems(alertTasks, incidents),
+        [alertTasks, incidents],
+    );
 
     return (
         <div
@@ -106,7 +126,9 @@ export function DigestPanel({
             <div className="px-2">
                 <PageTabs
                     value={tab}
-                    onValueChange={(next) => onTabChange(next as 'handover' | 'alerts' | 'notifs')}
+                    onValueChange={(next) =>
+                        onTabChange(next as 'handover' | 'alerts' | 'notifs')
+                    }
                     dense
                     items={[
                         {
@@ -114,7 +136,10 @@ export function DigestPanel({
                             label: t('digest_handover'),
                             icon: StickyNote,
                             badge: handover?.unread ? (
-                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning">
+                                <Badge
+                                    variant="outline"
+                                    className="border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning"
+                                >
                                     {t('digest_new_badge')}
                                 </Badge>
                             ) : null,
@@ -123,18 +148,25 @@ export function DigestPanel({
                             value: 'alerts',
                             label: t('digest_needs_you'),
                             icon: AlertTriangle,
-                            badge: openItems.length > 0 ? openItems.length : null,
+                            badge:
+                                openItems.length > 0 ? openItems.length : null,
                         },
                         {
                             value: 'notifs',
                             label: t('digest_updates'),
                             icon: Bell,
-                            badge: notifications.length > 0 ? notifications.length : null,
+                            badge:
+                                notifications.length > 0
+                                    ? notifications.length
+                                    : null,
                         },
                     ]}
                 >
                     <TabsContent value="handover" className="m-0">
-                        <HandoverPane handover={handover} onConfirmRead={onConfirmHandoverRead} />
+                        <HandoverPane
+                            handover={handover}
+                            onConfirmRead={onConfirmHandoverRead}
+                        />
                     </TabsContent>
                     <TabsContent value="alerts" className="m-0">
                         <NeedsYouPane
@@ -184,13 +216,17 @@ function HandoverPane({
                     </Avatar>
                 ) : null}
                 <div>
-                    <div className="text-[13.5px] font-semibold">{handover.from?.name ?? t('digest_previous_shift')}</div>
+                    <div className="text-[13.5px] font-semibold">
+                        {handover.from?.name ?? t('digest_previous_shift')}
+                    </div>
                     <div className="text-[11.5px] text-muted-foreground">
                         {handover.from?.role ?? t('digest_previous_shift')}
                         {handover.recorded_at ? (
                             <>
                                 {' · '}ended{' '}
-                                {new Date(handover.recorded_at).toLocaleTimeString([], {
+                                {new Date(
+                                    handover.recorded_at,
+                                ).toLocaleTimeString([], {
                                     hour: '2-digit',
                                     minute: '2-digit',
                                     hour12: false,
@@ -209,7 +245,9 @@ function HandoverPane({
                 ) : null}
             </div>
             {handover.summary ? (
-                <p className="mt-2.5 text-[13px] leading-[1.55]">{handover.summary}</p>
+                <p className="mt-2.5 text-[13px] leading-[1.55]">
+                    {handover.summary}
+                </p>
             ) : null}
             {handover.flags && handover.flags.length > 0 ? (
                 <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -319,7 +357,10 @@ function OpenItemRow({
             </div>
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant="outline" className={cn('text-[10px]', TONE_BADGE[meta.tone])}>
+                    <Badge
+                        variant="outline"
+                        className={cn('text-[10px]', TONE_BADGE[meta.tone])}
+                    >
                         {t(meta.labelKey)}
                     </Badge>
                     {isCrit ? (
@@ -334,7 +375,7 @@ function OpenItemRow({
                         {timeSince(item.occurredAt)}
                     </span>
                 </div>
-                <div className="mt-1 text-[12.5px] font-semibold leading-snug text-pretty">
+                <div className="mt-1 text-[12.5px] leading-snug font-semibold text-pretty">
                     {item.title}
                 </div>
                 {item.description ? (
@@ -343,14 +384,19 @@ function OpenItemRow({
                     </p>
                 ) : null}
                 <div className="mt-1 text-[11px] text-muted-foreground">
-                    {[item.clientName, item.sla].filter(Boolean).join(' · ') || '—'}
+                    {[item.clientName, item.sla].filter(Boolean).join(' · ') ||
+                        '—'}
                 </div>
                 {isCrit && item.raw ? (
                     <div className="mt-2 flex gap-1.5">
                         <Button size="sm" onClick={() => onAck?.(item.raw!)}>
                             {t('digest_acknowledge')}
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => onSnooze?.(item.raw!)}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onSnooze?.(item.raw!)}
+                        >
                             {t('digest_snooze_15m')}
                         </Button>
                     </div>
@@ -390,12 +436,17 @@ function NotifsPane({ notifications }: { notifications: MyDayNotification[] }) {
                             'mt-2 h-1.5 w-1.5 shrink-0 rounded-full',
                             n.tone === 'primary' && 'bg-primary',
                             n.tone === 'info' && 'bg-status-success',
-                            (n.tone === 'muted' || !n.tone) && 'bg-muted-foreground',
+                            (n.tone === 'muted' || !n.tone) &&
+                                'bg-muted-foreground',
                         )}
                     />
                     <div className="min-w-0 flex-1">
-                        <div className="text-[12.5px] font-medium">{n.title}</div>
-                        <div className="mt-0.5 text-[10.5px] text-muted-foreground">{n.at}</div>
+                        <div className="text-[12.5px] font-medium">
+                            {n.title}
+                        </div>
+                        <div className="mt-0.5 text-[10.5px] text-muted-foreground">
+                            {n.at}
+                        </div>
                     </div>
                 </div>
             ))}
@@ -408,10 +459,16 @@ function NotifsPane({ notifications }: { notifications: MyDayNotification[] }) {
  * `incidents` payload into a single priority-sorted open-item list. Sort order:
  * critical > high > medium > low; ties broken by most-recent.
  */
-function combineOpenItems(tasks: MyDayTaskFollowup[], incidents: MyDayIncident[]): OpenItem[] {
+function combineOpenItems(
+    tasks: MyDayTaskFollowup[],
+    incidents: MyDayIncident[],
+): OpenItem[] {
     const fromTasks: OpenItem[] = tasks.map((t) => ({
         id: `task-${t.id}`,
-        kind: t.type === 'note_followup' || t.type === 'followup' ? 'followup' : (t.type as OpenItemKind),
+        kind:
+            t.type === 'note_followup' || t.type === 'followup'
+                ? 'followup'
+                : (t.type as OpenItemKind),
         title: t.title,
         description: t.description ?? null,
         priority: t.priority,
@@ -436,15 +493,23 @@ function combineOpenItems(tasks: MyDayTaskFollowup[], incidents: MyDayIncident[]
     }));
 
     return [...fromTasks, ...fromIncidents].sort((a, b) => {
-        const rank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+        const rank: Record<string, number> = {
+            critical: 0,
+            high: 1,
+            medium: 2,
+            low: 3,
+        };
         const diff = (rank[a.priority] ?? 3) - (rank[b.priority] ?? 3);
         if (diff !== 0) return diff;
-        return new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime();
+        return (
+            new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+        );
     });
 }
 
 function mapSeverity(s: string): 'critical' | 'high' | 'medium' | 'low' {
-    if (s === 'critical' || s === 'high' || s === 'medium' || s === 'low') return s;
+    if (s === 'critical' || s === 'high' || s === 'medium' || s === 'low')
+        return s;
     return 'medium';
 }
 

@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
 import { ItModuleShell } from '@/components/it/it-module-shell';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -200,399 +200,415 @@ export default function ItMajorIncidentShow({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${ticket.reference} · Major incident`} />
             <ItModuleShell>
-            <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
-                <header className="overflow-hidden rounded-2xl border border-status-critical/30 bg-card shadow-sm">
-                    <div className="border-l-4 border-status-critical p-5">
-                        <Link
-                            href="/it/major-incidents"
-                            className="frontline-focus inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground"
-                        >
-                            <ArrowLeft className="h-4 w-4" aria-hidden="true" />{' '}
-                            Back to major incidents
-                        </Link>
-                        <div className="mt-2 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-                            <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <StatusBadge
-                                        variant={
-                                            majorIncident.severity === 'sev1' ||
-                                            majorIncident.severity === 'sev2'
-                                                ? 'critical'
-                                                : 'warning'
-                                        }
-                                    >
-                                        {majorIncident.severity.toUpperCase()}
-                                    </StatusBadge>
-                                    <StatusBadge
-                                        variant={
-                                            majorIncidentStateVariant[
-                                                ticket.workflow_state
-                                            ] ?? 'neutral'
-                                        }
-                                    >
-                                        {majorIncidentLabel(
-                                            ticket.workflow_state,
+                <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
+                    <header className="overflow-hidden rounded-2xl border border-status-critical/30 bg-card shadow-sm">
+                        <div className="border-l-4 border-status-critical p-5">
+                            <Link
+                                href="/it/major-incidents"
+                                className="frontline-focus inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground"
+                            >
+                                <ArrowLeft
+                                    className="h-4 w-4"
+                                    aria-hidden="true"
+                                />{' '}
+                                Back to major incidents
+                            </Link>
+                            <div className="mt-2 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <StatusBadge
+                                            variant={
+                                                majorIncident.severity ===
+                                                    'sev1' ||
+                                                majorIncident.severity ===
+                                                    'sev2'
+                                                    ? 'critical'
+                                                    : 'warning'
+                                            }
+                                        >
+                                            {majorIncident.severity.toUpperCase()}
+                                        </StatusBadge>
+                                        <StatusBadge
+                                            variant={
+                                                majorIncidentStateVariant[
+                                                    ticket.workflow_state
+                                                ] ?? 'neutral'
+                                            }
+                                        >
+                                            {majorIncidentLabel(
+                                                ticket.workflow_state,
+                                            )}
+                                        </StatusBadge>
+                                        {majorIncident.update_state ===
+                                        'overdue' ? (
+                                            <StatusBadge variant="critical">
+                                                Update overdue
+                                            </StatusBadge>
+                                        ) : (
+                                            <StatusBadge variant="success">
+                                                Updates on time
+                                            </StatusBadge>
                                         )}
-                                    </StatusBadge>
-                                    {majorIncident.update_state ===
-                                    'overdue' ? (
-                                        <StatusBadge variant="critical">
-                                            Update overdue
-                                        </StatusBadge>
-                                    ) : (
-                                        <StatusBadge variant="success">
-                                            Updates on time
-                                        </StatusBadge>
-                                    )}
+                                    </div>
+                                    <div className="mt-3 flex items-center gap-2">
+                                        <Siren
+                                            className="h-5 w-5 text-status-critical"
+                                            aria-hidden="true"
+                                        />
+                                        <span className="font-mono text-sm font-bold text-primary">
+                                            {ticket.reference}
+                                        </span>
+                                    </div>
+                                    <h1 className="mt-1 text-2xl font-bold tracking-tight">
+                                        {ticket.title}
+                                    </h1>
+                                    <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
+                                        {ticket.description ||
+                                            'No incident description recorded.'}
+                                    </p>
                                 </div>
-                                <div className="mt-3 flex items-center gap-2">
-                                    <Siren
-                                        className="h-5 w-5 text-status-critical"
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        className="min-h-11"
+                                    >
+                                        <Link href={ticket.href}>
+                                            Open canonical ticket workspace{' '}
+                                            <ExternalLink
+                                                className="h-4 w-4"
+                                                aria-hidden="true"
+                                            />
+                                        </Link>
+                                    </Button>
+                                    {can.manage ? (
+                                        <>
+                                            <Button
+                                                variant="outline"
+                                                className="min-h-11"
+                                                onClick={() => setEditing(true)}
+                                            >
+                                                <Pencil
+                                                    className="h-4 w-4"
+                                                    aria-hidden="true"
+                                                />{' '}
+                                                Edit command
+                                            </Button>
+                                            <Button
+                                                className="min-h-11"
+                                                onClick={() =>
+                                                    setPublishing(true)
+                                                }
+                                            >
+                                                <Send
+                                                    className="h-4 w-4"
+                                                    aria-hidden="true"
+                                                />{' '}
+                                                Publish update
+                                            </Button>
+                                        </>
+                                    ) : null}
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <section
+                        className={`rounded-2xl border p-4 ${majorIncident.update_state === 'overdue' ? 'border-status-critical/40 bg-status-critical-bg' : 'border-status-success/30 bg-status-success-bg'}`}
+                    >
+                        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                            <div className="flex items-start gap-3">
+                                <Clock3
+                                    className={`mt-0.5 h-5 w-5 ${majorIncident.update_state === 'overdue' ? 'text-status-critical' : 'text-status-success'}`}
+                                    aria-hidden="true"
+                                />
+                                <div>
+                                    <h2 className="font-semibold">
+                                        {majorIncident.update_state ===
+                                        'overdue'
+                                            ? 'Update overdue'
+                                            : 'Communication cadence on track'}
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        Next audience update:{' '}
+                                        {formatDateTime(
+                                            majorIncident.next_update_due_at,
+                                        )}{' '}
+                                        · every{' '}
+                                        {majorIncident.target_update_minutes}{' '}
+                                        minutes
+                                    </p>
+                                </div>
+                            </div>
+                            {can.manage ? (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setPublishing(true)}
+                                >
+                                    Publish now
+                                </Button>
+                            ) : null}
+                        </div>
+                    </section>
+
+                    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,.75fr)]">
+                        <div className="space-y-6">
+                            <section className="rounded-2xl border border-border bg-card p-5">
+                                <div className="flex items-center gap-2">
+                                    <Users
+                                        className="h-5 w-5 text-primary"
                                         aria-hidden="true"
                                     />
-                                    <span className="font-mono text-sm font-bold text-primary">
-                                        {ticket.reference}
-                                    </span>
+                                    <h2 className="font-semibold">
+                                        Command accountability
+                                    </h2>
                                 </div>
-                                <h1 className="mt-1 text-2xl font-bold tracking-tight">
-                                    {ticket.title}
-                                </h1>
-                                <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
-                                    {ticket.description ||
-                                        'No incident description recorded.'}
+                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                    <Fact
+                                        label="Incident commander"
+                                        value={
+                                            majorIncident.commander?.name ??
+                                            'Unassigned'
+                                        }
+                                    />
+                                    <Fact
+                                        label="Communications lead"
+                                        value={
+                                            majorIncident.communications_lead
+                                                ?.name ?? 'Unassigned'
+                                        }
+                                    />
+                                    <Fact
+                                        label="Declared"
+                                        value={formatDateTime(
+                                            majorIncident.declared_at,
+                                        )}
+                                    />
+                                    <Fact
+                                        label="Next action"
+                                        value={
+                                            ticket.next_action || 'Not recorded'
+                                        }
+                                    />
+                                </div>
+                                <div className="mt-4 rounded-xl bg-muted/40 p-4">
+                                    <h3 className="text-xs font-bold tracking-wide text-muted-foreground uppercase">
+                                        Current impact
+                                    </h3>
+                                    <p className="mt-2 text-sm">
+                                        {majorIncident.impact_summary ||
+                                            'Impact has not been recorded.'}
+                                    </p>
+                                </div>
+                            </section>
+
+                            <section className="rounded-2xl border border-border bg-card">
+                                <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                                    <div className="flex items-center gap-2">
+                                        <Megaphone
+                                            className="h-5 w-5 text-primary"
+                                            aria-hidden="true"
+                                        />
+                                        <div>
+                                            <h2 className="font-semibold">
+                                                Live communications
+                                            </h2>
+                                            <p className="text-xs text-muted-foreground">
+                                                Internal command notes remain
+                                                separate from staff and public
+                                                updates.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {can.manage ? (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setPublishing(true)}
+                                        >
+                                            New update
+                                        </Button>
+                                    ) : null}
+                                </div>
+                                {updates.length === 0 ? (
+                                    <div className="px-5 py-12 text-center text-sm text-muted-foreground">
+                                        No command or stakeholder updates
+                                        published.
+                                    </div>
+                                ) : (
+                                    <ol className="divide-y divide-border">
+                                        {updates.map((update) => (
+                                            <li key={update.id} className="p-5">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <StatusBadge
+                                                        variant={
+                                                            update.audience ===
+                                                            'internal'
+                                                                ? 'neutral'
+                                                                : 'info'
+                                                        }
+                                                    >
+                                                        {majorIncidentLabel(
+                                                            update.audience,
+                                                        )}
+                                                    </StatusBadge>
+                                                    <StatusBadge variant="neutral">
+                                                        {majorIncidentLabel(
+                                                            update.update_kind,
+                                                        )}
+                                                    </StatusBadge>
+                                                    {update.service_status ? (
+                                                        <StatusBadge variant="warning">
+                                                            {majorIncidentLabel(
+                                                                update.service_status,
+                                                            )}
+                                                        </StatusBadge>
+                                                    ) : null}
+                                                    <span className="ml-auto text-xs text-muted-foreground">
+                                                        {formatDateTime(
+                                                            update.published_at,
+                                                        )}
+                                                    </span>
+                                                </div>
+                                                <p className="mt-3 text-sm whitespace-pre-wrap">
+                                                    {update.summary}
+                                                </p>
+                                                <p className="mt-2 text-xs text-muted-foreground">
+                                                    Published by{' '}
+                                                    {update.author?.name ??
+                                                        'System'}
+                                                </p>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                )}
+                            </section>
+
+                            <section className="rounded-2xl border border-border bg-card p-5">
+                                <h2 className="font-semibold">
+                                    Restoration and review evidence
+                                </h2>
+                                <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                                    <Evidence
+                                        title="Restoration"
+                                        body={majorIncident.restoration_summary}
+                                        stamp={majorIncident.restored_at}
+                                    />
+                                    <Evidence
+                                        title="Root cause"
+                                        body={majorIncident.root_cause_summary}
+                                    />
+                                    <Evidence
+                                        title="Post-incident review"
+                                        body={majorIncident.review_summary}
+                                        stamp={majorIncident.reviewed_at}
+                                    />
+                                </div>
+                            </section>
+                        </div>
+
+                        <aside className="space-y-6">
+                            <section className="rounded-2xl border border-border bg-card p-5">
+                                <div className="flex items-center gap-2">
+                                    <Link2
+                                        className="h-5 w-5 text-primary"
+                                        aria-hidden="true"
+                                    />
+                                    <h2 className="font-semibold">
+                                        Operational impact
+                                    </h2>
+                                </div>
+                                <LinkList
+                                    title="Services"
+                                    values={links.services.map(
+                                        (item) => item.name,
+                                    )}
+                                />
+                                <LinkList
+                                    title="Sites"
+                                    values={links.sites.map(
+                                        (item) => item.name,
+                                    )}
+                                />
+                                <LinkList
+                                    title="Related incidents"
+                                    values={links.incidents.map(
+                                        (item) =>
+                                            `${item.reference} · ${item.title}`,
+                                    )}
+                                />
+                                <LinkList
+                                    title="Control Room alert"
+                                    values={
+                                        links.alert
+                                            ? [
+                                                  `${links.alert.reference ?? `Alert ${links.alert.id}`} · ${links.alert.title}`,
+                                              ]
+                                            : []
+                                    }
+                                />
+                            </section>
+
+                            <section className="rounded-2xl border border-border bg-card p-5">
+                                <div className="flex items-center gap-2">
+                                    <Radio
+                                        className="h-5 w-5 text-primary"
+                                        aria-hidden="true"
+                                    />
+                                    <h2 className="font-semibold">
+                                        Shared work record
+                                    </h2>
+                                </div>
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    Comments, tasks, evidence, approvals,
+                                    attachments, and audit events stay on the
+                                    canonical IT ticket.
                                 </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
+                                <div className="mt-4 grid grid-cols-2 gap-2">
+                                    <Count
+                                        label="Comments"
+                                        value={ticket.comments_count}
+                                    />
+                                    <Count
+                                        label="Tasks"
+                                        value={ticket.tasks_count}
+                                    />
+                                    <Count
+                                        label="Attachments"
+                                        value={ticket.attachments_count}
+                                    />
+                                    <Count
+                                        label="Events"
+                                        value={ticket.events_count}
+                                    />
+                                </div>
                                 <Button
                                     asChild
                                     variant="outline"
-                                    className="min-h-11"
+                                    className="mt-4 min-h-11 w-full"
                                 >
                                     <Link href={ticket.href}>
-                                        Open canonical ticket workspace{' '}
+                                        Open shared work{' '}
                                         <ExternalLink
                                             className="h-4 w-4"
                                             aria-hidden="true"
                                         />
                                     </Link>
                                 </Button>
-                                {can.manage ? (
-                                    <>
-                                        <Button
-                                            variant="outline"
-                                            className="min-h-11"
-                                            onClick={() => setEditing(true)}
-                                        >
-                                            <Pencil
-                                                className="h-4 w-4"
-                                                aria-hidden="true"
-                                            />{' '}
-                                            Edit command
-                                        </Button>
-                                        <Button
-                                            className="min-h-11"
-                                            onClick={() => setPublishing(true)}
-                                        >
-                                            <Send
-                                                className="h-4 w-4"
-                                                aria-hidden="true"
-                                            />{' '}
-                                            Publish update
-                                        </Button>
-                                    </>
-                                ) : null}
-                            </div>
-                        </div>
+                            </section>
+
+                            {can.manage &&
+                            (nextStates[ticket.workflow_state]?.length ?? 0) >
+                                0 ? (
+                                <Button
+                                    className="min-h-11 w-full"
+                                    onClick={() => setTransitioning(true)}
+                                >
+                                    Move command state
+                                </Button>
+                            ) : null}
+                        </aside>
                     </div>
-                </header>
-
-                <section
-                    className={`rounded-2xl border p-4 ${majorIncident.update_state === 'overdue' ? 'border-status-critical/40 bg-status-critical-bg' : 'border-status-success/30 bg-status-success-bg'}`}
-                >
-                    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                        <div className="flex items-start gap-3">
-                            <Clock3
-                                className={`mt-0.5 h-5 w-5 ${majorIncident.update_state === 'overdue' ? 'text-status-critical' : 'text-status-success'}`}
-                                aria-hidden="true"
-                            />
-                            <div>
-                                <h2 className="font-semibold">
-                                    {majorIncident.update_state === 'overdue'
-                                        ? 'Update overdue'
-                                        : 'Communication cadence on track'}
-                                </h2>
-                                <p className="text-sm text-muted-foreground">
-                                    Next audience update:{' '}
-                                    {formatDateTime(
-                                        majorIncident.next_update_due_at,
-                                    )}{' '}
-                                    · every{' '}
-                                    {majorIncident.target_update_minutes}{' '}
-                                    minutes
-                                </p>
-                            </div>
-                        </div>
-                        {can.manage ? (
-                            <Button
-                                variant="outline"
-                                onClick={() => setPublishing(true)}
-                            >
-                                Publish now
-                            </Button>
-                        ) : null}
-                    </div>
-                </section>
-
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,.75fr)]">
-                    <div className="space-y-6">
-                        <section className="rounded-2xl border border-border bg-card p-5">
-                            <div className="flex items-center gap-2">
-                                <Users
-                                    className="h-5 w-5 text-primary"
-                                    aria-hidden="true"
-                                />
-                                <h2 className="font-semibold">
-                                    Command accountability
-                                </h2>
-                            </div>
-                            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                <Fact
-                                    label="Incident commander"
-                                    value={
-                                        majorIncident.commander?.name ??
-                                        'Unassigned'
-                                    }
-                                />
-                                <Fact
-                                    label="Communications lead"
-                                    value={
-                                        majorIncident.communications_lead
-                                            ?.name ?? 'Unassigned'
-                                    }
-                                />
-                                <Fact
-                                    label="Declared"
-                                    value={formatDateTime(
-                                        majorIncident.declared_at,
-                                    )}
-                                />
-                                <Fact
-                                    label="Next action"
-                                    value={ticket.next_action || 'Not recorded'}
-                                />
-                            </div>
-                            <div className="mt-4 rounded-xl bg-muted/40 p-4">
-                                <h3 className="text-xs font-bold tracking-wide text-muted-foreground uppercase">
-                                    Current impact
-                                </h3>
-                                <p className="mt-2 text-sm">
-                                    {majorIncident.impact_summary ||
-                                        'Impact has not been recorded.'}
-                                </p>
-                            </div>
-                        </section>
-
-                        <section className="rounded-2xl border border-border bg-card">
-                            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                                <div className="flex items-center gap-2">
-                                    <Megaphone
-                                        className="h-5 w-5 text-primary"
-                                        aria-hidden="true"
-                                    />
-                                    <div>
-                                        <h2 className="font-semibold">
-                                            Live communications
-                                        </h2>
-                                        <p className="text-xs text-muted-foreground">
-                                            Internal command notes remain
-                                            separate from staff and public
-                                            updates.
-                                        </p>
-                                    </div>
-                                </div>
-                                {can.manage ? (
-                                    <Button
-                                        size="sm"
-                                        onClick={() => setPublishing(true)}
-                                    >
-                                        New update
-                                    </Button>
-                                ) : null}
-                            </div>
-                            {updates.length === 0 ? (
-                                <div className="px-5 py-12 text-center text-sm text-muted-foreground">
-                                    No command or stakeholder updates published.
-                                </div>
-                            ) : (
-                                <ol className="divide-y divide-border">
-                                    {updates.map((update) => (
-                                        <li key={update.id} className="p-5">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <StatusBadge
-                                                    variant={
-                                                        update.audience ===
-                                                        'internal'
-                                                            ? 'neutral'
-                                                            : 'info'
-                                                    }
-                                                >
-                                                    {majorIncidentLabel(
-                                                        update.audience,
-                                                    )}
-                                                </StatusBadge>
-                                                <StatusBadge variant="neutral">
-                                                    {majorIncidentLabel(
-                                                        update.update_kind,
-                                                    )}
-                                                </StatusBadge>
-                                                {update.service_status ? (
-                                                    <StatusBadge variant="warning">
-                                                        {majorIncidentLabel(
-                                                            update.service_status,
-                                                        )}
-                                                    </StatusBadge>
-                                                ) : null}
-                                                <span className="ml-auto text-xs text-muted-foreground">
-                                                    {formatDateTime(
-                                                        update.published_at,
-                                                    )}
-                                                </span>
-                                            </div>
-                                            <p className="mt-3 text-sm whitespace-pre-wrap">
-                                                {update.summary}
-                                            </p>
-                                            <p className="mt-2 text-xs text-muted-foreground">
-                                                Published by{' '}
-                                                {update.author?.name ??
-                                                    'System'}
-                                            </p>
-                                        </li>
-                                    ))}
-                                </ol>
-                            )}
-                        </section>
-
-                        <section className="rounded-2xl border border-border bg-card p-5">
-                            <h2 className="font-semibold">
-                                Restoration and review evidence
-                            </h2>
-                            <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                                <Evidence
-                                    title="Restoration"
-                                    body={majorIncident.restoration_summary}
-                                    stamp={majorIncident.restored_at}
-                                />
-                                <Evidence
-                                    title="Root cause"
-                                    body={majorIncident.root_cause_summary}
-                                />
-                                <Evidence
-                                    title="Post-incident review"
-                                    body={majorIncident.review_summary}
-                                    stamp={majorIncident.reviewed_at}
-                                />
-                            </div>
-                        </section>
-                    </div>
-
-                    <aside className="space-y-6">
-                        <section className="rounded-2xl border border-border bg-card p-5">
-                            <div className="flex items-center gap-2">
-                                <Link2
-                                    className="h-5 w-5 text-primary"
-                                    aria-hidden="true"
-                                />
-                                <h2 className="font-semibold">
-                                    Operational impact
-                                </h2>
-                            </div>
-                            <LinkList
-                                title="Services"
-                                values={links.services.map((item) => item.name)}
-                            />
-                            <LinkList
-                                title="Sites"
-                                values={links.sites.map((item) => item.name)}
-                            />
-                            <LinkList
-                                title="Related incidents"
-                                values={links.incidents.map(
-                                    (item) =>
-                                        `${item.reference} · ${item.title}`,
-                                )}
-                            />
-                            <LinkList
-                                title="Control Room alert"
-                                values={
-                                    links.alert
-                                        ? [
-                                              `${links.alert.reference ?? `Alert ${links.alert.id}`} · ${links.alert.title}`,
-                                          ]
-                                        : []
-                                }
-                            />
-                        </section>
-
-                        <section className="rounded-2xl border border-border bg-card p-5">
-                            <div className="flex items-center gap-2">
-                                <Radio
-                                    className="h-5 w-5 text-primary"
-                                    aria-hidden="true"
-                                />
-                                <h2 className="font-semibold">
-                                    Shared work record
-                                </h2>
-                            </div>
-                            <p className="mt-2 text-sm text-muted-foreground">
-                                Comments, tasks, evidence, approvals,
-                                attachments, and audit events stay on the
-                                canonical IT ticket.
-                            </p>
-                            <div className="mt-4 grid grid-cols-2 gap-2">
-                                <Count
-                                    label="Comments"
-                                    value={ticket.comments_count}
-                                />
-                                <Count
-                                    label="Tasks"
-                                    value={ticket.tasks_count}
-                                />
-                                <Count
-                                    label="Attachments"
-                                    value={ticket.attachments_count}
-                                />
-                                <Count
-                                    label="Events"
-                                    value={ticket.events_count}
-                                />
-                            </div>
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="mt-4 min-h-11 w-full"
-                            >
-                                <Link href={ticket.href}>
-                                    Open shared work{' '}
-                                    <ExternalLink
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />
-                                </Link>
-                            </Button>
-                        </section>
-
-                        {can.manage &&
-                        (nextStates[ticket.workflow_state]?.length ?? 0) > 0 ? (
-                            <Button
-                                className="min-h-11 w-full"
-                                onClick={() => setTransitioning(true)}
-                            >
-                                Move command state
-                            </Button>
-                        ) : null}
-                    </aside>
-                </div>
-            </main>
+                </main>
             </ItModuleShell>
 
             <Dialog open={publishing} onOpenChange={setPublishing}>

@@ -37,7 +37,8 @@ final class HrEquipmentAccessProjectionService
     public function present(User $viewer, HrEmployeeProfile $profile): array
     {
         $canViewHrAssets = $viewer->canDo('hr.assets.view');
-        $canViewDevices = $viewer->canDo('securityDevices.devices.view');
+        $canViewDevices = $viewer->canDo('securityDevices.viewAny')
+            && $viewer->canDo('securityDevices.devices.view');
         $canViewAssets = $viewer->canDo('assets.viewAny') || $viewer->canDo('assets.viewAssigned');
         $canViewIt = $viewer->canDo('it.view') || $viewer->canDo('it.manage');
 
@@ -72,8 +73,9 @@ final class HrEquipmentAccessProjectionService
             ? $this->accessWork($viewer, $profile)
             : collect();
 
-        $activeEquipment = $equipment->whereNull('returned_at')->count();
-        $recoveryDue = $equipment
+        $actionableEquipment = $equipment->where('historical_only', false);
+        $activeEquipment = $actionableEquipment->whereNull('returned_at')->count();
+        $recoveryDue = $actionableEquipment
             ->whereNull('returned_at')
             ->where('needs_recovery', true)
             ->count();
@@ -179,7 +181,9 @@ final class HrEquipmentAccessProjectionService
                     'health' => $this->enumValue($device?->health_status),
                     'condition' => null,
                     'needs_recovery' => ! $this->profileIsCurrent($profile) && $isActive,
-                    'href' => $device ? "/security-devices/devices/{$device->id}" : null,
+                    'href' => $device && in_array((int) $device->id, $visibleIds, true)
+                        ? "/security-devices/devices/{$device->id}"
+                        : null,
                     'canonical_asset_ids' => $device?->activeAssetLinks
                         ?->pluck('asset_id')
                         ->map(fn (mixed $id): int => (int) $id)
@@ -187,6 +191,7 @@ final class HrEquipmentAccessProjectionService
                     'recovery_only' => $device
                         && ! $this->profileIsCurrent($profile)
                         && ! in_array((int) $device->id, $visibleIds, true),
+                    'historical_only' => false,
                 ];
             })
             ->values();
@@ -252,6 +257,7 @@ final class HrEquipmentAccessProjectionService
                     'href' => $asset ? "/assets/{$asset->id}" : null,
                     'canonical_asset_ids' => $asset ? [(int) $asset->id] : [],
                     'recovery_only' => false,
+                    'historical_only' => false,
                 ];
             })
             ->values();
@@ -262,30 +268,38 @@ final class HrEquipmentAccessProjectionService
     {
         return HrAssetAssignment::query()
             ->where('employee_profile_id', $profile->id)
-            ->with('asset:id,asset_tag,name,category,serial_number,status')
+            ->with('asset:id,asset_tag,name,category,serial_number,status,fleet_asset_id')
             ->orderByDesc('assigned_at')
             ->get()
             ->filter(fn (HrAssetAssignment $assignment): bool => $assignment->asset !== null)
-            ->map(fn (HrAssetAssignment $assignment): array => [
-                'key' => 'hr-asset-'.$assignment->id,
-                'assignment_id' => $assignment->id,
-                'record_id' => $assignment->asset?->id,
-                'source' => 'hr_assets',
-                'source_label' => 'HR equipment',
-                'name' => $assignment->asset?->name,
-                'tag' => $assignment->asset?->asset_tag,
-                'category' => $assignment->asset?->category,
-                'serial_number' => $assignment->asset?->serial_number,
-                'assigned_at' => $assignment->assigned_at?->toDateString(),
-                'returned_at' => $assignment->returned_at?->toDateString(),
-                'status' => $assignment->asset?->status,
-                'health' => null,
-                'condition' => $assignment->condition_on_assign,
-                'needs_recovery' => ! $this->profileIsCurrent($profile) && $assignment->returned_at === null,
-                'href' => $assignment->asset ? "/hr/assets/{$assignment->asset->id}" : null,
-                'canonical_asset_ids' => [],
-                'recovery_only' => false,
-            ])
+            ->map(function (HrAssetAssignment $assignment) use ($profile): array {
+                $asset = $assignment->asset;
+                $historicalOnly = ! $asset->isHrLifecycleOwned();
+
+                return [
+                    'key' => 'hr-asset-'.$assignment->id,
+                    'assignment_id' => $assignment->id,
+                    'record_id' => $asset->id,
+                    'source' => 'hr_assets',
+                    'source_label' => $historicalOnly ? 'Historical HR record' : 'HR equipment',
+                    'name' => $asset->name,
+                    'tag' => $asset->asset_tag,
+                    'category' => $asset->category,
+                    'serial_number' => $asset->serial_number,
+                    'assigned_at' => $assignment->assigned_at?->toDateString(),
+                    'returned_at' => $assignment->returned_at?->toDateString(),
+                    'status' => $asset->status,
+                    'health' => null,
+                    'condition' => $assignment->condition_on_assign,
+                    'needs_recovery' => ! $historicalOnly
+                        && ! $this->profileIsCurrent($profile)
+                        && $assignment->returned_at === null,
+                    'href' => $historicalOnly ? null : "/hr/assets/{$asset->id}",
+                    'canonical_asset_ids' => $asset->fleet_asset_id ? [(int) $asset->fleet_asset_id] : [],
+                    'recovery_only' => false,
+                    'historical_only' => $historicalOnly,
+                ];
+            })
             ->values();
     }
 

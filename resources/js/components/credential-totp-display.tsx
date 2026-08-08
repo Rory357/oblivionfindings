@@ -47,7 +47,9 @@ export function CredentialTotpDisplay({ siteId, credentialId, onCopy }: Props) {
             setState(data);
         } catch (e) {
             setError(
-                e instanceof Error ? e.message : 'Could not fetch one-time code.',
+                e instanceof Error
+                    ? e.message
+                    : 'Could not fetch one-time code.',
             );
         } finally {
             setLoading(false);
@@ -164,7 +166,7 @@ export function CredentialTotpDisplay({ siteId, credentialId, onCopy }: Props) {
                     transform="rotate(-90 14 14)"
                 />
             </svg>
-            <span className="text-xs tabular-nums text-muted-foreground">
+            <span className="text-xs text-muted-foreground tabular-nums">
                 {state.seconds_remaining}s
             </span>
             <Button

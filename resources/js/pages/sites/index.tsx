@@ -7,7 +7,7 @@
 import type { PageHeroStat } from '@/components/page';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     AlertTriangle,

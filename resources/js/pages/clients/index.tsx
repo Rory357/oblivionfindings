@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero } from '@/components/page';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
@@ -83,11 +83,15 @@ export default function ClientsIndex({ clients }) {
                         { label: 'Total', value: clients.length },
                         {
                             label: 'Onboarding complete',
-                            value: (clients as any[]).filter((c) => c.onboarding?.status === 'complete').length,
+                            value: (clients as any[]).filter(
+                                (c) => c.onboarding?.status === 'complete',
+                            ).length,
                         },
                         {
                             label: 'Respite',
-                            value: (clients as any[]).filter((c) => c.has_respite).length,
+                            value: (clients as any[]).filter(
+                                (c) => c.has_respite,
+                            ).length,
                         },
                     ]}
                     actions={
@@ -174,7 +178,7 @@ export default function ClientsIndex({ clients }) {
                                         {client.first_name} {client.last_name}
                                     </div>
                                     {client.nhi_number ? (
-                                        <div className="mt-0.5 text-xs font-mono text-muted-foreground">
+                                        <div className="mt-0.5 font-mono text-xs text-muted-foreground">
                                             NHI: {client.nhi_number}
                                         </div>
                                     ) : null}

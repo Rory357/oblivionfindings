@@ -41,6 +41,7 @@ class MilesightObservationCapabilityTest extends TestCase
         config()->set('monitoring.delivery.sequence_lock_store', 'array');
         config()->set('monitoring.delivery.allow_local_sequence_lock_for_tests', true);
         config()->set('monitoring.delivery.queue_connection', 'sync');
+        config()->set('integration-capabilities.milesight.allowed_hosts', ['milesight.example.test']);
         Queue::fake();
     }
 

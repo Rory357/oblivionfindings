@@ -24,15 +24,27 @@ function scoreToLevel(score: number): string {
     return 'low';
 }
 
-const LIKELIHOOD_LABELS = ['Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'];
-const CONSEQUENCE_LABELS = ['Insignificant', 'Minor', 'Moderate', 'Major', 'Catastrophic'];
+const LIKELIHOOD_LABELS = [
+    'Rare',
+    'Unlikely',
+    'Possible',
+    'Likely',
+    'Almost Certain',
+];
+const CONSEQUENCE_LABELS = [
+    'Insignificant',
+    'Minor',
+    'Moderate',
+    'Major',
+    'Catastrophic',
+];
 
 interface RiskMatrixProps {
-    likelihood: number;         // 1-5
-    consequence: number;        // 1-5
+    likelihood: number; // 1-5
+    consequence: number; // 1-5
     residualLikelihood?: number | null;
     residualConsequence?: number | null;
-    compact?: boolean;          // smaller size for inline use
+    compact?: boolean; // smaller size for inline use
 }
 
 export function RiskMatrix({
@@ -49,18 +61,20 @@ export function RiskMatrix({
         <div className="inline-block">
             {/* Y-axis label */}
             {!compact && (
-                <div className={`mb-1 text-center ${labelSize} font-medium text-muted-foreground`}>
+                <div
+                    className={`mb-1 text-center ${labelSize} font-medium text-muted-foreground`}
+                >
                     Likelihood vs Consequence
                 </div>
             )}
 
             <div className="flex">
                 {/* Y-axis */}
-                <div className="flex flex-col-reverse justify-center gap-px mr-1">
+                <div className="mr-1 flex flex-col-reverse justify-center gap-px">
                     {LIKELIHOOD_LABELS.map((label, i) => (
                         <div
                             key={i}
-                            className={`flex items-center justify-end ${cellSize} ${labelSize} text-muted-foreground pr-1 truncate`}
+                            className={`flex items-center justify-end ${cellSize} ${labelSize} truncate pr-1 text-muted-foreground`}
                             style={{ maxWidth: compact ? 30 : 50 }}
                             title={label}
                         >
@@ -72,14 +86,18 @@ export function RiskMatrix({
                 {/* Grid */}
                 <div>
                     <div className="flex flex-col-reverse gap-px">
-                        {[1, 2, 3, 4, 5].map(l => (
+                        {[1, 2, 3, 4, 5].map((l) => (
                             <div key={l} className="flex gap-px">
-                                {[1, 2, 3, 4, 5].map(c => {
+                                {[1, 2, 3, 4, 5].map((c) => {
                                     const score = l * c;
                                     const level = scoreToLevel(score);
-                                    const isActive = l === likelihood && c === consequence;
-                                    const isResidual = residualLikelihood != null && residualConsequence != null
-                                        && l === residualLikelihood && c === residualConsequence;
+                                    const isActive =
+                                        l === likelihood && c === consequence;
+                                    const isResidual =
+                                        residualLikelihood != null &&
+                                        residualConsequence != null &&
+                                        l === residualLikelihood &&
+                                        c === residualConsequence;
                                     const isBoth = isActive && isResidual;
 
                                     return (
@@ -89,9 +107,15 @@ export function RiskMatrix({
                                                 cellSize,
                                                 'flex items-center justify-center rounded-sm font-semibold',
                                                 CELL_COLORS[level],
-                                                isActive && !isBoth ? ACTIVE_RING : '',
-                                                isResidual && !isBoth ? RESIDUAL_RING : '',
-                                                isBoth ? 'ring-2 ring-offset-1 ring-ring' : '',
+                                                isActive && !isBoth
+                                                    ? ACTIVE_RING
+                                                    : '',
+                                                isResidual && !isBoth
+                                                    ? RESIDUAL_RING
+                                                    : '',
+                                                isBoth
+                                                    ? 'ring-2 ring-ring ring-offset-1'
+                                                    : '',
                                             ].join(' ')}
                                             title={`L${l} x C${c} = ${score} (${level})`}
                                         >
@@ -105,11 +129,11 @@ export function RiskMatrix({
 
                     {/* X-axis */}
                     {!compact && (
-                        <div className="flex gap-px mt-1 ml-0">
+                        <div className="mt-1 ml-0 flex gap-px">
                             {CONSEQUENCE_LABELS.map((label, i) => (
                                 <div
                                     key={i}
-                                    className={`${cellSize} ${labelSize} text-center text-muted-foreground truncate`}
+                                    className={`${cellSize} ${labelSize} truncate text-center text-muted-foreground`}
                                     title={label}
                                 >
                                     {label.slice(0, 3)}
@@ -121,18 +145,20 @@ export function RiskMatrix({
             </div>
 
             {/* Legend */}
-            {!compact && (residualLikelihood != null && residualConsequence != null) && (
-                <div className="mt-2 flex gap-4 text-[10px] text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                        <span className="inline-block h-3 w-3 rounded-sm ring-2 ring-ring ring-offset-1 bg-muted" />
-                        Inherent
-                    </span>
-                    <span className="flex items-center gap-1">
-                        <span className="inline-block h-3 w-3 rounded-sm ring-2 ring-status-info ring-dashed ring-offset-1 bg-muted" />
-                        Residual
-                    </span>
-                </div>
-            )}
+            {!compact &&
+                residualLikelihood != null &&
+                residualConsequence != null && (
+                    <div className="mt-2 flex gap-4 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                            <span className="inline-block h-3 w-3 rounded-sm bg-muted ring-2 ring-ring ring-offset-1" />
+                            Inherent
+                        </span>
+                        <span className="flex items-center gap-1">
+                            <span className="ring-dashed inline-block h-3 w-3 rounded-sm bg-muted ring-2 ring-status-info ring-offset-1" />
+                            Residual
+                        </span>
+                    </div>
+                )}
         </div>
     );
 }

@@ -2,15 +2,21 @@
  * objective rows and right-click menu mirror the Goals & OKR design prototype and
  * use styled native controls. Every colour is a semantic design token. */
 import { PerformanceTabs } from '@/components/hr';
+import { CheckinWizard } from '@/components/hr/goals/checkin-wizard';
+import { DevelopmentWizard } from '@/components/hr/goals/development-wizard';
+import { ObjectiveWizard } from '@/components/hr/goals/objective-wizard';
 import {
     Avatar,
+    barColor,
     type CascadeNode,
+    checkinLabel,
     type Confidence,
     type Cycle,
     DEV_CAT_BADGE,
     DEV_STATUS_BADGE,
     type DevelopmentPlan,
     formatDate,
+    formatKrMeasure,
     type GoalType,
     initials,
     type Objective,
@@ -23,13 +29,7 @@ import {
     STATUS_LABEL,
     TYPE_LABEL,
     TypeBadge,
-    barColor,
-    checkinLabel,
-    formatKrMeasure,
 } from '@/components/hr/goals/okr-shared';
-import { CheckinWizard } from '@/components/hr/goals/checkin-wizard';
-import { DevelopmentWizard } from '@/components/hr/goals/development-wizard';
-import { ObjectiveWizard } from '@/components/hr/goals/objective-wizard';
 import { PageHero, PageLayout } from '@/components/page';
 import {
     Select,
@@ -53,8 +53,8 @@ import {
     ChevronRight,
     Copy,
     Download,
-    LayoutGrid,
     Layers,
+    LayoutGrid,
     List,
     MoreVertical,
     PauseCircle,
@@ -82,7 +82,11 @@ interface Analytics {
     off_track: number;
     avg_progress: number;
     completion_rate: number;
-    progress_by_type: Array<{ type: string; avg_progress: number; count: number }>;
+    progress_by_type: Array<{
+        type: string;
+        avg_progress: number;
+        count: number;
+    }>;
 }
 
 interface Props {
@@ -122,7 +126,10 @@ interface CtxItem {
 /* ------------------------------------------------------------------ */
 
 function useToast() {
-    const [toast, setToast] = useState<{ msg: string; tone: 'ok' | 'warn' } | null>(null);
+    const [toast, setToast] = useState<{
+        msg: string;
+        tone: 'ok' | 'warn';
+    } | null>(null);
     const show = (msg: string, tone: 'ok' | 'warn' = 'ok') => {
         setToast({ msg, tone });
         window.setTimeout(() => setToast(null), 2600);
@@ -154,7 +161,9 @@ export default function GoalsHub({
     useEffect(() => {
         let dt: HubTab = 'objectives';
         try {
-            dt = (localStorage.getItem('okr_default_tab') as HubTab) || 'objectives';
+            dt =
+                (localStorage.getItem('okr_default_tab') as HubTab) ||
+                'objectives';
             setPins(JSON.parse(localStorage.getItem('okr_pins') || '{}'));
         } catch {
             /* ignore */
@@ -162,7 +171,13 @@ export default function GoalsHub({
         setDefaultTabPref(dt);
         // ?tab= deep-link wins over the persisted default.
         const initial = (defaultTab as HubTab) || dt;
-        setTab(['objectives', 'alignment', 'development', 'analytics'].includes(initial) ? initial : 'objectives');
+        setTab(
+            ['objectives', 'alignment', 'development', 'analytics'].includes(
+                initial,
+            )
+                ? initial
+                : 'objectives',
+        );
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -184,17 +199,30 @@ export default function GoalsHub({
     const [devCat, setDevCat] = useState('');
 
     /* ---- modals ---- */
-    const [objWizard, setObjWizard] = useState<{ open: boolean; goal: Objective | null; parentId: number | null }>({
+    const [objWizard, setObjWizard] = useState<{
+        open: boolean;
+        goal: Objective | null;
+        parentId: number | null;
+    }>({
         open: false,
         goal: null,
         parentId: null,
     });
-    const [checkin, setCheckin] = useState<{ open: boolean; obj: Objective | null }>({ open: false, obj: null });
+    const [checkin, setCheckin] = useState<{
+        open: boolean;
+        obj: Objective | null;
+    }>({ open: false, obj: null });
     const [devWizard, setDevWizard] = useState(false);
     const [reparent, setReparent] = useState<Objective | null>(null);
 
     /* ---- context menu + toast ---- */
-    const [ctx, setCtx] = useState<{ open: boolean; x: number; y: number; title: string; items: CtxItem[] }>({
+    const [ctx, setCtx] = useState<{
+        open: boolean;
+        x: number;
+        y: number;
+        title: string;
+        items: CtxItem[];
+    }>({
         open: false,
         x: 0,
         y: 0,
@@ -207,19 +235,38 @@ export default function GoalsHub({
         e.preventDefault();
         e.stopPropagation();
         const x = Math.min(e.clientX, window.innerWidth - 244);
-        const y = Math.min(e.clientY, window.innerHeight - (items.length * 38 + 60));
-        setCtx({ open: true, x: Math.max(8, x), y: Math.max(8, y), title, items });
+        const y = Math.min(
+            e.clientY,
+            window.innerHeight - (items.length * 38 + 60),
+        );
+        setCtx({
+            open: true,
+            x: Math.max(8, x),
+            y: Math.max(8, y),
+            title,
+            items,
+        });
     };
     const closeCtx = () => setCtx((c) => ({ ...c, open: false }));
 
     /* ---- cycle selector ---- */
     const changeCycle = (id: number | 'all') => {
-        router.get('/hr/goals', { cycle: id === 'all' ? 'all' : id, tab }, { preserveScroll: true, preserveState: false });
+        router.get(
+            '/hr/goals',
+            { cycle: id === 'all' ? 'all' : id, tab },
+            { preserveScroll: true, preserveState: false },
+        );
     };
     const selectedCycle = cycles.find((c) => c.id === selectedCycleId);
 
     /* ---- objectives filter/sort ---- */
-    const ownerOptions = useMemo(() => [...new Set(objectives.map((o) => o.user?.name).filter(Boolean))] as string[], [objectives]);
+    const ownerOptions = useMemo(
+        () =>
+            [
+                ...new Set(objectives.map((o) => o.user?.name).filter(Boolean)),
+            ] as string[],
+        [objectives],
+    );
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -230,20 +277,32 @@ export default function GoalsHub({
             if (fOwner && o.user?.name !== fOwner) return false;
             if (fTag && !(o.tags ?? []).includes(fTag)) return false;
             if (q) {
-                const hay = `${o.title} ${o.user?.name ?? ''} ${o.category ?? ''} ${o.description ?? ''}`.toLowerCase();
+                const hay =
+                    `${o.title} ${o.user?.name ?? ''} ${o.category ?? ''} ${o.description ?? ''}`.toLowerCase();
                 if (!hay.includes(q)) return false;
             }
             return true;
         });
         const pr: Record<string, number> = { high: 0, medium: 1, low: 2 };
-        const rg: Record<string, number> = { off_track: 0, at_risk: 1, on_track: 2 };
+        const rg: Record<string, number> = {
+            off_track: 0,
+            at_risk: 1,
+            on_track: 2,
+        };
         return [...list].sort((a, b) => {
-            if (sort === 'progress') return b.progress_percentage - a.progress_percentage;
-            if (sort === 'due') return (a.due_date ?? '').localeCompare(b.due_date ?? '');
+            if (sort === 'progress')
+                return b.progress_percentage - a.progress_percentage;
+            if (sort === 'due')
+                return (a.due_date ?? '').localeCompare(b.due_date ?? '');
             if (sort === 'priority') return pr[a.priority] - pr[b.priority];
-            if (sort === 'owner') return (a.user?.name ?? '').localeCompare(b.user?.name ?? '');
-            if (sort === 'confidence') return rg[a.confidence] - rg[b.confidence];
-            if (sort === 'checkin') return (b.last_checkin_days ?? 999) - (a.last_checkin_days ?? 999);
+            if (sort === 'owner')
+                return (a.user?.name ?? '').localeCompare(b.user?.name ?? '');
+            if (sort === 'confidence')
+                return rg[a.confidence] - rg[b.confidence];
+            if (sort === 'checkin')
+                return (
+                    (b.last_checkin_days ?? 999) - (a.last_checkin_days ?? 999)
+                );
             return 0;
         });
     }, [objectives, search, fStatus, fType, fConfidence, fOwner, fTag, sort]);
@@ -258,18 +317,47 @@ export default function GoalsHub({
         router.put(
             `/hr/goals/${o.id}`,
             { status },
-            { preserveScroll: true, onSuccess: () => show(status === 'completed' ? 'Objective completed 🎉' : 'Objective archived', status === 'cancelled' ? 'warn' : 'ok') },
+            {
+                preserveScroll: true,
+                onSuccess: () =>
+                    show(
+                        status === 'completed'
+                            ? 'Objective completed 🎉'
+                            : 'Objective archived',
+                        status === 'cancelled' ? 'warn' : 'ok',
+                    ),
+            },
         );
     };
     const duplicate = (o: Objective) =>
-        router.post(`/hr/goals/${o.id}/duplicate`, { cycle_id: selectedCycleId, with_key_results: true }, { preserveScroll: true, onSuccess: () => show('Objective duplicated') });
+        router.post(
+            `/hr/goals/${o.id}/duplicate`,
+            { cycle_id: selectedCycleId, with_key_results: true },
+            {
+                preserveScroll: true,
+                onSuccess: () => show('Objective duplicated'),
+            },
+        );
     const destroy = (o: Objective) => {
         if (confirm(`Delete “${o.title}”? This cannot be undone.`)) {
-            router.delete(`/hr/goals/${o.id}`, { preserveScroll: true, onSuccess: () => show('Objective deleted', 'warn') });
+            router.delete(`/hr/goals/${o.id}`, {
+                preserveScroll: true,
+                onSuccess: () => show('Objective deleted', 'warn'),
+            });
         }
     };
     const bulk = (action: string, extra: Record<string, unknown> = {}) => {
-        router.post('/hr/goals/bulk', { action, ids: selectedIds, ...extra }, { preserveScroll: true, onSuccess: () => { setSelected({}); show('Bulk action applied'); } });
+        router.post(
+            '/hr/goals/bulk',
+            { action, ids: selectedIds, ...extra },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelected({});
+                    show('Bulk action applied');
+                },
+            },
+        );
     };
     const exportCsv = () => {
         const q = selectedCycleId ? `?cycle=${selectedCycleId}` : '';
@@ -278,19 +366,81 @@ export default function GoalsHub({
 
     const objMenu = (o: Objective): CtxItem[] => [
         { label: 'Open', icon: ArrowRight, onClick: () => openObjective(o.id) },
-        { label: 'Log check-in', icon: CheckCircle2, onClick: () => setCheckin({ open: true, obj: o }) },
+        {
+            label: 'Log check-in',
+            icon: CheckCircle2,
+            onClick: () => setCheckin({ open: true, obj: o }),
+        },
         ...(can.manage
             ? [
-                  { label: 'Edit', icon: Pencil, onClick: () => setObjWizard({ open: true, goal: o, parentId: null }) },
-                  { label: 'Add child objective', icon: Layers, onClick: () => setObjWizard({ open: true, goal: null, parentId: o.id }) },
-                  { label: 'Move under…', icon: Layers, onClick: () => setReparent(o) },
+                  {
+                      label: 'Edit',
+                      icon: Pencil,
+                      onClick: () =>
+                          setObjWizard({ open: true, goal: o, parentId: null }),
+                  },
+                  {
+                      label: 'Add child objective',
+                      icon: Layers,
+                      onClick: () =>
+                          setObjWizard({
+                              open: true,
+                              goal: null,
+                              parentId: o.id,
+                          }),
+                  },
+                  {
+                      label: 'Move under…',
+                      icon: Layers,
+                      onClick: () => setReparent(o),
+                  },
                   { divider: true },
-                  { label: 'Duplicate into cycle', icon: Copy, onClick: () => duplicate(o) },
-                  { label: o.status === 'on_hold' ? 'Resume (active)' : 'Put on hold', icon: PauseCircle, onClick: () => markStatus(o, o.status === 'on_hold' ? 'active' : 'on_hold') },
-                  { label: o.status === 'blocked' ? 'Unblock (active)' : 'Mark blocked', icon: Ban, onClick: () => markStatus(o, o.status === 'blocked' ? 'active' : 'blocked') },
-                  { label: 'Mark complete', icon: Check, onClick: () => markStatus(o, 'completed') },
-                  { label: 'Archive', icon: Trash2, danger: true, onClick: () => markStatus(o, 'cancelled') },
-                  { label: 'Delete', icon: Trash2, danger: true, onClick: () => destroy(o) },
+                  {
+                      label: 'Duplicate into cycle',
+                      icon: Copy,
+                      onClick: () => duplicate(o),
+                  },
+                  {
+                      label:
+                          o.status === 'on_hold'
+                              ? 'Resume (active)'
+                              : 'Put on hold',
+                      icon: PauseCircle,
+                      onClick: () =>
+                          markStatus(
+                              o,
+                              o.status === 'on_hold' ? 'active' : 'on_hold',
+                          ),
+                  },
+                  {
+                      label:
+                          o.status === 'blocked'
+                              ? 'Unblock (active)'
+                              : 'Mark blocked',
+                      icon: Ban,
+                      onClick: () =>
+                          markStatus(
+                              o,
+                              o.status === 'blocked' ? 'active' : 'blocked',
+                          ),
+                  },
+                  {
+                      label: 'Mark complete',
+                      icon: Check,
+                      onClick: () => markStatus(o, 'completed'),
+                  },
+                  {
+                      label: 'Archive',
+                      icon: Trash2,
+                      danger: true,
+                      onClick: () => markStatus(o, 'cancelled'),
+                  },
+                  {
+                      label: 'Delete',
+                      icon: Trash2,
+                      danger: true,
+                      onClick: () => destroy(o),
+                  },
               ]
             : []),
     ];
@@ -299,7 +449,10 @@ export default function GoalsHub({
     const tabMenu = (id: HubTab): CtxItem[] => [
         { label: 'Open', icon: ArrowRight, onClick: () => setTabAndStore(id) },
         {
-            label: defaultTabPref === id ? 'Default view ✓' : 'Set as default view',
+            label:
+                defaultTabPref === id
+                    ? 'Default view ✓'
+                    : 'Set as default view',
             icon: Star,
             onClick: () => {
                 try {
@@ -331,20 +484,65 @@ export default function GoalsHub({
     /* ---- hero derived ---- */
     const needsYou = useMemo(() => {
         const active = objectives.filter((o) => o.status === 'active');
-        const checkinsDue = active.filter((o) => o.last_checkin_days == null || o.last_checkin_days > 14).length;
-        const blocked = developmentPlans.filter((d) => d.status === 'blocked').length;
+        const checkinsDue = active.filter(
+            (o) => o.last_checkin_days == null || o.last_checkin_days > 14,
+        ).length;
+        const blocked = developmentPlans.filter(
+            (d) => d.status === 'blocked',
+        ).length;
         return [
-            { label: `${analytics.at_risk} at-risk objectives`, onClick: () => { setTab('objectives'); setFConfidence('at_risk'); } },
-            { label: `${checkinsDue} check-ins due`, onClick: () => { setTab('objectives'); setSort('checkin'); } },
-            { label: `${analytics.overdue} overdue`, onClick: () => { setTab('objectives'); setSort('due'); } },
-            { label: `${blocked} plan${blocked === 1 ? '' : 's'} blocked`, onClick: () => setTab('development') },
+            {
+                label: `${analytics.at_risk} at-risk objectives`,
+                onClick: () => {
+                    setTab('objectives');
+                    setFConfidence('at_risk');
+                },
+            },
+            {
+                label: `${checkinsDue} check-ins due`,
+                onClick: () => {
+                    setTab('objectives');
+                    setSort('checkin');
+                },
+            },
+            {
+                label: `${analytics.overdue} overdue`,
+                onClick: () => {
+                    setTab('objectives');
+                    setSort('due');
+                },
+            },
+            {
+                label: `${blocked} plan${blocked === 1 ? '' : 's'} blocked`,
+                onClick: () => setTab('development'),
+            },
         ];
     }, [objectives, developmentPlans, analytics]);
 
-    const tabDefs: Array<{ id: HubTab; label: string; icon: typeof Target; count: number | null }> = [
-        { id: 'objectives', label: 'Objectives', icon: Target, count: objectives.length },
-        { id: 'alignment', label: 'Alignment', icon: Layers, count: objectives.filter((o) => o.goal_type === 'company').length },
-        { id: 'development', label: 'Development', icon: Sprout, count: developmentPlans.length },
+    const tabDefs: Array<{
+        id: HubTab;
+        label: string;
+        icon: typeof Target;
+        count: number | null;
+    }> = [
+        {
+            id: 'objectives',
+            label: 'Objectives',
+            icon: Target,
+            count: objectives.length,
+        },
+        {
+            id: 'alignment',
+            label: 'Alignment',
+            icon: Layers,
+            count: objectives.filter((o) => o.goal_type === 'company').length,
+        },
+        {
+            id: 'development',
+            label: 'Development',
+            icon: Sprout,
+            count: developmentPlans.length,
+        },
         { id: 'analytics', label: 'Analytics', icon: BarChart3, count: null },
     ];
 
@@ -363,7 +561,10 @@ export default function GoalsHub({
                             { label: 'Active', value: analytics.active },
                             { label: 'On track', value: analytics.on_track },
                             { label: 'At risk', value: analytics.at_risk },
-                            { label: 'Avg progress', value: `${analytics.avg_progress}%` },
+                            {
+                                label: 'Avg progress',
+                                value: `${analytics.avg_progress}%`,
+                            },
                         ]}
                         actions={
                             <div className="flex items-center gap-2">
@@ -377,10 +578,17 @@ export default function GoalsHub({
                                 {can.manage && (
                                     <button
                                         type="button"
-                                        onClick={() => setObjWizard({ open: true, goal: null, parentId: null })}
+                                        onClick={() =>
+                                            setObjWizard({
+                                                open: true,
+                                                goal: null,
+                                                parentId: null,
+                                            })
+                                        }
                                         className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[13px] font-semibold text-primary hover:bg-white/90"
                                     >
-                                        <Plus className="h-4 w-4" /> New objective
+                                        <Plus className="h-4 w-4" /> New
+                                        objective
                                     </button>
                                 )}
                             </div>
@@ -388,11 +596,15 @@ export default function GoalsHub({
                     />
                 }
             >
-                <PerformanceTabs active={tab === 'development' ? 'development' : 'goals'} />
+                <PerformanceTabs
+                    active={tab === 'development' ? 'development' : 'goals'}
+                />
 
                 {/* cycle selector + needs-you ribbon */}
                 <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-sm">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">OKR cycle</span>
+                    <span className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                        OKR cycle
+                    </span>
                     <div className="inline-flex flex-wrap gap-1 rounded-lg bg-muted p-1">
                         {cycles.map((c) => {
                             const active = selectedCycleId === c.id;
@@ -403,7 +615,9 @@ export default function GoalsHub({
                                     onClick={() => changeCycle(c.id)}
                                     className={cn(
                                         'rounded-md px-3 py-1.5 text-[12.5px] font-bold transition-colors',
-                                        active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                                        active
+                                            ? 'bg-card text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground',
                                     )}
                                 >
                                     {c.name}
@@ -415,17 +629,23 @@ export default function GoalsHub({
                             onClick={() => changeCycle('all')}
                             className={cn(
                                 'rounded-md px-3 py-1.5 text-[12.5px] font-bold transition-colors',
-                                selectedCycleId === null ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                                selectedCycleId === null
+                                    ? 'bg-card text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground',
                             )}
                         >
                             All
                         </button>
                     </div>
                     <span className="text-[11.5px] text-muted-foreground">
-                        {selectedCycle ? `${selectedCycle.meta} · ${objectives.length} objectives` : `All cycles · ${objectives.length} objectives`}
+                        {selectedCycle
+                            ? `${selectedCycle.meta} · ${objectives.length} objectives`
+                            : `All cycles · ${objectives.length} objectives`}
                     </span>
                     <div className="ml-auto flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Needs you</span>
+                        <span className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                            Needs you
+                        </span>
                         {needsYou.map((n) => (
                             <button
                                 key={n.label}
@@ -442,7 +662,10 @@ export default function GoalsHub({
 
                 {/* tab strip */}
                 <div className="mb-4 flex flex-wrap items-center gap-2.5">
-                    <div role="tablist" className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-border bg-card p-1.5 shadow-sm">
+                    <div
+                        role="tablist"
+                        className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-border bg-card p-1.5 shadow-sm"
+                    >
                         {tabDefs.map((t) => {
                             const active = tab === t.id;
                             const Icon = t.icon;
@@ -453,40 +676,92 @@ export default function GoalsHub({
                                     role="tab"
                                     aria-selected={active}
                                     onClick={() => setTab(t.id)}
-                                    onContextMenu={(e) => openCtx(e, `${t.label} tab`, tabMenu(t.id))}
+                                    onContextMenu={(e) =>
+                                        openCtx(
+                                            e,
+                                            `${t.label} tab`,
+                                            tabMenu(t.id),
+                                        )
+                                    }
                                     className={cn(
                                         'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors',
-                                        active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground',
+                                        active
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'text-muted-foreground hover:text-foreground',
                                     )}
                                 >
-                                    <span className={cn('grid h-[22px] w-[22px] place-items-center rounded-md', active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+                                    <span
+                                        className={cn(
+                                            'grid h-[22px] w-[22px] place-items-center rounded-md',
+                                            active
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'bg-muted text-muted-foreground',
+                                        )}
+                                    >
                                         <Icon className="h-3.5 w-3.5" />
                                     </span>
                                     {t.label}
                                     <span className="inline-flex items-center rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] font-bold tabular-nums">
                                         {t.count ?? '·'}
                                     </span>
-                                    {defaultTabPref === t.id && <Star className="h-3 w-3 fill-status-warning text-status-warning" />}
-                                    {pins[t.id] && <Pin className="h-3 w-3 text-muted-foreground" />}
+                                    {defaultTabPref === t.id && (
+                                        <Star className="h-3 w-3 fill-status-warning text-status-warning" />
+                                    )}
+                                    {pins[t.id] && (
+                                        <Pin className="h-3 w-3 text-muted-foreground" />
+                                    )}
                                 </button>
                             );
                         })}
                     </div>
-                    <span className="text-[11.5px] text-muted-foreground">Right-click a tab to pin or set default · Right-click any row for actions</span>
+                    <span className="text-[11.5px] text-muted-foreground">
+                        Right-click a tab to pin or set default · Right-click
+                        any row for actions
+                    </span>
                 </div>
 
                 {tab === 'objectives' && (
                     <ObjectivesTab
                         list={filtered}
                         total={objectives.length}
-                        {...{ search, setSearch, fStatus, setFStatus, fType, setFType, fConfidence, setFConfidence, fOwner, setFOwner, fTag, setFTag, allTags, sort, setSort, view, setView, expanded, setExpanded, selected, setSelected, ownerOptions, can }}
+                        {...{
+                            search,
+                            setSearch,
+                            fStatus,
+                            setFStatus,
+                            fType,
+                            setFType,
+                            fConfidence,
+                            setFConfidence,
+                            fOwner,
+                            setFOwner,
+                            fTag,
+                            setFTag,
+                            allTags,
+                            sort,
+                            setSort,
+                            view,
+                            setView,
+                            expanded,
+                            setExpanded,
+                            selected,
+                            setSelected,
+                            ownerOptions,
+                            can,
+                        }}
                         selectedIds={selectedIds}
                         onOpen={openObjective}
                         onCheckin={(o) => setCheckin({ open: true, obj: o })}
                         onMenu={(e, o) => openCtx(e, o.title, objMenu(o))}
                         onAddKr={(o) => openObjective(o.id)}
                         onBulk={bulk}
-                        onNew={() => setObjWizard({ open: true, goal: null, parentId: null })}
+                        onNew={() =>
+                            setObjWizard({
+                                open: true,
+                                goal: null,
+                                parentId: null,
+                            })
+                        }
                     />
                 )}
 
@@ -495,27 +770,69 @@ export default function GoalsHub({
                         objectives={objectives}
                         can={can}
                         onOpen={openObjective}
-                        onAddChild={(id) => setObjWizard({ open: true, goal: null, parentId: id })}
+                        onAddChild={(id) =>
+                            setObjWizard({
+                                open: true,
+                                goal: null,
+                                parentId: id,
+                            })
+                        }
                         onMenu={(e, o) =>
                             openCtx(e, o.title, [
-                                { label: 'Open', icon: ArrowRight, onClick: () => openObjective(o.id) },
+                                {
+                                    label: 'Open',
+                                    icon: ArrowRight,
+                                    onClick: () => openObjective(o.id),
+                                },
                                 ...(can.manage
                                     ? [
-                                          { label: 'Add child objective', icon: Layers, onClick: () => setObjWizard({ open: true, goal: null, parentId: o.id }) },
-                                          { label: 'Move under…', icon: Layers, onClick: () => setReparent(o) },
+                                          {
+                                              label: 'Add child objective',
+                                              icon: Layers,
+                                              onClick: () =>
+                                                  setObjWizard({
+                                                      open: true,
+                                                      goal: null,
+                                                      parentId: o.id,
+                                                  }),
+                                          },
+                                          {
+                                              label: 'Move under…',
+                                              icon: Layers,
+                                              onClick: () => setReparent(o),
+                                          },
                                       ]
                                     : []),
-                                { label: 'Log check-in', icon: CheckCircle2, onClick: () => setCheckin({ open: true, obj: o }) },
+                                {
+                                    label: 'Log check-in',
+                                    icon: CheckCircle2,
+                                    onClick: () =>
+                                        setCheckin({ open: true, obj: o }),
+                                },
                             ])
                         }
-                        onNew={() => setObjWizard({ open: true, goal: null, parentId: null })}
+                        onNew={() =>
+                            setObjWizard({
+                                open: true,
+                                goal: null,
+                                parentId: null,
+                            })
+                        }
                     />
                 )}
 
                 {tab === 'development' && (
                     <DevelopmentTab
                         plans={developmentPlans}
-                        {...{ devSearch, setDevSearch, devStatus, setDevStatus, devCat, setDevCat, can }}
+                        {...{
+                            devSearch,
+                            setDevSearch,
+                            devStatus,
+                            setDevStatus,
+                            devCat,
+                            setDevCat,
+                            can,
+                        }}
                         onNew={() => setDevWizard(true)}
                     />
                 )}
@@ -527,8 +844,10 @@ export default function GoalsHub({
                         selectedCycle={selectedCycle}
                         onDrill={(patch) => {
                             setTab('objectives');
-                            if (patch.confidence !== undefined) setFConfidence(patch.confidence);
-                            if (patch.status !== undefined) setFStatus(patch.status);
+                            if (patch.confidence !== undefined)
+                                setFConfidence(patch.confidence);
+                            if (patch.status !== undefined)
+                                setFStatus(patch.status);
                             if (patch.type !== undefined) setFType(patch.type);
                         }}
                         onOpen={openObjective}
@@ -539,13 +858,24 @@ export default function GoalsHub({
             {/* ---- context menu ---- */}
             {ctx.open && (
                 <>
-                    <div className="fixed inset-0 z-[80]" onClick={closeCtx} onContextMenu={(e) => { e.preventDefault(); closeCtx(); }} />
+                    <div
+                        className="fixed inset-0 z-[80]"
+                        onClick={closeCtx}
+                        onContextMenu={(e) => {
+                            e.preventDefault();
+                            closeCtx();
+                        }}
+                    />
                     <div
                         role="menu"
                         className="fixed z-[81] min-w-[222px] rounded-xl border border-border bg-card p-1.5 shadow-2xl"
                         style={{ left: ctx.x, top: ctx.y }}
                     >
-                        {ctx.title && <div className="truncate px-2.5 pb-1.5 pt-1 text-[11px] font-bold text-muted-foreground">{ctx.title}</div>}
+                        {ctx.title && (
+                            <div className="truncate px-2.5 pt-1 pb-1.5 text-[11px] font-bold text-muted-foreground">
+                                {ctx.title}
+                            </div>
+                        )}
                         {ctx.items.map((it, i) =>
                             it.divider ? (
                                 <div key={i} className="my-1 h-px bg-border" />
@@ -559,10 +889,21 @@ export default function GoalsHub({
                                     }}
                                     className={cn(
                                         'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] font-semibold hover:bg-muted',
-                                        it.danger ? 'text-status-critical' : 'text-foreground',
+                                        it.danger
+                                            ? 'text-status-critical'
+                                            : 'text-foreground',
                                     )}
                                 >
-                                    {it.icon && <it.icon className={cn('h-[15px] w-[15px]', it.danger ? 'text-status-critical' : 'text-muted-foreground')} />}
+                                    {it.icon && (
+                                        <it.icon
+                                            className={cn(
+                                                'h-[15px] w-[15px]',
+                                                it.danger
+                                                    ? 'text-status-critical'
+                                                    : 'text-muted-foreground',
+                                            )}
+                                        />
+                                    )}
                                     {it.label}
                                 </button>
                             ),
@@ -574,8 +915,14 @@ export default function GoalsHub({
             {/* ---- toast ---- */}
             {toast && (
                 <div className="fixed bottom-6 left-1/2 z-[90] flex -translate-x-1/2 items-center gap-2.5 rounded-xl border border-border bg-card px-4 py-2.5 shadow-lg">
-                    {toast.tone === 'ok' ? <Check className="h-4 w-4 text-status-success" /> : <AlertTriangle className="h-4 w-4 text-status-warning" />}
-                    <span className="text-[13px] font-semibold">{toast.msg}</span>
+                    {toast.tone === 'ok' ? (
+                        <Check className="h-4 w-4 text-status-success" />
+                    ) : (
+                        <AlertTriangle className="h-4 w-4 text-status-warning" />
+                    )}
+                    <span className="text-[13px] font-semibold">
+                        {toast.msg}
+                    </span>
                 </div>
             )}
 
@@ -583,7 +930,13 @@ export default function GoalsHub({
             {can.manage && (
                 <ObjectiveWizard
                     open={objWizard.open}
-                    onClose={() => setObjWizard({ open: false, goal: null, parentId: null })}
+                    onClose={() =>
+                        setObjWizard({
+                            open: false,
+                            goal: null,
+                            parentId: null,
+                        })
+                    }
                     owners={users}
                     parentGoals={parentGoals}
                     cycles={cycles}
@@ -593,13 +946,20 @@ export default function GoalsHub({
                     goal={objWizard.goal}
                 />
             )}
-            <CheckinWizard open={checkin.open} onClose={() => setCheckin({ open: false, obj: null })} objective={checkin.obj} />
+            <CheckinWizard
+                open={checkin.open}
+                onClose={() => setCheckin({ open: false, obj: null })}
+                objective={checkin.obj}
+            />
             {can.manage && (
                 <DevelopmentWizard
                     open={devWizard}
                     onClose={() => setDevWizard(false)}
                     staff={users}
-                    objectives={objectives.map((o) => ({ id: o.id, title: o.title }))}
+                    objectives={objectives.map((o) => ({
+                        id: o.id,
+                        title: o.title,
+                    }))}
                     competencies={competencies}
                 />
             )}
@@ -609,7 +969,17 @@ export default function GoalsHub({
                     options={objectives}
                     onClose={() => setReparent(null)}
                     onMove={(parentId) =>
-                        router.patch(`/hr/goals/${reparent.id}/parent`, { parent_goal_id: parentId }, { preserveScroll: true, onSuccess: () => { setReparent(null); show('Objective moved'); } })
+                        router.patch(
+                            `/hr/goals/${reparent.id}/parent`,
+                            { parent_goal_id: parentId },
+                            {
+                                preserveScroll: true,
+                                onSuccess: () => {
+                                    setReparent(null);
+                                    show('Objective moved');
+                                },
+                            },
+                        )
                     }
                 />
             )}
@@ -657,7 +1027,16 @@ function ObjectivesTab(props: {
     onBulk: (action: string, extra?: Record<string, unknown>) => void;
     onNew: () => void;
 }) {
-    const { list, view, expanded, setExpanded, selected, setSelected, selectedIds, can } = props;
+    const {
+        list,
+        view,
+        expanded,
+        setExpanded,
+        selected,
+        setSelected,
+        selectedIds,
+        can,
+    } = props;
     const ALL = '__all__';
 
     const sel = (id: number) => setSelected((p) => ({ ...p, [id]: !p[id] }));
@@ -672,21 +1051,70 @@ function ObjectivesTab(props: {
         <div className="motion-safe:animate-in motion-safe:fade-in-0">
             {/* toolbar */}
             <div className="flex flex-wrap items-center gap-2">
-                <div className="relative min-w-[220px] max-w-[340px] flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <div className="relative max-w-[340px] min-w-[220px] flex-1">
+                    <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                     <input
                         value={props.search}
                         onChange={(e) => props.setSearch(e.target.value)}
                         placeholder="Search objectives, owners, categories…"
-                        className="h-9 w-full rounded-lg border border-border bg-card pl-8 pr-3 text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        className="h-9 w-full rounded-lg border border-border bg-card pr-3 pl-8 text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                     />
                 </div>
-                <FilterSelect value={props.fStatus} onChange={props.setFStatus} placeholder="All statuses" all={ALL} options={[['active', 'Active'], ['draft', 'Draft'], ['on_hold', 'On hold'], ['blocked', 'Blocked'], ['completed', 'Completed'], ['cancelled', 'Cancelled']]} />
-                <FilterSelect value={props.fType} onChange={props.setFType} placeholder="All types" all={ALL} options={[['company', 'Company'], ['team', 'Team'], ['individual', 'Individual']]} />
-                <FilterSelect value={props.fConfidence} onChange={props.setFConfidence} placeholder="Any confidence" all={ALL} options={[['on_track', 'On track'], ['at_risk', 'At risk'], ['off_track', 'Off track']]} />
-                <FilterSelect value={props.fOwner} onChange={props.setFOwner} placeholder="All owners" all={ALL} options={props.ownerOptions.map((o) => [o, o] as [string, string])} />
+                <FilterSelect
+                    value={props.fStatus}
+                    onChange={props.setFStatus}
+                    placeholder="All statuses"
+                    all={ALL}
+                    options={[
+                        ['active', 'Active'],
+                        ['draft', 'Draft'],
+                        ['on_hold', 'On hold'],
+                        ['blocked', 'Blocked'],
+                        ['completed', 'Completed'],
+                        ['cancelled', 'Cancelled'],
+                    ]}
+                />
+                <FilterSelect
+                    value={props.fType}
+                    onChange={props.setFType}
+                    placeholder="All types"
+                    all={ALL}
+                    options={[
+                        ['company', 'Company'],
+                        ['team', 'Team'],
+                        ['individual', 'Individual'],
+                    ]}
+                />
+                <FilterSelect
+                    value={props.fConfidence}
+                    onChange={props.setFConfidence}
+                    placeholder="Any confidence"
+                    all={ALL}
+                    options={[
+                        ['on_track', 'On track'],
+                        ['at_risk', 'At risk'],
+                        ['off_track', 'Off track'],
+                    ]}
+                />
+                <FilterSelect
+                    value={props.fOwner}
+                    onChange={props.setFOwner}
+                    placeholder="All owners"
+                    all={ALL}
+                    options={props.ownerOptions.map(
+                        (o) => [o, o] as [string, string],
+                    )}
+                />
                 {props.allTags.length > 0 && (
-                    <FilterSelect value={props.fTag} onChange={props.setFTag} placeholder="All tags" all={ALL} options={props.allTags.map((t) => [t, t] as [string, string])} />
+                    <FilterSelect
+                        value={props.fTag}
+                        onChange={props.setFTag}
+                        placeholder="All tags"
+                        all={ALL}
+                        options={props.allTags.map(
+                            (t) => [t, t] as [string, string],
+                        )}
+                    />
                 )}
                 <div className="flex-1" />
                 <Select value={props.sort} onValueChange={props.setSort}>
@@ -698,12 +1126,22 @@ function ObjectivesTab(props: {
                         <SelectItem value="due">Sort: Due date</SelectItem>
                         <SelectItem value="priority">Sort: Priority</SelectItem>
                         <SelectItem value="owner">Sort: Owner</SelectItem>
-                        <SelectItem value="confidence">Sort: Confidence</SelectItem>
-                        <SelectItem value="checkin">Sort: Last check-in</SelectItem>
+                        <SelectItem value="confidence">
+                            Sort: Confidence
+                        </SelectItem>
+                        <SelectItem value="checkin">
+                            Sort: Last check-in
+                        </SelectItem>
                     </SelectContent>
                 </Select>
                 <div className="inline-flex gap-1 rounded-lg border border-border bg-card p-1">
-                    {([['list', List], ['table', Rows3], ['board', LayoutGrid]] as const).map(([k, Icon]) => (
+                    {(
+                        [
+                            ['list', List],
+                            ['table', Rows3],
+                            ['board', LayoutGrid],
+                        ] as const
+                    ).map(([k, Icon]) => (
                         <button
                             key={k}
                             type="button"
@@ -711,7 +1149,12 @@ function ObjectivesTab(props: {
                             title={k === 'table' ? 'Table (dense)' : k}
                             aria-pressed={view === k}
                             onClick={() => props.setView(k)}
-                            className={cn('grid h-7 w-8 place-items-center rounded-md', view === k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}
+                            className={cn(
+                                'grid h-7 w-8 place-items-center rounded-md',
+                                view === k
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'text-muted-foreground hover:bg-muted',
+                            )}
                         >
                             <Icon className="h-4 w-4" />
                         </button>
@@ -722,25 +1165,51 @@ function ObjectivesTab(props: {
             {/* bulk bar */}
             {can.manage && selectedIds.length > 0 && (
                 <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-xl border border-primary/35 bg-primary/[0.07] px-3 py-2.5">
-                    <span className="text-[12.5px] font-bold text-primary">{selectedIds.length} selected</span>
+                    <span className="text-[12.5px] font-bold text-primary">
+                        {selectedIds.length} selected
+                    </span>
                     <span className="h-4 w-px bg-border" />
-                    <BulkBtn onClick={() => props.onBulk('recycle')}>Move to next cycle</BulkBtn>
-                    <BulkBtn onClick={() => props.onBulk('request_checkin')}>Request check-in</BulkBtn>
-                    <BulkBtn onClick={() => props.onBulk('archive')}>Archive</BulkBtn>
+                    <BulkBtn onClick={() => props.onBulk('recycle')}>
+                        Move to next cycle
+                    </BulkBtn>
+                    <BulkBtn onClick={() => props.onBulk('request_checkin')}>
+                        Request check-in
+                    </BulkBtn>
+                    <BulkBtn onClick={() => props.onBulk('archive')}>
+                        Archive
+                    </BulkBtn>
                     <div className="flex-1" />
-                    <button type="button" onClick={() => setSelected({})} className="text-[12px] font-semibold text-muted-foreground hover:text-foreground">
+                    <button
+                        type="button"
+                        onClick={() => setSelected({})}
+                        className="text-[12px] font-semibold text-muted-foreground hover:text-foreground"
+                    >
                         Clear
                     </button>
                 </div>
             )}
 
             {view === 'board' ? (
-                <BoardView list={list} onOpen={props.onOpen} onMenu={props.onMenu} />
+                <BoardView
+                    list={list}
+                    onOpen={props.onOpen}
+                    onMenu={props.onMenu}
+                />
             ) : (
                 <div className="mt-3.5 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    <div className="flex items-center gap-3 border-b border-border bg-sidebar px-4 py-2.5 text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">
+                    <div className="flex items-center gap-3 border-b border-border bg-sidebar px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
                         {can.manage ? (
-                            <button type="button" onClick={toggleAll} aria-label="Select all" className={cn('grid h-[18px] w-[18px] place-items-center rounded border-[1.5px]', allSel ? 'border-primary bg-primary text-white' : 'border-border bg-card')}>
+                            <button
+                                type="button"
+                                onClick={toggleAll}
+                                aria-label="Select all"
+                                className={cn(
+                                    'grid h-[18px] w-[18px] place-items-center rounded border-[1.5px]',
+                                    allSel
+                                        ? 'border-primary bg-primary text-white'
+                                        : 'border-border bg-card',
+                                )}
+                            >
                                 {allSel && <Check className="h-3 w-3" />}
                             </button>
                         ) : (
@@ -759,8 +1228,13 @@ function ObjectivesTab(props: {
                             <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-muted text-muted-foreground">
                                 <Search className="h-5 w-5" />
                             </div>
-                            <p className="text-sm font-bold">No objectives match</p>
-                            <p className="mt-1 text-[13px] text-muted-foreground">Try clearing filters or search — or create a new objective.</p>
+                            <p className="text-sm font-bold">
+                                No objectives match
+                            </p>
+                            <p className="mt-1 text-[13px] text-muted-foreground">
+                                Try clearing filters or search — or create a new
+                                objective.
+                            </p>
                         </div>
                     ) : (
                         list.map((o) => (
@@ -772,7 +1246,12 @@ function ObjectivesTab(props: {
                                 selected={!!selected[o.id]}
                                 expanded={view !== 'table' && !!expanded[o.id]}
                                 onSelect={() => sel(o.id)}
-                                onExpand={() => setExpanded((p) => ({ ...p, [o.id]: !p[o.id] }))}
+                                onExpand={() =>
+                                    setExpanded((p) => ({
+                                        ...p,
+                                        [o.id]: !p[o.id],
+                                    }))
+                                }
                                 onOpen={() => props.onOpen(o.id)}
                                 onCheckin={() => props.onCheckin(o)}
                                 onMenu={(e) => props.onMenu(e, o)}
@@ -786,9 +1265,24 @@ function ObjectivesTab(props: {
     );
 }
 
-function FilterSelect({ value, onChange, placeholder, all, options }: { value: string; onChange: (v: string) => void; placeholder: string; all: string; options: [string, string][] }) {
+function FilterSelect({
+    value,
+    onChange,
+    placeholder,
+    all,
+    options,
+}: {
+    value: string;
+    onChange: (v: string) => void;
+    placeholder: string;
+    all: string;
+    options: [string, string][];
+}) {
     return (
-        <Select value={value || all} onValueChange={(v) => onChange(v === all ? '' : v)}>
+        <Select
+            value={value || all}
+            onValueChange={(v) => onChange(v === all ? '' : v)}
+        >
             <SelectTrigger className={SELECT_CLS}>
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>
@@ -804,9 +1298,19 @@ function FilterSelect({ value, onChange, placeholder, all, options }: { value: s
     );
 }
 
-function BulkBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+function BulkBtn({
+    onClick,
+    children,
+}: {
+    onClick: () => void;
+    children: React.ReactNode;
+}) {
     return (
-        <button type="button" onClick={onClick} className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold hover:bg-muted">
+        <button
+            type="button"
+            onClick={onClick}
+            className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold hover:bg-muted"
+        >
             {children}
         </button>
     );
@@ -841,10 +1345,24 @@ function ObjectiveRow({
         <div className="border-b border-border/60 last:border-0">
             <div
                 onContextMenu={onMenu}
-                className={cn('flex items-center gap-3 px-4 transition-colors hover:bg-muted/40', dense ? 'py-1.5' : 'py-2.5', selected && 'bg-primary/[0.06]')}
+                className={cn(
+                    'flex items-center gap-3 px-4 transition-colors hover:bg-muted/40',
+                    dense ? 'py-1.5' : 'py-2.5',
+                    selected && 'bg-primary/[0.06]',
+                )}
             >
                 {can.manage ? (
-                    <button type="button" onClick={onSelect} aria-label="Select objective" className={cn('grid h-[18px] w-[18px] shrink-0 place-items-center rounded border-[1.5px]', selected ? 'border-primary bg-primary text-white' : 'border-border bg-card')}>
+                    <button
+                        type="button"
+                        onClick={onSelect}
+                        aria-label="Select objective"
+                        className={cn(
+                            'grid h-[18px] w-[18px] shrink-0 place-items-center rounded border-[1.5px]',
+                            selected
+                                ? 'border-primary bg-primary text-white'
+                                : 'border-border bg-card',
+                        )}
+                    >
                         {selected && <Check className="h-3 w-3" />}
                     </button>
                 ) : (
@@ -853,27 +1371,73 @@ function ObjectiveRow({
                 {dense ? (
                     <span className="w-[18px] shrink-0" />
                 ) : (
-                    <button type="button" onClick={onExpand} aria-label="Expand key results" className="grid h-[18px] w-[18px] shrink-0 place-items-center text-muted-foreground">
-                        {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <button
+                        type="button"
+                        onClick={onExpand}
+                        aria-label="Expand key results"
+                        className="grid h-[18px] w-[18px] shrink-0 place-items-center text-muted-foreground"
+                    >
+                        {expanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                        ) : (
+                            <ChevronRight className="h-4 w-4" />
+                        )}
                     </button>
                 )}
                 <div className="min-w-0 flex-1 cursor-pointer" onClick={onOpen}>
                     <div className="flex items-center gap-2">
-                        <span className={cn('truncate font-semibold', dense ? 'text-[12.5px]' : 'text-[13.5px]')}>{o.title}</span>
-                        <span className={cn('h-2 w-2 shrink-0 rounded-full', PRIORITY_DOT[o.priority])} title={`${o.priority} priority`} />
+                        <span
+                            className={cn(
+                                'truncate font-semibold',
+                                dense ? 'text-[12.5px]' : 'text-[13.5px]',
+                            )}
+                        >
+                            {o.title}
+                        </span>
+                        <span
+                            className={cn(
+                                'h-2 w-2 shrink-0 rounded-full',
+                                PRIORITY_DOT[o.priority],
+                            )}
+                            title={`${o.priority} priority`}
+                        />
                         {dense && o.status !== 'active' && (
-                            <span className={cn('inline-flex items-center rounded px-1 py-0.5 text-[9px] font-bold capitalize', STATUS_BADGE[o.status])}>{STATUS_LABEL[o.status]}</span>
+                            <span
+                                className={cn(
+                                    'inline-flex items-center rounded px-1 py-0.5 text-[9px] font-bold capitalize',
+                                    STATUS_BADGE[o.status],
+                                )}
+                            >
+                                {STATUS_LABEL[o.status]}
+                            </span>
                         )}
                     </div>
                     {!dense && (
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
                             <TypeBadge type={o.goal_type} />
-                            {o.cycle && <span className="text-[11px] text-muted-foreground">{o.cycle.name}</span>}
-                            {o.parent_goal && <span className="max-w-[200px] truncate text-[11px] text-muted-foreground">↳ {o.parent_goal.title}</span>}
-                            {o.key_results_count > 0 && <span className="text-[11px] text-muted-foreground">· {o.key_results_count} KR</span>}
-                            <span className="text-[11px] text-muted-foreground">· {checkinLabel(o.last_checkin_days)}</span>
+                            {o.cycle && (
+                                <span className="text-[11px] text-muted-foreground">
+                                    {o.cycle.name}
+                                </span>
+                            )}
+                            {o.parent_goal && (
+                                <span className="max-w-[200px] truncate text-[11px] text-muted-foreground">
+                                    ↳ {o.parent_goal.title}
+                                </span>
+                            )}
+                            {o.key_results_count > 0 && (
+                                <span className="text-[11px] text-muted-foreground">
+                                    · {o.key_results_count} KR
+                                </span>
+                            )}
+                            <span className="text-[11px] text-muted-foreground">
+                                · {checkinLabel(o.last_checkin_days)}
+                            </span>
                             {(o.tags ?? []).map((t) => (
-                                <span key={t} className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                <span
+                                    key={t}
+                                    className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+                                >
                                     <TagIcon className="h-2.5 w-2.5" />
                                     {t}
                                 </span>
@@ -883,50 +1447,89 @@ function ObjectiveRow({
                 </div>
                 <div className="hidden w-[120px] items-center gap-1.5 lg:flex">
                     <Avatar name={o.user?.name} />
-                    <span className="truncate text-xs">{o.user?.name ?? '—'}</span>
+                    <span className="truncate text-xs">
+                        {o.user?.name ?? '—'}
+                    </span>
                 </div>
                 <div className="flex w-[88px] justify-center">
                     <RagPill confidence={o.confidence} />
                 </div>
                 <div className="flex w-[150px] items-center gap-2">
-                    <ProgressBar pct={o.progress_percentage} className="h-1.5" />
-                    <span className="w-8 text-right text-xs font-bold tabular-nums">{o.progress_percentage}%</span>
+                    <ProgressBar
+                        pct={o.progress_percentage}
+                        className="h-1.5"
+                    />
+                    <span className="w-8 text-right text-xs font-bold tabular-nums">
+                        {o.progress_percentage}%
+                    </span>
                 </div>
-                <div className="hidden w-[90px] text-xs text-muted-foreground lg:block">{formatDate(o.due_date)}</div>
-                <button type="button" onClick={onMenu} aria-label="Row actions" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted">
+                <div className="hidden w-[90px] text-xs text-muted-foreground lg:block">
+                    {formatDate(o.due_date)}
+                </div>
+                <button
+                    type="button"
+                    onClick={onMenu}
+                    aria-label="Row actions"
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                >
                     <MoreVertical className="h-4 w-4" />
                 </button>
             </div>
 
             {expanded && (
-                <div className="border-t border-border/60 bg-muted/30 py-1.5 pl-14 pr-4">
+                <div className="border-t border-border/60 bg-muted/30 py-1.5 pr-4 pl-14">
                     {o.key_results.length === 0 ? (
-                        <p className="py-2 text-[12px] text-muted-foreground">No key results — progress is manual.</p>
+                        <p className="py-2 text-[12px] text-muted-foreground">
+                            No key results — progress is manual.
+                        </p>
                     ) : (
                         o.key_results.map((k) => (
-                            <div key={k.id} className="flex items-center gap-3 border-b border-border/50 py-2 last:border-0">
+                            <div
+                                key={k.id}
+                                className="flex items-center gap-3 border-b border-border/50 py-2 last:border-0"
+                            >
                                 <div className="min-w-0 flex-1">
-                                    <div className="text-[12.5px] font-semibold">{k.title}</div>
+                                    <div className="text-[12.5px] font-semibold">
+                                        {k.title}
+                                    </div>
                                     <div className="mt-0.5 text-[11px] text-muted-foreground">
-                                        {formatKrMeasure(k)} · weight {k.weight} · {k.owner?.name ?? '—'}
+                                        {formatKrMeasure(k)} · weight {k.weight}{' '}
+                                        · {k.owner?.name ?? '—'}
                                     </div>
                                 </div>
                                 <RagPill confidence={k.confidence} />
                                 <div className="flex w-[130px] items-center gap-2">
-                                    <ProgressBar pct={k.progress_percentage} className="h-1.5" />
-                                    <span className="w-7 text-right text-[11.5px] font-bold tabular-nums">{k.progress_percentage}%</span>
+                                    <ProgressBar
+                                        pct={k.progress_percentage}
+                                        className="h-1.5"
+                                    />
+                                    <span className="w-7 text-right text-[11.5px] font-bold tabular-nums">
+                                        {k.progress_percentage}%
+                                    </span>
                                 </div>
-                                <button type="button" onClick={onCheckin} className="rounded-md border border-border bg-card px-2 py-1 text-[11px] font-semibold hover:bg-muted">
+                                <button
+                                    type="button"
+                                    onClick={onCheckin}
+                                    className="rounded-md border border-border bg-card px-2 py-1 text-[11px] font-semibold hover:bg-muted"
+                                >
                                     Check in
                                 </button>
                             </div>
                         ))
                     )}
                     <div className="mt-2 flex gap-2">
-                        <button type="button" onClick={onAddKr} className="rounded-lg border border-dashed border-border px-2.5 py-1.5 text-[11.5px] font-semibold text-primary hover:bg-muted/40">
+                        <button
+                            type="button"
+                            onClick={onAddKr}
+                            className="rounded-lg border border-dashed border-border px-2.5 py-1.5 text-[11.5px] font-semibold text-primary hover:bg-muted/40"
+                        >
                             + Add key result
                         </button>
-                        <button type="button" onClick={onOpen} className="rounded-lg px-2 py-1.5 text-[11.5px] font-semibold text-muted-foreground hover:bg-muted/40">
+                        <button
+                            type="button"
+                            onClick={onOpen}
+                            className="rounded-lg px-2 py-1.5 text-[11.5px] font-semibold text-muted-foreground hover:bg-muted/40"
+                        >
                             Open objective →
                         </button>
                     </div>
@@ -936,7 +1539,15 @@ function ObjectiveRow({
     );
 }
 
-function BoardView({ list, onOpen, onMenu }: { list: Objective[]; onOpen: (id: number) => void; onMenu: (e: React.MouseEvent, o: Objective) => void }) {
+function BoardView({
+    list,
+    onOpen,
+    onMenu,
+}: {
+    list: Objective[];
+    onOpen: (id: number) => void;
+    onMenu: (e: React.MouseEvent, o: Objective) => void;
+}) {
     const cols: { key: Confidence; label: string }[] = [
         { key: 'on_track', label: 'On track' },
         { key: 'at_risk', label: 'At risk' },
@@ -947,12 +1558,23 @@ function BoardView({ list, onOpen, onMenu }: { list: Objective[]; onOpen: (id: n
             {cols.map((c) => {
                 const items = list.filter((o) => o.confidence === c.key);
                 return (
-                    <div key={c.key} className="overflow-hidden rounded-xl border border-border bg-sidebar">
+                    <div
+                        key={c.key}
+                        className="overflow-hidden rounded-xl border border-border bg-sidebar"
+                    >
                         <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
                             <span className="inline-flex items-center gap-2 text-[12.5px] font-bold">
-                                <span className={cn('h-2 w-2 rounded-full', RAG[c.key].dot)} /> {c.label}
+                                <span
+                                    className={cn(
+                                        'h-2 w-2 rounded-full',
+                                        RAG[c.key].dot,
+                                    )}
+                                />{' '}
+                                {c.label}
                             </span>
-                            <span className="text-[11px] font-bold tabular-nums text-muted-foreground">{items.length}</span>
+                            <span className="text-[11px] font-bold text-muted-foreground tabular-nums">
+                                {items.length}
+                            </span>
                         </div>
                         <div className="flex flex-col gap-2.5 p-2.5">
                             {items.map((o) => (
@@ -964,23 +1586,42 @@ function BoardView({ list, onOpen, onMenu }: { list: Objective[]; onOpen: (id: n
                                 >
                                     <div className="mb-1.5 flex items-center gap-2">
                                         <TypeBadge type={o.goal_type} />
-                                        <span className={cn('h-1.5 w-1.5 rounded-full', RAG[o.confidence].dot)} />
+                                        <span
+                                            className={cn(
+                                                'h-1.5 w-1.5 rounded-full',
+                                                RAG[o.confidence].dot,
+                                            )}
+                                        />
                                     </div>
-                                    <div className="mb-2 text-[13px] font-semibold leading-snug">{o.title}</div>
+                                    <div className="mb-2 text-[13px] leading-snug font-semibold">
+                                        {o.title}
+                                    </div>
                                     <div className="flex items-center gap-2">
-                                        <ProgressBar pct={o.progress_percentage} className="h-1.5" />
-                                        <span className="text-[11.5px] font-bold tabular-nums">{o.progress_percentage}%</span>
+                                        <ProgressBar
+                                            pct={o.progress_percentage}
+                                            className="h-1.5"
+                                        />
+                                        <span className="text-[11.5px] font-bold tabular-nums">
+                                            {o.progress_percentage}%
+                                        </span>
                                     </div>
                                     <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
                                         <span className="inline-flex items-center gap-1.5">
-                                            <Avatar name={o.user?.name} className="h-4 w-4 text-[8px]" />
+                                            <Avatar
+                                                name={o.user?.name}
+                                                className="h-4 w-4 text-[8px]"
+                                            />
                                             {o.user?.name ?? '—'}
                                         </span>
                                         <span>{formatDate(o.due_date)}</span>
                                     </div>
                                 </div>
                             ))}
-                            {items.length === 0 && <p className="px-1 py-4 text-center text-[11.5px] text-muted-foreground">Nothing here</p>}
+                            {items.length === 0 && (
+                                <p className="px-1 py-4 text-center text-[11.5px] text-muted-foreground">
+                                    Nothing here
+                                </p>
+                            )}
                         </div>
                     </div>
                 );
@@ -1023,7 +1664,11 @@ function AlignmentTab({
             (byParent.get(o.id) ?? []).forEach((c) => walk(c, depth + 1));
         };
         // Roots: top-level OR parent not in current cycle list.
-        objectives.filter((o) => o.parent_goal_id == null || !ids.has(o.parent_goal_id)).forEach((o) => walk(o, 0));
+        objectives
+            .filter(
+                (o) => o.parent_goal_id == null || !ids.has(o.parent_goal_id),
+            )
+            .forEach((o) => walk(o, 0));
         return out;
     }, [objectives]);
 
@@ -1032,17 +1677,27 @@ function AlignmentTab({
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5">
                 <div>
                     <p className="text-[15px] font-bold">Alignment tree</p>
-                    <p className="mt-0.5 text-[12.5px] text-muted-foreground">Company → team → individual, with weighted roll-up at each node. Right-click a node to add a child or re-parent.</p>
+                    <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                        Company → team → individual, with weighted roll-up at
+                        each node. Right-click a node to add a child or
+                        re-parent.
+                    </p>
                 </div>
                 {can.manage && (
-                    <button type="button" onClick={onNew} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] font-semibold shadow-sm hover:bg-muted">
+                    <button
+                        type="button"
+                        onClick={onNew}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] font-semibold shadow-sm hover:bg-muted"
+                    >
                         <Plus className="h-4 w-4 text-primary" /> New objective
                     </button>
                 )}
             </div>
             <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                 {flat.length === 0 ? (
-                    <p className="px-5 py-12 text-center text-[13px] text-muted-foreground">No objectives in this cycle.</p>
+                    <p className="px-5 py-12 text-center text-[13px] text-muted-foreground">
+                        No objectives in this cycle.
+                    </p>
                 ) : (
                     flat.map(({ o, depth }) => (
                         <div
@@ -1050,26 +1705,56 @@ function AlignmentTab({
                             onContextMenu={(e) => onMenu(e, o)}
                             className="flex items-center gap-3 border-b border-border/60 px-4 py-3 transition-colors last:border-0 hover:bg-muted/40"
                         >
-                            <div className="flex min-w-0 flex-1 items-center" style={{ paddingLeft: depth * 28 }}>
-                                {depth > 0 && <span className="-ml-5 mr-2 h-px w-4 shrink-0 bg-border" />}
-                                <div className="min-w-0 cursor-pointer" onClick={() => onOpen(o.id)}>
+                            <div
+                                className="flex min-w-0 flex-1 items-center"
+                                style={{ paddingLeft: depth * 28 }}
+                            >
+                                {depth > 0 && (
+                                    <span className="mr-2 -ml-5 h-px w-4 shrink-0 bg-border" />
+                                )}
+                                <div
+                                    className="min-w-0 cursor-pointer"
+                                    onClick={() => onOpen(o.id)}
+                                >
                                     <div className="flex items-center gap-2">
-                                        <span className={cn('h-2 w-2 shrink-0 rounded-full', RAG[o.confidence].dot)} title={RAG[o.confidence].label} />
-                                        <span className="truncate text-[13.5px] font-semibold">{o.title}</span>
+                                        <span
+                                            className={cn(
+                                                'h-2 w-2 shrink-0 rounded-full',
+                                                RAG[o.confidence].dot,
+                                            )}
+                                            title={RAG[o.confidence].label}
+                                        />
+                                        <span className="truncate text-[13.5px] font-semibold">
+                                            {o.title}
+                                        </span>
                                         <TypeBadge type={o.goal_type} />
                                     </div>
                                     <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                        <Avatar name={o.user?.name} className="h-4 w-4 text-[8px]" />
-                                        {o.user?.name ?? '—'} · {o.key_results_count} KR
+                                        <Avatar
+                                            name={o.user?.name}
+                                            className="h-4 w-4 text-[8px]"
+                                        />
+                                        {o.user?.name ?? '—'} ·{' '}
+                                        {o.key_results_count} KR
                                     </div>
                                 </div>
                             </div>
                             <div className="flex w-[170px] items-center gap-2">
-                                <ProgressBar pct={o.progress_percentage} className="h-1.5" />
-                                <span className="w-8 text-right text-xs font-bold tabular-nums">{o.progress_percentage}%</span>
+                                <ProgressBar
+                                    pct={o.progress_percentage}
+                                    className="h-1.5"
+                                />
+                                <span className="w-8 text-right text-xs font-bold tabular-nums">
+                                    {o.progress_percentage}%
+                                </span>
                             </div>
                             {can.manage && (
-                                <button type="button" onClick={() => onAddChild(o.id)} aria-label="Add child objective" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-dashed border-border text-primary hover:bg-muted">
+                                <button
+                                    type="button"
+                                    onClick={() => onAddChild(o.id)}
+                                    aria-label="Add child objective"
+                                    className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-dashed border-border text-primary hover:bg-muted"
+                                >
                                     <Plus className="h-3.5 w-3.5" />
                                 </button>
                             )}
@@ -1111,7 +1796,8 @@ function DevelopmentTab({
         if (devStatus && d.status !== devStatus) return false;
         if (devCat && d.category !== devCat) return false;
         if (devSearch) {
-            const hay = `${d.employee?.name ?? ''} ${d.manager?.name ?? ''} ${d.competency_area ?? ''}`.toLowerCase();
+            const hay =
+                `${d.employee?.name ?? ''} ${d.manager?.name ?? ''} ${d.competency_area ?? ''}`.toLowerCase();
             if (!hay.includes(devSearch.toLowerCase())) return false;
         }
         return true;
@@ -1120,60 +1806,133 @@ function DevelopmentTab({
     return (
         <div className="motion-safe:animate-in motion-safe:fade-in-0">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-                <div className="relative min-w-[220px] max-w-[320px] flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <div className="relative max-w-[320px] min-w-[220px] flex-1">
+                    <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                     <input
                         value={devSearch}
                         onChange={(e) => setDevSearch(e.target.value)}
                         placeholder="Search people, managers, competencies…"
-                        className="h-9 w-full rounded-lg border border-border bg-card pl-8 pr-3 text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        className="h-9 w-full rounded-lg border border-border bg-card pr-3 pl-8 text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                     />
                 </div>
-                <FilterSelect value={devStatus} onChange={setDevStatus} placeholder="Any status" all={ALL} options={[['not_started', 'Not started'], ['in_progress', 'In progress'], ['blocked', 'Blocked'], ['completed', 'Completed']]} />
-                <FilterSelect value={devCat} onChange={setDevCat} placeholder="All categories" all={ALL} options={[['growth', 'Growth'], ['performance', 'Performance'], ['leadership', 'Leadership'], ['compliance', 'Compliance'], ['capability', 'Capability']]} />
+                <FilterSelect
+                    value={devStatus}
+                    onChange={setDevStatus}
+                    placeholder="Any status"
+                    all={ALL}
+                    options={[
+                        ['not_started', 'Not started'],
+                        ['in_progress', 'In progress'],
+                        ['blocked', 'Blocked'],
+                        ['completed', 'Completed'],
+                    ]}
+                />
+                <FilterSelect
+                    value={devCat}
+                    onChange={setDevCat}
+                    placeholder="All categories"
+                    all={ALL}
+                    options={[
+                        ['growth', 'Growth'],
+                        ['performance', 'Performance'],
+                        ['leadership', 'Leadership'],
+                        ['compliance', 'Compliance'],
+                        ['capability', 'Capability'],
+                    ]}
+                />
                 <div className="flex-1" />
                 {can.manage && (
-                    <button type="button" onClick={onNew} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-semibold text-primary-foreground shadow-sm">
+                    <button
+                        type="button"
+                        onClick={onNew}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-semibold text-primary-foreground shadow-sm"
+                    >
                         <Plus className="h-4 w-4" /> New development plan
                     </button>
                 )}
             </div>
             <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                <div className="flex items-center gap-3 border-b border-border bg-sidebar px-4 py-2.5 text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">
+                <div className="flex items-center gap-3 border-b border-border bg-sidebar px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
                     <span className="flex-1">Person &amp; competency</span>
                     <span className="hidden w-[150px] lg:block">Level</span>
                     <span className="w-[120px]">Status</span>
-                    <span className="hidden w-[150px] lg:block">Linked objective</span>
+                    <span className="hidden w-[150px] lg:block">
+                        Linked objective
+                    </span>
                     <span className="w-[80px]">Review</span>
                 </div>
                 {filtered.length === 0 ? (
-                    <p className="px-5 py-12 text-center text-[13px] text-muted-foreground">No development plans match.</p>
+                    <p className="px-5 py-12 text-center text-[13px] text-muted-foreground">
+                        No development plans match.
+                    </p>
                 ) : (
                     filtered.map((d) => (
-                        <div key={d.id} className="flex items-center gap-3 border-b border-border/60 px-4 py-3 transition-colors last:border-0 hover:bg-muted/40">
+                        <div
+                            key={d.id}
+                            className="flex items-center gap-3 border-b border-border/60 px-4 py-3 transition-colors last:border-0 hover:bg-muted/40"
+                        >
                             <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                                <Avatar name={d.employee?.name} className="h-[34px] w-[34px] text-[12px]" />
+                                <Avatar
+                                    name={d.employee?.name}
+                                    className="h-[34px] w-[34px] text-[12px]"
+                                />
                                 <div className="min-w-0">
-                                    <div className="text-[13.5px] font-semibold">{d.employee?.name ?? '—'}</div>
+                                    <div className="text-[13.5px] font-semibold">
+                                        {d.employee?.name ?? '—'}
+                                    </div>
                                     <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                                        <span className="text-[12px] text-muted-foreground">{d.competency_area ?? '—'}</span>
-                                        <span className={cn('inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold', DEV_CAT_BADGE[d.category])}>{d.category}</span>
+                                        <span className="text-[12px] text-muted-foreground">
+                                            {d.competency_area ?? '—'}
+                                        </span>
+                                        <span
+                                            className={cn(
+                                                'inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold',
+                                                DEV_CAT_BADGE[d.category],
+                                            )}
+                                        >
+                                            {d.category}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
                             <div className="hidden w-[150px] items-center gap-1 lg:flex">
                                 {[1, 2, 3, 4, 5].map((n) => (
-                                    <span key={n} className={cn('h-2 w-3.5 rounded-sm', d.current_level && n <= d.current_level ? 'bg-primary' : d.target_level && n <= d.target_level ? 'bg-primary/25' : 'bg-muted')} />
+                                    <span
+                                        key={n}
+                                        className={cn(
+                                            'h-2 w-3.5 rounded-sm',
+                                            d.current_level &&
+                                                n <= d.current_level
+                                                ? 'bg-primary'
+                                                : d.target_level &&
+                                                    n <= d.target_level
+                                                  ? 'bg-primary/25'
+                                                  : 'bg-muted',
+                                        )}
+                                    />
                                 ))}
-                                <span className="ml-1.5 text-[11px] font-bold tabular-nums text-muted-foreground">
+                                <span className="ml-1.5 text-[11px] font-bold text-muted-foreground tabular-nums">
                                     {d.current_level ?? 0}→{d.target_level ?? 0}
                                 </span>
                             </div>
                             <div className="w-[120px]">
-                                <span className={cn('inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold', DEV_STATUS_BADGE[d.status])}>{d.status.replace('_', ' ')}</span>
+                                <span
+                                    className={cn(
+                                        'inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold',
+                                        DEV_STATUS_BADGE[d.status],
+                                    )}
+                                >
+                                    {d.status.replace('_', ' ')}
+                                </span>
                             </div>
-                            <div className="hidden w-[150px] truncate text-[11.5px] text-muted-foreground lg:block">{d.linked_objective ? `↳ ${d.linked_objective.title}` : ''}</div>
-                            <div className="w-[80px] text-[11.5px] capitalize text-muted-foreground">{d.review_frequency ?? '—'}</div>
+                            <div className="hidden w-[150px] truncate text-[11.5px] text-muted-foreground lg:block">
+                                {d.linked_objective
+                                    ? `↳ ${d.linked_objective.title}`
+                                    : ''}
+                            </div>
+                            <div className="w-[80px] text-[11.5px] text-muted-foreground capitalize">
+                                {d.review_frequency ?? '—'}
+                            </div>
                         </div>
                     ))
                 )}
@@ -1196,14 +1955,46 @@ function AnalyticsTab({
     analytics: Analytics;
     objectives: Objective[];
     selectedCycle: Cycle | undefined;
-    onDrill: (patch: { confidence?: string; status?: string; type?: string }) => void;
+    onDrill: (patch: {
+        confidence?: string;
+        status?: string;
+        type?: string;
+    }) => void;
     onOpen: (id: number) => void;
 }) {
     const kpis = [
-        { label: 'Active objectives', value: analytics.active, tone: 'text-primary', bg: 'bg-primary/10', icon: Target, drill: { status: 'active' } },
-        { label: 'On track', value: analytics.on_track, tone: 'text-status-success', bg: 'bg-status-success-bg', icon: CheckCircle2, drill: { confidence: 'on_track' } },
-        { label: 'At risk', value: analytics.at_risk, tone: 'text-status-warning', bg: 'bg-status-warning-bg', icon: AlertTriangle, drill: { confidence: 'at_risk' } },
-        { label: 'Completion', value: `${analytics.completion_rate}%`, tone: 'text-status-info', bg: 'bg-status-info-bg', icon: BarChart3, drill: { status: 'completed' } },
+        {
+            label: 'Active objectives',
+            value: analytics.active,
+            tone: 'text-primary',
+            bg: 'bg-primary/10',
+            icon: Target,
+            drill: { status: 'active' },
+        },
+        {
+            label: 'On track',
+            value: analytics.on_track,
+            tone: 'text-status-success',
+            bg: 'bg-status-success-bg',
+            icon: CheckCircle2,
+            drill: { confidence: 'on_track' },
+        },
+        {
+            label: 'At risk',
+            value: analytics.at_risk,
+            tone: 'text-status-warning',
+            bg: 'bg-status-warning-bg',
+            icon: AlertTriangle,
+            drill: { confidence: 'at_risk' },
+        },
+        {
+            label: 'Completion',
+            value: `${analytics.completion_rate}%`,
+            tone: 'text-status-info',
+            bg: 'bg-status-info-bg',
+            icon: BarChart3,
+            drill: { status: 'completed' },
+        },
     ];
 
     const byType = analytics.progress_by_type.map((b) => ({
@@ -1213,11 +2004,29 @@ function AnalyticsTab({
     }));
 
     const conf = [
-        { key: 'on_track', label: 'On track', value: analytics.on_track, color: 'bg-status-success' },
-        { key: 'at_risk', label: 'At risk', value: analytics.at_risk, color: 'bg-status-warning' },
-        { key: 'off_track', label: 'Off track', value: analytics.off_track, color: 'bg-status-critical' },
+        {
+            key: 'on_track',
+            label: 'On track',
+            value: analytics.on_track,
+            color: 'bg-status-success',
+        },
+        {
+            key: 'at_risk',
+            label: 'At risk',
+            value: analytics.at_risk,
+            color: 'bg-status-warning',
+        },
+        {
+            key: 'off_track',
+            label: 'Off track',
+            value: analytics.off_track,
+            color: 'bg-status-critical',
+        },
     ];
-    const confTotal = Math.max(1, conf.reduce((a, c) => a + c.value, 0));
+    const confTotal = Math.max(
+        1,
+        conf.reduce((a, c) => a + c.value, 0),
+    );
 
     const atRisk = objectives
         .filter((o) => o.status === 'active' && o.confidence !== 'on_track')
@@ -1227,15 +2036,32 @@ function AnalyticsTab({
     return (
         <div className="motion-safe:animate-in motion-safe:fade-in-0">
             <p className="mb-3 text-[12.5px] text-muted-foreground">
-                Every number deep-links into a filtered Objectives view. Showing <strong className="text-foreground">{selectedCycle ? selectedCycle.name : 'all cycles'}</strong>.
+                Every number deep-links into a filtered Objectives view. Showing{' '}
+                <strong className="text-foreground">
+                    {selectedCycle ? selectedCycle.name : 'all cycles'}
+                </strong>
+                .
             </p>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {kpis.map((k) => (
-                    <button key={k.label} type="button" onClick={() => onDrill(k.drill)} className="rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-shadow hover:shadow-md">
-                        <span className={cn('inline-grid h-9 w-9 place-items-center rounded-lg', k.bg, k.tone)}>
+                    <button
+                        key={k.label}
+                        type="button"
+                        onClick={() => onDrill(k.drill)}
+                        className="rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-shadow hover:shadow-md"
+                    >
+                        <span
+                            className={cn(
+                                'inline-grid h-9 w-9 place-items-center rounded-lg',
+                                k.bg,
+                                k.tone,
+                            )}
+                        >
                             <k.icon className="h-4 w-4" />
                         </span>
-                        <div className="mt-2.5 text-[28px] font-extrabold leading-none tabular-nums">{k.value}</div>
+                        <div className="mt-2.5 text-[28px] leading-none font-extrabold tabular-nums">
+                            {k.value}
+                        </div>
                         <div className="mt-1 text-[12px] text-muted-foreground">
                             {k.label} <span className="text-primary">›</span>
                         </div>
@@ -1245,20 +2071,35 @@ function AnalyticsTab({
 
             <div className="mt-3.5 grid gap-3.5 lg:grid-cols-2">
                 <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                    <p className="mb-3.5 text-[13.5px] font-bold">Average progress by type</p>
+                    <p className="mb-3.5 text-[13.5px] font-bold">
+                        Average progress by type
+                    </p>
                     {byType.length === 0 ? (
-                        <p className="py-6 text-center text-[13px] text-muted-foreground">No active objectives.</p>
+                        <p className="py-6 text-center text-[13px] text-muted-foreground">
+                            No active objectives.
+                        </p>
                     ) : (
                         byType.map((b) => (
                             <div key={b.label} className="mb-3 last:mb-0">
                                 <div className="mb-1.5 flex justify-between text-[12px]">
                                     <span className="font-semibold">
-                                        {b.label} <span className="font-normal text-muted-foreground">· {b.count}</span>
+                                        {b.label}{' '}
+                                        <span className="font-normal text-muted-foreground">
+                                            · {b.count}
+                                        </span>
                                     </span>
-                                    <span className="font-bold tabular-nums">{b.value}%</span>
+                                    <span className="font-bold tabular-nums">
+                                        {b.value}%
+                                    </span>
                                 </div>
                                 <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                                    <div className={cn('h-full rounded-full', barColor(b.value))} style={{ width: `${b.value}%` }} />
+                                    <div
+                                        className={cn(
+                                            'h-full rounded-full',
+                                            barColor(b.value),
+                                        )}
+                                        style={{ width: `${b.value}%` }}
+                                    />
                                 </div>
                             </div>
                         ))
@@ -1266,19 +2107,42 @@ function AnalyticsTab({
                 </div>
 
                 <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                    <p className="mb-3.5 text-[13.5px] font-bold">Confidence distribution</p>
+                    <p className="mb-3.5 text-[13.5px] font-bold">
+                        Confidence distribution
+                    </p>
                     <div className="mb-3.5 flex h-4 overflow-hidden rounded-full">
                         {conf.map((c) => (
-                            <div key={c.key} className={c.color} style={{ flex: `${c.value} 0 0` }} title={c.label} />
+                            <div
+                                key={c.key}
+                                className={c.color}
+                                style={{ flex: `${c.value} 0 0` }}
+                                title={c.label}
+                            />
                         ))}
                     </div>
                     <div className="flex flex-col gap-2.5">
                         {conf.map((c) => (
-                            <button key={c.key} type="button" onClick={() => onDrill({ confidence: c.key })} className="flex items-center gap-2.5 text-left">
-                                <span className={cn('h-2.5 w-2.5 rounded-full', c.color)} />
-                                <span className="flex-1 text-[12.5px]">{c.label}</span>
-                                <span className="text-[13px] font-bold tabular-nums">{c.value}</span>
-                                <span className="text-[11px] text-muted-foreground">{Math.round((c.value / confTotal) * 100)}%</span>
+                            <button
+                                key={c.key}
+                                type="button"
+                                onClick={() => onDrill({ confidence: c.key })}
+                                className="flex items-center gap-2.5 text-left"
+                            >
+                                <span
+                                    className={cn(
+                                        'h-2.5 w-2.5 rounded-full',
+                                        c.color,
+                                    )}
+                                />
+                                <span className="flex-1 text-[12.5px]">
+                                    {c.label}
+                                </span>
+                                <span className="text-[13px] font-bold tabular-nums">
+                                    {c.value}
+                                </span>
+                                <span className="text-[11px] text-muted-foreground">
+                                    {Math.round((c.value / confTotal) * 100)}%
+                                </span>
                             </button>
                         ))}
                     </div>
@@ -1288,24 +2152,49 @@ function AnalyticsTab({
             <div className="mt-3.5 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                 <div className="flex items-center gap-2 border-b border-border px-4 py-3.5">
                     <AlertTriangle className="h-4 w-4 text-status-warning" />
-                    <p className="text-[13.5px] font-bold">At-risk &amp; off-track queue</p>
+                    <p className="text-[13.5px] font-bold">
+                        At-risk &amp; off-track queue
+                    </p>
                 </div>
                 {atRisk.length === 0 ? (
-                    <p className="px-5 py-10 text-center text-[13px] text-muted-foreground">Nothing at risk — everything's on track. 🎉</p>
+                    <p className="px-5 py-10 text-center text-[13px] text-muted-foreground">
+                        Nothing at risk — everything's on track. 🎉
+                    </p>
                 ) : (
                     atRisk.map((o) => (
-                        <div key={o.id} onClick={() => onOpen(o.id)} className="flex cursor-pointer items-center gap-3 border-b border-border/60 px-4 py-2.5 last:border-0 hover:bg-muted/40">
-                            <span className={cn('h-2 w-2 rounded-full', RAG[o.confidence].dot)} />
-                            <span className="flex-1 truncate text-[13px] font-semibold">{o.title}</span>
+                        <div
+                            key={o.id}
+                            onClick={() => onOpen(o.id)}
+                            className="flex cursor-pointer items-center gap-3 border-b border-border/60 px-4 py-2.5 last:border-0 hover:bg-muted/40"
+                        >
+                            <span
+                                className={cn(
+                                    'h-2 w-2 rounded-full',
+                                    RAG[o.confidence].dot,
+                                )}
+                            />
+                            <span className="flex-1 truncate text-[13px] font-semibold">
+                                {o.title}
+                            </span>
                             <span className="hidden items-center gap-1.5 text-[11.5px] text-muted-foreground lg:flex">
-                                <Avatar name={o.user?.name} className="h-4 w-4 text-[8px]" />
+                                <Avatar
+                                    name={o.user?.name}
+                                    className="h-4 w-4 text-[8px]"
+                                />
                                 {o.user?.name ?? '—'}
                             </span>
                             <div className="flex w-[120px] items-center gap-2">
-                                <ProgressBar pct={o.progress_percentage} className="h-1.5" />
-                                <span className="w-7 text-right text-[11.5px] font-bold tabular-nums">{o.progress_percentage}%</span>
+                                <ProgressBar
+                                    pct={o.progress_percentage}
+                                    className="h-1.5"
+                                />
+                                <span className="w-7 text-right text-[11.5px] font-bold tabular-nums">
+                                    {o.progress_percentage}%
+                                </span>
                             </div>
-                            <span className="w-[60px] text-right text-[11.5px] text-muted-foreground">{formatDate(o.due_date)}</span>
+                            <span className="w-[60px] text-right text-[11.5px] text-muted-foreground">
+                                {formatDate(o.due_date)}
+                            </span>
                         </div>
                     ))
                 )}
@@ -1318,22 +2207,47 @@ function AnalyticsTab({
 /*  Re-parent dialog                                                  */
 /* ================================================================== */
 
-function ReparentDialog({ objective, options, onClose, onMove }: { objective: Objective; options: Objective[]; onClose: () => void; onMove: (parentId: number | null) => void }) {
-    const [parentId, setParentId] = useState<string>(objective.parent_goal_id ? String(objective.parent_goal_id) : '__none__');
+function ReparentDialog({
+    objective,
+    options,
+    onClose,
+    onMove,
+}: {
+    objective: Objective;
+    options: Objective[];
+    onClose: () => void;
+    onMove: (parentId: number | null) => void;
+}) {
+    const [parentId, setParentId] = useState<string>(
+        objective.parent_goal_id
+            ? String(objective.parent_goal_id)
+            : '__none__',
+    );
     const valid = options.filter((o) => o.id !== objective.id);
 
     return (
-        <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40 p-6" onClick={onClose}>
-            <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div
+            className="fixed inset-0 z-[100] grid place-items-center bg-black/40 p-6"
+            onClick={onClose}
+        >
+            <div
+                className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <h3 className="text-base font-bold">Move objective</h3>
-                <p className="mt-1 text-[13px] text-muted-foreground">Re-parent “{objective.title}”. Roll-ups recompute on both branches.</p>
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                    Re-parent “{objective.title}”. Roll-ups recompute on both
+                    branches.
+                </p>
                 <div className="mt-4">
                     <Select value={parentId} onValueChange={setParentId}>
                         <SelectTrigger>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="__none__">Top-level (no parent)</SelectItem>
+                            <SelectItem value="__none__">
+                                Top-level (no parent)
+                            </SelectItem>
                             {valid.map((o) => (
                                 <SelectItem key={o.id} value={String(o.id)}>
                                     {initials(o.user?.name)} · {o.title}
@@ -1343,12 +2257,22 @@ function ReparentDialog({ objective, options, onClose, onMove }: { objective: Ob
                     </Select>
                 </div>
                 <div className="mt-5 flex justify-end gap-2">
-                    <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted"
+                    >
                         Cancel
                     </button>
                     <button
                         type="button"
-                        onClick={() => onMove(parentId === '__none__' ? null : Number(parentId))}
+                        onClick={() =>
+                            onMove(
+                                parentId === '__none__'
+                                    ? null
+                                    : Number(parentId),
+                            )
+                        }
                         className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
                     >
                         Move

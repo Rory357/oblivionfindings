@@ -4,8 +4,10 @@ namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
+use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
+use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Topology\Models\TopologyEdge;
 use App\Domain\Monitoring\Topology\Models\TopologySnapshot;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
@@ -28,16 +30,25 @@ class NetworkItWorkspacePresenter
 {
     private const DEVICE_LIMIT = 100;
 
+    public function __construct(private readonly CanonicalDeviceSiteResolver $siteResolver) {}
+
     /** @return array<string, mixed> */
     public function present(User $viewer, Builder $networkScope, array $activeTab): array
     {
         $candidates = (clone $networkScope)
             ->with([
-                'assignments' => fn ($query) => $query->active(),
+                'assignments' => fn ($query) => $query
+                    ->active()
+                    ->where('assigned_at', '<=', now())
+                    ->orderBy('id'),
+                'activeAssetLinks' => fn ($query) => $query->orderBy('id'),
                 'monitors' => fn ($query) => $query
                     ->with('collector:id,name,status,last_seen_at')
                     ->orderBy('name'),
-                'latestConfigurationSnapshot',
+                'configurationSnapshots' => fn ($query) => $query
+                    ->latest('captured_at')
+                    ->latest('id')
+                    ->limit(12),
             ])
             ->orderBy('name')
             ->limit(self::DEVICE_LIMIT + 1)
@@ -45,6 +56,13 @@ class NetworkItWorkspacePresenter
         $inventoryTruncated = $candidates->count() > self::DEVICE_LIMIT;
         $devices = $candidates->take(self::DEVICE_LIMIT)->values();
         $deviceIds = $devices->pluck('id');
+        $canonicalSiteIds = $devices->mapWithKeys(function (Device $device): array {
+            try {
+                return [$device->id => $this->siteResolver->resolveLoadedForContext($device)];
+            } catch (Throwable) {
+                return [$device->id => null];
+            }
+        });
         $monitorIds = $devices->flatMap->monitors->pluck('id');
         $latestObservations = $this->latestObservations($viewer, $monitorIds);
         $siteContext = $this->siteContext($devices);
@@ -80,7 +98,11 @@ class NetworkItWorkspacePresenter
             ])
             ->values();
         $configuration = $devices
-            ->map(fn (Device $device): array => $this->configuration($device, $viewer))
+            ->map(fn (Device $device): array => $this->configuration(
+                $device,
+                $viewer,
+                $canonicalSiteIds->get($device->id),
+            ))
             ->values();
         $permissions = [
             'viewItWork' => $viewer->canDo('it.view'),
@@ -270,6 +292,7 @@ class NetworkItWorkspacePresenter
         }
 
         return DeviceRelationship::query()
+            ->active()
             ->whereIn('parent_device_id', $deviceIds)
             ->whereIn('child_device_id', $deviceIds)
             ->orderBy('id')
@@ -552,7 +575,7 @@ class NetworkItWorkspacePresenter
     }
 
     /** @return array<string, mixed> */
-    private function configuration(Device $device, User $viewer): array
+    private function configuration(Device $device, User $viewer, ?int $canonicalSiteId): array
     {
         $observedHash = $this->evidenceValue($device, [
             'observed.configuration_hash',
@@ -597,10 +620,22 @@ class NetworkItWorkspacePresenter
             $currentFirmware !== null => 'observed',
             default => 'desired_only',
         };
-        $snapshot = $device->latestConfigurationSnapshot;
-        $canDownload = $snapshot !== null
-            && $snapshot->storage_state === 'available'
-            && ($snapshot->source_kind !== 'provider' || $viewer->canDo('securityDevices.integrations.view'));
+        $snapshotCandidates = $canonicalSiteId === null
+            ? collect()
+            : $device->configurationSnapshots
+                ->where('site_id', $canonicalSiteId)
+                ->values();
+        /** @var ConfigurationSnapshot|null $latestSnapshot */
+        $latestSnapshot = $snapshotCandidates->first();
+        $snapshotHistory = $latestSnapshot === null
+            ? collect()
+            : $snapshotCandidates
+                ->filter(fn (ConfigurationSnapshot $snapshot): bool => (int) $snapshot->site_id === (int) $latestSnapshot->site_id)
+                ->take(11)
+                ->values();
+        $snapshotHistory = $snapshotHistory
+            ->map(fn (ConfigurationSnapshot $snapshot): array => $this->configurationSnapshot($device, $snapshot, $viewer))
+            ->values();
 
         return [
             'deviceId' => $device->id,
@@ -618,21 +653,44 @@ class NetworkItWorkspacePresenter
                 'desiredVersion' => $desiredFirmware,
                 'observedAt' => $firmwareAt,
             ],
-            'latestSnapshot' => $snapshot === null ? null : [
-                'id' => $snapshot->id,
-                'sourceKind' => $snapshot->source_kind,
-                'source' => $snapshot->source,
-                'capturedAt' => $snapshot->captured_at?->toISOString(),
-                'contentHash' => $snapshot->content_hash,
-                'configurationHash' => $snapshot->configuration_hash,
-                'contentSize' => $snapshot->content_size,
-                'mimeType' => $snapshot->mime_type,
-                'storageState' => $snapshot->storage_state,
-                'diff' => $snapshot->diff_summary,
-                'downloadHref' => $canDownload
-                    ? "/security-devices/devices/{$device->id}/configuration-snapshots/{$snapshot->id}"
-                    : null,
+            'latestSnapshot' => $snapshotHistory->first(),
+            'snapshotHistory' => $snapshotHistory,
+            'snapshotHistoryTruncated' => $snapshotCandidates->count() > $snapshotHistory->count(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function configurationSnapshot(Device $device, ConfigurationSnapshot $snapshot, User $viewer): array
+    {
+        $diff = is_array($snapshot->diff_summary) ? $snapshot->diff_summary : [];
+        $added = collect($diff['added'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
+        $removed = collect($diff['removed'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
+        $changed = collect($diff['changed'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
+        $canDownload = $snapshot->storage_state === 'available'
+            && ($snapshot->source_kind !== 'provider' || $viewer->canDo('securityDevices.integrations.view'));
+
+        return [
+            'id' => $snapshot->id,
+            'sourceKind' => $snapshot->source_kind,
+            'source' => $snapshot->source,
+            'capturedAt' => $snapshot->captured_at?->toISOString(),
+            'contentHash' => $snapshot->content_hash,
+            'configurationHash' => $snapshot->configuration_hash,
+            'contentSize' => $snapshot->content_size,
+            'mimeType' => $snapshot->mime_type,
+            'firmwareVersion' => $snapshot->firmware_version,
+            'storageState' => $snapshot->storage_state,
+            'previousSnapshotId' => $snapshot->previous_snapshot_id,
+            'diff' => [
+                'added' => $added->all(),
+                'removed' => $removed->all(),
+                'changed' => $changed->all(),
+                'count' => $added->count() + $removed->count() + $changed->count(),
+                'truncated' => (bool) ($diff['truncated'] ?? false),
             ],
+            'downloadHref' => $canDownload
+                ? "/security-devices/devices/{$device->id}/configuration-snapshots/{$snapshot->id}"
+                : null,
         ];
     }
 

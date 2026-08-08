@@ -1212,7 +1212,7 @@ class ClientController extends Controller
                     ->values()
                 : [],
             'ra_pickers' => $sectionAccess['first_aid_manage']
-                ? RiskAssessmentPresenter::pickers($client->organization_id)
+                ? RiskAssessmentPresenter::pickers()
                 : ['sites' => [], 'clients' => [], 'events' => []],
 
             // Recent incidents (last 5)
@@ -1549,7 +1549,11 @@ class ClientController extends Controller
                     ->value('scheduled_date'),
             ] : null,
             ...($sectionAccess['tracking'] && $canViewClientLocation ? [
-                'location' => $this->buildLocationData($client, $canManageClientTrackers),
+                'location' => $this->buildLocationData(
+                    $client,
+                    $canManageClientTrackers,
+                    $request->user(),
+                ),
             ] : []),
             'calendar_events' => $sectionAccess['calendar']
                 ? $this->buildCalendarEvents(
@@ -2398,9 +2402,11 @@ class ClientController extends Controller
         try {
             $data = $request->validated();
 
-            // If not specified, apply the application default service context (if configured).
+            // If not specified, apply the active application default only when
+            // it is available to the selected Site.
             if (empty($data['service_context_id'])) {
-                $data['service_context_id'] = ServiceContext::defaultId();
+                $siteId = filled($data['site_id'] ?? null) ? (int) $data['site_id'] : null;
+                $data['service_context_id'] = ServiceContext::defaultIdForSite($siteId);
             }
 
             // Pull the related-record payloads out of the flat client attributes.
@@ -2432,7 +2438,6 @@ class ClientController extends Controller
             }
 
             $auth = $request->user();
-            $clientFields['organization_id'] = $auth->organization_id;
 
             $client = DB::transaction(function () use ($clientFields, $medical, $conditions, $emergencyContacts, $createPortalUser, $data, $auth, $portalMembership) {
                 if (! empty($clientFields['room_id'])) {
@@ -3281,7 +3286,7 @@ class ClientController extends Controller
         return (bool) ($user?->canDo('fleet.manage') || $user?->canDo('assets.trackers.manage'));
     }
 
-    private function buildLocationData(Client $client, bool $canManageTrackers): array
+    private function buildLocationData(Client $client, bool $canManageTrackers, User $viewer): array
     {
         $assignment = app(PersonalTrackingPrivacyService::class)
             ->authorisedClientAssignment($client);
@@ -3329,6 +3334,14 @@ class ClientController extends Controller
         $currentLocation = null;
 
         if ($device) {
+            $canonicalDetailUrl = $viewer->canDo('securityDevices.viewAny')
+                && $viewer->canDo('securityDevices.devices.view')
+                && app(SecurityDevicesAccessService::class)
+                    ->visibleDevices($viewer)
+                    ->whereKey($device->id)
+                    ->exists()
+                ? "/security-devices/devices/{$device->id}"
+                : null;
             $meta = $device->meta ?? [];
             $lat = $device->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? null;
             $lng = $device->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? null;
@@ -3393,7 +3406,7 @@ class ClientController extends Controller
                     ->whereHas('device', fn ($query) => $query->where('device_id', $device->id))
                     ->latest()
                     ->value('status'),
-                'detail_url' => "/security-devices/devices/{$device->id}",
+                'detail_url' => $canonicalDetailUrl,
             ];
 
             if ($lat !== null && $lng !== null) {

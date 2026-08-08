@@ -24,6 +24,7 @@ use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
+use App\Models\SiteHouseRoom;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -790,6 +791,43 @@ class SettingsAuditTest extends TestCase
                 $this->assertSame([$site->id], $scope['site_ids']);
             }
         }
+    }
+
+    public function test_vehicle_audit_scope_never_reinterprets_a_residential_room_id_as_a_hardware_room(): void
+    {
+        $canonicalSite = Site::factory()->create([]);
+        $collisionSite = Site::factory()->create([]);
+        $collisionRoom = SiteRoom::query()->forceCreate([
+            'id' => 900001,
+            'site_id' => $collisionSite->id,
+            'name' => 'Unrelated hardware room',
+        ]);
+        $residentialRoom = SiteHouseRoom::query()->forceCreate([
+            'id' => $collisionRoom->id,
+            'site_id' => $canonicalSite->id,
+            'name' => 'Canonical residential room',
+            'is_active' => true,
+            'is_assignable' => false,
+        ]);
+        $vehicle = Asset::factory()->create([
+            'category' => 'Vehicle',
+            'site_id' => null,
+            'home_site_id' => $canonicalSite->id,
+            'client_id' => null,
+            'room_id' => $residentialRoom->id,
+        ]);
+        $device = Device::factory()->create([]);
+
+        $scope = SafeOperationalData::auditScope(new DeviceAssignment([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
+            'assignable_id' => $vehicle->id,
+            'assigned_at' => now(),
+        ]));
+
+        $this->assertSame([$canonicalSite->id], $scope['site_ids']);
+        $this->assertSame($canonicalSite->id, $scope['site_id']);
+        $this->assertNotContains($collisionSite->id, $scope['site_ids']);
     }
 
     public function test_future_device_audit_uses_only_the_current_assignment_after_a_site_move(): void

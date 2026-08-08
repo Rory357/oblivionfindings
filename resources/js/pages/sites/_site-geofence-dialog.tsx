@@ -23,7 +23,13 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useForm } from '@inertiajs/react';
-import { AlertCircle, CheckCircle2, Loader2, MapPin, Shield } from 'lucide-react';
+import {
+    AlertCircle,
+    CheckCircle2,
+    Loader2,
+    MapPin,
+    Shield,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 export type SiteGeofenceRecord = {
@@ -75,7 +81,9 @@ function FieldError({ message }: { message?: string }) {
     return <p className="mt-1 text-xs text-status-critical">{message}</p>;
 }
 
-function normalizeInitialShape(existing?: SiteGeofenceRecord | null): GeofenceShape | null {
+function normalizeInitialShape(
+    existing?: SiteGeofenceRecord | null,
+): GeofenceShape | null {
     if (!existing?.shape) return null;
 
     if (
@@ -152,7 +160,10 @@ export default function SiteGeofenceDialog({
         lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng);
     const center = hasCoords ? { lat, lng } : null;
 
-    const initialShape = useMemo(() => normalizeInitialShape(existing), [existing]);
+    const initialShape = useMemo(
+        () => normalizeInitialShape(existing),
+        [existing],
+    );
     const [shape, setShape] = useState<GeofenceShape | null>(initialShape);
     const assignedAssetIds = existing?.assigned_asset_ids ?? [];
 
@@ -227,8 +238,8 @@ export default function SiteGeofenceDialog({
                 <DialogHeader>
                     <DialogTitle>Site Geofence</DialogTitle>
                     <DialogDescription>
-                        Draw the boundary used for this site and choose which site
-                        assets it applies to.
+                        Draw the boundary used for this site and choose which
+                        site assets it applies to.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -239,8 +250,8 @@ export default function SiteGeofenceDialog({
                             Pick the site address first
                         </h3>
                         <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-                            The map needs a saved latitude and longitude before a
-                            site geofence can be drawn.
+                            The map needs a saved latitude and longitude before
+                            a site geofence can be drawn.
                         </p>
                         <Button
                             type="button"
@@ -291,9 +302,15 @@ export default function SiteGeofenceDialog({
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="enter">Enter only</SelectItem>
-                                        <SelectItem value="exit">Exit only</SelectItem>
-                                        <SelectItem value="both">Enter and exit</SelectItem>
+                                        <SelectItem value="enter">
+                                            Enter only
+                                        </SelectItem>
+                                        <SelectItem value="exit">
+                                            Exit only
+                                        </SelectItem>
+                                        <SelectItem value="both">
+                                            Enter and exit
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <FieldError message={form.errors.breach_type} />
@@ -324,7 +341,8 @@ export default function SiteGeofenceDialog({
                                         Assignments
                                     </div>
                                     <Badge variant="outline">
-                                        {form.data.asset_ids.length}/{assets.length}
+                                        {form.data.asset_ids.length}/
+                                        {assets.length}
                                     </Badge>
                                 </div>
 
@@ -337,7 +355,9 @@ export default function SiteGeofenceDialog({
                                     <div className="max-h-56 overflow-y-auto p-2">
                                         {assets.map((asset) => {
                                             const checked =
-                                                form.data.asset_ids.includes(asset.id);
+                                                form.data.asset_ids.includes(
+                                                    asset.id,
+                                                );
 
                                             return (
                                                 <label
@@ -346,7 +366,9 @@ export default function SiteGeofenceDialog({
                                                 >
                                                     <Checkbox
                                                         checked={checked}
-                                                        onCheckedChange={(value) =>
+                                                        onCheckedChange={(
+                                                            value,
+                                                        ) =>
                                                             toggleAsset(
                                                                 asset.id,
                                                                 Boolean(value),
@@ -358,9 +380,14 @@ export default function SiteGeofenceDialog({
                                                             {asset.name}
                                                         </span>
                                                         <span className="block truncate text-xs text-muted-foreground">
-                                                            {[asset.asset_tag, asset.category, asset.status]
+                                                            {[
+                                                                asset.asset_tag,
+                                                                asset.category,
+                                                                asset.status,
+                                                            ]
                                                                 .filter(Boolean)
-                                                                .join(' · ') || 'Site asset'}
+                                                                .join(' · ') ||
+                                                                'Site asset'}
                                                         </span>
                                                     </span>
                                                     {checked && (

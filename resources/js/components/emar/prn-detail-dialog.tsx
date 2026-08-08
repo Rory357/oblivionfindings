@@ -3,9 +3,14 @@
  * chrome (rail + sectioned panes + footer Options bar) so it matches every
  * other popup workflow; the primary actions open the relevant wizard in place
  * rather than navigating off-page. Colours are semantic tokens throughout. */
-import { InfoCard } from '@/components/wizard/primitives';
-import { ReviewCard, ReviewRow, WizardShell, type WizardStep } from '@/components/wizard/shell';
 import { Button } from '@/components/ui/button';
+import { InfoCard } from '@/components/wizard/primitives';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    type WizardStep,
+} from '@/components/wizard/shell';
 import type { PrnMedication } from '@/pages/meds/today/types';
 import { router } from '@inertiajs/react';
 import {
@@ -69,14 +74,26 @@ export type PrnAdministration = {
 };
 
 const SECTIONS: WizardStep[] = [
-    { key: 'admin', label: 'Administration', blurb: 'Dose, indication & baseline obs', icon: Pill },
-    { key: 'review', label: 'Review & audit', blurb: 'Effectiveness & trail', icon: FileText },
+    {
+        key: 'admin',
+        label: 'Administration',
+        blurb: 'Dose, indication & baseline obs',
+        icon: Pill,
+    },
+    {
+        key: 'review',
+        label: 'Review & audit',
+        blurb: 'Effectiveness & trail',
+        icon: FileText,
+    },
 ];
 
 function effPillClass(eff: string | null): string {
     if (eff === 'effective') return 'bg-status-success-bg text-status-success';
-    if (eff === 'partially_effective') return 'bg-status-warning-bg text-status-warning';
-    if (eff === 'not_effective') return 'bg-status-critical-bg text-status-critical';
+    if (eff === 'partially_effective')
+        return 'bg-status-warning-bg text-status-warning';
+    if (eff === 'not_effective')
+        return 'bg-status-critical-bg text-status-critical';
     return 'bg-status-info-bg text-status-info';
 }
 
@@ -100,9 +117,16 @@ export function PrnDetailDialog({
     const eff = admin.effectiveness_detail;
     const reviewDue = !eff;
     const baseline = admin.baseline ?? {};
-    const hasBaseline = Object.values(baseline).some((v) => v != null && v !== '');
-    const givenAt = [admin.given_time, admin.given_date].filter(Boolean).join(' · ');
-    const todayCount = med && med.max_per_day != null ? `${med.given_last_24h} of ${med.max_per_day}` : null;
+    const hasBaseline = Object.values(baseline).some(
+        (v) => v != null && v !== '',
+    );
+    const givenAt = [admin.given_time, admin.given_date]
+        .filter(Boolean)
+        .join(' · ');
+    const todayCount =
+        med && med.max_per_day != null
+            ? `${med.given_last_24h} of ${med.max_per_day}`
+            : null;
 
     return (
         <WizardShell
@@ -112,7 +136,11 @@ export function PrnDetailDialog({
             description="Read-only detail of an as-needed medication administration."
             railIcon={ClipboardCheck}
             railTitle={admin.client_name}
-            railSub={[admin.client_room, admin.client_site].filter(Boolean).join(' · ') || 'PRN administration'}
+            railSub={
+                [admin.client_room, admin.client_site]
+                    .filter(Boolean)
+                    .join(' · ') || 'PRN administration'
+            }
             steps={SECTIONS}
             stepIndex={section}
             onStepClick={setSection}
@@ -126,25 +154,51 @@ export function PrnDetailDialog({
                 <>
                     {reviewDue ? (
                         <Button type="button" onClick={onRecordEffectiveness}>
-                            <Stethoscope className="h-4 w-4" /> Record effectiveness
+                            <Stethoscope className="h-4 w-4" /> Record
+                            effectiveness
                         </Button>
                     ) : (
-                        <Button type="button" variant="outline" onClick={onRecordEffectiveness}>
-                            <Stethoscope className="h-4 w-4" /> Re-record effectiveness
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onRecordEffectiveness}
+                        >
+                            <Stethoscope className="h-4 w-4" /> Re-record
+                            effectiveness
                         </Button>
                     )}
-                    <Button type="button" variant="outline" onClick={onReRecordDose}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onReRecordDose}
+                    >
                         <Pill className="h-4 w-4" /> Re-record dose
                     </Button>
-                    <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${admin.client_id}?tab=mar`)}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() =>
+                            router.visit(
+                                `/operations/clients/${admin.client_id}?tab=mar`,
+                            )
+                        }
+                    >
                         <User className="h-4 w-4" /> Client
                     </Button>
                     {admin.mar_url ? (
-                        <Button type="button" variant="ghost" onClick={() => router.visit(admin.mar_url!)}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => router.visit(admin.mar_url!)}
+                        >
                             <FileText className="h-4 w-4" /> MAR
                         </Button>
                     ) : null}
-                    <Button type="button" variant="ghost" onClick={() => window.print()}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => window.print()}
+                    >
                         <Printer className="h-4 w-4" /> Print
                     </Button>
                 </>
@@ -164,15 +218,26 @@ export function PrnDetailDialog({
                                 <span className="inline-flex items-center gap-1.5">
                                     {admin.medication_name ?? '—'}
                                     {admin.controlled_drug ? (
-                                        <span className="rounded bg-status-critical-bg px-1 py-0.5 text-[9px] font-bold text-status-critical">CD</span>
+                                        <span className="rounded bg-status-critical-bg px-1 py-0.5 text-[9px] font-bold text-status-critical">
+                                            CD
+                                        </span>
                                     ) : null}
                                 </span>
                             }
                         />
                         <ReviewRow label="Route" value={admin.route} />
-                        <ReviewRow label="Dose given" value={admin.dose_given} />
-                        <ReviewRow label="Prescribed" value={admin.prescribed_dose} />
-                        <ReviewRow label="Indication" value={admin.reason ?? admin.indication} />
+                        <ReviewRow
+                            label="Dose given"
+                            value={admin.dose_given}
+                        />
+                        <ReviewRow
+                            label="Prescribed"
+                            value={admin.prescribed_dose}
+                        />
+                        <ReviewRow
+                            label="Indication"
+                            value={admin.reason ?? admin.indication}
+                        />
                     </ReviewCard>
                     <ReviewCard icon={ClipboardCheck} title="This dose">
                         <ReviewRow label="Time given" value={givenAt} />
@@ -180,18 +245,47 @@ export function PrnDetailDialog({
                         <ReviewRow label="Today's count" value={todayCount} />
                     </ReviewCard>
                     {hasBaseline ? (
-                        <ReviewCard icon={Activity} title="Baseline observations" span>
-                            {baseline.pulse_bpm != null ? <ReviewRow label="Pulse" value={`${baseline.pulse_bpm} bpm`} /> : null}
-                            {baseline.blood_pressure_systolic != null && baseline.blood_pressure_diastolic != null ? (
-                                <ReviewRow label="Blood pressure" value={`${baseline.blood_pressure_systolic}/${baseline.blood_pressure_diastolic} mmHg`} />
+                        <ReviewCard
+                            icon={Activity}
+                            title="Baseline observations"
+                            span
+                        >
+                            {baseline.pulse_bpm != null ? (
+                                <ReviewRow
+                                    label="Pulse"
+                                    value={`${baseline.pulse_bpm} bpm`}
+                                />
                             ) : null}
-                            {baseline.blood_glucose_level != null ? <ReviewRow label="Blood glucose" value={`${baseline.blood_glucose_level} mmol/L`} /> : null}
-                            {baseline.insulin_units_given != null ? <ReviewRow label="Insulin" value={`${baseline.insulin_units_given} units`} /> : null}
+                            {baseline.blood_pressure_systolic != null &&
+                            baseline.blood_pressure_diastolic != null ? (
+                                <ReviewRow
+                                    label="Blood pressure"
+                                    value={`${baseline.blood_pressure_systolic}/${baseline.blood_pressure_diastolic} mmHg`}
+                                />
+                            ) : null}
+                            {baseline.blood_glucose_level != null ? (
+                                <ReviewRow
+                                    label="Blood glucose"
+                                    value={`${baseline.blood_glucose_level} mmol/L`}
+                                />
+                            ) : null}
+                            {baseline.insulin_units_given != null ? (
+                                <ReviewRow
+                                    label="Insulin"
+                                    value={`${baseline.insulin_units_given} units`}
+                                />
+                            ) : null}
                         </ReviewCard>
                     ) : null}
                     {admin.notes ? (
-                        <ReviewCard icon={FileText} title="Observations at administration" span>
-                            <p className="text-[13px] leading-relaxed text-muted-foreground">{admin.notes}</p>
+                        <ReviewCard
+                            icon={FileText}
+                            title="Observations at administration"
+                            span
+                        >
+                            <p className="text-[13px] leading-relaxed text-muted-foreground">
+                                {admin.notes}
+                            </p>
                         </ReviewCard>
                     ) : null}
                 </div>
@@ -199,23 +293,40 @@ export function PrnDetailDialog({
                 <div className="grid gap-4">
                     {eff ? (
                         <>
-                            <ReviewCard icon={CheckCircle2} title="Effectiveness review">
+                            <ReviewCard
+                                icon={CheckCircle2}
+                                title="Effectiveness review"
+                            >
                                 <ReviewRow
                                     label="Outcome"
                                     value={
-                                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${effPillClass(eff.effectiveness)}`}>
+                                        <span
+                                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${effPillClass(eff.effectiveness)}`}
+                                        >
                                             {eff.label ?? '—'}
                                         </span>
                                     }
                                 />
-                                <ReviewRow label="Reviewed after" value={eff.review_minutes_after != null ? `${eff.review_minutes_after} min` : null} />
-                                <ReviewRow label="Observations" value={eff.observations} />
+                                <ReviewRow
+                                    label="Reviewed after"
+                                    value={
+                                        eff.review_minutes_after != null
+                                            ? `${eff.review_minutes_after} min`
+                                            : null
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Observations"
+                                    value={eff.observations}
+                                />
                                 <ReviewRow
                                     label="Escalation"
                                     value={
                                         eff.escalation_needed ? (
                                             <span className="inline-flex items-center gap-1 text-status-critical">
-                                                <Flag className="h-3 w-3" /> {eff.escalation_action ?? 'Raised'}
+                                                <Flag className="h-3 w-3" />{' '}
+                                                {eff.escalation_action ??
+                                                    'Raised'}
                                             </span>
                                         ) : (
                                             'Not needed'
@@ -224,17 +335,27 @@ export function PrnDetailDialog({
                                 />
                             </ReviewCard>
                             <ReviewCard icon={FileText} title="Audit trail">
-                                <ReviewRow label="Recorded" value={`${admin.given_by ?? '—'}${givenAt ? ` · ${givenAt}` : ''}`} />
-                                <ReviewRow label="Reviewed" value={`${eff.reviewed_by ?? '—'}${eff.reviewed_label ? ` · ${eff.reviewed_label}` : ''}`} />
+                                <ReviewRow
+                                    label="Recorded"
+                                    value={`${admin.given_by ?? '—'}${givenAt ? ` · ${givenAt}` : ''}`}
+                                />
+                                <ReviewRow
+                                    label="Reviewed"
+                                    value={`${eff.reviewed_by ?? '—'}${eff.reviewed_label ? ` · ${eff.reviewed_label}` : ''}`}
+                                />
                             </ReviewCard>
                         </>
                     ) : (
                         <>
                             <InfoCard icon={Stethoscope} tone="warn">
-                                Effectiveness review still due — record the outcome of this dose to close the loop.
+                                Effectiveness review still due — record the
+                                outcome of this dose to close the loop.
                             </InfoCard>
                             <ReviewCard icon={FileText} title="Audit trail">
-                                <ReviewRow label="Recorded" value={`${admin.given_by ?? '—'}${givenAt ? ` · ${givenAt}` : ''}`} />
+                                <ReviewRow
+                                    label="Recorded"
+                                    value={`${admin.given_by ?? '—'}${givenAt ? ` · ${givenAt}` : ''}`}
+                                />
                                 <ReviewRow label="Reviewed" value={null} />
                             </ReviewCard>
                         </>

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { useState } from 'react';
 import { formatMoney } from './money';
 import {
     Field,
@@ -13,12 +14,11 @@ import {
     ReviewRow,
     SelectInput,
     StepHead,
+    useWizard,
     WizardShell,
     WizardSuccessPane,
     type WizardStep,
-    useWizard,
 } from './wizard';
-import { useState } from 'react';
 
 export type DonorFundGlAccount = { id: number; code: string; name: string };
 export type DonorFundFundingStream = { id: number; name: string };
@@ -33,12 +33,28 @@ const FUND_TYPES = [
 ];
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'fund', label: 'Fund', blurb: 'Code, name & donor', icon: HandHeart },
-    { key: 'accounting', label: 'Accounting & dates', blurb: 'GL, dates & reporting', icon: Landmark },
-    { key: 'review', label: 'Review', blurb: 'Confirm & create', icon: ListChecks },
+    {
+        key: 'fund',
+        label: 'Fund',
+        blurb: 'Code, name & donor',
+        icon: HandHeart,
+    },
+    {
+        key: 'accounting',
+        label: 'Accounting & dates',
+        blurb: 'GL, dates & reporting',
+        icon: Landmark,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & create',
+        icon: ListChecks,
+    },
 ];
 
-const fundTypeLabel = (v: string) => FUND_TYPES.find((t) => t.value === v)?.label ?? v;
+const fundTypeLabel = (v: string) =>
+    FUND_TYPES.find((t) => t.value === v)?.label ?? v;
 
 /**
  * Donor Fund wizard — create a donor-restricted fund as a stepper modal
@@ -96,14 +112,25 @@ export function DonorFundDialog({
     });
     const { data, setData, processing, errors } = form;
 
-    const glOptions = glAccounts.map((a) => ({ value: String(a.id), label: `${a.code} · ${a.name}` }));
-    const streamOptions = fundingStreams.map((s) => ({ value: String(s.id), label: s.name }));
-    const glLabel = glOptions.find((a) => a.value === data.gl_account_id)?.label ?? '—';
-    const streamLabel = streamOptions.find((s) => s.value === data.funding_stream_id)?.label ?? '—';
+    const glOptions = glAccounts.map((a) => ({
+        value: String(a.id),
+        label: `${a.code} · ${a.name}`,
+    }));
+    const streamOptions = fundingStreams.map((s) => ({
+        value: String(s.id),
+        label: s.name,
+    }));
+    const glLabel =
+        glOptions.find((a) => a.value === data.gl_account_id)?.label ?? '—';
+    const streamLabel =
+        streamOptions.find((s) => s.value === data.funding_stream_id)?.label ??
+        '—';
 
     // Mirror the backend `after_or_equal:start_date` rule so users see it before submit.
-    const datesValid = !data.start_date || !data.end_date || data.end_date >= data.start_date;
-    const fundValid = !!data.fund_code.trim() && !!data.fund_name.trim() && !!data.fund_type;
+    const datesValid =
+        !data.start_date || !data.end_date || data.end_date >= data.start_date;
+    const fundValid =
+        !!data.fund_code.trim() && !!data.fund_name.trim() && !!data.fund_type;
     const accountingValid = datesValid;
     const allValid = fundValid && accountingValid;
 
@@ -160,22 +187,34 @@ export function DonorFundDialog({
             onStepClick={goTo}
             pct={allValid ? 100 : fundValid ? 65 : 30}
             pctLabel="Fund"
-            success={succeeded ? (
-                <WizardSuccessPane
-                    title={`${data.fund_name || 'Donor fund'} created`}
-                    blurb="The fund is ready. Open it to record receipts, expenditure, and generate reports."
-                    actions={
-                        <>
-                            <Button variant="outline" onClick={startAnother}>Add another</Button>
-                            <Button onClick={close}>Done</Button>
-                        </>
-                    }
-                />
-            ) : undefined}
+            success={
+                succeeded ? (
+                    <WizardSuccessPane
+                        title={`${data.fund_name || 'Donor fund'} created`}
+                        blurb="The fund is ready. Open it to record receipts, expenditure, and generate reports."
+                        actions={
+                            <>
+                                <Button
+                                    variant="outline"
+                                    onClick={startAnother}
+                                >
+                                    Add another
+                                </Button>
+                                <Button onClick={close}>Done</Button>
+                            </>
+                        }
+                    />
+                ) : undefined
+            }
             footerEnd={
                 <>
                     {!isFirst && (
-                        <Button type="button" variant="outline" onClick={back} disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={back}
+                            disabled={processing}
+                        >
                             Back
                         </Button>
                     )}
@@ -183,13 +222,20 @@ export function DonorFundDialog({
                         <Button
                             type="button"
                             onClick={next}
-                            disabled={(index === 0 && !fundValid) || (index === 1 && !accountingValid)}
+                            disabled={
+                                (index === 0 && !fundValid) ||
+                                (index === 1 && !accountingValid)
+                            }
                         >
                             Continue
                         </Button>
                     )}
                     {isLast && (
-                        <Button type="button" onClick={submit} disabled={processing || !allValid}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={processing || !allValid}
+                        >
                             Create fund
                         </Button>
                     )}
@@ -198,12 +244,30 @@ export function DonorFundDialog({
         >
             {index === 0 && (
                 <div>
-                    <StepHead icon={HandHeart} title="Fund details" blurb="Identify the fund and its donor." />
+                    <StepHead
+                        icon={HandHeart}
+                        title="Fund details"
+                        blurb="Identify the fund and its donor."
+                    />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Fund code" required error={errors.fund_code}>
-                            <Input value={data.fund_code} onChange={(e) => setData('fund_code', e.target.value)} placeholder="e.g. GNT-2026-001" />
+                        <Field
+                            label="Fund code"
+                            required
+                            error={errors.fund_code}
+                        >
+                            <Input
+                                value={data.fund_code}
+                                onChange={(e) =>
+                                    setData('fund_code', e.target.value)
+                                }
+                                placeholder="e.g. GNT-2026-001"
+                            />
                         </Field>
-                        <Field label="Fund type" required error={errors.fund_type}>
+                        <Field
+                            label="Fund type"
+                            required
+                            error={errors.fund_type}
+                        >
                             <SelectInput
                                 value={data.fund_type}
                                 onChange={(v) => setData('fund_type', v)}
@@ -211,26 +275,76 @@ export function DonorFundDialog({
                                 options={FUND_TYPES}
                             />
                         </Field>
-                        <Field label="Fund name" span required error={errors.fund_name}>
-                            <Input value={data.fund_name} onChange={(e) => setData('fund_name', e.target.value)} placeholder="e.g. Lotteries NZ Community Grant" />
+                        <Field
+                            label="Fund name"
+                            span
+                            required
+                            error={errors.fund_name}
+                        >
+                            <Input
+                                value={data.fund_name}
+                                onChange={(e) =>
+                                    setData('fund_name', e.target.value)
+                                }
+                                placeholder="e.g. Lotteries NZ Community Grant"
+                            />
                         </Field>
-                        <Field label="Donor name" hint="optional" error={errors.donor_name}>
-                            <Input value={data.donor_name} onChange={(e) => setData('donor_name', e.target.value)} placeholder="e.g. Lotteries NZ" />
+                        <Field
+                            label="Donor name"
+                            hint="optional"
+                            error={errors.donor_name}
+                        >
+                            <Input
+                                value={data.donor_name}
+                                onChange={(e) =>
+                                    setData('donor_name', e.target.value)
+                                }
+                                placeholder="e.g. Lotteries NZ"
+                            />
                         </Field>
-                        <Field label="Donor contact" hint="optional" error={errors.donor_contact}>
-                            <Input value={data.donor_contact} onChange={(e) => setData('donor_contact', e.target.value)} placeholder="e.g. grants@lotterygrants.govt.nz" />
+                        <Field
+                            label="Donor contact"
+                            hint="optional"
+                            error={errors.donor_contact}
+                        >
+                            <Input
+                                value={data.donor_contact}
+                                onChange={(e) =>
+                                    setData('donor_contact', e.target.value)
+                                }
+                                placeholder="e.g. grants@lotterygrants.govt.nz"
+                            />
                         </Field>
-                        <Field label="Budget amount (NZD)" span hint="optional" error={errors.budget_amount}>
-                            <Input type="number" step="0.01" min="0" value={data.budget_amount} onChange={(e) => setData('budget_amount', e.target.value)} placeholder="Total grant amount" />
+                        <Field
+                            label="Budget amount (NZD)"
+                            span
+                            hint="optional"
+                            error={errors.budget_amount}
+                        >
+                            <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={data.budget_amount}
+                                onChange={(e) =>
+                                    setData('budget_amount', e.target.value)
+                                }
+                                placeholder="Total grant amount"
+                            />
                         </Field>
                         <div className="flex items-center justify-between gap-3 sm:col-span-2">
                             <div>
                                 <Label>Restricted fund</Label>
-                                <p className="text-sm text-muted-foreground">Expenditure is limited to the available balance</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Expenditure is limited to the available
+                                    balance
+                                </p>
                             </div>
                             <Switch
                                 checked={data.is_restricted}
-                                onCheckedChange={(checked) => setData('is_restricted', checked)}
+                                onCheckedChange={(checked) =>
+                                    setData('is_restricted', checked)
+                                }
                                 aria-label="Restricted fund"
                             />
                         </div>
@@ -240,9 +354,17 @@ export function DonorFundDialog({
 
             {index === 1 && (
                 <div>
-                    <StepHead icon={Landmark} title="Accounting, dates & reporting" blurb="Where it posts, when it runs, and what reporting it needs." />
+                    <StepHead
+                        icon={Landmark}
+                        title="Accounting, dates & reporting"
+                        blurb="Where it posts, when it runs, and what reporting it needs."
+                    />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="GL account" hint="liability / equity" error={errors.gl_account_id}>
+                        <Field
+                            label="GL account"
+                            hint="liability / equity"
+                            error={errors.gl_account_id}
+                        >
                             <SelectInput
                                 value={data.gl_account_id}
                                 onChange={(v) => setData('gl_account_id', v)}
@@ -250,32 +372,97 @@ export function DonorFundDialog({
                                 options={glOptions}
                             />
                         </Field>
-                        <Field label="Funding stream" hint="optional" error={errors.funding_stream_id}>
+                        <Field
+                            label="Funding stream"
+                            hint="optional"
+                            error={errors.funding_stream_id}
+                        >
                             <SelectInput
                                 value={data.funding_stream_id}
-                                onChange={(v) => setData('funding_stream_id', v)}
+                                onChange={(v) =>
+                                    setData('funding_stream_id', v)
+                                }
                                 placeholder="Select funding stream"
                                 options={streamOptions}
                             />
                         </Field>
-                        <Field label="Start date" hint="optional" error={errors.start_date}>
-                            <Input type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)} />
+                        <Field
+                            label="Start date"
+                            hint="optional"
+                            error={errors.start_date}
+                        >
+                            <Input
+                                type="date"
+                                value={data.start_date}
+                                onChange={(e) =>
+                                    setData('start_date', e.target.value)
+                                }
+                            />
                         </Field>
                         <Field
                             label="End date"
                             hint="optional"
-                            error={errors.end_date ?? (!datesValid ? 'Must be on or after the start date.' : undefined)}
+                            error={
+                                errors.end_date ??
+                                (!datesValid
+                                    ? 'Must be on or after the start date.'
+                                    : undefined)
+                            }
                         >
-                            <Input type="date" value={data.end_date} onChange={(e) => setData('end_date', e.target.value)} />
+                            <Input
+                                type="date"
+                                value={data.end_date}
+                                onChange={(e) =>
+                                    setData('end_date', e.target.value)
+                                }
+                            />
                         </Field>
-                        <Field label="Next report due" span hint="optional" error={errors.next_report_due}>
-                            <Input type="date" value={data.next_report_due} onChange={(e) => setData('next_report_due', e.target.value)} />
+                        <Field
+                            label="Next report due"
+                            span
+                            hint="optional"
+                            error={errors.next_report_due}
+                        >
+                            <Input
+                                type="date"
+                                value={data.next_report_due}
+                                onChange={(e) =>
+                                    setData('next_report_due', e.target.value)
+                                }
+                            />
                         </Field>
-                        <Field label="Restrictions" span hint="optional" error={errors.restrictions}>
-                            <Textarea rows={2} value={data.restrictions} onChange={(e) => setData('restrictions', e.target.value)} placeholder="How may funds be used? Any restrictions or conditions…" />
+                        <Field
+                            label="Restrictions"
+                            span
+                            hint="optional"
+                            error={errors.restrictions}
+                        >
+                            <Textarea
+                                rows={2}
+                                value={data.restrictions}
+                                onChange={(e) =>
+                                    setData('restrictions', e.target.value)
+                                }
+                                placeholder="How may funds be used? Any restrictions or conditions…"
+                            />
                         </Field>
-                        <Field label="Reporting requirements" span hint="optional" error={errors.reporting_requirements}>
-                            <Textarea rows={2} value={data.reporting_requirements} onChange={(e) => setData('reporting_requirements', e.target.value)} placeholder="What reporting is required? Frequency, format, etc." />
+                        <Field
+                            label="Reporting requirements"
+                            span
+                            hint="optional"
+                            error={errors.reporting_requirements}
+                        >
+                            <Textarea
+                                rows={2}
+                                value={data.reporting_requirements}
+                                onChange={(e) =>
+                                    setData(
+                                        'reporting_requirements',
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="What reporting is required? Frequency, format, etc."
+                            />
                         </Field>
                     </div>
                 </div>
@@ -283,21 +470,50 @@ export function DonorFundDialog({
 
             {index === 2 && (
                 <div>
-                    <StepHead icon={ListChecks} title="Review & create" blurb="Creates the fund — record receipts and expenditure from its page afterwards." />
+                    <StepHead
+                        icon={ListChecks}
+                        title="Review & create"
+                        blurb="Creates the fund — record receipts and expenditure from its page afterwards."
+                    />
                     <ReviewCard icon={CalendarClock} title="Donor fund">
                         <ReviewRow label="Code" value={data.fund_code || '—'} />
                         <ReviewRow label="Name" value={data.fund_name || '—'} />
-                        <ReviewRow label="Type" value={fundTypeLabel(data.fund_type)} />
-                        {data.donor_name && <ReviewRow label="Donor" value={data.donor_name} />}
-                        {data.budget_amount !== '' && <ReviewRow label="Budget" value={formatMoney(data.budget_amount)} />}
-                        <ReviewRow label="Restricted" value={data.is_restricted ? 'Yes' : 'No'} />
+                        <ReviewRow
+                            label="Type"
+                            value={fundTypeLabel(data.fund_type)}
+                        />
+                        {data.donor_name && (
+                            <ReviewRow label="Donor" value={data.donor_name} />
+                        )}
+                        {data.budget_amount !== '' && (
+                            <ReviewRow
+                                label="Budget"
+                                value={formatMoney(data.budget_amount)}
+                            />
+                        )}
+                        <ReviewRow
+                            label="Restricted"
+                            value={data.is_restricted ? 'Yes' : 'No'}
+                        />
                         <ReviewRow label="GL account" value={glLabel} />
-                        {data.funding_stream_id && <ReviewRow label="Funding stream" value={streamLabel} />}
+                        {data.funding_stream_id && (
+                            <ReviewRow
+                                label="Funding stream"
+                                value={streamLabel}
+                            />
+                        )}
                         {(data.start_date || data.end_date) && (
-                            <ReviewRow label="Period" value={`${data.start_date || 'Any time'} — ${data.end_date || 'ongoing'}`} />
+                            <ReviewRow
+                                label="Period"
+                                value={`${data.start_date || 'Any time'} — ${data.end_date || 'ongoing'}`}
+                            />
                         )}
                     </ReviewCard>
-                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">Creating…</p>}
+                    {processing && (
+                        <p className="mt-3 text-[13px] text-muted-foreground">
+                            Creating…
+                        </p>
+                    )}
                 </div>
             )}
         </WizardShell>

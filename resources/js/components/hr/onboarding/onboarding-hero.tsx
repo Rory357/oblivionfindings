@@ -58,10 +58,26 @@ function HeroRail({ summary }: { summary: OnboardingSummary }) {
     const c = 2 * Math.PI * r;
 
     const statusSegs = [
-        { label: 'Completed', value: summary.completed, color: 'var(--status-success)' },
-        { label: 'In progress', value: summary.in_progress, color: 'var(--hr-amber)' },
-        { label: 'Pending', value: summary.pending, color: 'rgba(255,255,255,.55)' },
-        { label: 'Overdue', value: summary.overdue, color: 'var(--status-critical)' },
+        {
+            label: 'Completed',
+            value: summary.completed,
+            color: 'var(--status-success)',
+        },
+        {
+            label: 'In progress',
+            value: summary.in_progress,
+            color: 'var(--hr-amber)',
+        },
+        {
+            label: 'Pending',
+            value: summary.pending,
+            color: 'rgba(255,255,255,.55)',
+        },
+        {
+            label: 'Overdue',
+            value: summary.overdue,
+            color: 'var(--status-critical)',
+        },
     ].filter((s) => s.value > 0);
 
     let arcs: { color: string; dash: string; offset: number }[] = [];
@@ -74,7 +90,11 @@ function HeroRail({ summary }: { summary: OnboardingSummary }) {
         let accum = 0;
         arcs = statusSegs.map((s) => {
             const len = (s.value / total) * c;
-            const seg = { color: s.color, dash: `${len.toFixed(1)} ${(c - len).toFixed(1)}`, offset: -accum };
+            const seg = {
+                color: s.color,
+                dash: `${len.toFixed(1)} ${(c - len).toFixed(1)}`,
+                offset: -accum,
+            };
             accum += len;
             return seg;
         });
@@ -83,10 +103,24 @@ function HeroRail({ summary }: { summary: OnboardingSummary }) {
         centerLabel = 'checklists';
     } else {
         const pct = summary.avg_completion;
-        arcs = [{ color: 'var(--hr-amber)', dash: `${((pct / 100) * c).toFixed(1)} ${c.toFixed(1)}`, offset: 0 }];
+        arcs = [
+            {
+                color: 'var(--hr-amber)',
+                dash: `${((pct / 100) * c).toFixed(1)} ${c.toFixed(1)}`,
+                offset: 0,
+            },
+        ];
         legend = [
-            { label: 'Avg completion', value: `${pct}%`, color: 'var(--hr-amber)' },
-            { label: 'Completed (30d)', value: summary.completed_30d, color: 'rgba(255,255,255,.5)' },
+            {
+                label: 'Avg completion',
+                value: `${pct}%`,
+                color: 'var(--hr-amber)',
+            },
+            {
+                label: 'Completed (30d)',
+                value: summary.completed_30d,
+                color: 'rgba(255,255,255,.5)',
+            },
         ];
         center = `${pct}%`;
         centerLabel = 'complete';
@@ -102,18 +136,38 @@ function HeroRail({ summary }: { summary: OnboardingSummary }) {
                     Progress
                 </span>
                 <div className="inline-flex gap-0.5 rounded-lg bg-white/10 p-0.5">
-                    <button type="button" className={toggleBtn(mode === 'status')} onClick={() => setMode('status')}>
+                    <button
+                        type="button"
+                        className={toggleBtn(mode === 'status')}
+                        onClick={() => setMode('status')}
+                    >
                         Status
                     </button>
-                    <button type="button" className={toggleBtn(mode === 'completion')} onClick={() => setMode('completion')}>
+                    <button
+                        type="button"
+                        className={toggleBtn(mode === 'completion')}
+                        onClick={() => setMode('completion')}
+                    >
                         Completion
                     </button>
                 </div>
             </div>
             <div className="mt-2 flex items-center gap-4">
                 <div className="relative flex-none">
-                    <svg width="116" height="116" viewBox="0 0 140 140" style={{ transform: 'rotate(-90deg)' }}>
-                        <circle cx="70" cy="70" r={r} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="18" />
+                    <svg
+                        width="116"
+                        height="116"
+                        viewBox="0 0 140 140"
+                        style={{ transform: 'rotate(-90deg)' }}
+                    >
+                        <circle
+                            cx="70"
+                            cy="70"
+                            r={r}
+                            fill="none"
+                            stroke="rgba(255,255,255,.16)"
+                            strokeWidth="18"
+                        />
                         {arcs.map((a, i) => (
                             <circle
                                 key={i}
@@ -129,16 +183,30 @@ function HeroRail({ summary }: { summary: OnboardingSummary }) {
                         ))}
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-[26px] leading-none font-extrabold tabular-nums">{center}</span>
-                        <span className="text-[10px] font-semibold text-white/60">{centerLabel}</span>
+                        <span className="text-[26px] leading-none font-extrabold tabular-nums">
+                            {center}
+                        </span>
+                        <span className="text-[10px] font-semibold text-white/60">
+                            {centerLabel}
+                        </span>
                     </div>
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5">
                     {legend.map((l) => (
-                        <div key={l.label} className="flex items-center gap-2 text-[11.5px] text-white/85">
-                            <span className="h-2.5 w-2.5 flex-none rounded-[3px]" style={{ background: l.color }} />
-                            <span className="flex-1 whitespace-nowrap">{l.label}</span>
-                            <span className="font-bold tabular-nums">{l.value}</span>
+                        <div
+                            key={l.label}
+                            className="flex items-center gap-2 text-[11.5px] text-white/85"
+                        >
+                            <span
+                                className="h-2.5 w-2.5 flex-none rounded-[3px]"
+                                style={{ background: l.color }}
+                            />
+                            <span className="flex-1 whitespace-nowrap">
+                                {l.label}
+                            </span>
+                            <span className="font-bold tabular-nums">
+                                {l.value}
+                            </span>
                         </div>
                     ))}
                 </div>
@@ -163,7 +231,9 @@ export function OnboardingHero({
     onNewTemplate: () => void;
     onEmails: () => void;
     onExport: () => void;
-    onStat: (key: 'active' | 'in_progress' | 'overdue' | 'due_this_week' | 'avg') => void;
+    onStat: (
+        key: 'active' | 'in_progress' | 'overdue' | 'due_this_week' | 'avg',
+    ) => void;
     needs: HeroNeed[];
 }) {
     const subtitle = `${summary.active} active ${summary.active === 1 ? 'checklist' : 'checklists'}${
@@ -179,7 +249,8 @@ export function OnboardingHero({
             style={{
                 background:
                     'linear-gradient(120deg, color-mix(in oklch, var(--category-hr) 72%, black 22%), var(--category-hr) 58%, color-mix(in oklch, var(--category-hr) 90%, white 8%))',
-                boxShadow: 'var(--shadow-hero, 0 24px 60px -22px rgba(60,40,10,.45))',
+                boxShadow:
+                    'var(--shadow-hero, 0 24px 60px -22px rgba(60,40,10,.45))',
             }}
         >
             <div className="pointer-events-none absolute -top-20 right-[22%] h-60 w-60 rounded-full bg-white/5" />
@@ -190,17 +261,43 @@ export function OnboardingHero({
                             <UserPlus className="h-6 w-6" />
                         </span>
                         <div className="min-w-0">
-                            <h1 className="text-[28px] leading-[1.05] font-bold tracking-tight">Onboarding</h1>
-                            <p className="mt-1 text-[13px] font-medium text-white/75">{subtitle}</p>
+                            <h1 className="text-[28px] leading-[1.05] font-bold tracking-tight">
+                                Onboarding
+                            </h1>
+                            <p className="mt-1 text-[13px] font-medium text-white/75">
+                                {subtitle}
+                            </p>
                         </div>
                     </div>
 
-                    <div className="-ml-3 mt-4 flex flex-wrap gap-0.5">
-                        <HeroStat label="Active" value={summary.active} onClick={() => onStat('active')} />
-                        <HeroStat label="In progress" value={summary.in_progress} onClick={() => onStat('in_progress')} />
-                        <HeroStat label="Overdue" value={summary.overdue} amber={summary.overdue > 0} onClick={() => onStat('overdue')} />
-                        <HeroStat label="Due this week" value={summary.due_this_week} amber={summary.due_this_week > 0} onClick={() => onStat('due_this_week')} />
-                        <HeroStat label="Avg completion" value={`${summary.avg_completion}%`} onClick={() => onStat('avg')} />
+                    <div className="mt-4 -ml-3 flex flex-wrap gap-0.5">
+                        <HeroStat
+                            label="Active"
+                            value={summary.active}
+                            onClick={() => onStat('active')}
+                        />
+                        <HeroStat
+                            label="In progress"
+                            value={summary.in_progress}
+                            onClick={() => onStat('in_progress')}
+                        />
+                        <HeroStat
+                            label="Overdue"
+                            value={summary.overdue}
+                            amber={summary.overdue > 0}
+                            onClick={() => onStat('overdue')}
+                        />
+                        <HeroStat
+                            label="Due this week"
+                            value={summary.due_this_week}
+                            amber={summary.due_this_week > 0}
+                            onClick={() => onStat('due_this_week')}
+                        />
+                        <HeroStat
+                            label="Avg completion"
+                            value={`${summary.avg_completion}%`}
+                            onClick={() => onStat('avg')}
+                        />
                     </div>
 
                     {canManage && (
@@ -213,14 +310,28 @@ export function OnboardingHero({
                                 <Plus className="h-[15px] w-[15px]" />
                                 Start onboarding
                             </button>
-                            <button type="button" onClick={onNewTemplate} className={actionBtn}>
+                            <button
+                                type="button"
+                                onClick={onNewTemplate}
+                                className={actionBtn}
+                            >
                                 New template
                             </button>
-                            <button type="button" onClick={onEmails} className={actionBtn}>
-                                <Mail className="h-[14px] w-[14px]" /> Email templates
+                            <button
+                                type="button"
+                                onClick={onEmails}
+                                className={actionBtn}
+                            >
+                                <Mail className="h-[14px] w-[14px]" /> Email
+                                templates
                             </button>
-                            <button type="button" onClick={onExport} className={actionBtn}>
-                                <Download className="h-[14px] w-[14px]" /> Export
+                            <button
+                                type="button"
+                                onClick={onExport}
+                                className={actionBtn}
+                            >
+                                <Download className="h-[14px] w-[14px]" />{' '}
+                                Export
                             </button>
                         </div>
                     )}
@@ -241,7 +352,8 @@ export function OnboardingHero({
                                         className="h-1.5 w-1.5 flex-none rounded-full"
                                         style={{
                                             background: 'var(--hr-amber)',
-                                            boxShadow: '0 0 0 3px color-mix(in oklch, var(--hr-amber) 32%, transparent)',
+                                            boxShadow:
+                                                '0 0 0 3px color-mix(in oklch, var(--hr-amber) 32%, transparent)',
                                         }}
                                     />
                                     {n.label}

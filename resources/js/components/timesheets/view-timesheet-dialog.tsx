@@ -21,11 +21,11 @@ import {
     Banknote,
     Briefcase,
     CalendarDays,
-    CheckCircle2,
-    Clock,
-    ClipboardList,
-    Coffee,
     Car,
+    CheckCircle2,
+    ClipboardList,
+    Clock,
+    Coffee,
     FileText,
     Link2,
     MapPin,
@@ -83,11 +83,17 @@ export type ViewTimesheetRow = {
 };
 
 function initials(name: string) {
-    return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+    return name
+        .split(' ')
+        .map((w) => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
 }
 function hueFor(name: string) {
     let h = 0;
-    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+    for (let i = 0; i < name.length; i++)
+        h = (h * 31 + name.charCodeAt(i)) % 360;
     return h;
 }
 
@@ -107,29 +113,57 @@ function fmtDate(iso: string) {
     });
 }
 
-function SectionTitle({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+function SectionTitle({
+    icon: Icon,
+    children,
+}: {
+    icon: React.ComponentType<{ className?: string }>;
+    children: React.ReactNode;
+}) {
     return (
-        <div className="flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="flex items-center gap-2 text-[11.5px] font-semibold tracking-wider text-muted-foreground uppercase">
             <Icon className="h-3.5 w-3.5" />
             {children}
         </div>
     );
 }
 
-function KV({ label, value, sub, icon: Icon }: { label: string; value: string; sub?: string; icon?: React.ComponentType<{ className?: string }> }) {
+function KV({
+    label,
+    value,
+    sub,
+    icon: Icon,
+}: {
+    label: string;
+    value: string;
+    sub?: string;
+    icon?: React.ComponentType<{ className?: string }>;
+}) {
     return (
         <div className="rounded-lg border border-border bg-muted/30 px-2.5 py-2">
-            <div className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
                 {Icon ? <Icon className="h-3 w-3" /> : null}
                 {label}
             </div>
-            <div className="mt-1 text-sm font-semibold tabular-nums">{value}</div>
-            {sub ? <div className="text-[11px] text-muted-foreground">{sub}</div> : null}
+            <div className="mt-1 text-sm font-semibold tabular-nums">
+                {value}
+            </div>
+            {sub ? (
+                <div className="text-[11px] text-muted-foreground">{sub}</div>
+            ) : null}
         </div>
     );
 }
 
-function Person({ label, name, role }: { label: string; name: string; role: string }) {
+function Person({
+    label,
+    name,
+    role,
+}: {
+    label: string;
+    name: string;
+    role: string;
+}) {
     return (
         <div className="mt-2 flex items-center gap-2.5">
             <div
@@ -139,9 +173,13 @@ function Person({ label, name, role }: { label: string; name: string; role: stri
                 {initials(name)}
             </div>
             <div className="min-w-0">
-                <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">{label}</div>
+                <div className="text-[10.5px] tracking-wider text-muted-foreground uppercase">
+                    {label}
+                </div>
                 <div className="truncate text-[13px] font-semibold">{name}</div>
-                <div className="truncate text-[11.5px] text-muted-foreground">{role}</div>
+                <div className="truncate text-[11.5px] text-muted-foreground">
+                    {role}
+                </div>
             </div>
         </div>
     );
@@ -159,7 +197,9 @@ export default function ViewTimesheetDialog({
     canApprove?: boolean;
 }) {
     const [busy, setBusy] = useState(false);
-    const [reasonAction, setReasonAction] = useState<'reject' | 'return' | null>(null);
+    const [reasonAction, setReasonAction] = useState<
+        'reject' | 'return' | null
+    >(null);
 
     if (!timesheet) return null;
     const t = timesheet;
@@ -170,7 +210,10 @@ export default function ViewTimesheetDialog({
     if (t.public_holiday) tagPills.push('Public holiday');
 
     const allocations = t.client_allocations ?? [];
-    const totalMinutes = allocations.reduce((s, a) => s + (a.minutes ?? (a.hours ? a.hours * 60 : 0)), 0);
+    const totalMinutes = allocations.reduce(
+        (s, a) => s + (a.minutes ?? (a.hours ? a.hours * 60 : 0)),
+        0,
+    );
 
     function call(method: 'post', url: string, data: Record<string, any> = {}) {
         setBusy(true);
@@ -184,13 +227,16 @@ export default function ViewTimesheetDialog({
     const shiftCtxName =
         typeof t.shift?.service_context === 'string'
             ? t.shift?.service_context
-            : t.shift?.service_context?.name ?? 'Care';
+            : (t.shift?.service_context?.name ?? 'Care');
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0"
-                style={{ maxWidth: 'min(94vw, 920px)', width: 'min(94vw, 920px)' }}
+                style={{
+                    maxWidth: 'min(94vw, 920px)',
+                    width: 'min(94vw, 920px)',
+                }}
             >
                 {/* Read-only detail header — icon tile + title + status, per
                     docs/POPUP_STYLE_GUIDE.md. */}
@@ -206,8 +252,10 @@ export default function ViewTimesheetDialog({
                             </DialogTitle>
                             <DialogDescription className="mt-0.5 text-[12.5px] text-muted-foreground">
                                 {t.staff?.name ?? 'Staff'} →{' '}
-                                {t.client ? `${t.client.first_name} ${t.client.last_name}` : t.activity_type ?? 'Activity'} ·{' '}
-                                {fmtDate(t.work_date)} · {hours.toFixed(2)}h
+                                {t.client
+                                    ? `${t.client.first_name} ${t.client.last_name}`
+                                    : (t.activity_type ?? 'Activity')}{' '}
+                                · {fmtDate(t.work_date)} · {hours.toFixed(2)}h
                             </DialogDescription>
                         </div>
                     </div>
@@ -219,8 +267,13 @@ export default function ViewTimesheetDialog({
                             <div className="flex items-start gap-2 text-status-critical">
                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                 <div className="min-w-0">
-                                    <div className="text-[12.5px] font-semibold">Returned to {t.staff?.name ?? 'staff'} for changes</div>
-                                    <div className="mt-0.5 text-[12px]">{t.returned_notes}</div>
+                                    <div className="text-[12.5px] font-semibold">
+                                        Returned to {t.staff?.name ?? 'staff'}{' '}
+                                        for changes
+                                    </div>
+                                    <div className="mt-0.5 text-[12px]">
+                                        {t.returned_notes}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -229,16 +282,42 @@ export default function ViewTimesheetDialog({
                     <div className="grid gap-4 p-5 md:grid-cols-[1fr_320px]">
                         <div className="min-w-0 space-y-4">
                             <section className="rounded-xl border border-border bg-card p-4">
-                                <SectionTitle icon={Clock}>Schedule &amp; hours</SectionTitle>
+                                <SectionTitle icon={Clock}>
+                                    Schedule &amp; hours
+                                </SectionTitle>
                                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                    <KV label="Start" value={fmtTime(t.starts_at)} sub={fmtDate(t.starts_at)} />
-                                    <KV label="End" value={fmtTime(t.ends_at)} sub={fmtDate(t.ends_at)} />
-                                    <KV label="Break" value={`${t.break_minutes}m`} icon={Coffee} />
-                                    <KV label="Mileage" value={(t.mileage_km ?? 0) > 0 ? `${t.mileage_km} km` : '—'} icon={Car} />
+                                    <KV
+                                        label="Start"
+                                        value={fmtTime(t.starts_at)}
+                                        sub={fmtDate(t.starts_at)}
+                                    />
+                                    <KV
+                                        label="End"
+                                        value={fmtTime(t.ends_at)}
+                                        sub={fmtDate(t.ends_at)}
+                                    />
+                                    <KV
+                                        label="Break"
+                                        value={`${t.break_minutes}m`}
+                                        icon={Coffee}
+                                    />
+                                    <KV
+                                        label="Mileage"
+                                        value={
+                                            (t.mileage_km ?? 0) > 0
+                                                ? `${t.mileage_km} km`
+                                                : '—'
+                                        }
+                                        icon={Car}
+                                    />
                                 </div>
                                 <div className="mt-3 flex items-center justify-between rounded-lg bg-status-info-bg px-3 py-2.5 text-[12.5px]">
-                                    <span className="font-medium">Billable hours</span>
-                                    <span className="text-base font-bold tabular-nums text-primary">{hours.toFixed(2)}h</span>
+                                    <span className="font-medium">
+                                        Billable hours
+                                    </span>
+                                    <span className="text-base font-bold text-primary tabular-nums">
+                                        {hours.toFixed(2)}h
+                                    </span>
                                 </div>
                                 {tagPills.length > 0 ? (
                                     <div className="mt-3 flex flex-wrap gap-1.5">
@@ -255,21 +334,32 @@ export default function ViewTimesheetDialog({
                             </section>
 
                             {/* Activity items (manual mode) or tasks (shift mode) */}
-                            {Array.isArray(t.activity_items) && t.activity_items.length > 0 ? (
+                            {Array.isArray(t.activity_items) &&
+                            t.activity_items.length > 0 ? (
                                 <section className="rounded-xl border border-border bg-card p-4">
                                     <div className="flex items-center justify-between">
-                                        <SectionTitle icon={ClipboardList}>Activity items</SectionTitle>
-                                        <span className="text-[11.5px] tabular-nums text-muted-foreground">
-                                            {t.activity_items.length} item{t.activity_items.length === 1 ? '' : 's'}
+                                        <SectionTitle icon={ClipboardList}>
+                                            Activity items
+                                        </SectionTitle>
+                                        <span className="text-[11.5px] text-muted-foreground tabular-nums">
+                                            {t.activity_items.length} item
+                                            {t.activity_items.length === 1
+                                                ? ''
+                                                : 's'}
                                         </span>
                                     </div>
                                     <ul className="mt-3 space-y-1.5">
                                         {t.activity_items.map((it, idx) => (
-                                            <li key={idx} className="flex items-center gap-2 rounded-lg border border-border bg-card p-2">
+                                            <li
+                                                key={idx}
+                                                className="flex items-center gap-2 rounded-lg border border-border bg-card p-2"
+                                            >
                                                 <span className="grid h-5 w-5 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
                                                     {idx + 1}
                                                 </span>
-                                                <span className="text-[12.5px]">{it}</span>
+                                                <span className="text-[12.5px]">
+                                                    {it}
+                                                </span>
                                             </li>
                                         ))}
                                     </ul>
@@ -277,14 +367,18 @@ export default function ViewTimesheetDialog({
                             ) : t.shift ? (
                                 <section className="rounded-xl border border-border bg-card p-4">
                                     <div className="flex items-center justify-between">
-                                        <SectionTitle icon={ClipboardList}>Tasks pulled from shift</SectionTitle>
-                                        <span className="text-[11.5px] tabular-nums text-muted-foreground">
-                                            {(t.tasks_completed ?? 0)} / {(t.tasks_total ?? 0)} completed
+                                        <SectionTitle icon={ClipboardList}>
+                                            Tasks pulled from shift
+                                        </SectionTitle>
+                                        <span className="text-[11.5px] text-muted-foreground tabular-nums">
+                                            {t.tasks_completed ?? 0} /{' '}
+                                            {t.tasks_total ?? 0} completed
                                         </span>
                                     </div>
                                     {(t.tasks_total ?? 0) === 0 ? (
                                         <div className="mt-3 rounded-lg border border-dashed border-border px-3 py-3 text-center text-[12px] text-muted-foreground">
-                                            No tasks were attached to the linked shift.
+                                            No tasks were attached to the linked
+                                            shift.
                                         </div>
                                     ) : (
                                         <div className="mt-3 flex items-center gap-1.5">
@@ -292,9 +386,24 @@ export default function ViewTimesheetDialog({
                                                 <div
                                                     className={cn(
                                                         'h-full rounded-full',
-                                                        (t.tasks_completed ?? 0) === (t.tasks_total ?? 0) ? 'bg-status-success' : 'bg-primary',
+                                                        (t.tasks_completed ??
+                                                            0) ===
+                                                            (t.tasks_total ?? 0)
+                                                            ? 'bg-status-success'
+                                                            : 'bg-primary',
                                                     )}
-                                                    style={{ width: ((t.tasks_completed ?? 0) / Math.max(t.tasks_total ?? 1, 1)) * 100 + '%' }}
+                                                    style={{
+                                                        width:
+                                                            ((t.tasks_completed ??
+                                                                0) /
+                                                                Math.max(
+                                                                    t.tasks_total ??
+                                                                        1,
+                                                                    1,
+                                                                )) *
+                                                                100 +
+                                                            '%',
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -304,26 +413,52 @@ export default function ViewTimesheetDialog({
 
                             {allocations.length > 0 ? (
                                 <section className="rounded-xl border border-border bg-card p-4">
-                                    <SectionTitle icon={Users}>Client allocation</SectionTitle>
+                                    <SectionTitle icon={Users}>
+                                        Client allocation
+                                    </SectionTitle>
                                     <div className="mt-3 space-y-2">
                                         {allocations.map((a) => {
-                                            const aHours = a.hours ?? (a.minutes ? a.minutes / 60 : 0);
-                                            const aMinutes = a.minutes ?? aHours * 60;
-                                            const pct = totalMinutes > 0 ? Math.round((aMinutes / totalMinutes) * 100) : 100;
+                                            const aHours =
+                                                a.hours ??
+                                                (a.minutes
+                                                    ? a.minutes / 60
+                                                    : 0);
+                                            const aMinutes =
+                                                a.minutes ?? aHours * 60;
+                                            const pct =
+                                                totalMinutes > 0
+                                                    ? Math.round(
+                                                          (aMinutes /
+                                                              totalMinutes) *
+                                                              100,
+                                                      )
+                                                    : 100;
                                             return (
                                                 <div key={a.client_id}>
                                                     <div className="flex items-center justify-between text-[12.5px]">
-                                                        <span className="truncate font-medium">{a.client_name ?? `Client #${a.client_id}`}</span>
-                                                        <span className="tabular-nums text-muted-foreground">
-                                                            {aHours.toFixed(2)}h · {pct}%
+                                                        <span className="truncate font-medium">
+                                                            {a.client_name ??
+                                                                `Client #${a.client_id}`}
+                                                        </span>
+                                                        <span className="text-muted-foreground tabular-nums">
+                                                            {aHours.toFixed(2)}h
+                                                            · {pct}%
                                                         </span>
                                                     </div>
                                                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                                                        <div className="h-full rounded-full bg-primary" style={{ width: pct + '%' }} />
+                                                        <div
+                                                            className="h-full rounded-full bg-primary"
+                                                            style={{
+                                                                width:
+                                                                    pct + '%',
+                                                            }}
+                                                        />
                                                     </div>
                                                     {a.allocation_method ? (
-                                                        <div className="mt-0.5 text-[10.5px] uppercase tracking-wider text-muted-foreground">
-                                                            {a.allocation_method}
+                                                        <div className="mt-0.5 text-[10.5px] tracking-wider text-muted-foreground uppercase">
+                                                            {
+                                                                a.allocation_method
+                                                            }
                                                         </div>
                                                     ) : null}
                                                 </div>
@@ -334,17 +469,24 @@ export default function ViewTimesheetDialog({
                             ) : null}
 
                             <section className="rounded-xl border border-border bg-card p-4">
-                                <SectionTitle icon={Pencil}>Staff notes</SectionTitle>
+                                <SectionTitle icon={Pencil}>
+                                    Staff notes
+                                </SectionTitle>
                                 {t.notes ? (
                                     <div className="mt-3 rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2.5 text-[13px] leading-relaxed">
-                                        <p className="whitespace-pre-line">{t.notes}</p>
-                                        <div className="mt-2 text-[10.5px] uppercase tracking-wider text-muted-foreground">
-                                            Logged by {t.staff?.name ?? 'staff'} on {fmtDate(t.work_date)}
+                                        <p className="whitespace-pre-line">
+                                            {t.notes}
+                                        </p>
+                                        <div className="mt-2 text-[10.5px] tracking-wider text-muted-foreground uppercase">
+                                            Logged by {t.staff?.name ?? 'staff'}{' '}
+                                            on {fmtDate(t.work_date)}
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="mt-3 rounded-lg border border-dashed border-border px-3 py-3 text-center text-[12px] text-muted-foreground">
-                                        No notes left by {t.staff?.name ?? 'staff'} for this timesheet.
+                                        No notes left by{' '}
+                                        {t.staff?.name ?? 'staff'} for this
+                                        timesheet.
                                     </div>
                                 )}
                             </section>
@@ -353,7 +495,11 @@ export default function ViewTimesheetDialog({
                         <aside className="space-y-4">
                             <section className="rounded-xl border border-border bg-card p-4">
                                 <SectionTitle icon={User}>People</SectionTitle>
-                                <Person label="Staff" name={t.staff?.name ?? 'Unknown'} role="Support worker" />
+                                <Person
+                                    label="Staff"
+                                    name={t.staff?.name ?? 'Unknown'}
+                                    role="Support worker"
+                                />
                                 {t.client ? (
                                     <Person
                                         label="Client"
@@ -361,29 +507,45 @@ export default function ViewTimesheetDialog({
                                         role={shiftCtxName}
                                     />
                                 ) : t.activity_type ? (
-                                    <Person label="Activity" name={t.activity_type} role="Manual entry" />
+                                    <Person
+                                        label="Activity"
+                                        name={t.activity_type}
+                                        role="Manual entry"
+                                    />
                                 ) : null}
                             </section>
 
                             {t.shift ? (
                                 <section className="rounded-xl border border-border bg-card p-4">
-                                    <SectionTitle icon={Briefcase}>Linked shift</SectionTitle>
+                                    <SectionTitle icon={Briefcase}>
+                                        Linked shift
+                                    </SectionTitle>
                                     <div className="mt-2 rounded-lg border border-primary/30 bg-status-info-bg p-3 text-[12.5px]">
-                                        <div className="font-semibold">Shift #{t.shift.id}</div>
+                                        <div className="font-semibold">
+                                            Shift #{t.shift.id}
+                                        </div>
                                         {t.shift.location ? (
                                             <div className="mt-0.5 inline-flex items-center gap-1 text-[11.5px] text-muted-foreground">
                                                 <MapPin className="h-3 w-3" />
                                                 {t.shift.location}
                                             </div>
                                         ) : null}
-                                        <div className="mt-0.5 text-[11.5px] capitalize text-muted-foreground">
-                                            {(t.shift.shift_type ?? 'standard').replace('_', ' ')} · {shiftCtxName}
+                                        <div className="mt-0.5 text-[11.5px] text-muted-foreground capitalize">
+                                            {(
+                                                t.shift.shift_type ?? 'standard'
+                                            ).replace('_', ' ')}{' '}
+                                            · {shiftCtxName}
                                         </div>
                                         <button
-                                            onClick={() => router.visit(`/operations/shifts/${t.shift!.id}`)}
+                                            onClick={() =>
+                                                router.visit(
+                                                    `/operations/shifts/${t.shift!.id}`,
+                                                )
+                                            }
                                             className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-1 text-[11.5px] font-medium text-primary hover:bg-background/80"
                                         >
-                                            <Link2 className="h-3 w-3" /> Open shift
+                                            <Link2 className="h-3 w-3" /> Open
+                                            shift
                                         </button>
                                     </div>
                                 </section>
@@ -391,20 +553,30 @@ export default function ViewTimesheetDialog({
 
                             {t.exported_to_payroll_at || t.payroll_reference ? (
                                 <section className="rounded-xl border border-border bg-card p-4">
-                                    <SectionTitle icon={Banknote}>Payroll</SectionTitle>
+                                    <SectionTitle icon={Banknote}>
+                                        Payroll
+                                    </SectionTitle>
                                     <div className="mt-3 space-y-2">
                                         {t.exported_to_payroll_at ? (
                                             <div className="flex items-center justify-between rounded-lg border border-status-success/30 bg-status-success-bg px-3 py-2 text-[12.5px]">
-                                                <span className="font-medium text-status-success">Exported</span>
-                                                <span className="tabular-nums text-status-success">
-                                                    {fmtDate(t.exported_to_payroll_at)}
+                                                <span className="font-medium text-status-success">
+                                                    Exported
+                                                </span>
+                                                <span className="text-status-success tabular-nums">
+                                                    {fmtDate(
+                                                        t.exported_to_payroll_at,
+                                                    )}
                                                 </span>
                                             </div>
                                         ) : null}
                                         {t.payroll_reference ? (
                                             <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
-                                                <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">Reference</div>
-                                                <div className="mt-0.5 break-all text-[12px] font-medium">{t.payroll_reference}</div>
+                                                <div className="text-[10.5px] tracking-wider text-muted-foreground uppercase">
+                                                    Reference
+                                                </div>
+                                                <div className="mt-0.5 text-[12px] font-medium break-all">
+                                                    {t.payroll_reference}
+                                                </div>
                                             </div>
                                         ) : null}
                                     </div>
@@ -412,15 +584,20 @@ export default function ViewTimesheetDialog({
                             ) : null}
 
                             <section className="rounded-xl border border-border bg-card p-4">
-                                <SectionTitle icon={CalendarDays}>Audit trail</SectionTitle>
+                                <SectionTitle icon={CalendarDays}>
+                                    Audit trail
+                                </SectionTitle>
                                 <ol className="mt-3 space-y-3 border-l-2 border-border pl-4">
                                     <li className="relative">
                                         <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-muted-foreground text-white shadow">
                                             <Pencil className="h-2.5 w-2.5" />
                                         </span>
-                                        <div className="text-[12.5px] font-semibold">Timesheet drafted</div>
+                                        <div className="text-[12.5px] font-semibold">
+                                            Timesheet drafted
+                                        </div>
                                         <div className="text-[11px] text-muted-foreground">
-                                            {t.staff?.name ?? 'Staff'} · {fmtDate(t.work_date)}
+                                            {t.staff?.name ?? 'Staff'} ·{' '}
+                                            {fmtDate(t.work_date)}
                                         </div>
                                     </li>
                                     {t.submitted_at ? (
@@ -428,7 +605,9 @@ export default function ViewTimesheetDialog({
                                             <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-status-warning text-white shadow">
                                                 <Send className="h-2.5 w-2.5" />
                                             </span>
-                                            <div className="text-[12.5px] font-semibold">Submitted for approval</div>
+                                            <div className="text-[12.5px] font-semibold">
+                                                Submitted for approval
+                                            </div>
                                             <div className="text-[11px] text-muted-foreground">
                                                 {t.staff?.name ?? 'Staff'} ·{' '}
                                                 {formatDateTime(t.submitted_at)}
@@ -440,7 +619,9 @@ export default function ViewTimesheetDialog({
                                             <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-status-critical text-white shadow">
                                                 <RotateCcw className="h-2.5 w-2.5" />
                                             </span>
-                                            <div className="text-[12.5px] font-semibold">Returned for changes</div>
+                                            <div className="text-[12.5px] font-semibold">
+                                                Returned for changes
+                                            </div>
                                             {t.returned_notes ? (
                                                 <div className="mt-1 rounded-md bg-status-critical-bg px-2 py-1 text-[11.5px] text-status-critical">
                                                     {t.returned_notes}
@@ -453,7 +634,9 @@ export default function ViewTimesheetDialog({
                                             <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-status-success text-white shadow">
                                                 <CheckCircle2 className="h-2.5 w-2.5" />
                                             </span>
-                                            <div className="text-[12.5px] font-semibold">Approved</div>
+                                            <div className="text-[12.5px] font-semibold">
+                                                Approved
+                                            </div>
                                             <div className="text-[11px] text-muted-foreground">
                                                 {formatDateTime(t.approved_at)}
                                             </div>
@@ -464,9 +647,12 @@ export default function ViewTimesheetDialog({
                                             <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-muted-foreground text-white shadow">
                                                 <MessageSquareWarning className="h-2.5 w-2.5" />
                                             </span>
-                                            <div className="text-[12.5px] font-semibold">Archived</div>
+                                            <div className="text-[12.5px] font-semibold">
+                                                Archived
+                                            </div>
                                             <div className="text-[11px] text-muted-foreground">
-                                                {t.archived_reason ?? 'Archived from row menu'}
+                                                {t.archived_reason ??
+                                                    'Archived from row menu'}
                                             </div>
                                         </li>
                                     ) : null}
@@ -498,7 +684,9 @@ export default function ViewTimesheetDialog({
                                         variant="outline"
                                         size="sm"
                                         className="gap-1.5 border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
-                                        onClick={() => setReasonAction('reject')}
+                                        onClick={() =>
+                                            setReasonAction('reject')
+                                        }
                                         disabled={busy}
                                     >
                                         <XCircle className="h-4 w-4" /> Reject
@@ -507,18 +695,28 @@ export default function ViewTimesheetDialog({
                                         variant="outline"
                                         size="sm"
                                         className="gap-1.5 border-status-warning/30 text-status-warning hover:bg-status-warning-bg"
-                                        onClick={() => setReasonAction('return')}
+                                        onClick={() =>
+                                            setReasonAction('return')
+                                        }
                                         disabled={busy}
                                     >
-                                        <RotateCcw className="h-4 w-4" /> Return for changes
+                                        <RotateCcw className="h-4 w-4" /> Return
+                                        for changes
                                     </Button>
                                     <Button
                                         size="sm"
                                         className="gap-1.5 bg-status-success text-white hover:bg-status-success/90"
-                                        onClick={() => call('post', `/operations/timesheets/${t.id}/approve`, {})}
+                                        onClick={() =>
+                                            call(
+                                                'post',
+                                                `/operations/timesheets/${t.id}/approve`,
+                                                {},
+                                            )
+                                        }
                                         disabled={busy}
                                     >
-                                        <CheckCircle2 className="h-4 w-4" /> Approve
+                                        <CheckCircle2 className="h-4 w-4" />{' '}
+                                        Approve
                                     </Button>
                                 </>
                             ) : null}
@@ -526,13 +724,23 @@ export default function ViewTimesheetDialog({
                                 <Button
                                     size="sm"
                                     className="gap-1.5"
-                                    onClick={() => call('post', `/operations/timesheets/${t.id}/submit`, {})}
+                                    onClick={() =>
+                                        call(
+                                            'post',
+                                            `/operations/timesheets/${t.id}/submit`,
+                                            {},
+                                        )
+                                    }
                                     disabled={busy}
                                 >
-                                    <Send className="h-4 w-4" /> Submit for approval
+                                    <Send className="h-4 w-4" /> Submit for
+                                    approval
                                 </Button>
                             ) : null}
-                            <Button size="sm" onClick={() => onOpenChange(false)}>
+                            <Button
+                                size="sm"
+                                onClick={() => onOpenChange(false)}
+                            >
                                 Close
                             </Button>
                         </div>
@@ -543,20 +751,36 @@ export default function ViewTimesheetDialog({
             <ReasonDialog
                 open={reasonAction !== null}
                 onClose={() => setReasonAction(null)}
-                title={reasonAction === 'reject' ? 'Reject timesheet?' : 'Return for changes?'}
+                title={
+                    reasonAction === 'reject'
+                        ? 'Reject timesheet?'
+                        : 'Return for changes?'
+                }
                 description={
                     reasonAction === 'reject'
                         ? 'The staff member will see this timesheet as rejected, with your reason.'
                         : 'The timesheet goes back to the staff member to fix and resubmit.'
                 }
-                label={reasonAction === 'reject' ? 'Reason for rejection' : 'What needs changing?'}
-                confirmLabel={reasonAction === 'reject' ? 'Reject timesheet' : 'Return to staff'}
+                label={
+                    reasonAction === 'reject'
+                        ? 'Reason for rejection'
+                        : 'What needs changing?'
+                }
+                confirmLabel={
+                    reasonAction === 'reject'
+                        ? 'Reject timesheet'
+                        : 'Return to staff'
+                }
                 destructive={reasonAction === 'reject'}
                 onConfirm={(reason) => {
                     if (reasonAction === 'reject') {
-                        call('post', `/operations/timesheets/${t.id}/reject`, { decision_notes: reason });
+                        call('post', `/operations/timesheets/${t.id}/reject`, {
+                            decision_notes: reason,
+                        });
                     } else {
-                        call('post', `/operations/timesheets/${t.id}/return`, { returned_notes: reason });
+                        call('post', `/operations/timesheets/${t.id}/return`, {
+                            returned_notes: reason,
+                        });
                     }
                     setReasonAction(null);
                 }}

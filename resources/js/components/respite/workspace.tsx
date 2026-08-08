@@ -7,13 +7,14 @@ import {
     AddClientDialog,
     type ClientWizardForm,
 } from '@/components/clients/add-client-dialog';
+import { RestraintEventWizard } from '@/components/health-safety/restraint-event-wizard';
 import {
     PageHero,
     type PageHeroBadge,
     type PageHeroMetaItem,
     type PageHeroStat,
 } from '@/components/page';
-import { RestraintEventWizard } from '@/components/health-safety/restraint-event-wizard';
+import { ReasonDialog } from '@/components/reason-dialog';
 import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
 import { Button } from '@/components/ui/button';
 import { router, usePage } from '@inertiajs/react';
@@ -36,7 +37,6 @@ import { respiteActions } from './actions';
 import { RespiteDetailModal, type RespiteDetail } from './detail-modal';
 import { ConfirmBookingModal } from './modals/booking-confirm';
 import { OnboardModal } from './modals/onboard';
-import { ReasonDialog } from '@/components/reason-dialog';
 import { ReferralIntakeModal } from './modals/referral-intake';
 import { RequestIntakeModal } from './modals/request-intake';
 import {
@@ -55,8 +55,8 @@ import { StaysPane } from './panes/stays';
 import { TasksPane } from './panes/tasks';
 import {
     RESPITE_TABS,
-    type RespiteCan,
     type RespiteBookingRow,
+    type RespiteCan,
     type RespiteReferralRow,
     type RespiteRequestRow,
     type RespiteStayRow,
@@ -64,10 +64,7 @@ import {
     type RespiteWorkspaceData,
 } from './types';
 
-type ReasonKind =
-    | 'decline'
-    | 'reject'
-    | 'fundingOverride';
+type ReasonKind = 'decline' | 'reject' | 'fundingOverride';
 
 type ProfileCompletionTarget = {
     clientId: number;
@@ -135,15 +132,18 @@ export function RespiteWorkspace({
         useState<RespiteBookingRow | null>(null);
     const [checkInStay, setCheckInStay] = useState<RespiteStayRow | null>(null);
     const [medRecStay, setMedRecStay] = useState<RespiteStayRow | null>(null);
-    const [restraintStay, setRestraintStay] =
-        useState<RespiteStayRow | null>(null);
+    const [restraintStay, setRestraintStay] = useState<RespiteStayRow | null>(
+        null,
+    );
     const [incidentStay, setIncidentStay] = useState<RespiteStayRow | null>(
         null,
     );
-    const [dischargeStay, setDischargeStay] =
-        useState<RespiteStayRow | null>(null);
-    const [complaintStay, setComplaintStay] =
-        useState<RespiteStayRow | null>(null);
+    const [dischargeStay, setDischargeStay] = useState<RespiteStayRow | null>(
+        null,
+    );
+    const [complaintStay, setComplaintStay] = useState<RespiteStayRow | null>(
+        null,
+    );
     const [reasonAction, setReasonAction] = useState<{
         kind: ReasonKind;
         id: number;

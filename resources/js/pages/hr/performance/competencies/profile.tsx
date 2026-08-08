@@ -1,4 +1,6 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
+import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Table,
@@ -8,13 +10,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { FileText, Paperclip } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 interface RadarPoint {
     competency: string;
@@ -102,7 +102,8 @@ export default function CompetencyProfile({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref="/hr/performance/competencies"
                         title={employee.name}
@@ -401,7 +402,11 @@ function AssessmentEvidence({
         router.post(
             `/hr/performance/competencies/assessments/${assessment.id}/evidence`,
             fd,
-            { forceFormData: true, preserveScroll: true, onFinish: () => setUploading(false) },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onFinish: () => setUploading(false),
+            },
         );
     };
 
@@ -422,15 +427,24 @@ function AssessmentEvidence({
             )}
             {canManage && (
                 <>
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         onClick={() => inputRef.current?.click()}
                         disabled={uploading}
                         className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-xs font-semibold disabled:opacity-50"
-                        title={assessment.has_evidence ? 'Replace evidence' : 'Attach evidence'}
+                        title={
+                            assessment.has_evidence
+                                ? 'Replace evidence'
+                                : 'Attach evidence'
+                        }
                     >
                         <Paperclip className="h-3 w-3" />
-                        {uploading ? '…' : assessment.has_evidence ? 'Replace' : 'Attach'}
+                        {uploading
+                            ? '…'
+                            : assessment.has_evidence
+                              ? 'Replace'
+                              : 'Attach'}
                     </GuardrailButton>
                     <input
                         ref={inputRef}

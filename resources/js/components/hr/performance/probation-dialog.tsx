@@ -41,7 +41,12 @@ export interface ExistingProbationReview {
 
 const STEPS: readonly WizardStep[] = [
     { key: 'review', label: 'Review', blurb: 'Who & when', icon: ShieldCheck },
-    { key: 'outcome', label: 'Outcome', blurb: 'Assessment & recommendation', icon: ClipboardCheck },
+    {
+        key: 'outcome',
+        label: 'Outcome',
+        blurb: 'Assessment & recommendation',
+        icon: ClipboardCheck,
+    },
 ];
 
 const STATUS_OPTIONS = [
@@ -102,11 +107,15 @@ export function ProbationDialog({
             : review?.employee_user_id
               ? String(review.employee_user_id)
               : '',
-        review_number: review?.review_number ? String(review.review_number) : '1',
+        review_number: review?.review_number
+            ? String(review.review_number)
+            : '1',
         review_date: review?.review_date ?? '',
         status: review?.status ?? 'scheduled',
         recommendation: review?.recommendation ?? '',
-        extension_weeks: review?.extension_weeks ? String(review.extension_weeks) : '',
+        extension_weeks: review?.extension_weeks
+            ? String(review.extension_weeks)
+            : '',
         concerns: review?.concerns ?? '',
         areas_text: toLines(review?.areas_assessed),
         notes: review?.notes ?? '',
@@ -147,7 +156,8 @@ export function ProbationDialog({
                 data.recommendation === '' || data.recommendation === NO_REC
                     ? null
                     : data.recommendation,
-            extension_weeks: data.extension_weeks === '' ? null : data.extension_weeks,
+            extension_weeks:
+                data.extension_weeks === '' ? null : data.extension_weeks,
             areas_assessed: fromLines(data.areas_text),
         }));
 
@@ -272,7 +282,10 @@ export function ProbationDialog({
                                 min="1"
                                 value={form.data.review_number}
                                 onChange={(e) =>
-                                    form.setData('review_number', e.target.value)
+                                    form.setData(
+                                        'review_number',
+                                        e.target.value,
+                                    )
                                 }
                                 disabled={isEdit}
                             />
@@ -290,7 +303,11 @@ export function ProbationDialog({
                                 }
                             />
                         </Field>
-                        <Field label="Status" required error={form.errors.status}>
+                        <Field
+                            label="Status"
+                            required
+                            error={form.errors.status}
+                        >
                             <SelectInput
                                 value={form.data.status}
                                 onChange={(v) => form.setData('status', v)}
@@ -354,10 +371,16 @@ export function ProbationDialog({
                                 onChange={(e) =>
                                     form.setData('areas_text', e.target.value)
                                 }
-                                placeholder={'Punctuality\nMedication competency\nTeamwork'}
+                                placeholder={
+                                    'Punctuality\nMedication competency\nTeamwork'
+                                }
                             />
                         </Field>
-                        <Field label="Concerns" hint="optional" error={form.errors.concerns}>
+                        <Field
+                            label="Concerns"
+                            hint="optional"
+                            error={form.errors.concerns}
+                        >
                             <Textarea
                                 rows={2}
                                 value={form.data.concerns}
@@ -366,7 +389,11 @@ export function ProbationDialog({
                                 }
                             />
                         </Field>
-                        <Field label="Notes" hint="optional" error={form.errors.notes}>
+                        <Field
+                            label="Notes"
+                            hint="optional"
+                            error={form.errors.notes}
+                        >
                             <Textarea
                                 rows={2}
                                 value={form.data.notes}

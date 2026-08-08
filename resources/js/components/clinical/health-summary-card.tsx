@@ -1,5 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Activity,
     AlertTriangle,
@@ -7,19 +7,17 @@ import {
     Heart,
     Moon,
     Scale,
-    Thermometer,
 } from 'lucide-react';
 
 export interface HealthSummary {
     latest_observations: Record<
         string,
-        | {
-              id: number;
-              recorded_at: string;
-              data: Record<string, any>;
-              recorded_by: number;
-          }
-        | null
+        {
+            id: number;
+            recorded_at: string;
+            data: Record<string, any>;
+            recorded_by: number;
+        } | null
     >;
     recent_events: {
         count: number;
@@ -85,9 +83,7 @@ function ObsRow({
     );
 }
 
-function formatVitals(
-    data: Record<string, any> | undefined,
-): string | null {
+function formatVitals(data: Record<string, any> | undefined): string | null {
     if (!data) return null;
     const parts: string[] = [];
     if (data.systolic && data.diastolic)
@@ -104,8 +100,11 @@ export default function HealthSummaryCard({
 }) {
     if (!summary) return null;
 
-    const { latest_observations: obs, recent_events: events, protocol_compliance: compliance } =
-        summary;
+    const {
+        latest_observations: obs,
+        recent_events: events,
+        protocol_compliance: compliance,
+    } = summary;
 
     const vitals = obs.vitals;
     const weight = obs.weight;

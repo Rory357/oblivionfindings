@@ -35,7 +35,10 @@ function persistRecent(list: RecentClient[]) {
     }
 }
 
-export default function RecentClientsStrip({ currentClient, currentTab }: Props) {
+export default function RecentClientsStrip({
+    currentClient,
+    currentTab,
+}: Props) {
     const [recents, setRecents] = useState<RecentClient[]>(() => loadRecent());
 
     useEffect(() => {
@@ -59,7 +62,7 @@ export default function RecentClientsStrip({ currentClient, currentTab }: Props)
 
     return (
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
                 Recent
             </span>
             {others.map((c) => (

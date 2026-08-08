@@ -13,6 +13,7 @@ import {
     Clock,
     Download,
     Inbox,
+    LockKeyhole,
     Server,
     Star,
     TriangleAlert,
@@ -101,10 +102,11 @@ interface ReportData {
         href?: string;
     };
     automation_outcomes: {
-        succeeded: number;
-        failed: number;
-        skipped: number;
-        href?: string;
+        access?: 'allowed' | 'restricted';
+        succeeded: number | null;
+        failed: number | null;
+        skipped: number | null;
+        href?: string | null;
     };
     service_reliability: Array<{
         service_id: number;
@@ -116,10 +118,11 @@ interface ReportData {
         href: string;
     }>;
     device_reliability: {
-        affected_devices: number;
-        open_incidents: number;
-        recovered: number;
-        href?: string;
+        access?: 'allowed' | 'restricted';
+        affected_devices: number | null;
+        open_incidents: number | null;
+        recovered: number | null;
+        href?: string | null;
     };
     quality: Record<string, DrillMetric>;
 }
@@ -250,9 +253,24 @@ export function ItReports() {
         (data.kpis.open > 0 ||
             data.kpis.resolved > 0 ||
             data.provisioning.raised > 0 ||
+            data.provisioning.fulfilled > 0 ||
             data.major_incidents.declared > 0 ||
-            data.automation_outcomes.succeeded > 0 ||
-            data.automation_outcomes.failed > 0 ||
+            data.major_incidents.restored > 0 ||
+            data.major_incidents.open > 0 ||
+            data.change_success.successful > 0 ||
+            data.change_success.failed > 0 ||
+            data.change_success.inconclusive > 0 ||
+            data.recurring_problems.total > 0 ||
+            data.recurring_problems.known_errors > 0 ||
+            data.recurring_problems.root_causes > 0 ||
+            data.automation_outcomes.access === 'restricted' ||
+            data.device_reliability.access === 'restricted' ||
+            (data.automation_outcomes.succeeded ?? 0) > 0 ||
+            (data.automation_outcomes.failed ?? 0) > 0 ||
+            (data.automation_outcomes.skipped ?? 0) > 0 ||
+            (data.device_reliability.affected_devices ?? 0) > 0 ||
+            (data.device_reliability.open_incidents ?? 0) > 0 ||
+            (data.device_reliability.recovered ?? 0) > 0 ||
             data.service_reliability.some((service) => service.tickets > 0) ||
             data.trend.some((t) => t.created > 0 || t.resolved > 0));
 
@@ -660,20 +678,38 @@ export function ItReports() {
                                         href: data.recurring_problems.href,
                                     },
                                     {
-                                        name: 'Automation runs',
-                                        value: String(
-                                            data.automation_outcomes.succeeded,
-                                        ),
-                                        sub: `${data.automation_outcomes.failed} failed · ${data.automation_outcomes.skipped} skipped`,
-                                        href: data.automation_outcomes.href,
+                                        name:
+                                            data.automation_outcomes.access ===
+                                            'restricted'
+                                                ? 'Automation outcomes'
+                                                : 'Successful automation runs',
+                                        value:
+                                            data.automation_outcomes.access ===
+                                            'restricted'
+                                                ? 'Restricted'
+                                                : String(
+                                                      data.automation_outcomes
+                                                          .succeeded ?? 0,
+                                                  ),
+                                        sub:
+                                            data.automation_outcomes.access ===
+                                            'restricted'
+                                                ? 'IT management access is required to view application-wide automation outcomes.'
+                                                : `${data.automation_outcomes.failed ?? 0} failed · ${data.automation_outcomes.skipped ?? 0} skipped`,
+                                        href:
+                                            data.automation_outcomes.href ??
+                                            undefined,
+                                        restricted:
+                                            data.automation_outcomes.access ===
+                                            'restricted',
                                     },
                                 ]}
                             />
                         </ReportSection>
 
                         <ReportSection
-                            title="Service & device reliability"
-                            blurb="Ticket demand joined to the services and monitored devices that caused it."
+                            title="Service & Device context"
+                            blurb="Ticket demand joined to its recorded service and canonical Device context."
                         >
                             <Card title="Services" icon={Activity}>
                                 <MetricLinks
@@ -689,16 +725,34 @@ export function ItReports() {
                                 />
                             </Card>
                             <OutcomeCard
-                                title="Monitored devices"
+                                title="Device-linked incidents"
                                 rows={[
                                     {
-                                        name: 'Affected devices',
-                                        value: String(
-                                            data.device_reliability
-                                                .affected_devices,
-                                        ),
-                                        sub: `${data.device_reliability.open_incidents} open incidents · ${data.device_reliability.recovered} recovered`,
-                                        href: data.device_reliability.href,
+                                        name:
+                                            data.device_reliability.access ===
+                                            'restricted'
+                                                ? 'Device context'
+                                                : 'Affected Devices',
+                                        value:
+                                            data.device_reliability.access ===
+                                            'restricted'
+                                                ? 'Restricted'
+                                                : String(
+                                                      data.device_reliability
+                                                          .affected_devices ??
+                                                          0,
+                                                  ),
+                                        sub:
+                                            data.device_reliability.access ===
+                                            'restricted'
+                                                ? 'Security & Devices access is required to view canonical Device-linked counts.'
+                                                : `${data.device_reliability.open_incidents ?? 0} open incidents · ${data.device_reliability.recovered ?? 0} recovered incidents`,
+                                        href:
+                                            data.device_reliability.href ??
+                                            undefined,
+                                        restricted:
+                                            data.device_reliability.access ===
+                                            'restricted',
                                     },
                                 ]}
                             />
@@ -801,7 +855,13 @@ function OutcomeCard({
     rows,
 }: {
     title: string;
-    rows: Array<{ name: string; value: string; sub: string; href?: string }>;
+    rows: Array<{
+        name: string;
+        value: string;
+        sub: string;
+        href?: string;
+        restricted?: boolean;
+    }>;
 }) {
     return (
         <Card title={title} icon={Activity}>
@@ -812,7 +872,13 @@ function OutcomeCard({
                             <span className="text-[11.5px] font-semibold text-muted-foreground">
                                 {row.name}
                             </span>
-                            <span className="mt-1 block text-[20px] leading-none font-bold">
+                            <span className="mt-1 flex items-center gap-1.5 text-[20px] leading-none font-bold">
+                                {row.restricted ? (
+                                    <LockKeyhole
+                                        className="h-4 w-4"
+                                        aria-hidden="true"
+                                    />
+                                ) : null}
                                 {row.value}
                             </span>
                             <span className="mt-1 block text-[11px] text-muted-foreground">

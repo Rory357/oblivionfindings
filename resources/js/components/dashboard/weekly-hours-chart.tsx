@@ -1,6 +1,13 @@
 import { Badge } from '@/components/ui/badge';
 import { useMemo } from 'react';
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+    Bar,
+    BarChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
 type WeeklyHoursChartProps = {
     dailyHours: Record<string, number>;
@@ -10,7 +17,11 @@ type WeeklyHoursChartProps = {
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export function WeeklyHoursChart({ dailyHours, totalHours, weekStart }: WeeklyHoursChartProps) {
+export function WeeklyHoursChart({
+    dailyHours,
+    totalHours,
+    weekStart,
+}: WeeklyHoursChartProps) {
     const chartData = useMemo(() => {
         if (!weekStart) {
             // Build from keys directly
@@ -49,22 +60,34 @@ export function WeeklyHoursChart({ dailyHours, totalHours, weekStart }: WeeklyHo
             </div>
 
             <ResponsiveContainer width="100%" height={140}>
-                <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: -24 }}>
+                <BarChart
+                    data={chartData}
+                    margin={{ top: 0, right: 0, bottom: 0, left: -24 }}
+                >
                     <XAxis
                         dataKey="day"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{
+                            fontSize: 11,
+                            fill: 'hsl(var(--muted-foreground))',
+                        }}
                     />
                     <YAxis
                         domain={[0, maxHours]}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{
+                            fontSize: 10,
+                            fill: 'hsl(var(--muted-foreground))',
+                        }}
                         width={32}
                     />
                     <Tooltip
-                        formatter={(value: any) => [`${Number(value).toFixed(1)}h`, 'Hours']}
+                        formatter={(value: any) => [
+                            `${Number(value).toFixed(1)}h`,
+                            'Hours',
+                        ]}
                         contentStyle={{
                             backgroundColor: 'hsl(var(--card))',
                             border: '1px solid hsl(var(--border))',

@@ -7,20 +7,25 @@ import {
     ChevronRight,
     ClipboardCheck,
     LayoutGrid,
-    Plus,
     PlayCircle,
+    Plus,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { WeekPicker } from '@/components/rostering/week-picker';
 import { Button } from '@/components/ui/button';
 
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { catColorVar } from './category';
 import { useChecklistConfig } from './context';
 import type { WeekInfo } from './hero-footer';
-import { Dropdown, SearchInput, StatusBadge, type DropdownOption } from './primitives';
+import {
+    Dropdown,
+    SearchInput,
+    StatusBadge,
+    type DropdownOption,
+} from './primitives';
 import type { ChecklistStats, SiteRef } from './types';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 export function ChecklistsEmbeddedHeader({
     stats,
@@ -77,19 +82,33 @@ export function ChecklistsEmbeddedHeader({
                     </span>
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold">Checklists</h3>
+                            <h3 className="text-base font-semibold">
+                                Checklists
+                            </h3>
                             <span className="text-sm text-muted-foreground">
                                 {site?.name ?? 'All sites'}
                             </span>
                         </div>
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                            <StatusBadge tone={stats.onTrack >= 90 ? 'success' : 'warning'}>
+                            <StatusBadge
+                                tone={
+                                    stats.onTrack >= 90 ? 'success' : 'warning'
+                                }
+                            >
                                 On-track {stats.onTrack}%
                             </StatusBadge>
-                            <StatusBadge tone={stats.dueToday > 0 ? 'warning' : 'neutral'}>
+                            <StatusBadge
+                                tone={
+                                    stats.dueToday > 0 ? 'warning' : 'neutral'
+                                }
+                            >
                                 Due today {stats.dueToday}
                             </StatusBadge>
-                            <StatusBadge tone={stats.overdue > 0 ? 'critical' : 'neutral'}>
+                            <StatusBadge
+                                tone={
+                                    stats.overdue > 0 ? 'critical' : 'neutral'
+                                }
+                            >
                                 Overdue {stats.overdue}
                             </StatusBadge>
                         </div>
@@ -110,7 +129,12 @@ export function ChecklistsEmbeddedHeader({
                         </Button>
                     ) : null}
                     {can.manageTemplates ? (
-                        <Button type="button" size="sm" variant="secondary" onClick={onNewTemplate}>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={onNewTemplate}
+                        >
                             <Plus className="h-4 w-4" />
                             New template
                         </Button>
@@ -120,15 +144,19 @@ export function ChecklistsEmbeddedHeader({
 
             <div className="mt-3 flex flex-col gap-2 border-t pt-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <Button unstyled
+                    <Button
+                        unstyled
                         type="button"
                         onClick={onPrevWeek}
                         className="inline-flex h-9 items-center gap-1 rounded-md border bg-card px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent/50"
                     >
                         <ChevronLeft className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">{week.prevLabel}</span>
+                        <span className="hidden sm:inline">
+                            {week.prevLabel}
+                        </span>
                     </Button>
-                    <Button unstyled
+                    <Button
+                        unstyled
                         ref={weekBtnRef}
                         type="button"
                         onClick={() => setPickerOpen((value) => !value)}
@@ -139,16 +167,22 @@ export function ChecklistsEmbeddedHeader({
                         <CalendarRange className="h-3.5 w-3.5" />
                         <span>
                             {week.label}
-                            <span className="text-muted-foreground"> · {week.range}</span>
+                            <span className="text-muted-foreground">
+                                {' '}
+                                · {week.range}
+                            </span>
                         </span>
                         <ChevronDown className="h-3 w-3 text-muted-foreground" />
                     </Button>
-                    <Button unstyled
+                    <Button
+                        unstyled
                         type="button"
                         onClick={onNextWeek}
                         className="inline-flex h-9 items-center gap-1 rounded-md border bg-card px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent/50"
                     >
-                        <span className="hidden sm:inline">{week.nextLabel}</span>
+                        <span className="hidden sm:inline">
+                            {week.nextLabel}
+                        </span>
                         <ChevronRight className="h-3.5 w-3.5" />
                     </Button>
                     {pickerOpen ? (
@@ -170,7 +204,11 @@ export function ChecklistsEmbeddedHeader({
                     <SearchInput
                         value={query}
                         onChange={onQuery}
-                        placeholder={site ? `Search ${site.name}...` : 'Search checklists...'}
+                        placeholder={
+                            site
+                                ? `Search ${site.name}...`
+                                : 'Search checklists...'
+                        }
                         className="min-w-0 flex-1 md:w-56 md:flex-none"
                     />
                     <Dropdown

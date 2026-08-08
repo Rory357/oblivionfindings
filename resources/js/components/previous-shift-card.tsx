@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { formatRelative, formatTime } from '@/lib/datetime';
 import { show as showShift } from '@/routes/operations/shifts';
 
-import type { RosterShift } from './roster/types';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import type { RosterShift } from './roster/types';
 
 export type PreviousShift = RosterShift & {
     handover_sent: boolean;
@@ -42,7 +42,10 @@ export default function PreviousShiftCard({ shift }: { shift: PreviousShift }) {
                     </p>
 
                     <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                        <GuardrailCard unstyled className="rounded-lg border bg-background/80 p-3 text-sm">
+                        <GuardrailCard
+                            unstyled
+                            className="rounded-lg border bg-background/80 p-3 text-sm"
+                        >
                             <div className="flex items-center gap-2 font-medium">
                                 <FileText className="h-4 w-4 text-muted-foreground" />
                                 Handover
@@ -51,7 +54,10 @@ export default function PreviousShiftCard({ shift }: { shift: PreviousShift }) {
                                 {shift.handover_sent ? 'Sent' : 'Missing'}
                             </p>
                         </GuardrailCard>
-                        <GuardrailCard unstyled className="rounded-lg border bg-background/80 p-3 text-sm">
+                        <GuardrailCard
+                            unstyled
+                            className="rounded-lg border bg-background/80 p-3 text-sm"
+                        >
                             <div className="flex items-center gap-2 font-medium">
                                 <Clock className="h-4 w-4 text-muted-foreground" />
                                 Timesheet
@@ -60,7 +66,10 @@ export default function PreviousShiftCard({ shift }: { shift: PreviousShift }) {
                                 {timesheetStatus.replace(/_/g, ' ')}
                             </p>
                         </GuardrailCard>
-                        <GuardrailCard unstyled className="rounded-lg border bg-background/80 p-3 text-sm">
+                        <GuardrailCard
+                            unstyled
+                            className="rounded-lg border bg-background/80 p-3 text-sm"
+                        >
                             <div className="flex items-center gap-2 font-medium">
                                 <ListTodo className="h-4 w-4 text-muted-foreground" />
                                 Tasks

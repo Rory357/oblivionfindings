@@ -14,7 +14,11 @@ export type PageHeroAvatarPopover = {
     /** Primary call-to-action — usually "Open profile". */
     primaryAction?: { label: string; href: string };
     /** 2-column grid of secondary quick actions. */
-    actions?: { icon: ComponentType<{ className?: string }>; label: string; href: string }[];
+    actions?: {
+        icon: ComponentType<{ className?: string }>;
+        label: string;
+        href: string;
+    }[];
 };
 
 export type PageHeroStackAvatar = {
@@ -43,7 +47,11 @@ interface PageHeroAvatarStackProps {
  *
  * Visual-only. The page renders this through `PageHero.avatarStack`.
  */
-export function PageHeroAvatarStack({ residents, max = 3, className }: PageHeroAvatarStackProps) {
+export function PageHeroAvatarStack({
+    residents,
+    max = 3,
+    className,
+}: PageHeroAvatarStackProps) {
     const [hoverIdx, setHoverIdx] = useState<number | null>(null);
     const visible = residents.slice(0, max);
     const extra = residents.length - visible.length;
@@ -60,7 +68,9 @@ export function PageHeroAvatarStack({ residents, max = 3, className }: PageHeroA
                     isHover={hoverIdx === i}
                     anyHover={anyHover}
                     onEnter={() => setHoverIdx(i)}
-                    onLeave={() => setHoverIdx((cur) => (cur === i ? null : cur))}
+                    onLeave={() =>
+                        setHoverIdx((cur) => (cur === i ? null : cur))
+                    }
                 />
             ))}
             {extra > 0 ? (
@@ -88,7 +98,15 @@ interface StackedAvatarProps {
     onLeave: () => void;
 }
 
-function StackedAvatar({ resident, index, total, isHover, anyHover, onEnter, onLeave }: StackedAvatarProps) {
+function StackedAvatar({
+    resident,
+    index,
+    total,
+    isHover,
+    anyHover,
+    onEnter,
+    onLeave,
+}: StackedAvatarProps) {
     const background = `oklch(0.85 0.10 ${resident.hue})`;
     const foreground = `oklch(0.28 0.16 ${resident.hue})`;
     return (
@@ -112,7 +130,8 @@ function StackedAvatar({ resident, index, total, isHover, anyHover, onEnter, onL
                     'flex h-[76px] w-[76px] cursor-pointer items-center justify-center rounded-full',
                     'border-4 border-primary-foreground/20 text-2xl font-semibold',
                     'shadow-[0_6px_22px_-8px_rgba(0,0,0,0.30)] transition-shadow duration-200',
-                    isHover && 'shadow-[0_14px_30px_-10px_rgba(0,0,0,0.45),0_0_0_3px_var(--primary-foreground)]',
+                    isHover &&
+                        'shadow-[0_14px_30px_-10px_rgba(0,0,0,0.45),0_0_0_3px_var(--primary-foreground)]',
                 )}
                 style={{ background, color: foreground }}
             >
@@ -120,7 +139,11 @@ function StackedAvatar({ resident, index, total, isHover, anyHover, onEnter, onL
             </button>
 
             {isHover && resident.popover ? (
-                <AvatarPopoverContent popover={resident.popover} initials={resident.initials} hue={resident.hue} />
+                <AvatarPopoverContent
+                    popover={resident.popover}
+                    initials={resident.initials}
+                    hue={resident.hue}
+                />
             ) : null}
         </div>
     );
@@ -137,19 +160,19 @@ export function AvatarPopoverContent({
 }) {
     return (
         <div
-            className="absolute left-1/2 top-full z-[100] w-[260px] -translate-x-1/2 pt-3"
+            className="absolute top-full left-1/2 z-[100] w-[260px] -translate-x-1/2 pt-3"
             onMouseDown={(e) => e.stopPropagation()}
         >
             <div
                 className={cn(
                     'relative rounded-xl border border-border bg-popover p-3.5 text-popover-foreground',
                     'shadow-[0_18px_50px_-12px_rgba(0,0,0,0.30),0_4px_12px_-4px_rgba(0,0,0,0.18)]',
-                    'animate-in fade-in-0 slide-in-from-top-2 duration-150',
+                    'animate-in duration-150 fade-in-0 slide-in-from-top-2',
                 )}
             >
                 {/* arrow */}
                 <div
-                    className="absolute -top-[7px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t border-border bg-popover"
+                    className="absolute -top-[7px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-t border-l border-border bg-popover"
                     aria-hidden="true"
                 />
 
@@ -164,16 +187,23 @@ export function AvatarPopoverContent({
                         {initials}
                     </div>
                     <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold tracking-tight text-foreground">{popover.title}</div>
+                        <div className="truncate text-sm font-semibold tracking-tight text-foreground">
+                            {popover.title}
+                        </div>
                         {popover.subtitle ? (
-                            <div className="text-[11.5px] text-muted-foreground">{popover.subtitle}</div>
+                            <div className="text-[11.5px] text-muted-foreground">
+                                {popover.subtitle}
+                            </div>
                         ) : null}
                     </div>
                 </div>
 
                 {popover.note ? (
                     <div className="mb-2.5 rounded-md border-l-2 border-primary bg-muted px-2.5 py-2 text-[11.5px] leading-snug text-muted-foreground">
-                        <span className="font-medium text-foreground">Care note:</span> {popover.note}
+                        <span className="font-medium text-foreground">
+                            Care note:
+                        </span>{' '}
+                        {popover.note}
                     </div>
                 ) : null}
 
@@ -182,7 +212,9 @@ export function AvatarPopoverContent({
                         href={popover.primaryAction.href}
                         className="mb-2 flex items-center gap-2 rounded-md bg-primary px-2.5 py-2 text-[12.5px] font-semibold text-primary-foreground"
                     >
-                        <span className="flex-1">{popover.primaryAction.label}</span>
+                        <span className="flex-1">
+                            {popover.primaryAction.label}
+                        </span>
                         <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
                 ) : null}

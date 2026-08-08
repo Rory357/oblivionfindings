@@ -73,9 +73,7 @@ export const STALE_MS = 16 * 60 * 60 * 1000;
 export function minutesBetween(a: Date | string, b: Date | string): number {
     return Math.max(
         0,
-        Math.round(
-            (new Date(b).getTime() - new Date(a).getTime()) / 60000,
-        ),
+        Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000),
     );
 }
 

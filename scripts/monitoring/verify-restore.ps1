@@ -1,16 +1,46 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)] [string] $MySqlDsn,
-    [Parameter(Mandatory)] [string] $RedisUrl,
-    [Parameter(Mandatory)] [string] $InfluxUrl,
-    [Parameter(Mandatory)] [string] $VaultUrl,
     [Parameter(Mandatory)] [string] $ObjectDisk,
+    [Parameter(Mandatory)]
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')]
+    [string] $BackupGeneration,
+    [Parameter(Mandatory)] [DateTimeOffset] $RecoveryPointUtc,
+    [Parameter(Mandatory)] [DateTimeOffset] $RecoveryStartedAtUtc,
+    [Parameter(Mandatory)] [ValidateRange(1, 10080)] [int] $MaximumRpoMinutes,
+    [Parameter(Mandatory)] [ValidateRange(1, 10080)] [int] $MaximumRtoMinutes,
     [switch] $AllowProductionReadOnly,
     [string] $ApplicationPath = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$verificationStartedAtUtc = [DateTimeOffset]::UtcNow
+
+if ($RecoveryPointUtc.Offset -ne [TimeSpan]::Zero -or $RecoveryStartedAtUtc.Offset -ne [TimeSpan]::Zero) {
+    throw 'RecoveryPointUtc and RecoveryStartedAtUtc must use an explicit UTC offset.'
+}
+if ($RecoveryPointUtc -gt $RecoveryStartedAtUtc) {
+    throw 'RecoveryPointUtc cannot be later than RecoveryStartedAtUtc.'
+}
+if ($RecoveryStartedAtUtc -gt $verificationStartedAtUtc) {
+    throw 'RecoveryStartedAtUtc cannot be later than the verifier start.'
+}
+
+function Get-RequiredProcessEnvironmentValue {
+    param([Parameter(Mandatory)] [string] $Name)
+
+    $value = [Environment]::GetEnvironmentVariable($Name, 'Process')
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        throw "Required restore-verification environment variable '$Name' is unavailable."
+    }
+
+    return $value
+}
+
+$MySqlDsn = Get-RequiredProcessEnvironmentValue -Name 'MONITORING_RESTORE_MYSQL_DSN'
+$RedisUrl = Get-RequiredProcessEnvironmentValue -Name 'MONITORING_RESTORE_REDIS_URL'
+$InfluxUrl = Get-RequiredProcessEnvironmentValue -Name 'MONITORING_RESTORE_INFLUX_URL'
+$VaultUrl = Get-RequiredProcessEnvironmentValue -Name 'MONITORING_RESTORE_VAULT_URL'
 
 function Get-ConnectionHost {
     param([Parameter(Mandatory)] [string] $Connection)
@@ -51,12 +81,17 @@ foreach ($connection in @($MySqlDsn, $RedisUrl, $InfluxUrl, $VaultUrl)) {
     }
 }
 
-if ($ObjectDisk -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$') {
-    throw 'ObjectDisk must be a configured private filesystem disk name.'
+if ($ObjectDisk -cne 'monitoring-restore') {
+    throw 'ObjectDisk must be the dedicated monitoring-restore filesystem disk.'
 }
 
 $resolvedApplication = (Resolve-Path -LiteralPath $ApplicationPath).Path
-$variables = @('APP_ENV', 'APP_DEBUG', 'DB_CONNECTION', 'DB_URL', 'REDIS_URL', 'MONITORING_TIMESERIES_URL', 'MONITORING_SNAPSHOT_DISK', 'MONITORING_CREDENTIAL_DRIVER', 'MONITORING_VAULT_URL')
+$isolatedConfigCache = Join-Path ([IO.Path]::GetTempPath()) ("oblivion-monitoring-restore-config-{0}.php" -f [Guid]::NewGuid().ToString('N'))
+if (Test-Path -LiteralPath $isolatedConfigCache) {
+    throw 'Unable to allocate an isolated restore-verification config cache path.'
+}
+
+$variables = @('APP_ENV', 'APP_DEBUG', 'APP_CONFIG_CACHE', 'DB_CONNECTION', 'DB_URL', 'REDIS_URL', 'MONITORING_TIMESERIES_URL', 'MONITORING_SNAPSHOT_DISK', 'MONITORING_CREDENTIAL_DRIVER', 'MONITORING_VAULT_URL')
 $previous = @{}
 foreach ($name in $variables) {
     $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -66,6 +101,7 @@ Push-Location $resolvedApplication
 try {
     [Environment]::SetEnvironmentVariable('APP_ENV', 'restore-verification', 'Process')
     [Environment]::SetEnvironmentVariable('APP_DEBUG', 'false', 'Process')
+    [Environment]::SetEnvironmentVariable('APP_CONFIG_CACHE', $isolatedConfigCache, 'Process')
     [Environment]::SetEnvironmentVariable('DB_CONNECTION', 'mysql', 'Process')
     [Environment]::SetEnvironmentVariable('DB_URL', $MySqlDsn, 'Process')
     [Environment]::SetEnvironmentVariable('REDIS_URL', $RedisUrl, 'Process')
@@ -74,12 +110,17 @@ try {
     [Environment]::SetEnvironmentVariable('MONITORING_CREDENTIAL_DRIVER', 'vault', 'Process')
     [Environment]::SetEnvironmentVariable('MONITORING_VAULT_URL', $VaultUrl, 'Process')
 
+    & php artisan monitoring:reconcile-restore --assert-process-config --config-only
+    if ($LASTEXITCODE -ne 0) {
+        throw "Restore process configuration preflight failed with exit code $LASTEXITCODE. No restored store was read."
+    }
+
     & php artisan migrate --pretend --force
     if ($LASTEXITCODE -ne 0) {
         throw "Migration compatibility check failed with exit code $LASTEXITCODE."
     }
 
-    $reportJson = (& php artisan monitoring:reconcile-restore --json 2>&1 | Out-String).Trim()
+    $reportJson = (& php artisan monitoring:reconcile-restore --json --assert-process-config 2>&1 | Out-String).Trim()
     $reconciliationExit = $LASTEXITCODE
     $report = $reportJson | ConvertFrom-Json
     $required = @(
@@ -102,24 +143,76 @@ try {
         'secret_manager_unavailable'
     )
     foreach ($key in $required) {
-        if ($report.PSObject.Properties.Name -notcontains $key) {
+        $property = $report.PSObject.Properties[$key]
+        if ($null -eq $property) {
             throw "Restore report is missing $key."
+        }
+        $value = $property.Value
+        if ($value -isnot [long] -or $value -lt 0) {
+            throw "Restore report field $key must be a non-negative integer."
         }
     }
 
+    $verificationCompletedAtUtc = [DateTimeOffset]::UtcNow
+    $rpoMinutes = ($RecoveryStartedAtUtc - $RecoveryPointUtc).TotalMinutes
+    $rtoMinutes = ($verificationCompletedAtUtc - $RecoveryStartedAtUtc).TotalMinutes
+    $recoveryObjectivesMet = $rpoMinutes -le $MaximumRpoMinutes -and $rtoMinutes -le $MaximumRtoMinutes
+    $evidence = [ordered]@{}
+    foreach ($key in $required) {
+        $evidence[$key] = [long] $report.$key
+    }
+    $evidence['checked_at'] = $report.checked_at
+    $evidence['backup_generation'] = $BackupGeneration
+    $evidence['recovery_point_utc'] = $RecoveryPointUtc.ToString('o', [Globalization.CultureInfo]::InvariantCulture)
+    $evidence['recovery_started_at_utc'] = $RecoveryStartedAtUtc.ToString('o', [Globalization.CultureInfo]::InvariantCulture)
+    $evidence['verification_started_at_utc'] = $verificationStartedAtUtc.ToString('o', [Globalization.CultureInfo]::InvariantCulture)
+    $evidence['verification_completed_at_utc'] = $verificationCompletedAtUtc.ToString('o', [Globalization.CultureInfo]::InvariantCulture)
+    $evidence['rpo_minutes'] = [Math]::Round($rpoMinutes, 3)
+    $evidence['rto_minutes'] = [Math]::Round($rtoMinutes, 3)
+    $evidence['maximum_rpo_minutes'] = $MaximumRpoMinutes
+    $evidence['maximum_rto_minutes'] = $MaximumRtoMinutes
+    $evidence['recovery_objectives_met'] = $recoveryObjectivesMet
+
     $outputDirectory = Join-Path $resolvedApplication 'output\monitoring\restore'
     New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
-    $outputPath = Join-Path $outputDirectory ("reconciliation-{0}.json" -f (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ'))
-    $report | ConvertTo-Json | Set-Content -LiteralPath $outputPath -Encoding utf8NoBOM
-
-    if ($reconciliationExit -ne 0 -or ($required | Where-Object { [int] $report.$_ -ne 0 }).Count -gt 0) {
-        throw "Restore reconciliation found continuity failures. Value-free report: $outputPath"
+    $evidenceTimestamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ', [Globalization.CultureInfo]::InvariantCulture)
+    $evidenceNonce = [Guid]::NewGuid().ToString('N')
+    $outputPath = Join-Path $outputDirectory ("reconciliation-{0}-{1}.json" -f $evidenceTimestamp, $evidenceNonce)
+    $evidenceBytes = [Text.UTF8Encoding]::new($false).GetBytes(($evidence | ConvertTo-Json))
+    $evidenceStream = $null
+    $evidenceCreated = $false
+    $evidenceCommitted = $false
+    try {
+        $evidenceStream = [IO.File]::Open($outputPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $evidenceCreated = $true
+        $evidenceStream.Write($evidenceBytes, 0, $evidenceBytes.Length)
+        $evidenceStream.Flush($true)
+        $evidenceStream.Dispose()
+        $evidenceStream = $null
+        $evidenceCommitted = $true
+    } finally {
+        if ($null -ne $evidenceStream) {
+            $evidenceStream.Dispose()
+        }
+        if ($evidenceCreated -and -not $evidenceCommitted -and (Test-Path -LiteralPath $outputPath)) {
+            Remove-Item -LiteralPath $outputPath -Force
+        }
     }
 
-    Write-Output "Restore reconciliation passed. Value-free report: $outputPath"
+    if ($reconciliationExit -ne 0 -or ($required | Where-Object { $report.$_ -ne 0 }).Count -gt 0) {
+        throw "Restore reconciliation found continuity failures. Value-free report: $outputPath"
+    }
+    if (-not $recoveryObjectivesMet) {
+        throw "Restore reconciliation exceeded the approved RPO or RTO. Value-free report: $outputPath"
+    }
+
+    Write-Output "Restore reconciliation and recovery objectives passed. Value-free report: $outputPath"
 } finally {
     Pop-Location
     foreach ($name in $variables) {
         [Environment]::SetEnvironmentVariable($name, $previous[$name], 'Process')
+    }
+    if (Test-Path -LiteralPath $isolatedConfigCache) {
+        Remove-Item -LiteralPath $isolatedConfigCache -Force
     }
 }

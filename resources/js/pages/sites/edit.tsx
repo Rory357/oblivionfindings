@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -8,17 +9,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { PageHero } from '@/components/page';
 import WizardStepper from '@/components/wizard-stepper';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import axios from 'axios';
-import {
-    ArrowLeft,
-    ArrowRight,
-    Check,
-    Loader2,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -116,8 +111,14 @@ const WORKFLOW_HELP = [
 ];
 
 export default function EditSite() {
-    const { site, users, checklistTemplates, availableAssets, regionOptions, labels } =
-        usePage<PageProps>().props;
+    const {
+        site,
+        users,
+        checklistTemplates,
+        availableAssets,
+        regionOptions,
+        labels,
+    } = usePage<PageProps>().props;
     const siteSingular = labels?.['site.singular'] ?? 'Site';
     const sitePlural = labels?.['site.plural'] ?? 'Sites';
 
@@ -178,39 +179,40 @@ export default function EditSite() {
         [site.checklist_assignments],
     );
 
-    const { data, setData, put, processing, errors, isDirty } = useForm<WizardData>({
-        name: site.name,
-        type: site.type,
-        brand_colour: site.brand_colour ?? '',
-        phone: site.phone ?? '',
-        email: site.email ?? '',
-        emergency_plan_location: site.emergency_plan_location ?? '',
-        medication_storage_location: site.medication_storage_location ?? '',
-        notes: site.notes ?? '',
-        address_line_1: site.address_line_1 ?? '',
-        address_line_2: site.address_line_2 ?? '',
-        suburb: site.suburb ?? '',
-        city: site.city ?? '',
-        postcode: site.postcode ?? '',
-        country: site.country ?? 'New Zealand',
-        region: site.region ?? '',
-        latitude: site.latitude ?? '',
-        longitude: site.longitude ?? '',
-        access_instructions: site.access_instructions ?? '',
-        is_active: site.is_active,
-        is_high_risk: site.is_high_risk,
-        is_high_needs: site.is_high_needs,
-        risk_notes: site.risk_notes ?? '',
-        risk_review_date: site.risk_review_date ?? '',
-        primary_contact_user_id:
-            site.primary_contact_user_id?.toString() ?? '',
-        contacts: initialContacts,
-        rooms: initialRooms,
-        resources: initialResources,
-        zones: initialZones,
-        assets: site.assigned_asset_ids ?? [],
-        checklists: initialChecklists,
-    });
+    const { data, setData, put, processing, errors, isDirty } =
+        useForm<WizardData>({
+            name: site.name,
+            type: site.type,
+            brand_colour: site.brand_colour ?? '',
+            phone: site.phone ?? '',
+            email: site.email ?? '',
+            emergency_plan_location: site.emergency_plan_location ?? '',
+            medication_storage_location: site.medication_storage_location ?? '',
+            notes: site.notes ?? '',
+            address_line_1: site.address_line_1 ?? '',
+            address_line_2: site.address_line_2 ?? '',
+            suburb: site.suburb ?? '',
+            city: site.city ?? '',
+            postcode: site.postcode ?? '',
+            country: site.country ?? 'New Zealand',
+            region: site.region ?? '',
+            latitude: site.latitude ?? '',
+            longitude: site.longitude ?? '',
+            access_instructions: site.access_instructions ?? '',
+            is_active: site.is_active,
+            is_high_risk: site.is_high_risk,
+            is_high_needs: site.is_high_needs,
+            risk_notes: site.risk_notes ?? '',
+            risk_review_date: site.risk_review_date ?? '',
+            primary_contact_user_id:
+                site.primary_contact_user_id?.toString() ?? '',
+            contacts: initialContacts,
+            rooms: initialRooms,
+            resources: initialResources,
+            zones: initialZones,
+            assets: site.assigned_asset_ids ?? [],
+            checklists: initialChecklists,
+        });
 
     const [step, setStep] = useState(0);
     const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
@@ -323,7 +325,9 @@ export default function EditSite() {
                 `/sites/${site.id}/documents/${deleteCandidate}`,
                 xhrConfig(),
             );
-            setExistingDocs((prev) => prev.filter((d) => d.id !== deleteCandidate));
+            setExistingDocs((prev) =>
+                prev.filter((d) => d.id !== deleteCandidate),
+            );
             setDeleteCandidate(null);
             toast.success('Document deleted.');
         } catch {
@@ -336,9 +340,7 @@ export default function EditSite() {
     const updateContact = (index: number, patch: Partial<Contact>) =>
         setData(
             'contacts',
-            data.contacts.map((c, i) =>
-                i === index ? { ...c, ...patch } : c,
-            ),
+            data.contacts.map((c, i) => (i === index ? { ...c, ...patch } : c)),
         );
     const removeContact = (index: number) =>
         setData(
@@ -405,10 +407,17 @@ export default function EditSite() {
                     <div className="min-w-0 space-y-6 lg:space-y-8">
                         <WizardStepper steps={STEPS} current={step} />
                         <p className="sr-only" aria-live="polite">
-                            Step {step + 1} of {STEPS.length}: {STEPS[step].label}
+                            Step {step + 1} of {STEPS.length}:{' '}
+                            {STEPS[step].label}
                         </p>
-                        <p className="sr-only" role="alert" aria-live="assertive">
-                            {Object.values(allErrors).filter(Boolean).join('. ')}
+                        <p
+                            className="sr-only"
+                            role="alert"
+                            aria-live="assertive"
+                        >
+                            {Object.values(allErrors)
+                                .filter(Boolean)
+                                .join('. ')}
                         </p>
 
                         <Card className="p-4 sm:p-6 lg:p-8">
@@ -526,11 +535,15 @@ export default function EditSite() {
                             )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Documents save instantly. Everything else is saved when you finish the wizard.
+                            Documents save instantly. Everything else is saved
+                            when you finish the wizard.
                         </p>
                     </div>
 
-                    <aside aria-label="Site summary" className="hidden lg:block">
+                    <aside
+                        aria-label="Site summary"
+                        className="hidden lg:block"
+                    >
                         <Card className="sticky top-4 space-y-6 p-5">
                             <div className="space-y-1">
                                 <p className="text-xs font-medium text-muted-foreground">
@@ -552,9 +565,7 @@ export default function EditSite() {
                                     {data.name || <Empty>Not set</Empty>}
                                 </SummaryRow>
                                 <SummaryRow label="Address">
-                                    {summaryAddress ?? (
-                                        <Empty>Not set</Empty>
-                                    )}
+                                    {summaryAddress ?? <Empty>Not set</Empty>}
                                 </SummaryRow>
                                 <SummaryRow
                                     label={typeAreaLabel(data.type) ?? 'Areas'}
@@ -588,8 +599,7 @@ export default function EditSite() {
                                     )}
                                 </SummaryRow>
                                 <SummaryRow label="Risk level">
-                                    {data.is_high_risk ||
-                                    data.is_high_needs ? (
+                                    {data.is_high_risk || data.is_high_needs ? (
                                         <RiskPill warning>
                                             {data.is_high_risk &&
                                             data.is_high_needs
@@ -627,7 +637,10 @@ export default function EditSite() {
                 </div>
             </div>
 
-            <Dialog open={confirmCancelOpen} onOpenChange={setConfirmCancelOpen}>
+            <Dialog
+                open={confirmCancelOpen}
+                onOpenChange={setConfirmCancelOpen}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Discard unsaved changes?</DialogTitle>

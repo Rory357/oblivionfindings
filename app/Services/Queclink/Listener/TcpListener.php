@@ -3,6 +3,8 @@
 namespace App\Services\Queclink\Listener;
 
 use App\Services\Queclink\AtTrackProtocolParser;
+use App\Services\Queclink\Exceptions\IntakeRejected;
+use App\Support\SafeOperationalData;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -34,11 +36,15 @@ class TcpListener
     protected array $states = [];
 
     protected bool $shouldStop = false;
+
     protected bool $hasPcntl = false;
 
     public function __construct(
         protected AtTrackProtocolParser $parser,
         protected FrameRouter $router,
+        protected ListenerLimits $limits,
+        protected ListenerPressureGuard $pressure,
+        protected ListenerSecurityEventAggregator $securityEvents,
     ) {
         $this->hasPcntl = function_exists('pcntl_signal') && function_exists('pcntl_signal_dispatch');
     }
@@ -65,11 +71,14 @@ class TcpListener
         );
 
         if (! is_resource($this->server)) {
-            throw new RuntimeException("queclink: failed to bind tcp://0.0.0.0:{$port} — {$errstr} (errno {$errno})");
+            throw new RuntimeException('Queclink listener failed to bind.');
         }
 
         stream_set_blocking($this->server, false);
-        Log::info("queclink: listening on tcp://0.0.0.0:{$port}");
+        Log::info('Queclink listener started.', SafeOperationalData::logContext([
+            'provider' => 'queclink',
+            'status' => 'started',
+        ]));
 
         try {
             $this->loop($tick);
@@ -97,6 +106,7 @@ class TcpListener
                 if ($this->hasPcntl) {
                     pcntl_signal_dispatch();
                 }
+
                 continue;
             }
 
@@ -108,6 +118,10 @@ class TcpListener
             foreach ($read as $clientId => $client) {
                 $this->serviceClient((int) $clientId, $client);
             }
+
+            $this->pruneIdleConnections();
+            $this->pressure->prune(microtime(true));
+            $this->flushSecurityEvents();
 
             if ($tick !== null) {
                 $tick();
@@ -126,11 +140,32 @@ class TcpListener
         if (! is_resource($client)) {
             return;
         }
+
+        $sourceFingerprint = $this->pressure->sourceFingerprint($peer);
+        $activeForSource = 0;
+        foreach ($this->states as $state) {
+            if ($this->pressure->sourceFingerprint($state->remoteAddress) === $sourceFingerprint) {
+                $activeForSource++;
+            }
+        }
+
+        $rejection = $this->pressure->connectionRejection(
+            $peer,
+            count($this->clients),
+            $activeForSource,
+            microtime(true),
+        );
+        if ($rejection !== null) {
+            @fclose($client);
+            $this->recordSecurityEvent($rejection);
+
+            return;
+        }
+
         stream_set_blocking($client, false);
         $id = (int) $client;
         $this->clients[$id] = $client;
         $this->states[$id] = new ConnectionState($peer);
-        Log::debug('queclink: accepted', ['peer' => $peer, 'session' => $this->states[$id]->sessionId]);
     }
 
     protected function serviceClient(int $clientId, $client): void
@@ -138,30 +173,93 @@ class TcpListener
         $state = $this->states[$clientId] ?? null;
         if ($state === null) {
             $this->disconnect($clientId);
+
             return;
         }
 
-        $data = @fread($client, 65536);
+        $data = @fread($client, $this->limits->maxBufferBytes + 1);
         if ($data === false || $data === '') {
             // Connection closed by peer.
             $this->disconnect($clientId);
+
             return;
         }
 
-        $frames = $this->parser->splitFrames($data, $state->buffer);
+        try {
+            $frames = $this->parser->splitFrames(
+                $data,
+                $state->buffer,
+                $this->limits->maxBufferBytes,
+                $this->limits->maxFrameBytes,
+            );
+        } catch (IntakeRejected $rejection) {
+            $this->recordSecurityEvent($rejection->reason);
+            $this->disconnect($clientId);
+
+            return;
+        }
+
         foreach ($frames as $rawFrame) {
+            $pressureRejection = $this->pressure->frameRejection($state, microtime(true));
+            if ($pressureRejection !== null) {
+                $this->recordSecurityEvent($pressureRejection);
+                $this->disconnect($clientId);
+
+                return;
+            }
+
             try {
                 $responses = $this->router->handleInbound($rawFrame, $state);
                 foreach ($responses as $response) {
                     @fwrite($client, $response);
                 }
+            } catch (IntakeRejected $rejection) {
+                $this->recordSecurityEvent($rejection->reason);
+                $invalidRejection = $this->pressure->invalidFrameRejection($state, microtime(true));
+                if ($invalidRejection !== null) {
+                    $this->recordSecurityEvent($invalidRejection);
+                    $this->disconnect($clientId);
+
+                    return;
+                }
             } catch (\Throwable $e) {
-                Log::error('queclink: frame handler threw', [
-                    'session' => $state->sessionId,
-                    'frame' => substr($rawFrame, 0, 200),
-                    'error' => $e->getMessage(),
-                ]);
+                Log::error('Queclink frame processing failed.', SafeOperationalData::logContext([
+                    'provider' => 'queclink',
+                    'failure_category' => SafeOperationalData::failureCategory($e),
+                    'items_errored' => 1,
+                ]));
+                $this->disconnect($clientId);
+
+                return;
             }
+        }
+    }
+
+    protected function pruneIdleConnections(): void
+    {
+        $now = microtime(true);
+        foreach ($this->states as $clientId => $state) {
+            if ($this->pressure->isIdle($state, $now)) {
+                $this->recordSecurityEvent('idle_timeout');
+                $this->disconnect($clientId);
+            }
+        }
+    }
+
+    protected function recordSecurityEvent(string $failureCategory): void
+    {
+        $this->securityEvents->record($failureCategory, microtime(true));
+        $this->flushSecurityEvents();
+    }
+
+    protected function flushSecurityEvents(bool $force = false): void
+    {
+        foreach ($this->securityEvents->drain(microtime(true), $force) as $category => $count) {
+            Log::warning('Queclink intake pressure event.', SafeOperationalData::logContext([
+                'provider' => 'queclink',
+                'failure_category' => $category,
+                'items_errored' => $count,
+            ]));
         }
     }
 
@@ -179,6 +277,7 @@ class TcpListener
 
     protected function shutdown(): void
     {
+        $this->flushSecurityEvents(true);
         foreach (array_keys($this->clients) as $clientId) {
             $this->disconnect($clientId);
         }
@@ -186,7 +285,10 @@ class TcpListener
             @fclose($this->server);
         }
         $this->server = null;
-        Log::info('queclink: listener stopped');
+        Log::info('Queclink listener stopped.', SafeOperationalData::logContext([
+            'provider' => 'queclink',
+            'status' => 'stopped',
+        ]));
     }
 
     protected function registerSignalHandlers(): void

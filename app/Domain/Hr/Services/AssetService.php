@@ -19,6 +19,31 @@ use Illuminate\Support\Str;
 class AssetService
 {
     /**
+     * Fail closed whenever a caller attempts to mutate a record whose lifecycle
+     * belongs to a canonical source module.
+     */
+    public function assertHrLifecycleOwned(HrAsset $asset): void
+    {
+        if ($asset->isFleetLinked()) {
+            throw new \LogicException(
+                "Asset '{$asset->asset_tag}' is owned by Fleet & Assets. Manage its lifecycle in the canonical Asset record."
+            );
+        }
+
+        if ($asset->isLegacyTechnology()) {
+            throw new \LogicException(
+                "Historical technology record '{$asset->asset_tag}' is read-only until it is reconciled to Security & Devices."
+            );
+        }
+
+        if (! $asset->isHrLifecycleOwned()) {
+            throw new \LogicException(
+                "Historical asset record '{$asset->asset_tag}' is read-only until it is reconciled to its canonical register."
+            );
+        }
+    }
+
+    /**
      * Assign an asset to an employee, optionally capturing a return-by date and an
      * in-app acknowledgement (e-signature) at the point of handover.
      */
@@ -27,6 +52,8 @@ class AssetService
         $assignment = DB::transaction(function () use ($asset, $profile, $data) {
             $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
             $lockedProfile = HrEmployeeProfile::query()->lockForUpdate()->findOrFail($profile->getKey());
+
+            $this->assertHrLifecycleOwned($lockedAsset);
 
             if ($lockedAsset->status !== 'available') {
                 throw new \LogicException("Asset '{$lockedAsset->asset_tag}' is not available for assignment (current status: {$lockedAsset->status}).");
@@ -104,6 +131,8 @@ class AssetService
                 ->lockForUpdate()
                 ->findOrFail($lockedAssignment->asset_id);
 
+            $this->assertHrLifecycleOwned($lockedAsset);
+
             if ($lockedAssignment->returned_at !== null) {
                 throw new \LogicException('This asset assignment has already been returned.');
             }
@@ -130,6 +159,7 @@ class AssetService
     {
         return DB::transaction(function () use ($asset, $data) {
             $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $this->assertHrLifecycleOwned($lockedAsset);
             if (! in_array($lockedAsset->status, ['available', 'maintenance'], true)) {
                 throw new \LogicException("Only an available asset can be sent for repair (current status: {$lockedAsset->status}). Return it from the employee first.");
             }
@@ -169,6 +199,7 @@ class AssetService
     {
         return DB::transaction(function () use ($asset, $data) {
             $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $this->assertHrLifecycleOwned($lockedAsset);
             if ($lockedAsset->status !== 'maintenance') {
                 throw new \LogicException("Only an asset in maintenance can be returned to service (current status: {$lockedAsset->status}).");
             }
@@ -206,6 +237,7 @@ class AssetService
     {
         return DB::transaction(function () use ($asset, $data): HrAsset {
             $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $this->assertHrLifecycleOwned($lockedAsset);
             if ($lockedAsset->status !== 'available') {
                 throw new \LogicException("Only an available asset can be sent to maintenance (current status: {$lockedAsset->status}).");
             }
@@ -228,6 +260,7 @@ class AssetService
     {
         return DB::transaction(function () use ($asset, $data): HrAsset {
             $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $this->assertHrLifecycleOwned($lockedAsset);
             if ($lockedAsset->status !== 'maintenance') {
                 throw new \LogicException("Only an asset in maintenance can be returned to service (current status: {$lockedAsset->status}).");
             }
@@ -250,6 +283,7 @@ class AssetService
     {
         return DB::transaction(function () use ($asset, $data): HrAsset {
             $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $this->assertHrLifecycleOwned($lockedAsset);
             if (! in_array($lockedAsset->status, ['available', 'maintenance'], true)) {
                 throw new \LogicException("Cannot retire a '{$lockedAsset->status}' asset. Return it from assignment first.");
             }
@@ -283,11 +317,19 @@ class AssetService
      */
     public function ensureQrToken(HrAsset $asset): string
     {
-        if (! $asset->qr_token) {
-            $asset->update(['qr_token' => (string) Str::uuid()]);
+        if ($asset->qr_token) {
+            return $asset->qr_token;
         }
 
-        return $asset->qr_token;
+        return DB::transaction(function () use ($asset): string {
+            $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            if (! $lockedAsset->qr_token) {
+                $this->assertHrLifecycleOwned($lockedAsset);
+                $lockedAsset->update(['qr_token' => (string) Str::uuid()]);
+            }
+
+            return (string) $lockedAsset->qr_token;
+        });
     }
 
     /**

@@ -141,6 +141,8 @@ it('reports Site-specific direct path proof without exposing network or credenti
     ])->and($report['runtime']['state'])->toBe('available')
         ->and($report['runtime']['available'])->toBe(4)
         ->and($report['runtime']['required'])->toBe(4)
+        ->and($report['oldest_evidence_at'])->toBe($report['evidence_at'])
+        ->and($report['direct_monitor_fingerprint'])->toMatch('/\A[a-f0-9]{64}\z/')
         ->and($report['topology']['state'])->toBe('current')
         ->and($report['topology']['node_count'])->toBe(2)
         ->and($report['topology']['edge_count'])->toBe(1)
@@ -150,6 +152,30 @@ it('reports Site-specific direct path proof without exposing network or credenti
         ->not->toContain('10.44.1.1')
         ->not->toContain('vault-secret-reference')
         ->not->toContain('10.44.0.0/16');
+
+    $neverObservedMonitor = Monitor::factory()->create([
+        'device_id' => $device->id,
+        'profile_id' => $profile->id,
+        'current_state' => MonitorState::Unknown,
+        'effective_state' => MonitorState::Unknown,
+        'last_observation_at' => null,
+    ])->load('profile');
+    $partialEvidence = app(CentralSiteMonitoringReadinessService::class)->assess(
+        collect([$site]),
+        collect([$device]),
+        collect([$monitor, $neverObservedMonitor]),
+        collect([$device->id => $site->id]),
+        $workers,
+    )->sole();
+    expect($partialEvidence)->toMatchArray([
+        'state' => 'awaiting_evidence',
+        'proof_state' => 'not_verified',
+        'direct_monitors' => 2,
+        'durable_direct_evidence' => 1,
+        'fresh' => 1,
+        'stale' => 0,
+        'never_observed' => 1,
+    ])->and($partialEvidence['direct_monitor_fingerprint'])->not->toBe($report['direct_monitor_fingerprint']);
 
     TopologySnapshot::factory()->create([
         'site_id' => $site->id,

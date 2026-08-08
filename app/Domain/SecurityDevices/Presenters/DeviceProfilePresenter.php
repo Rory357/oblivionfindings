@@ -34,6 +34,7 @@ use App\Models\ItTicketLink;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Queclink\QueclinkConfigurationProfileService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -62,6 +63,7 @@ class DeviceProfilePresenter
         private readonly ItWorkAccessService $itWorkAccess,
         private readonly QueclinkConfigurationProfileService $configurationProfiles,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly ControlRoomAlertAccessService $controlRoomAccess,
     ) {}
 
     /** @return array<string, mixed> */
@@ -748,15 +750,40 @@ class DeviceProfilePresenter
             });
         }
 
-        return $query->get()->map(fn (ControlRoomAlert $alert): array => [
-            'id' => $alert->id,
-            'reference' => $alert->reference_number,
-            'type' => $alert->alert_type,
-            'severity' => $alert->getRawOriginal('severity'),
-            'status' => $alert->status,
-            'triggeredAt' => $alert->triggered_at?->toISOString(),
-            'href' => "/control-room/alerts/{$alert->id}",
-        ]);
+        $alerts = $query->get();
+        $readableAlertIds = $this->controlRoomAccess->readableIds($alerts, $viewer);
+
+        return $alerts->map(function (ControlRoomAlert $alert) use ($readableAlertIds): array {
+            if (! $readableAlertIds->contains((int) $alert->id)) {
+                return [
+                    'id' => $alert->id,
+                    'reference' => null,
+                    'type' => null,
+                    'severity' => null,
+                    'status' => null,
+                    'triggeredAt' => null,
+                    'href' => null,
+                    'access' => [
+                        'state' => 'restricted',
+                        'label' => 'Control Room alert access required',
+                    ],
+                ];
+            }
+
+            return [
+                'id' => $alert->id,
+                'reference' => $alert->reference_number,
+                'type' => $alert->alert_type,
+                'severity' => $alert->getRawOriginal('severity'),
+                'status' => $alert->status,
+                'triggeredAt' => $alert->triggered_at?->toISOString(),
+                'href' => "/control-room/alerts/{$alert->id}",
+                'access' => [
+                    'state' => 'available',
+                    'label' => 'Open Control Room alert',
+                ],
+            ];
+        });
     }
 
     /** @return Collection<int, array<string, mixed>> */
@@ -1042,7 +1069,8 @@ class DeviceProfilePresenter
                     }
                     $latestAttempt = $command->attempts->sortByDesc('attempt_number')->first();
                     $latestReconciliation = $command->reconciliations->sortByDesc('observed_at')->first();
-                    $canViewChange = $command->change?->ticket !== null
+                    $canViewChange = $viewer->canDo('it.view')
+                        && $command->change?->ticket !== null
                         && $this->itWorkAccess->canView($viewer, $command->change->ticket);
                     $changeRequired = $definition?->requiresChange ?? $command->it_change_id !== null;
                     $changeGovernanceCurrent = $command->is_break_glass

@@ -107,7 +107,8 @@ export default function EditVetting({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref="/hr/compliance/vetting"
                         title="Edit Background Check"
@@ -116,388 +117,400 @@ export default function EditVetting({
                 }
             >
                 <div className="max-w-4xl space-y-6">
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Check Details</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label htmlFor="user_id">
-                                        Staff Member
-                                    </Label>
-                                    <Input
-                                        value={check.user.name}
-                                        disabled
-                                        className="bg-muted"
-                                    />
-                                    <p className="text-xs text-muted-foreground">
-                                        Employee cannot be changed
-                                    </p>
-                                </div>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Check Details</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="user_id">
+                                            Staff Member
+                                        </Label>
+                                        <Input
+                                            value={check.user.name}
+                                            disabled
+                                            className="bg-muted"
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Employee cannot be changed
+                                        </p>
+                                    </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="check_type">
-                                        Check Type{' '}
-                                        <span className="text-status-critical">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Select
-                                        value={data.check_type}
-                                        onValueChange={(value) =>
-                                            setData('check_type', value)
-                                        }
-                                    >
-                                        <SelectTrigger
-                                            id="check_type"
-                                            className={
-                                                errors.check_type
-                                                    ? 'border-status-critical/30'
-                                                    : ''
+                                    <div className="space-y-2">
+                                        <Label htmlFor="check_type">
+                                            Check Type{' '}
+                                            <span className="text-status-critical">
+                                                *
+                                            </span>
+                                        </Label>
+                                        <Select
+                                            value={data.check_type}
+                                            onValueChange={(value) =>
+                                                setData('check_type', value)
                                             }
                                         >
-                                            <SelectValue placeholder="Select check type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {checkTypes.map((type) => (
-                                                <SelectItem
-                                                    key={type.value}
-                                                    value={type.value}
-                                                >
-                                                    {type.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.check_type && (
-                                        <p className="text-sm text-status-critical">
-                                            {errors.check_type}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="status">
-                                        Status{' '}
-                                        <span className="text-status-critical">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Select
-                                        value={data.status}
-                                        onValueChange={(value) =>
-                                            setData('status', value)
-                                        }
-                                    >
-                                        <SelectTrigger
-                                            id="status"
-                                            className={
-                                                errors.status
-                                                    ? 'border-status-critical/30'
-                                                    : ''
-                                            }
-                                        >
-                                            <SelectValue placeholder="Select status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {statuses.map((s) => (
-                                                <SelectItem
-                                                    key={s.value}
-                                                    value={s.value}
-                                                >
-                                                    {s.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.status && (
-                                        <p className="text-sm text-status-critical">
-                                            {errors.status}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="provider">Provider</Label>
-                                    <Input
-                                        id="provider"
-                                        value={data.provider}
-                                        onChange={(e) =>
-                                            setData('provider', e.target.value)
-                                        }
-                                        placeholder="e.g., NZ Police Vetting Service"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="reference_number">
-                                        Reference Number
-                                    </Label>
-                                    <Input
-                                        id="reference_number"
-                                        value={data.reference_number}
-                                        onChange={(e) =>
-                                            setData(
-                                                'reference_number',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="e.g., VET-12345"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="check_date">
-                                        Check Date
-                                    </Label>
-                                    <Input
-                                        id="check_date"
-                                        type="date"
-                                        value={data.check_date}
-                                        onChange={(e) =>
-                                            setData(
-                                                'check_date',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="issue_date">
-                                        Issue Date
-                                    </Label>
-                                    <Input
-                                        id="issue_date"
-                                        type="date"
-                                        value={data.issue_date}
-                                        onChange={(e) =>
-                                            setData(
-                                                'issue_date',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="expires_at">
-                                        Expiry Date
-                                    </Label>
-                                    <Input
-                                        id="expires_at"
-                                        type="date"
-                                        value={data.expires_at}
-                                        onChange={(e) =>
-                                            setData(
-                                                'expires_at',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="notes">Notes</Label>
-                                <Textarea
-                                    id="notes"
-                                    value={data.notes}
-                                    onChange={(e) =>
-                                        setData('notes', e.target.value)
-                                    }
-                                    placeholder="General notes about this check..."
-                                    rows={3}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Disclosure Information</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="disclosures_present"
-                                    checked={data.disclosures_present}
-                                    onCheckedChange={(checked) =>
-                                        setData(
-                                            'disclosures_present',
-                                            checked as boolean,
-                                        )
-                                    }
-                                />
-                                <Label
-                                    htmlFor="disclosures_present"
-                                    className="text-sm font-normal"
-                                >
-                                    Disclosures present on check
-                                </Label>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="disclosure_details">
-                                    Disclosure Details
-                                </Label>
-                                <Textarea
-                                    id="disclosure_details"
-                                    value={data.disclosure_details}
-                                    onChange={(e) =>
-                                        setData(
-                                            'disclosure_details',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="Details of any disclosures found..."
-                                    rows={3}
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="conditions">Conditions</Label>
-                                <Textarea
-                                    id="conditions"
-                                    value={data.conditions}
-                                    onChange={(e) =>
-                                        setData('conditions', e.target.value)
-                                    }
-                                    placeholder="Any conditions placed on employment..."
-                                    rows={2}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Risk Assessment</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="risk_assessed"
-                                    checked={data.risk_assessed}
-                                    onCheckedChange={(checked) =>
-                                        setData(
-                                            'risk_assessed',
-                                            checked as boolean,
-                                        )
-                                    }
-                                />
-                                <Label
-                                    htmlFor="risk_assessed"
-                                    className="text-sm font-normal"
-                                >
-                                    Risk assessment completed
-                                </Label>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="risk_decision">
-                                    Risk Decision
-                                </Label>
-                                <Select
-                                    value={data.risk_decision}
-                                    onValueChange={(value) =>
-                                        setData('risk_decision', value)
-                                    }
-                                >
-                                    <SelectTrigger id="risk_decision">
-                                        <SelectValue placeholder="Select decision" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {riskDecisions.map((d) => (
-                                            <SelectItem
-                                                key={d.value}
-                                                value={d.value}
+                                            <SelectTrigger
+                                                id="check_type"
+                                                className={
+                                                    errors.check_type
+                                                        ? 'border-status-critical/30'
+                                                        : ''
+                                                }
                                             >
-                                                {d.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                                                <SelectValue placeholder="Select check type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {checkTypes.map((type) => (
+                                                    <SelectItem
+                                                        key={type.value}
+                                                        value={type.value}
+                                                    >
+                                                        {type.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {errors.check_type && (
+                                            <p className="text-sm text-status-critical">
+                                                {errors.check_type}
+                                            </p>
+                                        )}
+                                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="risk_assessment">
-                                    Risk Assessment Notes
-                                </Label>
-                                <Textarea
-                                    id="risk_assessment"
-                                    value={data.risk_assessment}
-                                    onChange={(e) =>
-                                        setData(
-                                            'risk_assessment',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="Details of risk assessment conducted..."
-                                    rows={4}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="status">
+                                            Status{' '}
+                                            <span className="text-status-critical">
+                                                *
+                                            </span>
+                                        </Label>
+                                        <Select
+                                            value={data.status}
+                                            onValueChange={(value) =>
+                                                setData('status', value)
+                                            }
+                                        >
+                                            <SelectTrigger
+                                                id="status"
+                                                className={
+                                                    errors.status
+                                                        ? 'border-status-critical/30'
+                                                        : ''
+                                                }
+                                            >
+                                                <SelectValue placeholder="Select status" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {statuses.map((s) => (
+                                                    <SelectItem
+                                                        key={s.value}
+                                                        value={s.value}
+                                                    >
+                                                        {s.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {errors.status && (
+                                            <p className="text-sm text-status-critical">
+                                                {errors.status}
+                                            </p>
+                                        )}
+                                    </div>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Update Service</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="enrolled_in_update_service"
-                                    checked={data.enrolled_in_update_service}
-                                    onCheckedChange={(checked) =>
-                                        setData(
-                                            'enrolled_in_update_service',
-                                            checked as boolean,
-                                        )
-                                    }
-                                />
-                                <Label
-                                    htmlFor="enrolled_in_update_service"
-                                    className="text-sm font-normal"
-                                >
-                                    Enrolled in update service
-                                </Label>
-                            </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="provider">
+                                            Provider
+                                        </Label>
+                                        <Input
+                                            id="provider"
+                                            value={data.provider}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'provider',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="e.g., NZ Police Vetting Service"
+                                        />
+                                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="update_service_reference">
-                                    Update Service Reference
-                                </Label>
-                                <Input
-                                    id="update_service_reference"
-                                    value={data.update_service_reference}
-                                    onChange={(e) =>
-                                        setData(
-                                            'update_service_reference',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="e.g., US-12345"
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="reference_number">
+                                            Reference Number
+                                        </Label>
+                                        <Input
+                                            id="reference_number"
+                                            value={data.reference_number}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'reference_number',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="e.g., VET-12345"
+                                        />
+                                    </div>
 
-                    <div className="flex items-center justify-end gap-4">
-                        <Link href={`/hr/compliance/vetting/${check.id}`}>
-                            <Button type="button" variant="outline">
-                                Cancel
+                                    <div className="space-y-2">
+                                        <Label htmlFor="check_date">
+                                            Check Date
+                                        </Label>
+                                        <Input
+                                            id="check_date"
+                                            type="date"
+                                            value={data.check_date}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'check_date',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="issue_date">
+                                            Issue Date
+                                        </Label>
+                                        <Input
+                                            id="issue_date"
+                                            type="date"
+                                            value={data.issue_date}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'issue_date',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="expires_at">
+                                            Expiry Date
+                                        </Label>
+                                        <Input
+                                            id="expires_at"
+                                            type="date"
+                                            value={data.expires_at}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'expires_at',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="notes">Notes</Label>
+                                    <Textarea
+                                        id="notes"
+                                        value={data.notes}
+                                        onChange={(e) =>
+                                            setData('notes', e.target.value)
+                                        }
+                                        placeholder="General notes about this check..."
+                                        rows={3}
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Disclosure Information</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id="disclosures_present"
+                                        checked={data.disclosures_present}
+                                        onCheckedChange={(checked) =>
+                                            setData(
+                                                'disclosures_present',
+                                                checked as boolean,
+                                            )
+                                        }
+                                    />
+                                    <Label
+                                        htmlFor="disclosures_present"
+                                        className="text-sm font-normal"
+                                    >
+                                        Disclosures present on check
+                                    </Label>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="disclosure_details">
+                                        Disclosure Details
+                                    </Label>
+                                    <Textarea
+                                        id="disclosure_details"
+                                        value={data.disclosure_details}
+                                        onChange={(e) =>
+                                            setData(
+                                                'disclosure_details',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Details of any disclosures found..."
+                                        rows={3}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="conditions">
+                                        Conditions
+                                    </Label>
+                                    <Textarea
+                                        id="conditions"
+                                        value={data.conditions}
+                                        onChange={(e) =>
+                                            setData(
+                                                'conditions',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Any conditions placed on employment..."
+                                        rows={2}
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Risk Assessment</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id="risk_assessed"
+                                        checked={data.risk_assessed}
+                                        onCheckedChange={(checked) =>
+                                            setData(
+                                                'risk_assessed',
+                                                checked as boolean,
+                                            )
+                                        }
+                                    />
+                                    <Label
+                                        htmlFor="risk_assessed"
+                                        className="text-sm font-normal"
+                                    >
+                                        Risk assessment completed
+                                    </Label>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="risk_decision">
+                                        Risk Decision
+                                    </Label>
+                                    <Select
+                                        value={data.risk_decision}
+                                        onValueChange={(value) =>
+                                            setData('risk_decision', value)
+                                        }
+                                    >
+                                        <SelectTrigger id="risk_decision">
+                                            <SelectValue placeholder="Select decision" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {riskDecisions.map((d) => (
+                                                <SelectItem
+                                                    key={d.value}
+                                                    value={d.value}
+                                                >
+                                                    {d.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="risk_assessment">
+                                        Risk Assessment Notes
+                                    </Label>
+                                    <Textarea
+                                        id="risk_assessment"
+                                        value={data.risk_assessment}
+                                        onChange={(e) =>
+                                            setData(
+                                                'risk_assessment',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Details of risk assessment conducted..."
+                                        rows={4}
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Update Service</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id="enrolled_in_update_service"
+                                        checked={
+                                            data.enrolled_in_update_service
+                                        }
+                                        onCheckedChange={(checked) =>
+                                            setData(
+                                                'enrolled_in_update_service',
+                                                checked as boolean,
+                                            )
+                                        }
+                                    />
+                                    <Label
+                                        htmlFor="enrolled_in_update_service"
+                                        className="text-sm font-normal"
+                                    >
+                                        Enrolled in update service
+                                    </Label>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="update_service_reference">
+                                        Update Service Reference
+                                    </Label>
+                                    <Input
+                                        id="update_service_reference"
+                                        value={data.update_service_reference}
+                                        onChange={(e) =>
+                                            setData(
+                                                'update_service_reference',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="e.g., US-12345"
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <div className="flex items-center justify-end gap-4">
+                            <Link href={`/hr/compliance/vetting/${check.id}`}>
+                                <Button type="button" variant="outline">
+                                    Cancel
+                                </Button>
+                            </Link>
+                            <Button type="submit" disabled={processing}>
+                                {processing
+                                    ? 'Saving...'
+                                    : 'Update Background Check'}
                             </Button>
-                        </Link>
-                        <Button type="submit" disabled={processing}>
-                            {processing
-                                ? 'Saving...'
-                                : 'Update Background Check'}
-                        </Button>
-                    </div>
-                </form>
+                        </div>
+                    </form>
                 </div>
             </PageLayout>
         </AppLayout>

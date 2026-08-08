@@ -12,7 +12,16 @@ interface Props {
     interactions: Interaction[];
 }
 
-const severityConfig: Record<string, { bg: string; border: string; text: string; badge: string; icon: typeof ShieldAlert }> = {
+const severityConfig: Record<
+    string,
+    {
+        bg: string;
+        border: string;
+        text: string;
+        badge: string;
+        icon: typeof ShieldAlert;
+    }
+> = {
     contraindicated: {
         bg: 'bg-status-critical-bg',
         border: 'border-status-critical/30 dark:border-status-critical/30',
@@ -50,7 +59,8 @@ export default function DrugInteractionAlert({ interactions }: Props) {
     if (!interactions || interactions.length === 0) return null;
 
     const sorted = [...interactions].sort(
-        (a, b) => (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3),
+        (a, b) =>
+            (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3),
     );
 
     return (
@@ -64,21 +74,31 @@ export default function DrugInteractionAlert({ interactions }: Props) {
                         className={`rounded-lg border-2 ${config.border} ${config.bg} p-3`}
                     >
                         <div className="flex items-start gap-2">
-                            <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${config.text}`} />
+                            <Icon
+                                className={`mt-0.5 h-5 w-5 shrink-0 ${config.text}`}
+                            />
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
-                                    <span className={`text-sm font-bold ${config.text}`}>
+                                    <span
+                                        className={`text-sm font-bold ${config.text}`}
+                                    >
                                         Drug Interaction
                                     </span>
-                                    <Badge className={`${config.badge} text-[10px]`}>
+                                    <Badge
+                                        className={`${config.badge} text-[10px]`}
+                                    >
                                         {interaction.severity}
                                     </Badge>
                                 </div>
-                                <p className={`mt-0.5 text-sm font-medium ${config.text}`}>
+                                <p
+                                    className={`mt-0.5 text-sm font-medium ${config.text}`}
+                                >
                                     {interaction.drug_a} + {interaction.drug_b}
                                 </p>
                                 {interaction.description && (
-                                    <p className={`mt-1 text-xs ${config.text} opacity-80`}>
+                                    <p
+                                        className={`mt-1 text-xs ${config.text} opacity-80`}
+                                    >
                                         {interaction.description}
                                     </p>
                                 )}

@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,10 +15,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
 import { governanceStatusColor } from '@/lib/governance-status';
+import { cn } from '@/lib/utils';
 import { PageProps } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -203,7 +203,9 @@ export default function MeetingsCalendar({
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                     asChild
                                 >
-                                    <Link href="/governance/meetings">List View</Link>
+                                    <Link href="/governance/meetings">
+                                        List View
+                                    </Link>
                                 </Button>
                                 <Button asChild>
                                     <Link href="/governance/meetings/create">

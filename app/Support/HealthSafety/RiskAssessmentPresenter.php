@@ -105,7 +105,7 @@ class RiskAssessmentPresenter
      *
      * @return array{sites:Collection,clients:Collection,events:Collection}
      */
-    public static function pickers(?int $legacyContext = null): array
+    public static function pickers(): array
     {
         $siteAccess = app(UserSiteAccessService::class);
 

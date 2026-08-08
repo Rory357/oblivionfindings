@@ -422,7 +422,8 @@ function Segmented<T extends string>({
             {options.map((o) => {
                 const active = value === o.value;
                 return (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         key={o.value}
                         type="button"
                         onClick={() => onChange(o.value)}
@@ -493,7 +494,8 @@ function ClientStep({
         <>
             <div className="mb-4 inline-flex rounded-[9px] border border-border bg-muted p-0.5">
                 {(['new', 'existing'] as const).map((m) => (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         key={m}
                         type="button"
                         onClick={() => setData('mode', m)}

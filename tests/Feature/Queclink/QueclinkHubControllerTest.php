@@ -26,6 +26,8 @@ use App\Models\Queclink\QueclinkPreset;
 use App\Models\Queclink\QueclinkRawFrame;
 use App\Models\Role;
 use App\Models\Site;
+use App\Models\SiteHouseRoom;
+use App\Models\SiteRoom;
 use App\Models\User;
 use App\Support\SafeOperationalData;
 use Database\Seeders\QueclinkPresetSeeder;
@@ -414,9 +416,15 @@ class QueclinkHubControllerTest extends TestCase
             'preset_id' => $applicationPreset->id,
         ])->assertRedirect();
         $this->actingAs($viewer)
-            ->delete("/security-devices/integrations/queclink/presets/{$applicationPreset->id}")
+            ->delete("/security-devices/integrations/queclink/presets/{$applicationPreset->id}", [
+                'reason' => 'Replaced by the approved application configuration baseline.',
+            ])
             ->assertRedirect();
-        $this->assertDatabaseMissing('queclink_presets', ['id' => $applicationPreset->id]);
+        $this->assertNotNull($applicationPreset->fresh()->retired_at);
+        $this->assertSame(
+            DeviceConfigurationProfile::STATUS_RETIRED,
+            $applicationPreset->fresh()->configurationProfile->fresh()->status,
+        );
         $this->actingAs($viewer)->post('/security-devices/integrations/queclink/bulk', [
             'device_ids' => [$ownDevice->id, $foreignPaired->id],
             'action' => 'resident_safety_profile',
@@ -782,6 +790,8 @@ class QueclinkHubControllerTest extends TestCase
                 'target_id' => $staff->id,
             ])
             ->assertRedirect();
+
+        $this->assertTrue(Str::isUuid((string) $device->fresh()->binding_uuid));
         $this->assertDatabaseHas('device_assignments', [
             'device_id' => $device->fresh()->device_id,
             'assignable_type' => DeviceAssignment::TARGET_STAFF,
@@ -1068,6 +1078,7 @@ class QueclinkHubControllerTest extends TestCase
             && str_contains($sql, 'for update')));
         $this->assertSame($localSite->id, $asset->fresh()->site_id);
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $device->fresh()->status);
+        $this->assertNull($device->fresh()->binding_uuid);
         $this->assertNull($device->fresh()->device_id);
         $this->assertDatabaseMissing('device_assignments', [
             'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
@@ -1674,12 +1685,15 @@ class QueclinkHubControllerTest extends TestCase
             ])
             ->assertRedirect();
 
+        $this->assertTrue(Str::isUuid((string) $device->fresh()->binding_uuid));
+
         // Then release
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/release")
             ->assertRedirect();
 
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $device->fresh()->status);
+        $this->assertNull($device->fresh()->binding_uuid);
     }
 
     public function test_release_uses_historical_provenance_for_deapproved_and_deleted_staff_profiles(): void
@@ -1855,6 +1869,55 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertDatabaseMissing('asset_trackers', ['device_uid' => $queclink->imei]);
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $queclink->fresh()->status);
         $this->assertNull($queclink->fresh()->device_id);
+    }
+
+    public function test_release_audit_never_reinterprets_a_residential_room_id_as_a_hardware_room(): void
+    {
+        $canonicalSite = Site::factory()->create([]);
+        $collisionSite = Site::factory()->create([]);
+        $collisionRoom = SiteRoom::query()->forceCreate([
+            'id' => 900002,
+            'site_id' => $collisionSite->id,
+            'name' => 'Unrelated hardware room',
+        ]);
+        $residentialRoom = SiteHouseRoom::query()->forceCreate([
+            'id' => $collisionRoom->id,
+            'site_id' => $canonicalSite->id,
+            'name' => 'Canonical residential room',
+            'is_active' => true,
+            'is_assignable' => false,
+        ]);
+        $asset = Asset::factory()->create([
+            'category' => 'Vehicle',
+            'site_id' => null,
+            'home_site_id' => $canonicalSite->id,
+            'client_id' => null,
+            'room_id' => $residentialRoom->id,
+        ]);
+        $canonicalDevice = Device::factory()->tracking()->create(['provider' => 'queclink']);
+        DeviceAssignment::query()->create([
+            'device_id' => $canonicalDevice->id,
+            'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
+            'assignable_id' => $asset->id,
+            'assigned_at' => now(),
+        ]);
+        $queclink = QueclinkDevice::query()->create([
+            'tenant_id' => 1,
+            'imei' => '864696060004199',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'device_id' => $canonicalDevice->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$queclink->id}/release")
+            ->assertRedirect();
+
+        $audit = QueclinkAuditEvent::query()
+            ->where('queclink_device_id', $queclink->id)
+            ->where('event_type', 'release')
+            ->sole();
+        $this->assertSame($canonicalSite->id, $audit->site_id);
+        $this->assertNotSame($collisionSite->id, $audit->site_id);
     }
 
     public function test_location_command_hands_off_to_governed_device_management_without_queueing_provider_work()

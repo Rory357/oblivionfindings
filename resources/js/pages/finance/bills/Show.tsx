@@ -1,16 +1,29 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
-import { AlertTriangle, CheckCircle, Edit, XCircle, FileText } from 'lucide-react';
-import { PageHero, PageLayout } from '@/components/page';
 import { ConfirmDialog, formatMoney } from '@/components/finance';
+import { PageHero, PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { PageProps } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    CheckCircle,
+    Edit,
+    FileText,
+    XCircle,
+} from 'lucide-react';
 import { useState } from 'react';
 
 interface BillLine {
@@ -48,7 +61,12 @@ interface Bill {
     notes: string | null;
     approved_by: { id: number; name: string } | null;
     approved_at: string | null;
-    journal: { id: number; journal_number: string; status: string; posted_at: string } | null;
+    journal: {
+        id: number;
+        journal_number: string;
+        status: string;
+        posted_at: string;
+    } | null;
     purchase_order: { id: number; po_number: string } | null;
     lines: BillLine[];
     payment_allocations: PaymentAllocation[];
@@ -59,15 +77,33 @@ interface Props extends PageProps {
 }
 
 const formatDate = (date: string | null) =>
-    date ? new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+    date
+        ? new Date(date).toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          })
+        : '-';
 
 const formatDateTime = (date: string | null) =>
-    date ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+    date
+        ? new Date(date).toLocaleString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+          })
+        : '-';
 
 export default function BillShow({ auth, bill }: Props) {
-    const isOverdue = bill.status !== 'paid' && bill.status !== 'cancelled' && new Date(bill.due_date) < new Date();
+    const isOverdue =
+        bill.status !== 'paid' &&
+        bill.status !== 'cancelled' &&
+        new Date(bill.due_date) < new Date();
     const isDraft = bill.status === 'draft';
-    const canCancel = bill.status === 'draft' || bill.status === 'awaiting_approval';
+    const canCancel =
+        bill.status === 'draft' || bill.status === 'awaiting_approval';
     const amountDue = Number(bill.total_amount) - Number(bill.amount_paid);
 
     const [cancelOpen, setCancelOpen] = useState(false);
@@ -78,11 +114,15 @@ export default function BillShow({ auth, bill }: Props) {
     };
 
     const confirmCancel = () => {
-        router.post(`/finance/bills/${bill.id}/cancel`, {}, {
-            onStart: () => setCancelling(true),
-            onFinish: () => setCancelling(false),
-            onSuccess: () => setCancelOpen(false),
-        });
+        router.post(
+            `/finance/bills/${bill.id}/cancel`,
+            {},
+            {
+                onStart: () => setCancelling(true),
+                onFinish: () => setCancelling(false),
+                onSuccess: () => setCancelOpen(false),
+            },
+        );
     };
 
     return (
@@ -98,7 +138,8 @@ export default function BillShow({ auth, bill }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/bills"
                         title={
@@ -107,7 +148,7 @@ export default function BillShow({ auth, bill }: Props) {
                                 <StatusBadge status={bill.status} />
                                 {isOverdue && (
                                     <Badge className="bg-status-critical-bg text-status-critical">
-                                        <AlertTriangle className="w-3 h-3 mr-1" />
+                                        <AlertTriangle className="mr-1 h-3 w-3" />
                                         Overdue
                                     </Badge>
                                 )}
@@ -116,7 +157,9 @@ export default function BillShow({ auth, bill }: Props) {
                         description={
                             <>
                                 {bill.vendor?.name ?? 'Unknown vendor'}
-                                {bill.vendor_reference && <span> - Ref: {bill.vendor_reference}</span>}
+                                {bill.vendor_reference && (
+                                    <span> - Ref: {bill.vendor_reference}</span>
+                                )}
                             </>
                         }
                         actions={
@@ -124,20 +167,25 @@ export default function BillShow({ auth, bill }: Props) {
                                 {isDraft && (
                                     <>
                                         <Button variant="outline" asChild>
-                                            <Link href={`/finance/bills/${bill.id}/edit`}>
-                                                <Edit className="w-4 h-4 mr-2" />
+                                            <Link
+                                                href={`/finance/bills/${bill.id}/edit`}
+                                            >
+                                                <Edit className="mr-2 h-4 w-4" />
                                                 Edit
                                             </Link>
                                         </Button>
                                         <Button onClick={handleApprove}>
-                                            <CheckCircle className="w-4 h-4 mr-2" />
+                                            <CheckCircle className="mr-2 h-4 w-4" />
                                             Approve
                                         </Button>
                                     </>
                                 )}
                                 {canCancel && (
-                                    <Button variant="destructive" onClick={() => setCancelOpen(true)}>
-                                        <XCircle className="w-4 h-4 mr-2" />
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() => setCancelOpen(true)}
+                                    >
+                                        <XCircle className="mr-2 h-4 w-4" />
                                         Cancel
                                     </Button>
                                 )}
@@ -146,47 +194,77 @@ export default function BillShow({ auth, bill }: Props) {
                     />
                 }
             >
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
                     {/* Bill Info */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Bill Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Bill Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">Bill Date</span>
-                                <span className="font-medium">{formatDate(bill.bill_date)}</span>
+                                <span className="text-muted-foreground">
+                                    Bill Date
+                                </span>
+                                <span className="font-medium">
+                                    {formatDate(bill.bill_date)}
+                                </span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">Due Date</span>
-                                <span className={cn('font-medium', isOverdue && 'text-status-critical')}>
+                                <span className="text-muted-foreground">
+                                    Due Date
+                                </span>
+                                <span
+                                    className={cn(
+                                        'font-medium',
+                                        isOverdue && 'text-status-critical',
+                                    )}
+                                >
                                     {formatDate(bill.due_date)}
                                 </span>
                             </div>
                             {bill.purchase_order && (
                                 <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Purchase Order</span>
-                                    <Link href={`/finance/purchase-orders/${bill.purchase_order.id}`} className="text-status-info hover:underline font-medium">
+                                    <span className="text-muted-foreground">
+                                        Purchase Order
+                                    </span>
+                                    <Link
+                                        href={`/finance/purchase-orders/${bill.purchase_order.id}`}
+                                        className="font-medium text-status-info hover:underline"
+                                    >
                                         {bill.purchase_order.po_number}
                                     </Link>
                                 </div>
                             )}
                             {bill.approved_by && (
                                 <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Approved By</span>
-                                    <span className="font-medium">{bill.approved_by.name}</span>
+                                    <span className="text-muted-foreground">
+                                        Approved By
+                                    </span>
+                                    <span className="font-medium">
+                                        {bill.approved_by.name}
+                                    </span>
                                 </div>
                             )}
                             {bill.approved_at && (
                                 <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Approved At</span>
-                                    <span className="font-medium">{formatDateTime(bill.approved_at)}</span>
+                                    <span className="text-muted-foreground">
+                                        Approved At
+                                    </span>
+                                    <span className="font-medium">
+                                        {formatDateTime(bill.approved_at)}
+                                    </span>
                                 </div>
                             )}
                             {bill.notes && (
-                                <div className="pt-2 border-t">
-                                    <span className="text-muted-foreground block mb-1">Notes</span>
-                                    <p className="text-foreground whitespace-pre-wrap">{bill.notes}</p>
+                                <div className="border-t pt-2">
+                                    <span className="mb-1 block text-muted-foreground">
+                                        Notes
+                                    </span>
+                                    <p className="whitespace-pre-wrap text-foreground">
+                                        {bill.notes}
+                                    </p>
                                 </div>
                             )}
                         </CardContent>
@@ -199,11 +277,15 @@ export default function BillShow({ auth, bill }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">Subtotal</span>
+                                <span className="text-muted-foreground">
+                                    Subtotal
+                                </span>
                                 <span>{formatMoney(bill.subtotal)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">GST</span>
+                                <span className="text-muted-foreground">
+                                    GST
+                                </span>
                                 <span>{formatMoney(bill.gst_amount)}</span>
                             </div>
                             <Separator />
@@ -216,7 +298,14 @@ export default function BillShow({ auth, bill }: Props) {
                                 <span>{formatMoney(bill.amount_paid)}</span>
                             </div>
                             <Separator />
-                            <div className={cn('flex justify-between font-bold', amountDue > 0 ? 'text-status-critical' : 'text-status-success')}>
+                            <div
+                                className={cn(
+                                    'flex justify-between font-bold',
+                                    amountDue > 0
+                                        ? 'text-status-critical'
+                                        : 'text-status-success',
+                                )}
+                            >
                                 <span>Amount Due</span>
                                 <span>{formatMoney(amountDue)}</span>
                             </div>
@@ -226,32 +315,51 @@ export default function BillShow({ auth, bill }: Props) {
                     {/* GL Journal */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">GL Journal</CardTitle>
+                            <CardTitle className="text-base">
+                                GL Journal
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {bill.journal ? (
                                 <div className="space-y-3 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Journal #</span>
-                                        <Link href={`/finance/journals/${bill.journal.id}`} className="text-status-info hover:underline font-medium">
+                                        <span className="text-muted-foreground">
+                                            Journal #
+                                        </span>
+                                        <Link
+                                            href={`/finance/journals/${bill.journal.id}`}
+                                            className="font-medium text-status-info hover:underline"
+                                        >
                                             {bill.journal.journal_number}
                                         </Link>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Status</span>
-                                        <Badge className="bg-status-success-bg text-status-success">{bill.journal.status}</Badge>
+                                        <span className="text-muted-foreground">
+                                            Status
+                                        </span>
+                                        <Badge className="bg-status-success-bg text-status-success">
+                                            {bill.journal.status}
+                                        </Badge>
                                     </div>
                                     {bill.journal.posted_at && (
                                         <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Posted</span>
-                                            <span className="font-medium">{formatDateTime(bill.journal.posted_at)}</span>
+                                            <span className="text-muted-foreground">
+                                                Posted
+                                            </span>
+                                            <span className="font-medium">
+                                                {formatDateTime(
+                                                    bill.journal.posted_at,
+                                                )}
+                                            </span>
                                         </div>
                                     )}
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
-                                    <FileText className="w-8 h-8 mb-2" />
-                                    <p className="text-sm">No journal posted yet</p>
+                                    <FileText className="mb-2 h-8 w-8" />
+                                    <p className="text-sm">
+                                        No journal posted yet
+                                    </p>
                                 </div>
                             )}
                         </CardContent>
@@ -267,34 +375,60 @@ export default function BillShow({ auth, bill }: Props) {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Description</TableHead>
-                                <TableHead className="text-right">Qty</TableHead>
-                                <TableHead className="text-right">Unit Price</TableHead>
-                                <TableHead className="text-right">GST %</TableHead>
+                                <TableHead className="text-right">
+                                    Qty
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Unit Price
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    GST %
+                                </TableHead>
                                 <TableHead>Account</TableHead>
                                 <TableHead>Cost Centre</TableHead>
                                 <TableHead>Funding Stream</TableHead>
-                                <TableHead className="text-right">GST</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
+                                <TableHead className="text-right">
+                                    GST
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Total
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {bill.lines.map((line) => (
                                 <TableRow key={line.id}>
                                     <TableCell>{line.description}</TableCell>
-                                    <TableCell className="text-right">{Number(line.quantity).toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">{formatMoney(line.unit_price)}</TableCell>
-                                    <TableCell className="text-right">{Number(line.gst_rate).toFixed(2)}%</TableCell>
-                                    <TableCell className="text-sm">
-                                        {line.account ? `${line.account.code} - ${line.account.name}` : '-'}
+                                    <TableCell className="text-right">
+                                        {Number(line.quantity).toFixed(2)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {formatMoney(line.unit_price)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {Number(line.gst_rate).toFixed(2)}%
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        {line.cost_centre ? `${line.cost_centre.code} - ${line.cost_centre.name}` : '-'}
+                                        {line.account
+                                            ? `${line.account.code} - ${line.account.name}`
+                                            : '-'}
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        {line.funding_stream ? `${line.funding_stream.code} - ${line.funding_stream.name}` : '-'}
+                                        {line.cost_centre
+                                            ? `${line.cost_centre.code} - ${line.cost_centre.name}`
+                                            : '-'}
                                     </TableCell>
-                                    <TableCell className="text-right">{formatMoney(line.gst_amount)}</TableCell>
-                                    <TableCell className="text-right font-medium">{formatMoney(line.line_total)}</TableCell>
+                                    <TableCell className="text-sm">
+                                        {line.funding_stream
+                                            ? `${line.funding_stream.code} - ${line.funding_stream.name}`
+                                            : '-'}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {formatMoney(line.gst_amount)}
+                                    </TableCell>
+                                    <TableCell className="text-right font-medium">
+                                        {formatMoney(line.line_total)}
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -302,31 +436,42 @@ export default function BillShow({ auth, bill }: Props) {
                 </Card>
 
                 {/* Payment History */}
-                {bill.payment_allocations && bill.payment_allocations.length > 0 && (
-                    <Card className="mb-6">
-                        <CardHeader>
-                            <CardTitle>Payment History</CardTitle>
-                        </CardHeader>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
-                                    <TableHead>Notes</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {bill.payment_allocations.map((payment) => (
-                                    <TableRow key={payment.id}>
-                                        <TableCell>{formatDate(payment.payment_date)}</TableCell>
-                                        <TableCell className="text-right font-medium">{formatMoney(payment.amount)}</TableCell>
-                                        <TableCell className="text-muted-foreground">{payment.notes ?? '-'}</TableCell>
+                {bill.payment_allocations &&
+                    bill.payment_allocations.length > 0 && (
+                        <Card className="mb-6">
+                            <CardHeader>
+                                <CardTitle>Payment History</CardTitle>
+                            </CardHeader>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead className="text-right">
+                                            Amount
+                                        </TableHead>
+                                        <TableHead>Notes</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </Card>
-                )}
+                                </TableHeader>
+                                <TableBody>
+                                    {bill.payment_allocations.map((payment) => (
+                                        <TableRow key={payment.id}>
+                                            <TableCell>
+                                                {formatDate(
+                                                    payment.payment_date,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right font-medium">
+                                                {formatMoney(payment.amount)}
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {payment.notes ?? '-'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </Card>
+                    )}
             </PageLayout>
 
             <ConfirmDialog
@@ -336,8 +481,10 @@ export default function BillShow({ auth, bill }: Props) {
                 description={
                     <>
                         This cancels bill{' '}
-                        <span className="font-medium text-foreground">{bill.bill_number}</span>. A
-                        cancelled bill can&rsquo;t be approved or paid.
+                        <span className="font-medium text-foreground">
+                            {bill.bill_number}
+                        </span>
+                        . A cancelled bill can&rsquo;t be approved or paid.
                     </>
                 }
                 confirmLabel="Cancel bill"

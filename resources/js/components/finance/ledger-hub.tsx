@@ -41,13 +41,62 @@ type LedgerTabDef = FinanceTabItem & {
 };
 
 export const LEDGER_TABS: LedgerTabDef[] = [
-    { id: 'accounts', label: 'Chart of accounts', icon: Landmark, tone: 'primary', href: '/finance/accounts', requires: (c) => !!c?.finance?.ledger?.view },
-    { id: 'journals', label: 'Journals', icon: BookOpen, tone: 'info', href: '/finance/journals', requires: (c) => !!c?.finance?.ledger?.view },
-    { id: 'cost-centres', label: 'Cost centres', icon: Building2, tone: 'violet', href: '/finance/cost-centres', requires: (c) => !!c?.finance?.admin },
-    { id: 'fiscal-periods', label: 'Fiscal periods', icon: CalendarRange, tone: 'warning', href: '/finance/fiscal-periods', requires: (c) => !!c?.finance?.admin },
-    { id: 'currencies', label: 'Currencies', icon: Coins, tone: 'success', href: '/finance/currencies', requires: (c) => !!c?.finance?.admin },
-    { id: 'fx-revaluations', label: 'FX revaluations', icon: RefreshCw, tone: 'info', href: '/finance/fx-revaluations', requires: (c) => !!c?.finance?.ledger?.manage },
-    { id: 'fixed-assets', label: 'Fixed assets', icon: Banknote, tone: 'primary', href: '/finance/fixed-assets', requires: (c) => !!c?.finance?.assets?.view },
+    {
+        id: 'accounts',
+        label: 'Chart of accounts',
+        icon: Landmark,
+        tone: 'primary',
+        href: '/finance/accounts',
+        requires: (c) => !!c?.finance?.ledger?.view,
+    },
+    {
+        id: 'journals',
+        label: 'Journals',
+        icon: BookOpen,
+        tone: 'info',
+        href: '/finance/journals',
+        requires: (c) => !!c?.finance?.ledger?.view,
+    },
+    {
+        id: 'cost-centres',
+        label: 'Cost centres',
+        icon: Building2,
+        tone: 'violet',
+        href: '/finance/cost-centres',
+        requires: (c) => !!c?.finance?.admin,
+    },
+    {
+        id: 'fiscal-periods',
+        label: 'Fiscal periods',
+        icon: CalendarRange,
+        tone: 'warning',
+        href: '/finance/fiscal-periods',
+        requires: (c) => !!c?.finance?.admin,
+    },
+    {
+        id: 'currencies',
+        label: 'Currencies',
+        icon: Coins,
+        tone: 'success',
+        href: '/finance/currencies',
+        requires: (c) => !!c?.finance?.admin,
+    },
+    {
+        id: 'fx-revaluations',
+        label: 'FX revaluations',
+        icon: RefreshCw,
+        tone: 'info',
+        href: '/finance/fx-revaluations',
+        requires: (c) => !!c?.finance?.ledger?.manage,
+    },
+    {
+        id: 'fixed-assets',
+        label: 'Fixed assets',
+        icon: Banknote,
+        tone: 'primary',
+        href: '/finance/fixed-assets',
+        requires: (c) => !!c?.finance?.assets?.view,
+    },
 ];
 
 /**
@@ -65,7 +114,9 @@ export function LedgerTabsFooter({ active }: { active: LedgerTabId }) {
         (page.props as { financeHubCounts?: FinanceHubCounts | null })
             .financeHubCounts?.['ledger'] ?? {};
 
-    const visible = LEDGER_TABS.filter((t) => t.id === active || t.requires(can));
+    const visible = LEDGER_TABS.filter(
+        (t) => t.id === active || t.requires(can),
+    );
 
     const handleTab = (id: string) => {
         if (id === active) return;

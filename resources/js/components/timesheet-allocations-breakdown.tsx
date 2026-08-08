@@ -106,8 +106,13 @@ function initialsFromName(name: string): string {
     return residentInitials(first, last);
 }
 
-function candidateName(candidates: AllocationCandidate[], clientId: number): string {
-    return candidates.find((c) => c.id === clientId)?.name ?? `Client #${clientId}`;
+function candidateName(
+    candidates: AllocationCandidate[],
+    clientId: number,
+): string {
+    return (
+        candidates.find((c) => c.id === clientId)?.name ?? `Client #${clientId}`
+    );
 }
 
 /**
@@ -139,7 +144,8 @@ export function TimesheetAllocationsBreakdown({
                     <span className="font-medium text-foreground">
                         Single client
                     </span>
-                    {' · '}all {Number(a.hours).toFixed(2)}h attributed to {name} (no breakdown recorded)
+                    {' · '}all {Number(a.hours).toFixed(2)}h attributed to{' '}
+                    {name} (no breakdown recorded)
                 </span>
             </div>
         );
@@ -147,10 +153,7 @@ export function TimesheetAllocationsBreakdown({
 
     const meta = METHOD_META[method] ?? METHOD_META.single;
     const Icon = meta.icon;
-    const sum = allocations.reduce(
-        (s, a) => s + Number(a.hours || 0),
-        0,
-    );
+    const sum = allocations.reduce((s, a) => s + Number(a.hours || 0), 0);
     const variance = Math.abs(sum - totalHours);
     const balanced = variance < 0.01;
 
@@ -191,7 +194,7 @@ export function TimesheetAllocationsBreakdown({
                                         </p>
                                     ) : null}
                                     {a.notes ? (
-                                        <p className="text-xs italic text-muted-foreground">
+                                        <p className="text-xs text-muted-foreground italic">
                                             “{a.notes}”
                                         </p>
                                     ) : null}

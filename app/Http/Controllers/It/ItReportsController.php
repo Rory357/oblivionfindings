@@ -4,6 +4,7 @@ namespace App\Http\Controllers\It;
 
 use App\Domain\It\Services\ItProvisioningAccessService;
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\ItAutomationRun;
 use App\Models\ItChange;
@@ -32,6 +33,7 @@ class ItReportsController extends Controller
     public function __construct(
         private readonly ItWorkAccessService $workAccess,
         private readonly ItProvisioningAccessService $provisioningAccess,
+        private readonly SecurityDevicesAccessService $deviceAccess,
     ) {}
 
     /** Agent-only (route gated `permission:it.view`); read-only analytics. */
@@ -201,9 +203,9 @@ class ItReportsController extends Controller
             'major_incidents' => Schema::hasTable('it_major_incidents') ? $this->majorIncidents($from, $to, $user) : ['declared' => 0, 'restored' => 0, 'open' => 0],
             'change_success' => Schema::hasTable('it_changes') ? $this->changeSuccess($from, $to, $user) : ['successful' => 0, 'failed' => 0, 'inconclusive' => 0],
             'recurring_problems' => Schema::hasTable('it_problems') ? $this->problemOutcomes($from, $to, $user) : ['total' => 0, 'known_errors' => 0, 'root_causes' => 0],
-            'automation_outcomes' => Schema::hasTable('it_automation_runs') ? $this->automationOutcomes($from, $to) : ['succeeded' => 0, 'failed' => 0, 'skipped' => 0],
+            'automation_outcomes' => $this->automationOutcomes($from, $to, $user),
             'service_reliability' => Schema::hasTable('it_services') ? $this->serviceReliability($from, $to, $user) : [],
-            'device_reliability' => Schema::hasTable('it_ticket_links') ? $this->deviceReliability($from, $to, $user) : ['affected_devices' => 0, 'open_incidents' => 0, 'recovered' => 0],
+            'device_reliability' => $this->deviceReliability($from, $to, $user),
             'quality' => $ticketsReady ? $this->qualityGaps($user) : [],
         ];
     }
@@ -338,9 +340,33 @@ class ItReportsController extends Controller
         ];
     }
 
-    /** @return array<string, int|string> */
-    private function automationOutcomes(Carbon $from, Carbon $to): array
+    /** @return array<string, int|string|null> */
+    private function automationOutcomes(Carbon $from, Carbon $to, User $user): array
     {
+        // Automation definitions and their run history are owned by the
+        // management-only Setup workspace. A read-only queue viewer must not
+        // receive application-wide run counts or a destination they cannot
+        // open.
+        if (! $user->canDo('it.manage')) {
+            return [
+                'access' => 'restricted',
+                'succeeded' => null,
+                'failed' => null,
+                'skipped' => null,
+                'href' => null,
+            ];
+        }
+
+        if (! Schema::hasTable('it_automation_runs')) {
+            return [
+                'access' => 'allowed',
+                'succeeded' => 0,
+                'failed' => 0,
+                'skipped' => 0,
+                'href' => null,
+            ];
+        }
+
         $counts = ItAutomationRun::query()
             ->whereBetween('started_at', [$from, $to])
             ->selectRaw('status, COUNT(*) AS aggregate')
@@ -348,6 +374,7 @@ class ItReportsController extends Controller
             ->pluck('aggregate', 'status');
 
         return [
+            'access' => 'allowed',
             'succeeded' => (int) ($counts['succeeded'] ?? 0),
             'failed' => (int) ($counts['failed'] ?? 0),
             'skipped' => (int) ($counts['skipped'] ?? 0),
@@ -388,18 +415,58 @@ class ItReportsController extends Controller
             ->all();
     }
 
-    /** @return array<string, int|string> */
+    /** @return array<string, int|string|null> */
     private function deviceReliability(Carbon $from, Carbon $to, User $user): array
     {
+        // IT owns the ticket projection, but Security & Devices remains the
+        // source of truth for Device identity and visibility. Do not turn an
+        // IT destination permission into a Device-existence side channel.
+        if (! $user->canDo('securityDevices.devices.view')) {
+            return [
+                'access' => 'restricted',
+                'affected_devices' => null,
+                'open_incidents' => null,
+                'recovered' => null,
+                'href' => null,
+            ];
+        }
+
+        if (! Schema::hasTable('it_ticket_links')) {
+            return [
+                'access' => 'allowed',
+                'affected_devices' => 0,
+                'open_incidents' => 0,
+                'recovered' => 0,
+                'href' => null,
+            ];
+        }
+
         $query = ItTicketLink::query()
             ->where('linkable_type', 'security_device')
             ->where('relationship', 'affected_device')
-            ->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user)->whereBetween('created_at', [$from, $to]));
+            ->whereIn('linkable_id', $this->deviceAccess->visibleDevices($user)->select('devices.id'))
+            ->whereHas('ticket', fn ($ticket) => $this->workAccess
+                ->applyViewScope($ticket, $user)
+                ->where('work_type', 'incident')
+                ->whereBetween('created_at', [$from, $to]));
 
         return [
+            'access' => 'allowed',
             'affected_devices' => (clone $query)->distinct('linkable_id')->count('linkable_id'),
-            'open_incidents' => (clone $query)->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user)->whereIn('status', ItTicket::OPEN_STATUSES))->count(),
-            'recovered' => (clone $query)->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user)->whereNotNull('monitoring_recovered_at'))->count(),
+            'open_incidents' => (clone $query)
+                ->whereHas('ticket', fn ($ticket) => $this->workAccess
+                    ->applyViewScope($ticket, $user)
+                    ->where('work_type', 'incident')
+                    ->whereIn('status', ItTicket::OPEN_STATUSES))
+                ->distinct('ticket_id')
+                ->count('ticket_id'),
+            'recovered' => (clone $query)
+                ->whereHas('ticket', fn ($ticket) => $this->workAccess
+                    ->applyViewScope($ticket, $user)
+                    ->where('work_type', 'incident')
+                    ->whereNotNull('monitoring_recovered_at'))
+                ->distinct('ticket_id')
+                ->count('ticket_id'),
             'href' => $this->ticketHref([
                 'device_linked' => 1,
                 'from' => $from->toDateString(),

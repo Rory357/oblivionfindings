@@ -8,8 +8,10 @@ use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceDocument;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
+use App\Domain\SecurityDevices\Services\DeviceDocumentLifecycleService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -18,9 +20,12 @@ use App\Models\SiteRoom;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class DeviceMutationAccessBoundaryTest extends TestCase
@@ -440,6 +445,148 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         ]);
     }
 
+    public function test_topology_relationship_lifecycle_retains_reasoned_history_and_audit_evidence(): void
+    {
+        $other = $this->deviceAt($this->allowedSite, 'Allowed downstream device');
+
+        $this->actingAs($this->manager)
+            ->post("/security-devices/devices/{$this->allowedDevice->id}/relationships", [
+                'other_device_id' => $other->id,
+                'relationship_type' => 'connected_to',
+                'direction' => 'downstream',
+                'port' => 'Port 8',
+            ])
+            ->assertRedirect();
+
+        $relationship = DeviceRelationship::query()->sole();
+        $this->assertSame($this->manager->id, $relationship->created_by_user_id);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'security_devices.relationship.created',
+            'auditable_id' => $relationship->id,
+        ]);
+
+        $this->actingAs($this->manager)
+            ->delete("/security-devices/devices/{$this->allowedDevice->id}/relationships/{$relationship->id}")
+            ->assertSessionHasErrors('reason');
+        $this->assertNull($relationship->fresh()->unlinked_at);
+
+        $this->actingAs($this->manager)
+            ->delete("/security-devices/devices/{$this->allowedDevice->id}/relationships/{$relationship->id}", [
+                'reason' => 'Approved network path replacement.',
+            ])
+            ->assertRedirect();
+
+        $relationship->refresh();
+        $this->assertNotNull($relationship->unlinked_at);
+        $this->assertSame($this->manager->id, $relationship->unlinked_by_user_id);
+        $this->assertSame('Approved network path replacement.', $relationship->unlink_reason);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'security_devices.relationship.unlinked',
+            'auditable_id' => $relationship->id,
+        ]);
+        $this->assertCount(0, $this->allowedDevice->fresh()->childRelationships);
+        try {
+            DB::table('device_relationships')
+                ->where('id', $relationship->id)
+                ->update(['unlink_reason' => 'Rewritten without lifecycle service']);
+            $this->fail('Retained relationship evidence was rewritten through a bulk update.');
+        } catch (QueryException) {
+            $this->assertSame('Approved network path replacement.', $relationship->fresh()->unlink_reason);
+        }
+        try {
+            DB::table('device_relationships')->where('id', $relationship->id)->delete();
+            $this->fail('Retained relationship evidence was deleted through a bulk delete.');
+        } catch (QueryException) {
+            $this->assertDatabaseHas('device_relationships', ['id' => $relationship->id]);
+        }
+        $this->actingAs($this->manager)
+            ->get("/security-devices/devices/{$this->allowedDevice->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('relationships.children', [])
+                ->where('relationshipHistory.children.0.id', $relationship->id)
+                ->where('relationshipHistory.children.0.device_id', $other->id)
+                ->where('relationshipHistory.children.0.unlinked_by', $this->manager->name)
+                ->where('relationshipHistory.children.0.unlink_reason', 'Approved network path replacement.'));
+
+        $this->actingAs($this->manager)
+            ->post("/security-devices/devices/{$this->allowedDevice->id}/relationships", [
+                'other_device_id' => $other->id,
+                'relationship_type' => 'connected_to',
+                'direction' => 'downstream',
+            ])
+            ->assertRedirect();
+        $this->assertSame(2, DeviceRelationship::query()->count());
+        $this->assertSame(1, DeviceRelationship::query()->active()->count());
+
+        $active = DeviceRelationship::query()->active()->sole();
+        try {
+            DB::table('device_relationships')
+                ->where('id', $active->id)
+                ->update(['port' => 'Unaudited bulk rewrite']);
+            $this->fail('Active Device relationship evidence was rewritten through a bulk update.');
+        } catch (QueryException) {
+            $this->assertNull($active->fresh()->port);
+        }
+        try {
+            $active->update(['port' => 'Unaudited rewrite']);
+            $this->fail('Active Device relationship evidence was rewritten in place.');
+        } catch (\UnexpectedValueException $exception) {
+            $this->assertStringContainsString('remove and recreate', $exception->getMessage());
+        }
+
+        try {
+            $relationship->delete();
+            $this->fail('Retained Device relationship evidence was deleted.');
+        } catch (\UnexpectedValueException $exception) {
+            $this->assertStringContainsString('cannot be deleted', $exception->getMessage());
+        }
+    }
+
+    public function test_topology_relationship_actor_evidence_survives_user_deletion_and_lossy_rollback_is_refused(): void
+    {
+        $actor = User::factory()->create();
+        $other = $this->deviceAt($this->allowedSite, 'Actor evidence peer');
+        $relationship = DeviceRelationship::query()->create([
+            'parent_device_id' => $this->allowedDevice->id,
+            'child_device_id' => $other->id,
+            'relationship_type' => 'connected_to',
+            'created_by_user_id' => $actor->id,
+        ]);
+
+        try {
+            DB::table('device_relationships')->insert([
+                'parent_device_id' => $other->id,
+                'child_device_id' => $this->allowedDevice->id,
+                'relationship_type' => 'powered_by',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->fail('A Device relationship was inserted without creation actor evidence.');
+        } catch (QueryException) {
+            $this->assertDatabaseMissing('device_relationships', [
+                'parent_device_id' => $other->id,
+                'child_device_id' => $this->allowedDevice->id,
+                'relationship_type' => 'powered_by',
+            ]);
+        }
+
+        try {
+            DB::table('users')->where('id', $actor->id)->delete();
+            $this->fail('The relationship creation actor was deleted and its evidence was lost.');
+        } catch (QueryException) {
+            $this->assertDatabaseHas('users', ['id' => $actor->id]);
+            $this->assertSame($actor->id, $relationship->fresh()->created_by_user_id);
+        }
+
+        $migration = require database_path('migrations/2026_08_06_000041_retain_device_relationship_history.php');
+        try {
+            $migration->down();
+            $this->fail('The retention migration rolled back after attributed lifecycle activity.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('attributed activity', $exception->getMessage());
+        }
+    }
+
     public function test_existing_child_links_cannot_bypass_target_scope_when_removed(): void
     {
         $hiddenAsset = Asset::factory()->create(['site_id' => $this->hiddenSite->id]);
@@ -454,6 +601,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
             'parent_device_id' => $this->allowedDevice->id,
             'child_device_id' => $this->hiddenDevice->id,
             'relationship_type' => 'connected_to',
+            'created_by_user_id' => $this->admin->id,
         ]);
 
         $this->actingAs($this->manager)
@@ -465,6 +613,26 @@ class DeviceMutationAccessBoundaryTest extends TestCase
 
         $this->assertNull($assetLink->fresh()->unlinked_at);
         $this->assertDatabaseHas('device_relationships', ['id' => $relationship->id]);
+
+        // Remove the unrelated hidden Asset provenance as an authorised repair
+        // before proving that retained topology history itself stays concealed.
+        DB::table('device_asset_links')->where('id', $assetLink->id)->update([
+            'unlinked_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('device_relationships')->where('id', $relationship->id)->update([
+            'unlinked_at' => now(),
+            'unlinked_by_user_id' => $this->admin->id,
+            'unlink_reason' => 'Hidden Site topology correction.',
+            'updated_at' => now(),
+        ]);
+        $this->actingAs($this->manager)
+            ->get("/security-devices/devices/{$this->allowedDevice->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('relationships.parents', [])
+                ->where('relationships.children', [])
+                ->where('relationshipHistory.parents', [])
+                ->where('relationshipHistory.children', []));
     }
 
     public function test_admin_can_manage_unassigned_stock_with_all_sites_access(): void
@@ -495,7 +663,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
 
     public function test_authorized_device_document_upload_download_and_delete_round_trip(): void
     {
-        Storage::fake('local');
+        Storage::fake('private');
 
         $this->actingAs($this->manager)
             ->post("/security-devices/devices/{$this->allowedDevice->id}/documents", [
@@ -506,7 +674,9 @@ class DeviceMutationAccessBoundaryTest extends TestCase
             ->assertRedirect();
 
         $document = DeviceDocument::query()->where('device_id', $this->allowedDevice->id)->firstOrFail();
-        Storage::disk('local')->assertExists($document->storage_path);
+        Storage::disk('private')->assertExists($document->storage_path);
+        $this->assertSame('private', $document->storage_disk);
+        $this->assertSame(64, strlen((string) $document->content_sha256));
 
         $this->actingAs($this->manager)
             ->get("/security-devices/devices/{$this->allowedDevice->id}/documents/{$document->id}")
@@ -515,10 +685,307 @@ class DeviceMutationAccessBoundaryTest extends TestCase
 
         $this->actingAs($this->manager)
             ->delete("/security-devices/devices/{$this->allowedDevice->id}/documents/{$document->id}")
+            ->assertSessionHasErrors('reason');
+        $this->assertNull($document->fresh()->removed_at);
+        Storage::disk('private')->assertExists($document->storage_path);
+
+        $this->actingAs($this->manager)
+            ->delete("/security-devices/devices/{$this->allowedDevice->id}/documents/{$document->id}", [
+                'reason' => 'Superseded by the verified current commissioning manual.',
+            ])
             ->assertRedirect();
 
-        $this->assertDatabaseMissing('device_documents', ['id' => $document->id]);
-        Storage::disk('local')->assertMissing($document->storage_path);
+        $removed = $document->fresh();
+        $this->assertNotNull($removed->removed_at);
+        $this->assertNotNull($removed->storage_deleted_at);
+        $this->assertSame($this->manager->id, $removed->removed_by_user_id);
+        $this->assertSame('Superseded by the verified current commissioning manual.', $removed->removal_reason);
+        Storage::disk('private')->assertMissing($document->storage_path);
+        $this->actingAs($this->manager)
+            ->get("/security-devices/devices/{$this->allowedDevice->id}/documents/{$document->id}")
+            ->assertNotFound();
+        $this->assertSame(0, $this->allowedDevice->fresh()->documents()->count());
+        $this->actingAs($this->manager)
+            ->get("/security-devices/devices/{$this->allowedDevice->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('documents', [])
+                ->where('documentHistory.0.id', $document->id)
+                ->where('documentHistory.0.status_label', 'Removed')
+                ->where('documentHistory.0.removed_by', $this->manager->name)
+                ->where('documentHistory.0.removal_reason', 'Superseded by the verified current commissioning manual.')
+                ->where('documentHistory.0.integrity_sha256', $removed->content_sha256));
+
+        $uploadAudit = AuditLog::query()
+            ->where('action', 'security_devices.device_document.uploaded')
+            ->where('auditable_id', $document->id)
+            ->sole();
+        $removeAudit = AuditLog::query()
+            ->where('action', 'security_devices.device_document.removed')
+            ->where('auditable_id', $document->id)
+            ->sole();
+        $this->assertSame('active', $uploadAudit->meta['after']['status']);
+        $this->assertSame('removed', $removeAudit->meta['after']['status']);
+        $this->assertSame($this->allowedDevice->id, $removeAudit->meta['scope']['device_id']);
+        $this->assertArrayNotHasKey('storage_path', $uploadAudit->meta);
+        $this->assertArrayNotHasKey('storage_path', $removeAudit->meta);
+
+        $this->expectException(\UnexpectedValueException::class);
+        $removed->delete();
+    }
+
+    public function test_device_document_integrity_and_removal_evidence_cannot_be_rewritten(): void
+    {
+        $document = DeviceDocument::query()->create([
+            'device_id' => $this->allowedDevice->id,
+            'uploaded_by_user_id' => $this->manager->id,
+            'title' => 'Immutable certificate',
+            'category' => 'compliance_cert',
+            'storage_disk' => 'private',
+            'storage_path' => 'device_documents/immutable.pdf',
+            'original_name' => 'immutable.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 7,
+            'content_sha256' => hash('sha256', 'content'),
+            'lifecycle_state' => DeviceDocument::STATE_ACTIVE,
+            'storage_verified_at' => now(),
+        ]);
+
+        $this->expectException(\UnexpectedValueException::class);
+        $document->forceFill(['content_sha256' => str_repeat('0', 64)])->save();
+    }
+
+    public function test_download_denies_tampered_private_bytes_and_moves_document_to_recovery_history(): void
+    {
+        Storage::fake('private');
+        $content = 'verified-content';
+        $path = 'device_documents/tamper.pdf';
+        Storage::disk('private')->put($path, $content);
+        $document = DeviceDocument::query()->create([
+            'device_id' => $this->allowedDevice->id,
+            'uploaded_by_user_id' => $this->manager->id,
+            'title' => 'Tamper protected certificate',
+            'category' => 'compliance_cert',
+            'storage_disk' => 'private',
+            'storage_path' => $path,
+            'original_name' => 'tamper.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => strlen($content),
+            'content_sha256' => hash('sha256', $content),
+            'lifecycle_state' => DeviceDocument::STATE_ACTIVE,
+            'storage_verified_at' => now(),
+        ]);
+        Storage::disk('private')->put($path, 'tampered-content');
+
+        $this->actingAs($this->manager)
+            ->get("/security-devices/devices/{$this->allowedDevice->id}/documents/{$document->id}")
+            ->assertStatus(409);
+
+        $this->assertSame('integrity_mismatch', $document->fresh()->lifecycle_error_code);
+        $this->assertSame(0, $this->allowedDevice->fresh()->documents()->count());
+        $this->assertSame(1, $this->allowedDevice->fresh()->documentHistory()->count());
+    }
+
+    public function test_device_document_upload_compensates_private_blob_when_metadata_creation_fails(): void
+    {
+        Storage::fake('private');
+        $failOnce = true;
+        DeviceDocument::creating(function () use (&$failOnce): void {
+            if ($failOnce) {
+                $failOnce = false;
+                throw new \RuntimeException('Simulated metadata failure.');
+            }
+        });
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->manager)
+                ->post("/security-devices/devices/{$this->allowedDevice->id}/documents", [
+                    'title' => 'Uncommitted manual',
+                    'category' => 'manual',
+                    'file' => UploadedFile::fake()->createWithContent('uncommitted.pdf', 'temporary-content'),
+                ]);
+            $this->fail('The simulated metadata failure was not raised.');
+        } catch (\RuntimeException $failure) {
+            $this->assertSame('Simulated metadata failure.', $failure->getMessage());
+        }
+
+        $this->assertDatabaseMissing('device_documents', [
+            'device_id' => $this->allowedDevice->id,
+            'title' => 'Uncommitted manual',
+        ]);
+        $this->assertSame([], Storage::disk('private')->allFiles("device_documents/{$this->allowedDevice->id}"));
+    }
+
+    public function test_staged_upload_recovers_after_activation_audit_transaction_fails(): void
+    {
+        Storage::fake('private');
+        $failOnce = true;
+        AuditLog::creating(function (AuditLog $audit) use (&$failOnce): void {
+            if ($failOnce && $audit->action === 'security_devices.device_document.uploaded') {
+                $failOnce = false;
+                throw new \RuntimeException('Simulated activation audit failure.');
+            }
+        });
+
+        $this->actingAs($this->manager)
+            ->post("/security-devices/devices/{$this->allowedDevice->id}/documents", [
+                'title' => 'Recoverable upload',
+                'category' => 'manual',
+                'file' => UploadedFile::fake()->createWithContent('recoverable.pdf', 'recoverable-content'),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('warning');
+
+        $document = DeviceDocument::query()->where('title', 'Recoverable upload')->sole();
+        $this->assertSame(DeviceDocument::STATE_UPLOAD_STAGED, $document->lifecycle_state);
+        $this->assertNotNull($document->upload_operation_uuid);
+        $this->assertNotNull($document->staged_storage_path);
+        $this->assertTrue(
+            Storage::disk('private')->exists($document->storage_path)
+                || Storage::disk('private')->exists($document->staged_storage_path),
+        );
+
+        $this->assertTrue(app(DeviceDocumentLifecycleService::class)->reconcileDocument($document->id));
+        $this->assertTrue($document->fresh()->isDownloadable());
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'security_devices.device_document.uploaded',
+            'auditable_id' => $document->id,
+        ]);
+    }
+
+    public function test_device_document_pending_removal_survives_interruption_and_reconciles_from_quarantine_intent(): void
+    {
+        Storage::fake('private');
+        $content = 'retained-private-content';
+        $path = 'device_documents/retained.pdf';
+        Storage::disk('private')->put($path, $content);
+        $document = DeviceDocument::query()->create([
+            'device_id' => $this->allowedDevice->id,
+            'uploaded_by_user_id' => $this->manager->id,
+            'title' => 'Retained certificate',
+            'category' => 'compliance_cert',
+            'storage_disk' => 'private',
+            'storage_path' => $path,
+            'original_name' => 'retained.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => strlen($content),
+            'content_sha256' => hash('sha256', $content),
+            'lifecycle_state' => DeviceDocument::STATE_ACTIVE,
+            'storage_verified_at' => now(),
+        ]);
+        $document->requestGovernedRemoval(
+            operationUuid: (string) Str::orderedUuid(),
+            actorId: $this->manager->id,
+            reason: 'Superseded by a verified replacement certificate.',
+            quarantinePath: 'device_documents/.quarantine/interrupted-removal',
+            requestedAt: now(),
+        );
+
+        $this->assertSame(DeviceDocument::STATE_REMOVAL_PENDING, $document->fresh()->lifecycle_state);
+        Storage::disk('private')->assertExists($path);
+
+        $this->assertTrue(app(DeviceDocumentLifecycleService::class)->reconcileDocument($document->id));
+        $this->assertSame(DeviceDocument::STATE_REMOVED, $document->fresh()->lifecycle_state);
+        $this->assertNotNull($document->fresh()->storage_deleted_at);
+        Storage::disk('private')->assertMissing($path);
+    }
+
+    public function test_device_document_removal_recovers_after_final_audit_transaction_fails(): void
+    {
+        Storage::fake('private');
+        $content = 'rollback-private-content';
+        $path = 'device_documents/rollback.pdf';
+        Storage::disk('private')->put($path, $content);
+        $document = DeviceDocument::query()->create([
+            'device_id' => $this->allowedDevice->id,
+            'uploaded_by_user_id' => $this->manager->id,
+            'title' => 'Rollback certificate',
+            'category' => 'compliance_cert',
+            'storage_disk' => 'private',
+            'storage_path' => $path,
+            'original_name' => 'rollback.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => strlen($content),
+            'content_sha256' => hash('sha256', $content),
+            'lifecycle_state' => DeviceDocument::STATE_ACTIVE,
+            'storage_verified_at' => now(),
+        ]);
+        $failOnce = true;
+        AuditLog::creating(function (AuditLog $audit) use (&$failOnce): void {
+            if ($failOnce && $audit->action === 'security_devices.device_document.removed') {
+                $failOnce = false;
+                throw new \RuntimeException('Simulated audit failure.');
+            }
+        });
+
+        $this->actingAs($this->manager)
+            ->delete("/security-devices/devices/{$this->allowedDevice->id}/documents/{$document->id}", [
+                'reason' => 'Superseded by a verified replacement certificate.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('warning');
+
+        $pending = $document->fresh();
+        $this->assertSame(DeviceDocument::STATE_REMOVAL_PENDING, $pending->lifecycle_state);
+        $this->assertNotNull($pending->quarantine_storage_path);
+        Storage::disk('private')->assertExists($pending->quarantine_storage_path);
+
+        $this->assertTrue(app(DeviceDocumentLifecycleService::class)->reconcileDocument($document->id));
+        $this->assertSame(DeviceDocument::STATE_REMOVED, $document->fresh()->lifecycle_state);
+        $this->assertNotNull($document->fresh()->storage_deleted_at);
+    }
+
+    public function test_document_reconciler_does_not_let_completed_history_starve_pending_storage_work(): void
+    {
+        Storage::fake('private');
+        DB::table('device_documents')->insert([
+            'device_id' => $this->allowedDevice->id,
+            'uploaded_by_user_id' => $this->manager->id,
+            'title' => 'Completed removal history',
+            'category' => 'manual',
+            'storage_disk' => DeviceDocument::DISK,
+            'storage_path' => 'device_documents/already-removed.pdf',
+            'original_name' => 'already-removed.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 7,
+            'content_sha256' => hash('sha256', 'removed'),
+            'lifecycle_state' => DeviceDocument::STATE_REMOVED,
+            'removed_at' => now()->subMinute(),
+            'removed_by_user_id' => $this->manager->id,
+            'removal_reason' => 'Superseded by verified current evidence.',
+            'storage_deleted_at' => now()->subMinute(),
+            'created_at' => now()->subHour(),
+            'updated_at' => now()->subMinute(),
+        ]);
+
+        $content = 'recoverable-stage';
+        $operationUuid = (string) Str::orderedUuid();
+        $stagedPath = "device_documents/.staging/{$operationUuid}.pdf";
+        $finalPath = "device_documents/{$this->allowedDevice->id}/{$operationUuid}.pdf";
+        Storage::disk('private')->put($stagedPath, $content);
+        $pending = DeviceDocument::query()->create([
+            'device_id' => $this->allowedDevice->id,
+            'uploaded_by_user_id' => $this->manager->id,
+            'title' => 'Pending staged evidence',
+            'category' => 'manual',
+            'storage_disk' => DeviceDocument::DISK,
+            'storage_path' => $finalPath,
+            'original_name' => 'pending.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => strlen($content),
+            'content_sha256' => hash('sha256', $content),
+            'lifecycle_state' => DeviceDocument::STATE_UPLOAD_STAGED,
+            'upload_operation_uuid' => $operationUuid,
+            'upload_requested_by_user_id' => $this->manager->id,
+            'staged_storage_path' => $stagedPath,
+        ]);
+
+        $result = app(DeviceDocumentLifecycleService::class)->reconcileAll(1);
+
+        $this->assertSame(1, $result['processed']);
+        $this->assertSame(1, $result['recovered']);
+        $this->assertSame(0, $result['pending']);
+        $this->assertTrue($pending->fresh()->isDownloadable());
     }
 
     private function deviceAt(Site $site, string $name): Device

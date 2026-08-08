@@ -33,7 +33,12 @@ export type PerfStat = {
     amber?: boolean;
 };
 
-export type PerfNeed = { label: string; icon: string; tab: string; status?: string };
+export type PerfNeed = {
+    label: string;
+    icon: string;
+    tab: string;
+    status?: string;
+};
 export type PerfCompliance = { label: string; ok: boolean };
 
 export type PerfHeroData = {
@@ -57,7 +62,8 @@ const HERO_STYLE: CSSProperties = {
     ['--hr-amber' as string]: 'oklch(0.86 0.13 90)',
     background:
         'linear-gradient(120deg, color-mix(in oklch, var(--primary) 72%, black 22%), var(--primary) 58%, color-mix(in oklch, var(--primary) 90%, white 8%))',
-    boxShadow: '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
+    boxShadow:
+        '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
 };
 
 const NEED_ICONS: Record<string, LucideIcon> = {
@@ -93,7 +99,7 @@ export function PerformanceHero({
         >
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
                 <div className="absolute -top-20 right-[22%] h-60 w-60 rounded-full bg-primary-foreground/[0.05]" />
-                <div className="absolute -bottom-[90px] right-[6%] h-50 w-50 rounded-full bg-primary-foreground/[0.04]" />
+                <div className="absolute right-[6%] -bottom-[90px] h-50 w-50 rounded-full bg-primary-foreground/[0.04]" />
             </div>
 
             <div className="relative flex flex-wrap items-stretch">
@@ -104,7 +110,7 @@ export function PerformanceHero({
                             <Award className="h-[26px] w-[26px]" />
                         </span>
                         <div className="min-w-0">
-                            <h1 className="text-[28px] font-bold leading-[1.05] tracking-tight">
+                            <h1 className="text-[28px] leading-[1.05] font-bold tracking-tight">
                                 Performance &amp; development
                             </h1>
                             <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] font-medium text-primary-foreground/75">
@@ -112,7 +118,9 @@ export function PerformanceHero({
                                     <CalendarDays className="h-3.5 w-3.5" />
                                     {dateLabel}
                                 </span>
-                                <span className="text-primary-foreground/40">·</span>
+                                <span className="text-primary-foreground/40">
+                                    ·
+                                </span>
                                 <span className="inline-flex items-center gap-1.5">
                                     <ShieldCheck className="h-3.5 w-3.5" />
                                     {subtitle}
@@ -122,7 +130,7 @@ export function PerformanceHero({
                     </div>
 
                     {/* stats */}
-                    <div className="-ml-3 mt-[18px] flex flex-wrap gap-0.5">
+                    <div className="mt-[18px] -ml-3 flex flex-wrap gap-0.5">
                         {hero.stats.map((s) => (
                             <HeroStat
                                 key={s.key}
@@ -147,26 +155,46 @@ export function PerformanceHero({
                             </button>
                         ) : null}
                         {canManage && handlers?.onLogSupervision ? (
-                            <QuickAction icon={UserCheck} label="Log supervision" onClick={handlers.onLogSupervision} />
+                            <QuickAction
+                                icon={UserCheck}
+                                label="Log supervision"
+                                onClick={handlers.onLogSupervision}
+                            />
                         ) : null}
                         {canManage && handlers?.onNewGoal ? (
-                            <QuickAction icon={Target} label="New goal / OKR" onClick={handlers.onNewGoal} />
+                            <QuickAction
+                                icon={Target}
+                                label="New goal / OKR"
+                                onClick={handlers.onNewGoal}
+                            />
                         ) : null}
                         {canManage && handlers?.onRequest360 ? (
-                            <QuickAction icon={MessageSquare} label="Request 360" onClick={handlers.onRequest360} />
+                            <QuickAction
+                                icon={MessageSquare}
+                                label="Request 360"
+                                onClick={handlers.onRequest360}
+                            />
                         ) : null}
                         {canManage && handlers?.onStartPip ? (
-                            <QuickAction icon={TrendingUp} label="Start PIP" onClick={handlers.onStartPip} />
+                            <QuickAction
+                                icon={TrendingUp}
+                                label="Start PIP"
+                                onClick={handlers.onStartPip}
+                            />
                         ) : null}
                         {handlers?.onExport ? (
-                            <QuickAction icon={Download} label="Export" onClick={handlers.onExport} />
+                            <QuickAction
+                                icon={Download}
+                                label="Export"
+                                onClick={handlers.onExport}
+                            />
                         ) : null}
                     </div>
 
                     {/* needs you */}
                     {hero.needs.length > 0 ? (
                         <div className="mt-[18px] flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary-foreground/50">
+                            <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/50 uppercase">
                                 Needs you
                             </span>
                             {hero.needs.map((chip) => {
@@ -176,7 +204,7 @@ export function PerformanceHero({
                                         key={chip.label}
                                         type="button"
                                         onClick={() => handlers?.onNeed?.(chip)}
-                                        className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/[0.13] py-1.5 pl-2.5 pr-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
+                                        className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/[0.13] py-1.5 pr-3 pl-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
                                     >
                                         <span className="h-1.5 w-1.5 flex-none rounded-full bg-[color:var(--hr-amber)] shadow-[0_0_0_3px_color-mix(in_oklch,var(--hr-amber)_32%,transparent)]" />
                                         <Icon className="h-[13px] w-[13px]" />
@@ -189,8 +217,8 @@ export function PerformanceHero({
                 </div>
 
                 {/* ── right rail: compliance ── */}
-                <div className="flex w-full flex-none flex-col gap-3 border-t border-primary-foreground/15 bg-black/[0.08] p-[24px] sm:w-[300px] sm:border-l sm:border-t-0">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary-foreground/55">
+                <div className="flex w-full flex-none flex-col gap-3 border-t border-primary-foreground/15 bg-black/[0.08] p-[24px] sm:w-[300px] sm:border-t-0 sm:border-l">
+                    <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/55 uppercase">
                         Compliance
                     </span>
                     <div className="flex flex-col gap-2.5">
@@ -207,7 +235,11 @@ export function PerformanceHero({
                                             : 'bg-[color:var(--hr-amber)]/20 text-[color:var(--hr-amber)]',
                                     )}
                                 >
-                                    {c.ok ? <Check className="h-2.5 w-2.5" /> : <Clock className="h-2.5 w-2.5" />}
+                                    {c.ok ? (
+                                        <Check className="h-2.5 w-2.5" />
+                                    ) : (
+                                        <Clock className="h-2.5 w-2.5" />
+                                    )}
                                 </span>
                                 {c.label}
                             </div>
@@ -236,7 +268,7 @@ function HeroStat({
             onClick={onClick}
             className="flex flex-col items-start gap-0.5 rounded-[10px] px-3 py-2 text-left transition-colors hover:bg-primary-foreground/10"
         >
-            <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.09em] text-primary-foreground/60">
+            <span className="text-[10px] font-bold tracking-[0.09em] whitespace-nowrap text-primary-foreground/60 uppercase">
                 {label}
             </span>
             <span
@@ -258,7 +290,11 @@ function HeroStat({
 /*  hub ↔ satellite feels continuous.                                  */
 /* ------------------------------------------------------------------ */
 
-export type SatelliteStat = { label: string; value: string | number; amber?: boolean };
+export type SatelliteStat = {
+    label: string;
+    value: string | number;
+    amber?: boolean;
+};
 
 export function PerformanceSatelliteHero({
     icon: Icon,
@@ -284,7 +320,7 @@ export function PerformanceSatelliteHero({
         >
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
                 <div className="absolute -top-24 right-[18%] h-56 w-56 rounded-full bg-primary-foreground/[0.05]" />
-                <div className="absolute -bottom-[80px] right-[4%] h-44 w-44 rounded-full bg-primary-foreground/[0.04]" />
+                <div className="absolute right-[4%] -bottom-[80px] h-44 w-44 rounded-full bg-primary-foreground/[0.04]" />
             </div>
 
             <div className="relative flex flex-wrap items-center gap-x-6 gap-y-4 p-[24px_28px]">
@@ -301,20 +337,33 @@ export function PerformanceSatelliteHero({
                             <Icon className="h-[22px] w-[22px]" />
                         </span>
                         <div className="min-w-0">
-                            <h1 className="text-[22px] font-bold leading-[1.1] tracking-tight">{title}</h1>
+                            <h1 className="text-[22px] leading-[1.1] font-bold tracking-tight">
+                                {title}
+                            </h1>
                             {description ? (
-                                <p className="mt-1 text-[13px] font-medium text-primary-foreground/75">{description}</p>
+                                <p className="mt-1 text-[13px] font-medium text-primary-foreground/75">
+                                    {description}
+                                </p>
                             ) : null}
                         </div>
                     </div>
                     {stats.length > 0 ? (
-                        <div className="-ml-3 mt-3 flex flex-wrap gap-0.5">
+                        <div className="mt-3 -ml-3 flex flex-wrap gap-0.5">
                             {stats.map((s) => (
-                                <div key={s.label} className="flex flex-col items-start gap-0.5 rounded-[10px] px-3 py-1.5 text-left">
-                                    <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.09em] text-primary-foreground/60">
+                                <div
+                                    key={s.label}
+                                    className="flex flex-col items-start gap-0.5 rounded-[10px] px-3 py-1.5 text-left"
+                                >
+                                    <span className="text-[10px] font-bold tracking-[0.09em] whitespace-nowrap text-primary-foreground/60 uppercase">
                                         {s.label}
                                     </span>
-                                    <span className={cn('text-[19px] font-bold tabular-nums', s.amber && 'text-[color:var(--hr-amber)]')}>
+                                    <span
+                                        className={cn(
+                                            'text-[19px] font-bold tabular-nums',
+                                            s.amber &&
+                                                'text-[color:var(--hr-amber)]',
+                                        )}
+                                    >
                                         {s.value}
                                     </span>
                                 </div>
@@ -323,7 +372,11 @@ export function PerformanceSatelliteHero({
                     ) : null}
                 </div>
 
-                {actions ? <div className="flex flex-none flex-wrap items-center gap-2">{actions}</div> : null}
+                {actions ? (
+                    <div className="flex flex-none flex-wrap items-center gap-2">
+                        {actions}
+                    </div>
+                ) : null}
             </div>
         </div>
     );

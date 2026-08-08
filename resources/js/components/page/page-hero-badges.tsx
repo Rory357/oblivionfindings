@@ -3,10 +3,19 @@ import { ArrowRight, ChevronDown } from 'lucide-react';
 import { type ComponentType, type ReactNode, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
-export type PageHeroBadgeTone = 'default' | 'success' | 'warning' | 'critical' | 'info';
+export type PageHeroBadgeTone =
+    | 'default'
+    | 'success'
+    | 'warning'
+    | 'critical'
+    | 'info';
 
 export type PageHeroBadgePopoverItemTone = 'critical' | 'warning' | 'info';
 
@@ -75,14 +84,20 @@ const ITEM_TONE_CLASSES: Record<PageHeroBadgePopoverItemTone, string> = {
     info: 'bg-accent text-primary',
 };
 
-export function PageHeroBadges({ badges, alignResponsive = true, className }: PageHeroBadgesProps) {
+export function PageHeroBadges({
+    badges,
+    alignResponsive = true,
+    className,
+}: PageHeroBadgesProps) {
     if (badges.length === 0) return null;
 
     return (
         <div
             className={cn(
                 'mt-3 flex flex-wrap items-center gap-2',
-                alignResponsive ? 'justify-center md:justify-start' : 'justify-start',
+                alignResponsive
+                    ? 'justify-center md:justify-start'
+                    : 'justify-start',
                 className,
             )}
         >
@@ -106,18 +121,27 @@ function PageHeroBadgeItem({ badge }: { badge: PageHeroBadge }) {
             className={cn(
                 'inline-flex items-center gap-1.5 border',
                 TONE_CLASSES[tone],
-                pinned && 'ring-2 ring-primary-foreground/40 ring-offset-1 ring-offset-transparent',
+                pinned &&
+                    'ring-2 ring-primary-foreground/40 ring-offset-1 ring-offset-transparent',
             )}
             aria-label={badge['aria-label']}
         >
             {badge.dot ? (
-                <span className={cn('inline-block h-1.5 w-1.5 shrink-0 rounded-full', DOT_CLASSES[tone])} />
+                <span
+                    className={cn(
+                        'inline-block h-1.5 w-1.5 shrink-0 rounded-full',
+                        DOT_CLASSES[tone],
+                    )}
+                />
             ) : null}
             {Icon ? <Icon className="mr-0.5 h-3 w-3" /> : null}
             {badge.label}
             {hasPopover ? (
                 <ChevronDown
-                    className={cn('ml-0.5 h-2.5 w-2.5 transition-transform duration-150', open && 'rotate-180')}
+                    className={cn(
+                        'ml-0.5 h-2.5 w-2.5 transition-transform duration-150',
+                        open && 'rotate-180',
+                    )}
                 />
             ) : null}
         </Badge>
@@ -132,7 +156,7 @@ function PageHeroBadgeItem({ badge }: { badge: PageHeroBadge }) {
                         onMouseEnter={() => setHover(true)}
                         onMouseLeave={() => setHover(false)}
                         onClick={() => setPinned((v) => !v)}
-                        className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        className="rounded-full focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
                         aria-label={badge['aria-label']}
                         aria-expanded={open}
                     >
@@ -161,7 +185,7 @@ function PageHeroBadgeItem({ badge }: { badge: PageHeroBadge }) {
             <button
                 type="button"
                 onClick={badge.onClick}
-                className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                className="rounded-full focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
                 aria-label={badge['aria-label']}
             >
                 {inner}
@@ -172,13 +196,21 @@ function PageHeroBadgeItem({ badge }: { badge: PageHeroBadge }) {
     return <span>{inner}</span>;
 }
 
-function PageHeroBadgePopoverBody({ popover }: { popover: PageHeroBadgePopover }) {
+function PageHeroBadgePopoverBody({
+    popover,
+}: {
+    popover: PageHeroBadgePopover;
+}) {
     return (
         <div className="overflow-hidden">
             <div className="border-b border-border px-3.5 py-3">
-                <div className="text-sm font-semibold tracking-tight">{popover.title}</div>
+                <div className="text-sm font-semibold tracking-tight">
+                    {popover.title}
+                </div>
                 {popover.subtitle ? (
-                    <div className="mt-0.5 text-[11.5px] text-muted-foreground">{popover.subtitle}</div>
+                    <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+                        {popover.subtitle}
+                    </div>
                 ) : null}
             </div>
             {popover.items && popover.items.length > 0 ? (
@@ -200,13 +232,17 @@ function PageHeroBadgePopoverBody({ popover }: { popover: PageHeroBadgePopover }
                             <>
                                 {tile}
                                 <span className="min-w-0 flex-1">
-                                    <span className="block font-medium leading-snug text-foreground">{item.label}</span>
+                                    <span className="block leading-snug font-medium text-foreground">
+                                        {item.label}
+                                    </span>
                                     {item.sub ? (
-                                        <span className="mt-px block text-[11px] text-muted-foreground">{item.sub}</span>
+                                        <span className="mt-px block text-[11px] text-muted-foreground">
+                                            {item.sub}
+                                        </span>
                                     ) : null}
                                 </span>
                                 {item.meta ? (
-                                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                                    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
                                         {item.meta}
                                     </span>
                                 ) : null}
@@ -215,7 +251,11 @@ function PageHeroBadgePopoverBody({ popover }: { popover: PageHeroBadgePopover }
                         const className =
                             'flex items-center gap-2.5 px-3.5 py-2 text-[12.5px] text-foreground transition-colors hover:bg-muted';
                         return item.href ? (
-                            <Link key={i} href={item.href} className={className}>
+                            <Link
+                                key={i}
+                                href={item.href}
+                                className={className}
+                            >
                                 {body}
                             </Link>
                         ) : (

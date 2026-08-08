@@ -1,22 +1,14 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, useForm, router } from '@inertiajs/react';
-import { ConfirmDialog, LedgerTabsFooter, useRowContextMenu, type RowCtxItem } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    ConfirmDialog,
+    LedgerTabsFooter,
+    useRowContextMenu,
+    type RowCtxItem,
+} from '@/components/finance';
+import { PageHero, PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -26,7 +18,20 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Coins, Plus, Pencil, Trash2, CircleDollarSign } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/react';
+import { CircleDollarSign, Coins, Pencil, Plus, Trash2 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type Currency = {
@@ -94,7 +99,9 @@ function CreateCurrencyDialog() {
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Create Currency</DialogTitle>
-                    <DialogDescription>Add a new currency for multi-currency transactions.</DialogDescription>
+                    <DialogDescription>
+                        Add a new currency for multi-currency transactions.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -103,21 +110,36 @@ function CreateCurrencyDialog() {
                             <Input
                                 id="curr-code"
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value.toUpperCase())}
+                                onChange={(e) =>
+                                    setData(
+                                        'code',
+                                        e.target.value.toUpperCase(),
+                                    )
+                                }
                                 placeholder="e.g. AUD"
                                 maxLength={3}
                             />
-                            {errors.code && <p className="text-sm text-destructive">{errors.code}</p>}
+                            {errors.code && (
+                                <p className="text-sm text-destructive">
+                                    {errors.code}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="curr-name">Name *</Label>
                             <Input
                                 id="curr-name"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                                 placeholder="e.g. Australian Dollar"
                             />
-                            {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                            {errors.name && (
+                                <p className="text-sm text-destructive">
+                                    {errors.name}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
@@ -126,21 +148,34 @@ function CreateCurrencyDialog() {
                             <Input
                                 id="curr-symbol"
                                 value={data.symbol}
-                                onChange={(e) => setData('symbol', e.target.value)}
+                                onChange={(e) =>
+                                    setData('symbol', e.target.value)
+                                }
                                 placeholder="e.g. A$"
                                 maxLength={10}
                             />
-                            {errors.symbol && <p className="text-sm text-destructive">{errors.symbol}</p>}
+                            {errors.symbol && (
+                                <p className="text-sm text-destructive">
+                                    {errors.symbol}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="curr-decimals">Decimal Places</Label>
+                            <Label htmlFor="curr-decimals">
+                                Decimal Places
+                            </Label>
                             <Input
                                 id="curr-decimals"
                                 type="number"
                                 min={0}
                                 max={6}
                                 value={data.decimal_places}
-                                onChange={(e) => setData('decimal_places', parseInt(e.target.value) || 2)}
+                                onChange={(e) =>
+                                    setData(
+                                        'decimal_places',
+                                        parseInt(e.target.value) || 2,
+                                    )
+                                }
                             />
                         </div>
                         <div className="space-y-1.5">
@@ -151,9 +186,15 @@ function CreateCurrencyDialog() {
                                 step="0.000001"
                                 min="0.000001"
                                 value={data.exchange_rate}
-                                onChange={(e) => setData('exchange_rate', e.target.value)}
+                                onChange={(e) =>
+                                    setData('exchange_rate', e.target.value)
+                                }
                             />
-                            {errors.exchange_rate && <p className="text-sm text-destructive">{errors.exchange_rate}</p>}
+                            {errors.exchange_rate && (
+                                <p className="text-sm text-destructive">
+                                    {errors.exchange_rate}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="flex items-center gap-6">
@@ -161,21 +202,38 @@ function CreateCurrencyDialog() {
                             <Checkbox
                                 id="curr-base"
                                 checked={data.is_base}
-                                onCheckedChange={(checked) => setData('is_base', checked === true)}
+                                onCheckedChange={(checked) =>
+                                    setData('is_base', checked === true)
+                                }
                             />
-                            <Label htmlFor="curr-base" className="font-normal">Base Currency</Label>
+                            <Label htmlFor="curr-base" className="font-normal">
+                                Base Currency
+                            </Label>
                         </div>
                         <div className="flex items-center gap-2">
                             <Checkbox
                                 id="curr-active"
                                 checked={data.is_active}
-                                onCheckedChange={(checked) => setData('is_active', checked === true)}
+                                onCheckedChange={(checked) =>
+                                    setData('is_active', checked === true)
+                                }
                             />
-                            <Label htmlFor="curr-active" className="font-normal">Active</Label>
+                            <Label
+                                htmlFor="curr-active"
+                                className="font-normal"
+                            >
+                                Active
+                            </Label>
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Creating...' : 'Create'}
                         </Button>
@@ -215,28 +273,47 @@ function EditCurrencyDialog({ currency }: { currency: Currency }) {
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Edit Currency</DialogTitle>
-                    <DialogDescription>Update currency details and exchange rate.</DialogDescription>
+                    <DialogDescription>
+                        Update currency details and exchange rate.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                            <Label htmlFor="edit-curr-code">Code (ISO 4217) *</Label>
+                            <Label htmlFor="edit-curr-code">
+                                Code (ISO 4217) *
+                            </Label>
                             <Input
                                 id="edit-curr-code"
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value.toUpperCase())}
+                                onChange={(e) =>
+                                    setData(
+                                        'code',
+                                        e.target.value.toUpperCase(),
+                                    )
+                                }
                                 maxLength={3}
                             />
-                            {errors.code && <p className="text-sm text-destructive">{errors.code}</p>}
+                            {errors.code && (
+                                <p className="text-sm text-destructive">
+                                    {errors.code}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="edit-curr-name">Name *</Label>
                             <Input
                                 id="edit-curr-name"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                             />
-                            {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                            {errors.name && (
+                                <p className="text-sm text-destructive">
+                                    {errors.name}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
@@ -245,33 +322,54 @@ function EditCurrencyDialog({ currency }: { currency: Currency }) {
                             <Input
                                 id="edit-curr-symbol"
                                 value={data.symbol}
-                                onChange={(e) => setData('symbol', e.target.value)}
+                                onChange={(e) =>
+                                    setData('symbol', e.target.value)
+                                }
                                 maxLength={10}
                             />
-                            {errors.symbol && <p className="text-sm text-destructive">{errors.symbol}</p>}
+                            {errors.symbol && (
+                                <p className="text-sm text-destructive">
+                                    {errors.symbol}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="edit-curr-decimals">Decimal Places</Label>
+                            <Label htmlFor="edit-curr-decimals">
+                                Decimal Places
+                            </Label>
                             <Input
                                 id="edit-curr-decimals"
                                 type="number"
                                 min={0}
                                 max={6}
                                 value={data.decimal_places}
-                                onChange={(e) => setData('decimal_places', parseInt(e.target.value) || 2)}
+                                onChange={(e) =>
+                                    setData(
+                                        'decimal_places',
+                                        parseInt(e.target.value) || 2,
+                                    )
+                                }
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="edit-curr-rate">Rate to NZD *</Label>
+                            <Label htmlFor="edit-curr-rate">
+                                Rate to NZD *
+                            </Label>
                             <Input
                                 id="edit-curr-rate"
                                 type="number"
                                 step="0.000001"
                                 min="0.000001"
                                 value={data.exchange_rate}
-                                onChange={(e) => setData('exchange_rate', e.target.value)}
+                                onChange={(e) =>
+                                    setData('exchange_rate', e.target.value)
+                                }
                             />
-                            {errors.exchange_rate && <p className="text-sm text-destructive">{errors.exchange_rate}</p>}
+                            {errors.exchange_rate && (
+                                <p className="text-sm text-destructive">
+                                    {errors.exchange_rate}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="flex items-center gap-6">
@@ -279,21 +377,41 @@ function EditCurrencyDialog({ currency }: { currency: Currency }) {
                             <Checkbox
                                 id="edit-curr-base"
                                 checked={data.is_base}
-                                onCheckedChange={(checked) => setData('is_base', checked === true)}
+                                onCheckedChange={(checked) =>
+                                    setData('is_base', checked === true)
+                                }
                             />
-                            <Label htmlFor="edit-curr-base" className="font-normal">Base Currency</Label>
+                            <Label
+                                htmlFor="edit-curr-base"
+                                className="font-normal"
+                            >
+                                Base Currency
+                            </Label>
                         </div>
                         <div className="flex items-center gap-2">
                             <Checkbox
                                 id="edit-curr-active"
                                 checked={data.is_active}
-                                onCheckedChange={(checked) => setData('is_active', checked === true)}
+                                onCheckedChange={(checked) =>
+                                    setData('is_active', checked === true)
+                                }
                             />
-                            <Label htmlFor="edit-curr-active" className="font-normal">Active</Label>
+                            <Label
+                                htmlFor="edit-curr-active"
+                                className="font-normal"
+                            >
+                                Active
+                            </Label>
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Saving...' : 'Save Changes'}
                         </Button>
@@ -324,7 +442,13 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
     const rowMenuItems = (currency: Currency): RowCtxItem[] => {
         const items: RowCtxItem[] = [];
         if (!currency.is_base) {
-            items.push({ kind: 'item', label: 'Delete', icon: Trash2, tone: 'critical', onSelect: () => setDeleteTarget(currency) });
+            items.push({
+                kind: 'item',
+                label: 'Delete',
+                icon: Trash2,
+                tone: 'critical',
+                onSelect: () => setDeleteTarget(currency),
+            });
         }
         return items;
     };
@@ -335,7 +459,8 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         footer={<LedgerTabsFooter active="currencies" />}
                         icon={Coins}
                         title="Currencies"
@@ -343,7 +468,12 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                         stats={[
                             { label: 'Total', value: currencies.length },
                             { label: 'Active', value: activeCurrencies.length },
-                            { label: 'Base', value: baseCurrency ? baseCurrency.code : 'Not set' },
+                            {
+                                label: 'Base',
+                                value: baseCurrency
+                                    ? baseCurrency.code
+                                    : 'Not set',
+                            },
                         ]}
                         actions={<CreateCurrencyDialog />}
                     />
@@ -357,8 +487,12 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                                 <Coins className="h-5 w-5 text-primary" />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Active Currencies</p>
-                                <p className="text-2xl font-bold">{activeCurrencies.length}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Active Currencies
+                                </p>
+                                <p className="text-2xl font-bold">
+                                    {activeCurrencies.length}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -368,8 +502,14 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                                 <CircleDollarSign className="h-5 w-5 text-primary" />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Base Currency</p>
-                                <p className="text-2xl font-bold">{baseCurrency ? `${baseCurrency.code} (${baseCurrency.symbol})` : 'Not set'}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Base Currency
+                                </p>
+                                <p className="text-2xl font-bold">
+                                    {baseCurrency
+                                        ? `${baseCurrency.code} (${baseCurrency.symbol})`
+                                        : 'Not set'}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -389,71 +529,106 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                                     <TableHead>Code</TableHead>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Symbol</TableHead>
-                                    <TableHead className="text-right">Exchange Rate (to NZD)</TableHead>
+                                    <TableHead className="text-right">
+                                        Exchange Rate (to NZD)
+                                    </TableHead>
                                     <TableHead>Rate Updated</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="text-right">
+                                        Actions
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {currencies.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                                            No currencies defined yet. Add your first currency to enable multi-currency support.
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            No currencies defined yet. Add your
+                                            first currency to enable
+                                            multi-currency support.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     currencies.map((currency) => {
-                                        const menuItems = rowMenuItems(currency);
+                                        const menuItems =
+                                            rowMenuItems(currency);
                                         return (
-                                        <TableRow
-                                            key={currency.id}
-                                            onContextMenu={menuItems.length ? rowMenu.open(menuItems) : undefined}
-                                        >
-                                            <TableCell className="font-mono text-sm font-semibold">
-                                                {currency.code}
-                                                {currency.is_base && (
-                                                    <Badge variant="outline" className="ml-2 bg-status-info-bg text-status-info border-status-info/30">
-                                                        Base
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="font-medium">{currency.name}</TableCell>
-                                            <TableCell className="text-sm">{currency.symbol}</TableCell>
-                                            <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                {Number(currency.exchange_rate).toFixed(6)}
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
-                                                {formatDate(currency.rate_updated_at)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={
-                                                        currency.is_active
-                                                            ? 'bg-status-success-bg text-status-success border-status-success/30'
-                                                            : 'bg-muted text-muted-foreground border-border'
-                                                    }
-                                                >
-                                                    {currency.is_active ? 'Active' : 'Inactive'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <EditCurrencyDialog currency={currency} />
-                                                    {!currency.is_base && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            aria-label={`Delete ${currency.code}`}
-                                                            onClick={() => setDeleteTarget(currency)}
+                                            <TableRow
+                                                key={currency.id}
+                                                onContextMenu={
+                                                    menuItems.length
+                                                        ? rowMenu.open(
+                                                              menuItems,
+                                                          )
+                                                        : undefined
+                                                }
+                                            >
+                                                <TableCell className="font-mono text-sm font-semibold">
+                                                    {currency.code}
+                                                    {currency.is_base && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="ml-2 border-status-info/30 bg-status-info-bg text-status-info"
                                                         >
-                                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                                        </Button>
+                                                            Base
+                                                        </Badge>
                                                     )}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
+                                                </TableCell>
+                                                <TableCell className="font-medium">
+                                                    {currency.name}
+                                                </TableCell>
+                                                <TableCell className="text-sm">
+                                                    {currency.symbol}
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono text-sm tabular-nums">
+                                                    {Number(
+                                                        currency.exchange_rate,
+                                                    ).toFixed(6)}
+                                                </TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    {formatDate(
+                                                        currency.rate_updated_at,
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={
+                                                            currency.is_active
+                                                                ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                                                : 'border-border bg-muted text-muted-foreground'
+                                                        }
+                                                    >
+                                                        {currency.is_active
+                                                            ? 'Active'
+                                                            : 'Inactive'}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <EditCurrencyDialog
+                                                            currency={currency}
+                                                        />
+                                                        {!currency.is_base && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                aria-label={`Delete ${currency.code}`}
+                                                                onClick={() =>
+                                                                    setDeleteTarget(
+                                                                        currency,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
                                         );
                                     })
                                 )}

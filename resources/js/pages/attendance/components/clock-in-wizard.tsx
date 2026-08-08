@@ -253,7 +253,11 @@ export function ClockInWizard({
                         blurb="Only shifts inside the clock-in window are shown."
                     />
                     <div className="grid gap-4">
-                        <Field label="Eligible shifts" required error={errors.shift}>
+                        <Field
+                            label="Eligible shifts"
+                            required
+                            error={errors.shift}
+                        >
                             <TilePicker
                                 value={shiftKey}
                                 onChange={setShiftKey}
@@ -285,7 +289,8 @@ export function ClockInWizard({
                             </span>
                             <div className="min-w-0">
                                 <div className="text-sm font-bold">
-                                    {shift?.location ?? 'No site location on file'}
+                                    {shift?.location ??
+                                        'No site location on file'}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
                                     Your starting point is recorded with the
@@ -298,7 +303,11 @@ export function ClockInWizard({
                                 value={locMode}
                                 onChange={setLocMode}
                                 options={[
-                                    { value: 'site', label: 'On site', icon: Home },
+                                    {
+                                        value: 'site',
+                                        label: 'On site',
+                                        icon: Home,
+                                    },
                                     {
                                         value: 'community',
                                         label: 'In the community',
@@ -341,9 +350,14 @@ export function ClockInWizard({
                         >
                             <ReviewRow
                                 label="Shift"
-                                value={shift ? `#${shift.id}` : 'No linked shift'}
+                                value={
+                                    shift ? `#${shift.id}` : 'No linked shift'
+                                }
                             />
-                            <ReviewRow label="Client" value={shift?.client_name} />
+                            <ReviewRow
+                                label="Client"
+                                value={shift?.client_name}
+                            />
                             <ReviewRow
                                 label="Scheduled"
                                 value={
@@ -352,7 +366,10 @@ export function ClockInWizard({
                                         : undefined
                                 }
                             />
-                            <ReviewRow label="Location" value={shift?.location} />
+                            <ReviewRow
+                                label="Location"
+                                value={shift?.location}
+                            />
                         </ReviewCard>
                         <ReviewCard
                             icon={MapPin}

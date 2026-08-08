@@ -101,6 +101,19 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
         ];
     }
 
+    public function test_category_registration_capability_matches_the_exact_create_permission(): void
+    {
+        $this->actingAs($this->auditor)
+            ->get('/security-devices/security')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('can.registerDevice', false));
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/security')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('can.registerDevice', true));
+    }
+
     #[DataProvider('canonicalOperationsProvider')]
     public function test_canonical_operations_routes_use_the_approved_plain_language_title(
         string $route,

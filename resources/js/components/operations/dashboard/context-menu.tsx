@@ -4,10 +4,12 @@ import {
     Building2,
     Calendar,
     CalendarPlus,
+    Clock,
     Download,
     FileSpreadsheet,
     FileText,
     GraduationCap,
+    type LucideIcon,
     MessageSquare,
     PieChart,
     Pin,
@@ -23,8 +25,6 @@ import {
     UserPlus,
     UserX,
     Users,
-    Clock,
-    type LucideIcon,
 } from 'lucide-react';
 import {
     type MouseEvent as ReactMouseEvent,
@@ -36,9 +36,9 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import { cn } from '@/lib/utils';
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 const ICON_MAP: Record<string, LucideIcon> = {
     users: Users,
@@ -114,7 +114,8 @@ export function ContextMenu({ open, x, y, menu, onClose }: ContextMenuProps) {
     useEffect(() => {
         if (!open) return;
         const onClick = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+            if (ref.current && !ref.current.contains(e.target as Node))
+                onClose();
         };
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -135,10 +136,11 @@ export function ContextMenu({ open, x, y, menu, onClose }: ContextMenuProps) {
     if (!open || !menu || typeof window === 'undefined') return null;
 
     return createPortal(
-        <GuardrailCard unstyled
+        <GuardrailCard
+            unstyled
             ref={ref}
             role="menu"
-            className="fixed z-[60] min-w-[240px] select-none rounded-lg border bg-card py-1 shadow-xl"
+            className="fixed z-[60] min-w-[240px] rounded-lg border bg-card py-1 shadow-xl select-none"
             style={{
                 left: pos?.left ?? -9999,
                 top: pos?.top ?? -9999,
@@ -148,7 +150,7 @@ export function ContextMenu({ open, x, y, menu, onClose }: ContextMenuProps) {
                     '0 12px 32px -8px rgba(76, 29, 149, 0.18), 0 4px 12px -4px rgba(0,0,0,0.08)',
             }}
         >
-            <div className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="px-3 pt-1.5 pb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
                 {menu.label}
             </div>
             {menu.items.map((item, idx) => {
@@ -156,7 +158,7 @@ export function ContextMenu({ open, x, y, menu, onClose }: ContextMenuProps) {
                     return (
                         <div
                             key={idx}
-                            className="my-1 mx-1.5 h-px"
+                            className="mx-1.5 my-1 h-px"
                             style={{ background: 'var(--border)' }}
                         />
                     );
@@ -164,13 +166,16 @@ export function ContextMenu({ open, x, y, menu, onClose }: ContextMenuProps) {
                 const it = item as Exclude<CtxMenuItem, { divider: true }>;
                 const Icon = ICON_MAP[it.icon] ?? Settings2;
                 return (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         key={idx}
                         type="button"
                         role="menuitem"
                         className={cn(
                             'group flex w-full items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-left text-[12px]',
-                            it.danger ? 'text-[color:var(--status-critical)]' : 'text-foreground',
+                            it.danger
+                                ? 'text-[color:var(--status-critical)]'
+                                : 'text-foreground',
                             'hover:bg-accent hover:text-accent-foreground',
                         )}
                         style={it.muted ? { opacity: 0.55 } : undefined}
@@ -190,7 +195,7 @@ export function ContextMenu({ open, x, y, menu, onClose }: ContextMenuProps) {
                         />
                         <span className="flex-1 truncate">{it.text}</span>
                         {it.shortcut ? (
-                            <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">
+                            <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
                                 {it.shortcut}
                             </span>
                         ) : null}
@@ -218,7 +223,10 @@ export function useContextMenu() {
         };
     }, []);
 
-    const close = useCallback(() => setState((s) => ({ ...s, open: false })), []);
+    const close = useCallback(
+        () => setState((s) => ({ ...s, open: false })),
+        [],
+    );
 
     return { state, onContextMenu, close };
 }

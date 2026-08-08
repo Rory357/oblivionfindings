@@ -42,7 +42,7 @@ class TimesheetUnifiedIndexTest extends TestCase
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
-        $this->site = Site::factory()->create(['tenant_id' => $this->admin->organization_id]);
+        $this->site = Site::factory()->create();
     }
 
     public function test_index_returns_redesigned_prop_shape(): void

@@ -328,6 +328,22 @@ it('rehearses compromised credential containment rotation and replacement verifi
             $oldLease->leaseId,
             'secret/data/sites',
         );
+
+    $priorGrant = CredentialLeaseGrant::query()
+        ->where('credential_reference_id', $reference->id)
+        ->where('reference_version', '<', $reference->version)
+        ->sole();
+    expect($priorGrant->status)->toBe(CredentialLeaseGrant::STATUS_CONTAINED)
+        ->and($priorGrant->ended_at)->not->toBeNull();
+    $priorGrant->forceFill(['lease_id' => 'corrupted-terminal-lease-identifier'])->save();
+
+    expect(Artisan::call('security-devices:verify-credential-containment', [
+        'site_id' => $site->id,
+        'reference_key' => $reference->reference_key,
+        '--require-active' => true,
+    ]))->toBe(1)
+        ->and(Artisan::output())->toContain('prior lease lifecycle record(s) are not terminal and erased')
+        ->not->toContain('corrupted-terminal-lease-identifier');
 });
 
 it('enforces command-admin permission and exact Site access on reference management', function () {

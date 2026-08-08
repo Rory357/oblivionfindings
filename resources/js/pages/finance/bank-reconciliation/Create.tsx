@@ -1,12 +1,18 @@
-import { Head, useForm } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PageHero, PageLayout } from '@/components/page';
-import { formatMoney } from '@/components/finance/money';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { Head, useForm } from '@inertiajs/react';
 
 interface BankAccount {
     id: number;
@@ -19,14 +25,21 @@ interface Props {
     preselectedBankAccountId: number | null;
 }
 
-export default function ReconciliationCreate({ bankAccounts, preselectedBankAccountId }: Props) {
+export default function ReconciliationCreate({
+    bankAccounts,
+    preselectedBankAccountId,
+}: Props) {
     const { data, setData, post, processing, errors } = useForm({
-        bank_account_id: preselectedBankAccountId ? String(preselectedBankAccountId) : '',
+        bank_account_id: preselectedBankAccountId
+            ? String(preselectedBankAccountId)
+            : '',
         statement_date: new Date().toISOString().split('T')[0],
         statement_balance: '',
     });
 
-    const selectedAccount = bankAccounts.find((a) => a.id === Number(data.bank_account_id));
+    const selectedAccount = bankAccounts.find(
+        (a) => a.id === Number(data.bank_account_id),
+    );
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -36,7 +49,10 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
     const breadcrumbs = [
         { title: 'Finance', href: '/finance' },
         { title: 'Bank Reconciliation', href: '/finance/bank-reconciliation' },
-        { title: 'New Reconciliation', href: '/finance/bank-reconciliation/create' },
+        {
+            title: 'New Reconciliation',
+            href: '/finance/bank-reconciliation/create',
+        },
     ];
 
     return (
@@ -45,7 +61,8 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/bank-reconciliation"
                         title="New Bank Reconciliation"
@@ -60,57 +77,91 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="space-y-2">
-                                <Label htmlFor="bank_account_id">Bank Account</Label>
+                                <Label htmlFor="bank_account_id">
+                                    Bank Account
+                                </Label>
                                 <Select
                                     value={data.bank_account_id}
-                                    onValueChange={(value) => setData('bank_account_id', value)}
+                                    onValueChange={(value) =>
+                                        setData('bank_account_id', value)
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a bank account" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {bankAccounts.map((account) => (
-                                            <SelectItem key={account.id} value={String(account.id)}>
-                                                {account.name} ({formatMoney(account.current_balance)})
+                                            <SelectItem
+                                                key={account.id}
+                                                value={String(account.id)}
+                                            >
+                                                {account.name} (
+                                                {formatMoney(
+                                                    account.current_balance,
+                                                )}
+                                                )
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                                 {errors.bank_account_id && (
-                                    <p className="text-sm text-status-critical">{errors.bank_account_id}</p>
+                                    <p className="text-sm text-status-critical">
+                                        {errors.bank_account_id}
+                                    </p>
                                 )}
                                 {selectedAccount && (
                                     <p className="text-sm text-muted-foreground">
-                                        Current balance: {formatMoney(selectedAccount.current_balance)}
+                                        Current balance:{' '}
+                                        {formatMoney(
+                                            selectedAccount.current_balance,
+                                        )}
                                     </p>
                                 )}
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="statement_date">Statement Date</Label>
+                                <Label htmlFor="statement_date">
+                                    Statement Date
+                                </Label>
                                 <Input
                                     id="statement_date"
                                     type="date"
                                     value={data.statement_date}
-                                    onChange={(e) => setData('statement_date', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'statement_date',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                                 {errors.statement_date && (
-                                    <p className="text-sm text-status-critical">{errors.statement_date}</p>
+                                    <p className="text-sm text-status-critical">
+                                        {errors.statement_date}
+                                    </p>
                                 )}
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="statement_balance">Statement Closing Balance (NZD)</Label>
+                                <Label htmlFor="statement_balance">
+                                    Statement Closing Balance (NZD)
+                                </Label>
                                 <Input
                                     id="statement_balance"
                                     type="number"
                                     step="0.01"
                                     placeholder="0.00"
                                     value={data.statement_balance}
-                                    onChange={(e) => setData('statement_balance', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'statement_balance',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                                 {errors.statement_balance && (
-                                    <p className="text-sm text-status-critical">{errors.statement_balance}</p>
+                                    <p className="text-sm text-status-critical">
+                                        {errors.statement_balance}
+                                    </p>
                                 )}
                             </div>
 
@@ -123,7 +174,9 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
                                     Cancel
                                 </Button>
                                 <Button type="submit" disabled={processing}>
-                                    {processing ? 'Starting...' : 'Start Reconciliation'}
+                                    {processing
+                                        ? 'Starting...'
+                                        : 'Start Reconciliation'}
                                 </Button>
                             </div>
                         </form>

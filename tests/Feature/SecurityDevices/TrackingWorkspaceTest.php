@@ -108,6 +108,32 @@ class TrackingWorkspaceTest extends TestCase
 
                 $this->assertSame(100, $activeTab['inventoryShown']);
                 $this->assertTrue($activeTab['inventoryTruncated']);
+                $this->assertFalse($page->toArray()['props']['trackingWorkspace']['overview']['countsComplete']);
+            });
+    }
+
+    public function test_attention_handoff_filters_the_bounded_tracking_worklist(): void
+    {
+        $offline = Device::factory()->offline()->create([
+            'domain' => 'tracking',
+            'category' => 'asset_tracker',
+            'name' => 'Offline tracker',
+        ]);
+        Device::factory()->create([
+            'domain' => 'tracking',
+            'category' => 'asset_tracker',
+            'name' => 'Healthy tracker',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/tracking?tab=overview&attention=offline')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($offline): void {
+                $active = $page->toArray()['props']['trackingWorkspace']['activeTab'];
+
+                $this->assertSame([$offline->id], collect($active['devices'])->pluck('id')->all());
+                $this->assertSame('offline', $active['attentionFilter']['key']);
+                $this->assertSame('Offline tracking devices', $active['attentionFilter']['label']);
             });
     }
 

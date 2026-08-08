@@ -149,8 +149,8 @@ test('a late asset assignment creates one return task and ignores returned or re
     );
     $asset = HrAsset::query()->create([
         'asset_tag' => 'LATE-001',
-        'name' => 'Late laptop',
-        'category' => 'laptop',
+        'name' => 'Late uniform return',
+        'category' => 'uniform',
         'status' => 'available',
     ]);
 

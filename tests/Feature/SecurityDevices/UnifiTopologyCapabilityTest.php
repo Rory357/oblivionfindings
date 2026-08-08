@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 if (getenv('MONITORING_USE_PREBUILT_TEST_DATABASE') === '1') {
@@ -171,6 +172,39 @@ final class UnifiTopologyCapabilityTest extends TestCase
             $this->assertSame(SafeOperationalData::failureSummary(), $exception->getMessage());
             $this->assertStringNotContainsString('RAW-', $exception->getMessage());
         }
+    }
+
+    #[DataProvider('redirectStatusProvider')]
+    public function test_api_key_is_not_forwarded_to_provider_redirects(int $status): void
+    {
+        Http::fake(function (Request $request) use ($status) {
+            if ($request->url() === 'https://api.ui.com/v1/sites') {
+                return Http::response([], $status, [
+                    'Location' => 'https://attacker.example.test/collect',
+                ]);
+            }
+
+            return Http::response(['data' => []]);
+        });
+
+        $this->assertFalse(app(UnifiAdapter::class)->testConnection($this->connection));
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.ui.com/v1/sites'
+            && $request->hasHeader('X-API-Key', 'official-unifi-key'));
+        Http::assertNotSent(fn (Request $request): bool => str_starts_with(
+            $request->url(),
+            'https://attacker.example.test/',
+        ));
+    }
+
+    /** @return array<string, array{int}> */
+    public static function redirectStatusProvider(): array
+    {
+        return [
+            'temporary redirect' => [307],
+            'permanent redirect' => [308],
+        ];
     }
 
     private function fakeOfficialTopologyApi(): void

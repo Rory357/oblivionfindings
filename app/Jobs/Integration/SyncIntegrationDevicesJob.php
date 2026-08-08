@@ -10,13 +10,15 @@ use App\Services\Integration\Exceptions\CapabilityUnavailable;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Support\SafeOperationalData;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
-class SyncIntegrationDevicesJob implements ShouldQueue
+class SyncIntegrationDevicesJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
@@ -27,10 +29,20 @@ class SyncIntegrationDevicesJob implements ShouldQueue
 
     public int $backoff = 60;
 
+    public int $timeout = 300;
+
+    public int $uniqueFor = 600;
+
     public function __construct(
         public string $provider,
         public ?int $siteId = null,
     ) {
+        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $provider) !== 1
+            || ($siteId !== null && $siteId < 1)) {
+            throw new InvalidArgumentException('Provider device sync scope is invalid.');
+        }
+
+        $this->onConnection('redis');
         $this->onQueue((string) config('monitoring.queues.provider', 'monitoring-provider'));
     }
 
@@ -64,15 +76,26 @@ class SyncIntegrationDevicesJob implements ShouldQueue
             return;
         }
 
+        $minimumInterval = $registry->manifest($this->provider)->minimumIntervalSeconds;
+
         $siteConfigs = IntegrationSiteConfig::query()
             ->forProvider($this->provider)
             ->active()
-            ->whereHas('site')
-            ->when($this->siteId, fn ($q) => $q->where('site_id', $this->siteId))
-            ->get();
+            ->whereNotNull('mapped_external_site_id')
+            ->where('mapped_external_site_id', '<>', '')
+            ->whereHas('site', fn ($site) => $site
+                ->where('is_active', true)
+                ->where(fn ($operational) => $operational->whereNull('archived')->orWhere('archived', false))
+                ->whereNull('archived_at'))
+            ->when($this->siteId !== null, fn ($q) => $q->where('site_id', $this->siteId))
+            ->get()
+            ->filter(fn (IntegrationSiteConfig $siteConfig): bool => $this->siteSyncIsDue(
+                (int) $siteConfig->site_id,
+                $minimumInterval,
+            ));
 
         if ($siteConfigs->isEmpty()) {
-            Log::info('SyncIntegrationDevicesJob: no active site configs found', SafeOperationalData::logContext([
+            Log::info('SyncIntegrationDevicesJob: no eligible Site sync is due', SafeOperationalData::logContext([
                 'provider' => $this->provider,
                 'site_id' => $this->siteId,
             ]));
@@ -81,6 +104,21 @@ class SyncIntegrationDevicesJob implements ShouldQueue
         }
 
         foreach ($siteConfigs as $siteConfig) {
+            $mappedExternalSiteId = trim((string) $siteConfig->mapped_external_site_id);
+            if (! $this->syncScopeStillUsable(
+                (int) $providerConnection->id,
+                (int) $siteConfig->id,
+                (int) $siteConfig->site_id,
+                $mappedExternalSiteId,
+            )) {
+                Log::info('SyncIntegrationDevicesJob: provider or Site scope became unavailable', SafeOperationalData::logContext([
+                    'provider' => $this->provider,
+                    'site_id' => $siteConfig->site_id,
+                ]));
+
+                return;
+            }
+
             $syncLog = IntegrationSyncLog::create([
                 'provider' => $this->provider,
                 'site_id' => $siteConfig->site_id,
@@ -91,6 +129,23 @@ class SyncIntegrationDevicesJob implements ShouldQueue
 
             try {
                 $result = $adapter->syncDevices($siteConfig, $providerConnection);
+                if (! $this->syncScopeStillUsable(
+                    (int) $providerConnection->id,
+                    (int) $siteConfig->id,
+                    (int) $siteConfig->site_id,
+                    $mappedExternalSiteId,
+                )) {
+                    Log::info('SyncIntegrationDevicesJob: provider result discarded after scope became unavailable', SafeOperationalData::logContext([
+                        'provider' => $this->provider,
+                        'site_id' => $siteConfig->site_id,
+                    ]));
+                    $syncLog->markCompleted(
+                        IntegrationSyncLog::STATUS_FAILED,
+                        SafeOperationalData::failureSummary(),
+                    );
+
+                    continue;
+                }
 
                 $syncLog->update([
                     'items_processed' => $result->processed,
@@ -118,5 +173,53 @@ class SyncIntegrationDevicesJob implements ShouldQueue
                 $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
             }
         }
+    }
+
+    public function uniqueId(): string
+    {
+        return $this->provider.':'.($this->siteId ?? 'all');
+    }
+
+    private function siteSyncIsDue(int $siteId, int $minimumInterval): bool
+    {
+        $latest = IntegrationSyncLog::query()
+            ->forProvider($this->provider)
+            ->where('site_id', $siteId)
+            ->where('action', 'sync_devices')
+            ->whereNotNull('completed_at')
+            ->latest('completed_at')
+            ->first(['completed_at']);
+
+        return $latest?->completed_at === null
+            || ! $latest->completed_at->isAfter(now()->subSeconds($minimumInterval));
+    }
+
+    private function syncScopeStillUsable(
+        int $connectionId,
+        int $siteConfigId,
+        int $siteId,
+        string $mappedExternalSiteId,
+    ): bool {
+        if ($mappedExternalSiteId === '') {
+            return false;
+        }
+
+        return IntegrationProviderConnection::query()
+            ->whereKey($connectionId)
+            ->forProvider($this->provider)
+            ->connected()
+            ->exists()
+            && IntegrationSiteConfig::query()
+                ->whereKey($siteConfigId)
+                ->forProvider($this->provider)
+                ->active()
+                ->where('site_id', $siteId)
+                ->where('mapped_external_site_id', $mappedExternalSiteId)
+                ->whereRaw("TRIM(`mapped_external_site_id`) <> ''")
+                ->whereHas('site', fn ($site) => $site
+                    ->where('is_active', true)
+                    ->where(fn ($operational) => $operational->whereNull('archived')->orWhere('archived', false))
+                    ->whereNull('archived_at'))
+                ->exists();
     }
 }

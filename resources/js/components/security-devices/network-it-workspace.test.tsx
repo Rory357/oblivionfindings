@@ -429,6 +429,81 @@ describe('NetworkItWorkspacePanels', () => {
                                     desiredVersion: '1.5.0',
                                     observedAt: '2026-07-19T03:00:00.000Z',
                                 },
+                                latestSnapshot: {
+                                    id: 902,
+                                    sourceKind: 'provider',
+                                    source: 'unifi',
+                                    capturedAt: '2026-07-19T04:00:00.000Z',
+                                    contentHash: 'a'.repeat(64),
+                                    configurationHash: 'b'.repeat(64),
+                                    contentSize: 2048,
+                                    mimeType: 'application/json',
+                                    firmwareVersion: '1.4.0',
+                                    storageState: 'available',
+                                    previousSnapshotId: 901,
+                                    diff: {
+                                        added: ['configuration.services.https'],
+                                        removed: [],
+                                        changed: [
+                                            'configuration.interfaces.wan.mtu',
+                                        ],
+                                        count: 2,
+                                        truncated: false,
+                                    },
+                                    downloadHref:
+                                        '/security-devices/devices/31/configuration-snapshots/902',
+                                },
+                                snapshotHistory: [
+                                    {
+                                        id: 902,
+                                        sourceKind: 'provider',
+                                        source: 'unifi',
+                                        capturedAt: '2026-07-19T04:00:00.000Z',
+                                        contentHash: 'a'.repeat(64),
+                                        configurationHash: 'b'.repeat(64),
+                                        contentSize: 2048,
+                                        mimeType: 'application/json',
+                                        firmwareVersion: '1.4.0',
+                                        storageState: 'available',
+                                        previousSnapshotId: 901,
+                                        diff: {
+                                            added: [
+                                                'configuration.services.https',
+                                            ],
+                                            removed: [],
+                                            changed: [
+                                                'configuration.interfaces.wan.mtu',
+                                            ],
+                                            count: 2,
+                                            truncated: false,
+                                        },
+                                        downloadHref:
+                                            '/security-devices/devices/31/configuration-snapshots/902',
+                                    },
+                                    {
+                                        id: 901,
+                                        sourceKind: 'provider',
+                                        source: 'unifi',
+                                        capturedAt: '2026-07-17T04:00:00.000Z',
+                                        contentHash: 'c'.repeat(64),
+                                        configurationHash: 'd'.repeat(64),
+                                        contentSize: 1900,
+                                        mimeType: 'application/json',
+                                        firmwareVersion: '1.3.0',
+                                        storageState: 'available',
+                                        previousSnapshotId: null,
+                                        diff: {
+                                            added: [],
+                                            removed: [],
+                                            changed: [],
+                                            count: 0,
+                                            truncated: false,
+                                        },
+                                        downloadHref:
+                                            '/security-devices/devices/31/configuration-snapshots/901',
+                                    },
+                                ],
+                                snapshotHistoryTruncated: true,
                             },
                             {
                                 deviceId: 32,
@@ -455,6 +530,30 @@ describe('NetworkItWorkspacePanels', () => {
 
         expect(screen.getByText('Configuration drift')).toBeInTheDocument();
         expect(screen.getByText('Update available')).toBeInTheDocument();
+        const drifted = screen.getByRole('article', {
+            name: 'Drifted firewall',
+        });
+        expect(
+            within(drifted).getByText(
+                /Compared with snapshot #901: 1 added, 1 changed/,
+            ),
+        ).toBeInTheDocument();
+        expect(
+            within(drifted).getByText(/View previous governed snapshots \(1\)/),
+        ).toBeInTheDocument();
+        expect(
+            within(drifted).getByText(
+                /Additional retained snapshots exist outside this bounded Site history/,
+            ),
+        ).toBeInTheDocument();
+        expect(
+            within(drifted).getByRole('link', {
+                name: 'Download governed snapshot',
+            }),
+        ).toHaveAttribute(
+            'href',
+            '/security-devices/devices/31/configuration-snapshots/902',
+        );
         const unsupported = screen.getByRole('article', {
             name: 'Basic printer',
         });

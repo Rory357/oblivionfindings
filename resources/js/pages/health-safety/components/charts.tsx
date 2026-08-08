@@ -31,7 +31,21 @@ const TOOLTIP_STYLE = {
 
 function monthLabel(ym: string): string {
     const [, m] = ym.split('-');
-    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+        '',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+    ];
     return months[Number(m)] ?? ym;
 }
 
@@ -81,9 +95,13 @@ function ChartCard({
                             </span>
                         ) : null}
                         <div>
-                            <CardTitle className="text-sm font-bold leading-tight">{title}</CardTitle>
+                            <CardTitle className="text-sm leading-tight font-bold">
+                                {title}
+                            </CardTitle>
                             {subtitle ? (
-                                <p className="mt-0.5 text-[11.5px] text-muted-foreground">{subtitle}</p>
+                                <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                                    {subtitle}
+                                </p>
                             ) : null}
                         </div>
                     </div>
@@ -103,8 +121,20 @@ function Gauge({ pct }: { pct: number }) {
     const clamped = Math.max(0, Math.min(100, pct));
     const offset = CIRC * (1 - clamped / 100);
     return (
-        <svg viewBox="0 0 120 120" className="h-32 w-32" role="img" aria-label={`${pct}%`}>
-            <circle cx="60" cy="60" r={RADIUS} fill="none" stroke="var(--muted)" strokeWidth="12" />
+        <svg
+            viewBox="0 0 120 120"
+            className="h-32 w-32"
+            role="img"
+            aria-label={`${pct}%`}
+        >
+            <circle
+                cx="60"
+                cy="60"
+                r={RADIUS}
+                fill="none"
+                stroke="var(--muted)"
+                strokeWidth="12"
+            />
             <circle
                 cx="60"
                 cy="60"
@@ -117,7 +147,14 @@ function Gauge({ pct }: { pct: number }) {
                 strokeDashoffset={offset}
                 transform="rotate(-90 60 60)"
             />
-            <text x="60" y="68" textAnchor="middle" fill="var(--foreground)" fontSize="24" fontWeight="700">
+            <text
+                x="60"
+                y="68"
+                textAnchor="middle"
+                fill="var(--foreground)"
+                fontSize="24"
+                fontWeight="700"
+            >
                 {pct}%
             </text>
         </svg>
@@ -151,8 +188,20 @@ export function RatioDonutCard({
     return (
         <ChartCard title="Near-miss : incident ratio">
             <div className="flex items-center gap-4">
-                <svg viewBox="0 0 120 120" className="h-28 w-28 shrink-0" role="img" aria-label="Near-miss ratio">
-                    <circle cx="60" cy="60" r={RADIUS} fill="none" stroke="var(--muted)" strokeWidth="14" />
+                <svg
+                    viewBox="0 0 120 120"
+                    className="h-28 w-28 shrink-0"
+                    role="img"
+                    aria-label="Near-miss ratio"
+                >
+                    <circle
+                        cx="60"
+                        cy="60"
+                        r={RADIUS}
+                        fill="none"
+                        stroke="var(--muted)"
+                        strokeWidth="14"
+                    />
                     <circle
                         cx="60"
                         cy="60"
@@ -165,19 +214,38 @@ export function RatioDonutCard({
                         strokeDashoffset={offset}
                         transform="rotate(-90 60 60)"
                     />
-                    <text x="60" y="62" textAnchor="middle" fill="var(--foreground)" fontSize="22" fontWeight="700">
+                    <text
+                        x="60"
+                        y="62"
+                        textAnchor="middle"
+                        fill="var(--foreground)"
+                        fontSize="22"
+                        fontWeight="700"
+                    >
                         {ratio == null ? '—' : `${ratio}×`}
                     </text>
-                    <text x="60" y="78" textAnchor="middle" fill="var(--muted-foreground)" fontSize="9">
+                    <text
+                        x="60"
+                        y="78"
+                        textAnchor="middle"
+                        fill="var(--muted-foreground)"
+                        fontSize="9"
+                    >
                         ratio
                     </text>
                 </svg>
                 <div className="min-w-0 text-xs text-muted-foreground">
                     <div>
-                        <span className="font-bold text-foreground">{operands.near_misses}</span> near misses reported
+                        <span className="font-bold text-foreground">
+                            {operands.near_misses}
+                        </span>{' '}
+                        near misses reported
                     </div>
                     <div>
-                        <span className="font-bold text-foreground">{operands.recordable}</span> recordable incidents
+                        <span className="font-bold text-foreground">
+                            {operands.recordable}
+                        </span>{' '}
+                        recordable incidents
                     </div>
                     <p className="mt-1.5 text-status-success">
                         A high ratio means hazards are caught before harm.
@@ -192,9 +260,15 @@ export function RatioDonutCard({
 /*  Severity breakdown donut                                           */
 /* ------------------------------------------------------------------ */
 
-type SeverityCounts = { minorModerate: number; serious: number; critical: number };
+type SeverityCounts = {
+    minorModerate: number;
+    serious: number;
+    critical: number;
+};
 
-export function mapSeverity(record: Record<string, number> | undefined): SeverityCounts {
+export function mapSeverity(
+    record: Record<string, number> | undefined,
+): SeverityCounts {
     const r = record ?? {};
     return {
         minorModerate: (r.low ?? 0) + (r.medium ?? 0),
@@ -206,15 +280,35 @@ export function mapSeverity(record: Record<string, number> | undefined): Severit
 export function SeverityDonutCard({ data }: { data: SeverityCounts }) {
     const total = data.minorModerate + data.serious + data.critical || 1;
     const segs = [
-        { label: 'Minor / moderate', count: data.minorModerate, color: 'var(--status-success)' },
-        { label: 'Serious', count: data.serious, color: 'var(--status-warning)' },
-        { label: 'Critical', count: data.critical, color: 'var(--status-critical)' },
+        {
+            label: 'Minor / moderate',
+            count: data.minorModerate,
+            color: 'var(--status-success)',
+        },
+        {
+            label: 'Serious',
+            count: data.serious,
+            color: 'var(--status-warning)',
+        },
+        {
+            label: 'Critical',
+            count: data.critical,
+            color: 'var(--status-critical)',
+        },
     ];
     let cumulative = 0;
     return (
-        <ChartCard title="Severity breakdown" subtitle="Open H&S events by severity">
+        <ChartCard
+            title="Severity breakdown"
+            subtitle="Open H&S events by severity"
+        >
             <div className="flex items-center gap-4">
-                <svg viewBox="0 0 120 120" className="h-28 w-28 shrink-0" role="img" aria-label="Severity breakdown">
+                <svg
+                    viewBox="0 0 120 120"
+                    className="h-28 w-28 shrink-0"
+                    role="img"
+                    aria-label="Severity breakdown"
+                >
                     {segs.map((s) => {
                         const len = (s.count / total) * CIRC;
                         const seg = (
@@ -238,9 +332,16 @@ export function SeverityDonutCard({ data }: { data: SeverityCounts }) {
                 <ul className="min-w-0 space-y-1 text-xs">
                     {segs.map((s) => (
                         <li key={s.label} className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
-                            <span className="text-muted-foreground">{s.label}</span>
-                            <span className="ml-auto font-bold tabular-nums text-foreground">{s.count}</span>
+                            <span
+                                className="h-2.5 w-2.5 rounded-sm"
+                                style={{ background: s.color }}
+                            />
+                            <span className="text-muted-foreground">
+                                {s.label}
+                            </span>
+                            <span className="ml-auto font-bold text-foreground tabular-nums">
+                                {s.count}
+                            </span>
                         </li>
                     ))}
                 </ul>
@@ -253,24 +354,37 @@ export function SeverityDonutCard({ data }: { data: SeverityCounts }) {
 /*  Incidents by category — horizontal bars                            */
 /* ------------------------------------------------------------------ */
 
-export function CategoryBarsCard({ data }: { data: Array<{ label: string; count: number }> }) {
+export function CategoryBarsCard({
+    data,
+}: {
+    data: Array<{ label: string; count: number }>;
+}) {
     const max = Math.max(...data.map((d) => d.count), 1);
     return (
-        <ChartCard title="Incidents by category" subtitle="Recordable incidents this period">
+        <ChartCard
+            title="Incidents by category"
+            subtitle="Recordable incidents this period"
+        >
             {data.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">No incidents this period.</p>
+                <p className="py-6 text-center text-xs text-muted-foreground">
+                    No incidents this period.
+                </p>
             ) : (
                 <div className="space-y-2.5 py-1">
                     {data.map((d) => (
                         <div key={d.label} className="flex items-center gap-2">
-                            <span className="w-32 shrink-0 truncate text-xs text-muted-foreground">{titleCase(d.label)}</span>
+                            <span className="w-32 shrink-0 truncate text-xs text-muted-foreground">
+                                {titleCase(d.label)}
+                            </span>
                             <div className="h-[7px] flex-1 overflow-hidden rounded-full bg-muted">
                                 <div
                                     className="h-full rounded-full bg-primary"
-                                    style={{ width: `${(d.count / max) * 100}%` }}
+                                    style={{
+                                        width: `${(d.count / max) * 100}%`,
+                                    }}
                                 />
                             </div>
-                            <span className="w-5 shrink-0 text-right text-xs font-semibold tabular-nums text-foreground">
+                            <span className="w-5 shrink-0 text-right text-xs font-semibold text-foreground tabular-nums">
                                 {d.count}
                             </span>
                         </div>
@@ -292,7 +406,11 @@ export function IncidentTrendCard({
     title = 'Incident & near-miss trend',
 }: {
     bars: Array<{ month: string; count: number }>;
-    frequency: Array<{ month: string; ltifr: number | null; trifr: number | null }>;
+    frequency: Array<{
+        month: string;
+        ltifr: number | null;
+        trifr: number | null;
+    }>;
     variant: 'mini' | 'full';
     title?: string;
 }) {
@@ -307,15 +425,24 @@ export function IncidentTrendCard({
     const legend = (
         <div className="flex flex-wrap items-center justify-end gap-x-3.5 gap-y-1 text-[11.5px] text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
-                <span className="h-[9px] w-[9px] rounded-sm" style={{ background: 'var(--primary)' }} />
+                <span
+                    className="h-[9px] w-[9px] rounded-sm"
+                    style={{ background: 'var(--primary)' }}
+                />
                 Incidents
             </span>
             <span className="inline-flex items-center gap-1.5">
-                <span className="h-[3px] w-3.5 rounded-sm" style={{ background: 'var(--status-critical)' }} />
+                <span
+                    className="h-[3px] w-3.5 rounded-sm"
+                    style={{ background: 'var(--status-critical)' }}
+                />
                 TRIFR
             </span>
             <span className="inline-flex items-center gap-1.5">
-                <span className="h-[3px] w-3.5 rounded-sm" style={{ background: 'var(--status-warning)' }} />
+                <span
+                    className="h-[3px] w-3.5 rounded-sm"
+                    style={{ background: 'var(--status-warning)' }}
+                />
                 LTIFR
             </span>
         </div>
@@ -323,9 +450,19 @@ export function IncidentTrendCard({
 
     return (
         <ChartCard title={title} headerRight={legend}>
-            <ResponsiveContainer width="100%" height={variant === 'full' ? 240 : 140}>
-                <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
-                    <CartesianGrid strokeDasharray="3 4" vertical={false} stroke="var(--border)" />
+            <ResponsiveContainer
+                width="100%"
+                height={variant === 'full' ? 240 : 140}
+            >
+                <ComposedChart
+                    data={data}
+                    margin={{ top: 8, right: 8, bottom: 0, left: -20 }}
+                >
+                    <CartesianGrid
+                        strokeDasharray="3 4"
+                        vertical={false}
+                        stroke="var(--border)"
+                    />
                     <XAxis
                         dataKey="label"
                         tickLine={false}
@@ -333,7 +470,10 @@ export function IncidentTrendCard({
                         tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
                     />
                     <YAxis hide />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'var(--muted)', opacity: 0.4 }} />
+                    <Tooltip
+                        contentStyle={TOOLTIP_STYLE}
+                        cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
+                    />
                     <Bar
                         dataKey="incidents"
                         name="Incidents"
@@ -368,7 +508,11 @@ export function IncidentTrendCard({
 /*  Hazard burn-down line                                              */
 /* ------------------------------------------------------------------ */
 
-export function HazardBurndownCard({ series }: { series: Array<{ week: string; open: number }> }) {
+export function HazardBurndownCard({
+    series,
+}: {
+    series: Array<{ week: string; open: number }>;
+}) {
     const first = series[0]?.open ?? 0;
     const last = series[series.length - 1]?.open ?? 0;
     return (
@@ -377,7 +521,10 @@ export function HazardBurndownCard({ series }: { series: Array<{ week: string; o
             subtitle={`${first} open → ${last} open over ${series.length} weeks`}
         >
             <ResponsiveContainer width="100%" height={140}>
-                <LineChart data={series} margin={{ top: 8, right: 12, bottom: 0, left: -28 }}>
+                <LineChart
+                    data={series}
+                    margin={{ top: 8, right: 12, bottom: 0, left: -28 }}
+                >
                     <XAxis dataKey="week" hide />
                     <YAxis hide />
                     <Tooltip contentStyle={TOOLTIP_STYLE} />
@@ -402,7 +549,12 @@ export function HazardBurndownCard({ series }: { series: Array<{ week: string; o
 export function SiteLeagueCard({
     data,
 }: {
-    data: Array<{ id: number; name: string; incidents: number; hazards: number }>;
+    data: Array<{
+        id: number;
+        name: string;
+        incidents: number;
+        hazards: number;
+    }>;
 }) {
     // Rank by risk score and show the top sites only — the prototype is a compact league,
     // not an exhaustive list (orgs can have many sites).
@@ -412,13 +564,25 @@ export function SiteLeagueCard({
         .slice(0, 6);
     const max = Math.max(...ranked.map((d) => d.score), 1);
     return (
-        <ChartCard title="Site safety league" subtitle="Incidents · open hazards (30d)" icon={Building2} iconTone="primary">
+        <ChartCard
+            title="Site safety league"
+            subtitle="Incidents · open hazards (30d)"
+            icon={Building2}
+            iconTone="primary"
+        >
             {ranked.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">No sites to compare.</p>
+                <p className="py-6 text-center text-xs text-muted-foreground">
+                    No sites to compare.
+                </p>
             ) : (
                 <div className="flex flex-col gap-3 py-1">
                     {ranked.map((d) => {
-                        const tone = d.score === 0 ? 'success' : d.score >= max * 0.6 ? 'critical' : 'warning';
+                        const tone =
+                            d.score === 0
+                                ? 'success'
+                                : d.score >= max * 0.6
+                                  ? 'critical'
+                                  : 'warning';
                         return (
                             <Link
                                 key={d.id}
@@ -426,15 +590,20 @@ export function SiteLeagueCard({
                                 className="block rounded-md transition-colors hover:bg-muted/50"
                             >
                                 <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                                    <span className="min-w-0 truncate font-semibold text-foreground">{d.name}</span>
-                                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                                    <span className="min-w-0 truncate font-semibold text-foreground">
+                                        {d.name}
+                                    </span>
+                                    <span className="shrink-0 text-muted-foreground tabular-nums">
                                         {d.incidents} inc · {d.hazards} haz
                                     </span>
                                 </div>
                                 <div className="h-[7px] overflow-hidden rounded-full bg-muted">
                                     <div
                                         className="h-full rounded-full"
-                                        style={{ width: `${Math.max((d.score / max) * 100, 6)}%`, background: `var(--status-${tone})` }}
+                                        style={{
+                                            width: `${Math.max((d.score / max) * 100, 6)}%`,
+                                            background: `var(--status-${tone})`,
+                                        }}
                                     />
                                 </div>
                             </Link>
@@ -459,7 +628,10 @@ export type OpenHazardRow = {
 };
 
 const HAZARD_TONE: Record<string, { label: string; cls: string }> = {
-    extreme: { label: 'High', cls: 'bg-status-critical-bg text-status-critical' },
+    extreme: {
+        label: 'High',
+        cls: 'bg-status-critical-bg text-status-critical',
+    },
     high: { label: 'High', cls: 'bg-status-critical-bg text-status-critical' },
     medium: { label: 'Med', cls: 'bg-status-warning-bg text-status-warning' },
     low: { label: 'Low', cls: 'bg-muted text-muted-foreground' },
@@ -470,7 +642,9 @@ export function OpenHazardsCard({ hazards }: { hazards: OpenHazardRow[] }) {
         <Card>
             <CardHeader className="pb-2">
                 <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-sm font-bold leading-tight">Open hazards</CardTitle>
+                    <CardTitle className="text-sm leading-tight font-bold">
+                        Open hazards
+                    </CardTitle>
                     <Link
                         href="/compliance/hazards"
                         className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
@@ -481,17 +655,26 @@ export function OpenHazardsCard({ hazards }: { hazards: OpenHazardRow[] }) {
             </CardHeader>
             <CardContent>
                 {hazards.length === 0 ? (
-                    <p className="py-6 text-center text-xs text-muted-foreground">No open hazards.</p>
+                    <p className="py-6 text-center text-xs text-muted-foreground">
+                        No open hazards.
+                    </p>
                 ) : (
                     <div className="flex flex-col gap-1">
                         {hazards.map((h) => {
-                            const tone = HAZARD_TONE[(h.risk_rating ?? '').toLowerCase()] ?? {
+                            const tone = HAZARD_TONE[
+                                (h.risk_rating ?? '').toLowerCase()
+                            ] ?? {
                                 label: 'Low',
                                 cls: 'bg-muted text-muted-foreground',
                             };
                             const inner = (
                                 <>
-                                    <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold', tone.cls)}>
+                                    <span
+                                        className={cn(
+                                            'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold',
+                                            tone.cls,
+                                        )}
+                                    >
                                         {tone.label}
                                     </span>
                                     <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-foreground">
@@ -508,7 +691,10 @@ export function OpenHazardsCard({ hazards }: { hazards: OpenHazardRow[] }) {
                                     {inner}
                                 </Link>
                             ) : (
-                                <div key={h.id} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2">
+                                <div
+                                    key={h.id}
+                                    className="flex items-center gap-2.5 rounded-lg px-2.5 py-2"
+                                >
                                     {inner}
                                 </div>
                             );
@@ -561,13 +747,22 @@ export function LaggingCharts({
     category,
 }: {
     bars: Array<{ month: string; count: number }>;
-    frequency: Array<{ month: string; ltifr: number | null; trifr: number | null }>;
+    frequency: Array<{
+        month: string;
+        ltifr: number | null;
+        trifr: number | null;
+    }>;
     severity: Record<string, number> | undefined;
     category: Array<{ label: string; count: number }>;
 }) {
     return (
         <div className={cn('flex flex-col gap-3')}>
-            <IncidentTrendCard bars={bars} frequency={frequency} variant="full" title="Incident trend with LTIFR & TRIFR" />
+            <IncidentTrendCard
+                bars={bars}
+                frequency={frequency}
+                variant="full"
+                title="Incident trend with LTIFR & TRIFR"
+            />
             <div className="grid gap-3 lg:grid-cols-2">
                 <SeverityDonutCard data={mapSeverity(severity)} />
                 <CategoryBarsCard data={category} />

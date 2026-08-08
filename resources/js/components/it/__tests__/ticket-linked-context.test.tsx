@@ -96,6 +96,7 @@ const problemFixture = {
     workaround: 'Reconnect through the secondary gateway.',
     known_error_at: '2026-07-18T00:59:00Z',
     href: '/it/problems/7',
+    workspace_access: { state: 'available' as const, message: null },
     ticket_href: '/it/tickets/42',
 };
 
@@ -110,6 +111,7 @@ const changeFixture = {
     maintenance_starts_at: '2026-07-19T22:00:00Z',
     maintenance_ends_at: '2026-07-19T23:00:00Z',
     href: '/it/changes/9',
+    workspace_access: { state: 'available' as const, message: null },
     ticket_href: '/it/tickets/52',
 };
 
@@ -123,6 +125,7 @@ const majorIncidentFixture = {
     restored_at: null,
     next_update_due_at: '2026-07-19T22:30:00Z',
     href: '/it/major-incidents/12',
+    workspace_access: { state: 'available' as const, message: null },
     ticket_href: '/it/tickets/60',
 };
 
@@ -182,12 +185,61 @@ it('shows monitoring recovery and canonical deep links without raw payloads', ()
     ).not.toBeInTheDocument();
 });
 
+it('keeps linked work context visible without offering agent workspaces to requesters', () => {
+    const restrictedAccess = {
+        state: 'restricted' as const,
+        message: 'IT workspace access is required to open this record.',
+    };
+
+    render(
+        <TicketLinkedContext
+            recoveredAt={null}
+            devices={[]}
+            alerts={[]}
+            problems={[
+                {
+                    ...problemFixture,
+                    href: null,
+                    workspace_access: restrictedAccess,
+                },
+            ]}
+            changes={[
+                {
+                    ...changeFixture,
+                    href: null,
+                    workspace_access: restrictedAccess,
+                },
+            ]}
+            majorIncidents={[
+                {
+                    ...majorIncidentFixture,
+                    href: null,
+                    workspace_access: restrictedAccess,
+                },
+            ]}
+        />,
+    );
+
+    expect(screen.getByText(problemFixture.title)).toBeVisible();
+    expect(screen.getByText(changeFixture.title)).toBeVisible();
+    expect(screen.getByText(majorIncidentFixture.title)).toBeVisible();
+    expect(
+        screen.getAllByText(
+            'IT workspace access is required to open this record.',
+        ),
+    ).toHaveLength(3);
+    expect(screen.queryByRole('link', { name: /IT-000042/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /IT-000052/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /IT-000060/i })).toBeNull();
+});
+
 it('lets an agent remove a human Device link but protects monitoring evidence', async () => {
     const { router } = await import('@inertiajs/react');
     render(
         <TicketLinkedContext
             ticketId={40}
             canManage
+            canLinkDevices
             deviceOptions={[
                 {
                     id: 11,
@@ -223,4 +275,28 @@ it('lets an agent remove a human Device link but protects monitoring evidence', 
         '/it/tickets/40/devices/10',
         expect.objectContaining({ preserveScroll: true }),
     );
+});
+
+it('explains exact Security and Devices access instead of claiming every Device is linked', () => {
+    render(
+        <TicketLinkedContext
+            ticketId={40}
+            canManage
+            canLinkDevices={false}
+            deviceOptions={[]}
+            recoveredAt={null}
+            devices={[]}
+            alerts={[]}
+        />,
+    );
+
+    expect(screen.getByRole('note')).toHaveTextContent(
+        'Security & Devices access is required to add affected Devices.',
+    );
+    expect(screen.queryByText('Add affected Device')).toBeNull();
+    expect(
+        screen.queryByText(
+            'All available Devices for this Site are already linked.',
+        ),
+    ).toBeNull();
 });

@@ -1,11 +1,11 @@
-import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
+import RespiteSubnav from '@/components/respite-subnav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
-import RespiteSubnav from '@/components/respite-subnav';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 
 export default function RespiteProcedureCreate() {
@@ -31,11 +31,13 @@ export default function RespiteProcedureCreate() {
     ];
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Respite', href: '/respite' },
-            { title: 'Procedures', href: '/respite/procedures' },
-            { title: 'New Template', href: '/respite/procedures/create' },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                { title: 'Procedures', href: '/respite/procedures' },
+                { title: 'New Template', href: '/respite/procedures/create' },
+            ]}
+        >
             <Head title="New Procedure Template" />
 
             <PageLayout
@@ -58,42 +60,87 @@ export default function RespiteProcedureCreate() {
                 >
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Template Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Template Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <Label>Name *</Label>
-                                    <Input value={data.name} onChange={(e) => setData('name', e.target.value)} />
-                                    {errors.name && <div className="mt-1 text-xs text-status-critical">{errors.name}</div>}
+                                    <Input
+                                        value={data.name}
+                                        onChange={(e) =>
+                                            setData('name', e.target.value)
+                                        }
+                                    />
+                                    {errors.name && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.name}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Version *</Label>
-                                    <Input type="number" min={1} value={data.version} onChange={(e) => setData('version', Number(e.target.value))} />
-                                    {errors.version && <div className="mt-1 text-xs text-status-critical">{errors.version}</div>}
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        value={data.version}
+                                        onChange={(e) =>
+                                            setData(
+                                                'version',
+                                                Number(e.target.value),
+                                            )
+                                        }
+                                    />
+                                    {errors.version && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.version}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
                             <div>
                                 <Label>Trigger Event</Label>
-                                <Input value={data.trigger_event} onChange={(e) => setData('trigger_event', e.target.value)} />
+                                <Input
+                                    value={data.trigger_event}
+                                    onChange={(e) =>
+                                        setData('trigger_event', e.target.value)
+                                    }
+                                />
                             </div>
 
                             <div>
                                 <Label>Description</Label>
-                                <Textarea value={data.description} onChange={(e) => setData('description', e.target.value)} rows={3} />
+                                <Textarea
+                                    value={data.description}
+                                    onChange={(e) =>
+                                        setData('description', e.target.value)
+                                    }
+                                    rows={3}
+                                />
                             </div>
 
                             <div>
                                 <Label>Steps (JSON)</Label>
                                 <Textarea
-                                    value={JSON.stringify(data.steps_json, null, 2)}
+                                    value={JSON.stringify(
+                                        data.steps_json,
+                                        null,
+                                        2,
+                                    )}
                                     onChange={(e) => {
                                         try {
-                                            const parsed = JSON.parse(e.target.value || '[]');
+                                            const parsed = JSON.parse(
+                                                e.target.value || '[]',
+                                            );
                                             setData('steps_json', parsed);
                                         } catch {
-                                            setData('steps_json', data.steps_json);
+                                            setData(
+                                                'steps_json',
+                                                data.steps_json,
+                                            );
                                         }
                                     }}
                                     rows={8}
@@ -104,13 +151,21 @@ export default function RespiteProcedureCreate() {
                                         {JSON.stringify(example, null, 2)}
                                     </pre>
                                 </div>
-                                {errors.steps_json && <div className="mt-1 text-xs text-status-critical">{errors.steps_json}</div>}
+                                {errors.steps_json && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.steps_json}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
 
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => window.history.back()}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => window.history.back()}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>

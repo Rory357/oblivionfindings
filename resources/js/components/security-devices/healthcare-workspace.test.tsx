@@ -9,6 +9,7 @@ import {
 const base: HealthcareWorkspaceData = {
     permissions: {
         clientContext: true,
+        clinicalMonitoring: true,
         maintenance: true,
         it: true,
     },
@@ -37,14 +38,14 @@ const base: HealthcareWorkspaceData = {
                 label: 'Offline healthcare devices',
                 count: 1,
                 description: 'Investigate offline devices.',
-                href: '/security-devices/healthcare?tab=data-flow&flow=offline',
+                href: '/security-devices/devices?domain=iot_healthcare&status=offline',
             },
             {
                 key: 'overdue_calibration',
                 label: 'Overdue calibration',
                 count: 1,
                 description: 'Complete canonical calibration work.',
-                href: '/security-devices/healthcare?tab=calibration-maintenance&status=overdue&type=calibration',
+                href: '/security-devices/maintenance?status=overdue&type=calibration&domain=iot_healthcare',
             },
         ],
     },
@@ -158,8 +159,35 @@ describe('HealthcareWorkspacePanels', () => {
             screen.getByRole('link', { name: /Offline healthcare devices/ }),
         ).toHaveAttribute(
             'href',
-            '/security-devices/healthcare?tab=data-flow&flow=offline',
+            '/security-devices/devices?domain=iot_healthcare&status=offline',
         );
+    });
+
+    it('explains the clinical boundary without exposing a dead link when access is restricted', () => {
+        render(
+            <HealthcareWorkspacePanels
+                data={{
+                    ...base,
+                    permissions: {
+                        ...base.permissions,
+                        clinicalMonitoring: false,
+                    },
+                    boundary: {
+                        ...base.boundary,
+                        clinicalHref: null,
+                    },
+                }}
+            />,
+        );
+
+        expect(
+            screen.queryByRole('link', {
+                name: 'Open Client Health Monitoring',
+            }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByText('Client Health Monitoring access required'),
+        ).toBeInTheDocument();
     });
 
     it('shows minimum client identity and technical support context with authorised IT links', () => {
@@ -220,6 +248,10 @@ describe('HealthcareWorkspacePanels', () => {
                                         id: 8,
                                         name: 'Kauri House',
                                         href: '/sites/8',
+                                        access: {
+                                            state: 'available',
+                                            label: 'Open Site profile',
+                                        },
                                     },
                                     room: null,
                                 },
@@ -252,6 +284,55 @@ describe('HealthcareWorkspacePanels', () => {
         expect(within(card).getByText('Kauri Site Lead')).toBeInTheDocument();
         expect(
             within(card).queryByText(/client assigned/i),
+        ).not.toBeInTheDocument();
+    });
+
+    it('retains safe Site context without a link when Site profile access is restricted', () => {
+        render(
+            <HealthcareWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'shared-site-devices',
+                        label: 'Shared & site devices',
+                        inventoryTotal: 1,
+                        inventoryShown: 1,
+                        devices: [
+                            {
+                                ...clientDevice,
+                                id: 13,
+                                name: 'Restricted occupancy sensor',
+                                deviceHref: '/security-devices/devices/13',
+                                client: null,
+                                location: {
+                                    site: {
+                                        id: 9,
+                                        name: 'Restricted House',
+                                        href: null,
+                                        access: {
+                                            state: 'restricted',
+                                            label: 'Site profile access required',
+                                        },
+                                    },
+                                    room: null,
+                                },
+                            },
+                        ],
+                    },
+                }}
+            />,
+        );
+
+        const card = screen.getByRole('article', {
+            name: 'Restricted occupancy sensor',
+        });
+        expect(within(card).getByText('Restricted House')).toBeInTheDocument();
+        expect(
+            within(card).getByText('Site profile access required'),
+        ).toBeInTheDocument();
+        expect(
+            within(card).queryByRole('link', { name: 'Restricted House' }),
         ).not.toBeInTheDocument();
     });
 

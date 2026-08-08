@@ -106,11 +106,11 @@ describe('site plan geometry', () => {
 
         expect(result).not.toBeNull();
         expect(result?.newWalls).toHaveLength(4);
-        expect(result?.snapped.wall_id).toBe(`${ROOM_EDGE_WALL_PREFIX}room-a:N`);
+        expect(result?.snapped.wall_id).toBe(
+            `${ROOM_EDGE_WALL_PREFIX}room-a:N`,
+        );
         // The fallback returned all four edges of room-a for promotion.
-        expect(
-            new Set(result!.newWalls.map((wall) => wall.id)),
-        ).toEqual(
+        expect(new Set(result!.newWalls.map((wall) => wall.id))).toEqual(
             new Set([
                 `${ROOM_EDGE_WALL_PREFIX}room-a:N`,
                 `${ROOM_EDGE_WALL_PREFIX}room-a:E`,
@@ -141,7 +141,9 @@ describe('site plan geometry', () => {
         expect(result).not.toBeNull();
         // Already real walls — first snap succeeds, no promotion needed.
         expect(result?.newWalls).toHaveLength(0);
-        expect(result?.snapped.wall_id).toBe(`${ROOM_EDGE_WALL_PREFIX}room-a:N`);
+        expect(result?.snapped.wall_id).toBe(
+            `${ROOM_EDGE_WALL_PREFIX}room-a:N`,
+        );
     });
 
     it('exposes room id from a room-edge wall id', () => {

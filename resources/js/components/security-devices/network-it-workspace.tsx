@@ -136,6 +136,28 @@ type TrafficRow = {
     source: string;
 };
 
+type ConfigurationSnapshotRow = {
+    id: number;
+    sourceKind: string;
+    source: string;
+    capturedAt: string | null;
+    contentHash: string;
+    configurationHash: string;
+    contentSize: number;
+    mimeType: string;
+    firmwareVersion: string | null;
+    storageState: string;
+    previousSnapshotId: number | null;
+    diff: {
+        added: string[];
+        removed: string[];
+        changed: string[];
+        count: number;
+        truncated: boolean;
+    };
+    downloadHref: string | null;
+};
+
 type ConfigurationRow = {
     deviceId: number;
     deviceName: string;
@@ -152,19 +174,9 @@ type ConfigurationRow = {
         desiredVersion: string | null;
         observedAt: string | null;
     };
-    latestSnapshot?: {
-        id: number;
-        sourceKind: string;
-        source: string;
-        capturedAt: string | null;
-        contentHash: string;
-        configurationHash: string;
-        contentSize: number;
-        mimeType: string;
-        storageState: string;
-        diff: { changes?: unknown[]; truncated?: boolean } | null;
-        downloadHref: string | null;
-    } | null;
+    latestSnapshot?: ConfigurationSnapshotRow | null;
+    snapshotHistory?: ConfigurationSnapshotRow[];
+    snapshotHistoryTruncated?: boolean;
 };
 
 export type NetworkItWorkspaceData = {
@@ -288,6 +300,28 @@ function stateLabel(state: string | null | undefined): string {
             .replaceAll('_', ' ')
             .replace(/^./, (letter) => letter.toUpperCase())
     );
+}
+
+function snapshotDiffLabel(snapshot: ConfigurationSnapshotRow): string {
+    if (snapshot.previousSnapshotId === null) {
+        return 'Initial retained baseline';
+    }
+
+    const breakdown = [
+        snapshot.diff.added.length > 0
+            ? `${snapshot.diff.added.length} added`
+            : null,
+        snapshot.diff.changed.length > 0
+            ? `${snapshot.diff.changed.length} changed`
+            : null,
+        snapshot.diff.removed.length > 0
+            ? `${snapshot.diff.removed.length} removed`
+            : null,
+    ].filter((value): value is string => value !== null);
+    const summary =
+        breakdown.length === 0 ? 'no structural changes' : breakdown.join(', ');
+
+    return `Compared with snapshot #${snapshot.previousSnapshotId}: ${summary}${snapshot.diff.truncated ? ' (bounded result)' : ''}`;
 }
 
 function stateVariant(state: string): StatusVariant {
@@ -1274,6 +1308,13 @@ function ConfigurationPanel({
                                         )}{' '}
                                         · {row.latestSnapshot.contentSize} bytes
                                     </p>
+                                    <p className="mt-1 text-muted-foreground">
+                                        Firmware{' '}
+                                        {row.latestSnapshot.firmwareVersion ??
+                                            'not recorded'}
+                                        {' · '}
+                                        {snapshotDiffLabel(row.latestSnapshot)}
+                                    </p>
                                     {row.latestSnapshot.downloadHref ? (
                                         <Link
                                             href={
@@ -1285,6 +1326,74 @@ function ConfigurationPanel({
                                         </Link>
                                     ) : null}
                                 </section>
+                            ) : null}
+                            {(row.snapshotHistory?.length ?? 0) > 1 ? (
+                                <details className="mt-3 rounded-lg border bg-background text-xs">
+                                    <summary className="frontline-focus flex min-h-11 cursor-pointer items-center px-3 font-medium">
+                                        View previous governed snapshots (
+                                        {(row.snapshotHistory?.length ?? 1) - 1}
+                                        )
+                                    </summary>
+                                    <ol className="divide-y border-t">
+                                        {row.snapshotHistory
+                                            ?.slice(1)
+                                            .map((snapshot) => (
+                                                <li
+                                                    key={snapshot.id}
+                                                    className="space-y-1 p-3"
+                                                >
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <span className="font-medium">
+                                                            {snapshot.capturedAt
+                                                                ? formatDateTime(
+                                                                      snapshot.capturedAt,
+                                                                  )
+                                                                : 'Capture time unavailable'}
+                                                        </span>
+                                                        <StateBadge
+                                                            state={
+                                                                snapshot.storageState
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <p className="text-muted-foreground">
+                                                        {stateLabel(
+                                                            snapshot.sourceKind,
+                                                        )}{' '}
+                                                        ·{' '}
+                                                        {stateLabel(
+                                                            snapshot.source,
+                                                        )}
+                                                        {' · Firmware '}
+                                                        {snapshot.firmwareVersion ??
+                                                            'not recorded'}
+                                                    </p>
+                                                    <p className="text-muted-foreground">
+                                                        {snapshotDiffLabel(
+                                                            snapshot,
+                                                        )}
+                                                    </p>
+                                                    {snapshot.downloadHref ? (
+                                                        <Link
+                                                            href={
+                                                                snapshot.downloadHref
+                                                            }
+                                                            className="frontline-focus inline-flex min-h-11 items-center font-medium text-primary hover:underline"
+                                                        >
+                                                            Download this
+                                                            snapshot
+                                                        </Link>
+                                                    ) : null}
+                                                </li>
+                                            ))}
+                                    </ol>
+                                </details>
+                            ) : null}
+                            {row.snapshotHistoryTruncated ? (
+                                <p className="mt-3 rounded-lg border bg-background p-3 text-xs text-muted-foreground">
+                                    Additional retained snapshots exist outside
+                                    this bounded Site history.
+                                </p>
                             ) : null}
                         </article>
                     ))}

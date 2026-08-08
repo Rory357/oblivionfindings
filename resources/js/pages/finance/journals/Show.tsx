@@ -1,12 +1,16 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Table,
     TableBody,
@@ -16,17 +20,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { CheckCircle, RotateCcw, Calendar, User, FileText } from 'lucide-react';
-import { PageHero, PageLayout } from '@/components/page';
-import { formatMoney } from '@/components/finance/money';
-import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { PageProps } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { Calendar, CheckCircle, FileText, RotateCcw, User } from 'lucide-react';
 import { useState } from 'react';
 
 interface Account {
@@ -127,25 +125,39 @@ export default function JournalsShow({ auth, journal }: Props) {
     const [reverseReason, setReverseReason] = useState('');
     const [posting, setPosting] = useState(false);
 
-    const totalDebits = journal.lines.reduce((sum, l) => sum + Number(l.debit), 0);
-    const totalCredits = journal.lines.reduce((sum, l) => sum + Number(l.credit), 0);
+    const totalDebits = journal.lines.reduce(
+        (sum, l) => sum + Number(l.debit),
+        0,
+    );
+    const totalCredits = journal.lines.reduce(
+        (sum, l) => sum + Number(l.credit),
+        0,
+    );
 
     const handlePost = () => {
         setPosting(true);
-        router.post(`/finance/journals/${journal.id}/post`, {}, {
-            onFinish: () => setPosting(false),
-        });
+        router.post(
+            `/finance/journals/${journal.id}/post`,
+            {},
+            {
+                onFinish: () => setPosting(false),
+            },
+        );
     };
 
     const handleReverse = () => {
-        router.post(`/finance/journals/${journal.id}/reverse`, {
-            reason: reverseReason,
-        }, {
-            onSuccess: () => {
-                setReverseDialogOpen(false);
-                setReverseReason('');
+        router.post(
+            `/finance/journals/${journal.id}/reverse`,
+            {
+                reason: reverseReason,
             },
-        });
+            {
+                onSuccess: () => {
+                    setReverseDialogOpen(false);
+                    setReverseReason('');
+                },
+            },
+        );
     };
 
     return (
@@ -154,24 +166,30 @@ export default function JournalsShow({ auth, journal }: Props) {
             breadcrumbs={[
                 { title: 'Finance', href: '/finance' },
                 { title: 'Journals', href: '/finance/journals' },
-                { title: journal.journal_number, href: `/finance/journals/${journal.id}` },
+                {
+                    title: journal.journal_number,
+                    href: `/finance/journals/${journal.id}`,
+                },
             ]}
         >
             <Head title={`Journal ${journal.journal_number}`} />
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/journals"
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {journal.journal_number}
                                 <Badge className={statusBadge(journal.status)}>
-                                    {journal.status.charAt(0).toUpperCase() + journal.status.slice(1)}
+                                    {journal.status.charAt(0).toUpperCase() +
+                                        journal.status.slice(1)}
                                 </Badge>
                                 <Badge className={typeBadge(journal.type)}>
-                                    {journal.type.charAt(0).toUpperCase() + journal.type.slice(1)}
+                                    {journal.type.charAt(0).toUpperCase() +
+                                        journal.type.slice(1)}
                                 </Badge>
                             </span>
                         }
@@ -179,65 +197,102 @@ export default function JournalsShow({ auth, journal }: Props) {
                         actions={
                             <>
                                 {journal.status === 'draft' && (
-                            <Button onClick={handlePost} disabled={posting}>
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Post Journal
-                            </Button>
-                        )}
-                        {journal.status === 'posted' && !journal.reversed_by_journal && (
-                            <Dialog open={reverseDialogOpen} onOpenChange={setReverseDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button variant="outline">
-                                        <RotateCcw className="w-4 h-4 mr-2" />
-                                        Reverse
+                                    <Button
+                                        onClick={handlePost}
+                                        disabled={posting}
+                                    >
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Post Journal
                                     </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>Reverse Journal {journal.journal_number}</DialogTitle>
-                                    </DialogHeader>
-                                    <div className="space-y-4 pt-4">
-                                        <p className="text-sm text-muted-foreground">
-                                            This will create a new reversing journal that swaps all debits and credits.
-                                            The reversing journal will be posted immediately.
-                                        </p>
-                                        <div>
-                                            <Label htmlFor="reason">Reason (optional)</Label>
-                                            <Textarea
-                                                id="reason"
-                                                value={reverseReason}
-                                                onChange={(e) => setReverseReason(e.target.value)}
-                                                placeholder="Reason for reversal"
-                                                rows={3}
-                                            />
-                                        </div>
-                                        <div className="flex justify-end gap-2">
-                                            <Button variant="outline" onClick={() => setReverseDialogOpen(false)}>
-                                                Cancel
-                                            </Button>
-                                            <Button variant="destructive" onClick={handleReverse}>
-                                                Confirm Reversal
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </DialogContent>
-                            </Dialog>
-                        )}
+                                )}
+                                {journal.status === 'posted' &&
+                                    !journal.reversed_by_journal && (
+                                        <Dialog
+                                            open={reverseDialogOpen}
+                                            onOpenChange={setReverseDialogOpen}
+                                        >
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline">
+                                                    <RotateCcw className="mr-2 h-4 w-4" />
+                                                    Reverse
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>
+                                                        Reverse Journal{' '}
+                                                        {journal.journal_number}
+                                                    </DialogTitle>
+                                                </DialogHeader>
+                                                <div className="space-y-4 pt-4">
+                                                    <p className="text-sm text-muted-foreground">
+                                                        This will create a new
+                                                        reversing journal that
+                                                        swaps all debits and
+                                                        credits. The reversing
+                                                        journal will be posted
+                                                        immediately.
+                                                    </p>
+                                                    <div>
+                                                        <Label htmlFor="reason">
+                                                            Reason (optional)
+                                                        </Label>
+                                                        <Textarea
+                                                            id="reason"
+                                                            value={
+                                                                reverseReason
+                                                            }
+                                                            onChange={(e) =>
+                                                                setReverseReason(
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Reason for reversal"
+                                                            rows={3}
+                                                        />
+                                                    </div>
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                setReverseDialogOpen(
+                                                                    false,
+                                                                )
+                                                            }
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                        <Button
+                                                            variant="destructive"
+                                                            onClick={
+                                                                handleReverse
+                                                            }
+                                                        >
+                                                            Confirm Reversal
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </DialogContent>
+                                        </Dialog>
+                                    )}
                             </>
                         }
                     />
                 }
             >
                 {/* Meta info */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardContent className="pt-6">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                                <Calendar className="w-4 h-4" />
+                            <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
+                                <Calendar className="h-4 w-4" />
                                 Journal Date
                             </div>
                             <p className="font-semibold">
-                                {new Date(journal.journal_date).toLocaleDateString('en-NZ', {
+                                {new Date(
+                                    journal.journal_date,
+                                ).toLocaleDateString('en-NZ', {
                                     day: 'numeric',
                                     month: 'long',
                                     year: 'numeric',
@@ -248,25 +303,31 @@ export default function JournalsShow({ auth, journal }: Props) {
 
                     <Card>
                         <CardContent className="pt-6">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                                <FileText className="w-4 h-4" />
+                            <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
+                                <FileText className="h-4 w-4" />
                                 Reference
                             </div>
-                            <p className="font-semibold">{journal.reference || '-'}</p>
+                            <p className="font-semibold">
+                                {journal.reference || '-'}
+                            </p>
                         </CardContent>
                     </Card>
 
                     {journal.status === 'posted' && journal.posted_by && (
                         <Card>
                             <CardContent className="pt-6">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                                    <User className="w-4 h-4" />
+                                <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
+                                    <User className="h-4 w-4" />
                                     Posted By
                                 </div>
-                                <p className="font-semibold">{journal.posted_by.name}</p>
+                                <p className="font-semibold">
+                                    {journal.posted_by.name}
+                                </p>
                                 {journal.posted_at && (
                                     <p className="text-xs text-muted-foreground">
-                                        {new Date(journal.posted_at).toLocaleString('en-NZ')}
+                                        {new Date(
+                                            journal.posted_at,
+                                        ).toLocaleString('en-NZ')}
                                     </p>
                                 )}
                             </CardContent>
@@ -276,11 +337,13 @@ export default function JournalsShow({ auth, journal }: Props) {
                     {journal.fiscal_period && (
                         <Card>
                             <CardContent className="pt-6">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                                    <Calendar className="w-4 h-4" />
+                                <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Calendar className="h-4 w-4" />
                                     Fiscal Period
                                 </div>
-                                <p className="font-semibold">{journal.fiscal_period.name}</p>
+                                <p className="font-semibold">
+                                    {journal.fiscal_period.name}
+                                </p>
                             </CardContent>
                         </Card>
                     )}
@@ -288,11 +351,13 @@ export default function JournalsShow({ auth, journal }: Props) {
                     {journal.created_by && (
                         <Card>
                             <CardContent className="pt-6">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                                    <User className="w-4 h-4" />
+                                <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
+                                    <User className="h-4 w-4" />
                                     Created By
                                 </div>
-                                <p className="font-semibold">{journal.created_by.name}</p>
+                                <p className="font-semibold">
+                                    {journal.created_by.name}
+                                </p>
                             </CardContent>
                         </Card>
                     )}
@@ -300,7 +365,7 @@ export default function JournalsShow({ auth, journal }: Props) {
 
                 {/* Reversed notice */}
                 {journal.reversed_by_journal && (
-                    <div className="mb-6 rounded-md bg-status-critical-bg border border-status-critical/30 p-4">
+                    <div className="mb-6 rounded-md border border-status-critical/30 bg-status-critical-bg p-4">
                         <p className="text-sm text-status-critical">
                             This journal has been reversed by{' '}
                             <Link
@@ -324,8 +389,12 @@ export default function JournalsShow({ auth, journal }: Props) {
                                 <TableRow>
                                     <TableHead>Account</TableHead>
                                     <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">Debit</TableHead>
-                                    <TableHead className="text-right">Credit</TableHead>
+                                    <TableHead className="text-right">
+                                        Debit
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Credit
+                                    </TableHead>
                                     <TableHead>Cost Centre</TableHead>
                                     <TableHead>Funding Stream</TableHead>
                                 </TableRow>
@@ -335,17 +404,28 @@ export default function JournalsShow({ auth, journal }: Props) {
                                     <TableRow key={line.id}>
                                         <TableCell className="font-medium">
                                             {line.account ? (
-                                                <span>{line.account.code} - {line.account.name}</span>
+                                                <span>
+                                                    {line.account.code} -{' '}
+                                                    {line.account.name}
+                                                </span>
                                             ) : (
-                                                <span className="text-muted-foreground">-</span>
+                                                <span className="text-muted-foreground">
+                                                    -
+                                                </span>
                                             )}
                                         </TableCell>
-                                        <TableCell>{line.description ?? '-'}</TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            {Number(line.debit) > 0 ? formatMoney(line.debit) : '-'}
+                                        <TableCell>
+                                            {line.description ?? '-'}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
-                                            {Number(line.credit) > 0 ? formatMoney(line.credit) : '-'}
+                                            {Number(line.debit) > 0
+                                                ? formatMoney(line.debit)
+                                                : '-'}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {Number(line.credit) > 0
+                                                ? formatMoney(line.credit)
+                                                : '-'}
                                         </TableCell>
                                         <TableCell>
                                             {line.cost_centre
@@ -362,7 +442,10 @@ export default function JournalsShow({ auth, journal }: Props) {
                             </TableBody>
                             <TableFooter>
                                 <TableRow>
-                                    <TableCell colSpan={2} className="text-right font-semibold">
+                                    <TableCell
+                                        colSpan={2}
+                                        className="text-right font-semibold"
+                                    >
                                         Totals
                                     </TableCell>
                                     <TableCell className="text-right font-mono font-semibold">

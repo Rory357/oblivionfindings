@@ -27,7 +27,11 @@ const HUBS: HubChip[] = [
     { label: 'Receivables', href: '/finance/receivables', icon: Receipt },
     { label: 'Payables', href: '/finance/bills', icon: CreditCard },
     { label: 'Banking', href: '/finance/bank-accounts', icon: Landmark },
-    { label: 'Funding & Claims', href: '/finance/funding-streams', icon: Coins },
+    {
+        label: 'Funding & Claims',
+        href: '/finance/funding-streams',
+        icon: Coins,
+    },
     { label: 'Reports', href: '/finance/reports/profit-loss', icon: BarChart3 },
     { label: 'Tax', href: '/finance/gst-returns', icon: Percent },
 ];
@@ -45,8 +49,12 @@ export function FinanceHubsBar({ className }: { className?: string }) {
                     <Layers className="h-4 w-4" />
                 </span>
                 <div className="leading-tight">
-                    <div className="text-[13px] font-bold tracking-tight">Finance hubs</div>
-                    <div className="text-[11.5px] text-muted-foreground">Jump to a workspace</div>
+                    <div className="text-[13px] font-bold tracking-tight">
+                        Finance hubs
+                    </div>
+                    <div className="text-[11.5px] text-muted-foreground">
+                        Jump to a workspace
+                    </div>
                 </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">

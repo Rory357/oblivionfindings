@@ -46,6 +46,18 @@ final class QueclinkConfigurationProfileService
     {
         return DeviceConfigurationProfile::query()
             ->active()
+            ->where(function ($query): void {
+                $query->where('profile_key', 'like', 'queclink:device-%:draft:%')
+                    ->orWhereExists(function ($preset): void {
+                        $preset->selectRaw('1')
+                            ->from('queclink_presets')
+                            ->whereColumn(
+                                'queclink_presets.device_configuration_profile_id',
+                                'device_configuration_profiles.id',
+                            )
+                            ->whereNull('queclink_presets.retired_at');
+                    });
+            })
             ->where('provider', strtolower(trim((string) $device->provider)))
             ->where('device_domain', $device->domain)
             ->where(function ($query) use ($device): void {

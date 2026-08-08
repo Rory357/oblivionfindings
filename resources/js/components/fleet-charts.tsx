@@ -4,16 +4,16 @@
 import { useState } from 'react';
 
 export const FLEET_COLORS = {
-    primary: '#7c3aed',      // purple-600
-    primaryLight: '#a78bfa',  // purple-400
-    primaryDark: '#5b21b6',   // purple-800
-    secondary: '#3b82f6',     // blue-500
-    accent: '#06b6d4',        // cyan-500
-    warning: '#f59e0b',       // amber-500
-    danger: '#ef4444',        // red-500
-    success: '#10b981',       // emerald-500 (only for status dots)
-    neutral: '#64748b',       // slate-500
-    muted: '#94a3b8',         // slate-400
+    primary: '#7c3aed', // purple-600
+    primaryLight: '#a78bfa', // purple-400
+    primaryDark: '#5b21b6', // purple-800
+    secondary: '#3b82f6', // blue-500
+    accent: '#06b6d4', // cyan-500
+    warning: '#f59e0b', // amber-500
+    danger: '#ef4444', // red-500
+    success: '#10b981', // emerald-500 (only for status dots)
+    neutral: '#64748b', // slate-500
+    muted: '#94a3b8', // slate-400
 };
 
 /* ------------------------------------------------------------------ */
@@ -56,15 +56,20 @@ export function HalfMoonGauge({
     const largeArc = clampedValue > 50 ? 1 : 0;
 
     const bgPath = `M ${bgStartX} ${bgStartY} A ${radius} ${radius} 0 1 1 ${bgEndX} ${bgEndY}`;
-    const filledPath = clampedValue > 0
-        ? `M ${bgStartX} ${bgStartY} A ${radius} ${radius} 0 ${largeArc} 1 ${filledEndX} ${filledEndY}`
-        : '';
+    const filledPath =
+        clampedValue > 0
+            ? `M ${bgStartX} ${bgStartY} A ${radius} ${radius} 0 ${largeArc} 1 ${filledEndX} ${filledEndY}`
+            : '';
 
     const viewHeight = size * 0.65;
 
     return (
         <div className="flex flex-col items-center">
-            <svg width={size} height={viewHeight} viewBox={`0 0 ${size} ${viewHeight + strokeWidth}`}>
+            <svg
+                width={size}
+                height={viewHeight}
+                viewBox={`0 0 ${size} ${viewHeight + strokeWidth}`}
+            >
                 {/* Background arc */}
                 <path
                     d={bgPath}
@@ -97,10 +102,14 @@ export function HalfMoonGauge({
                 </text>
             </svg>
             {label && (
-                <span className="text-sm font-medium text-foreground -mt-1">{label}</span>
+                <span className="-mt-1 text-sm font-medium text-foreground">
+                    {label}
+                </span>
             )}
             {sublabel && (
-                <span className="text-xs text-muted-foreground mt-0.5">{sublabel}</span>
+                <span className="mt-0.5 text-xs text-muted-foreground">
+                    {sublabel}
+                </span>
             )}
         </div>
     );
@@ -123,7 +132,9 @@ export function SparklineChart({
     height?: number;
     width?: number;
 }) {
-    const [gradientId] = useState(() => `sparkGrad-${color.replace('#', '')}-${++sparklineCounter}`);
+    const [gradientId] = useState(
+        () => `sparkGrad-${color.replace('#', '')}-${++sparklineCounter}`,
+    );
 
     if (!data || data.length < 2) {
         return <svg width={width} height={height} />;
@@ -173,15 +184,27 @@ export function HorizontalBarChart({
     heightPerBar = 28,
     color = FLEET_COLORS.primary,
 }: {
-    items: Array<{ label: string; value: number; color?: string; maxValue?: number }>;
+    items: Array<{
+        label: string;
+        value: number;
+        color?: string;
+        maxValue?: number;
+    }>;
     heightPerBar?: number;
     color?: string;
 }) {
     if (!items || items.length === 0) {
-        return <p className="py-4 text-center text-sm text-muted-foreground">No data available.</p>;
+        return (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+                No data available.
+            </p>
+        );
     }
 
-    const maxValue = Math.max(...items.map((item) => item.maxValue ?? item.value), 1);
+    const maxValue = Math.max(
+        ...items.map((item) => item.maxValue ?? item.value),
+        1,
+    );
 
     return (
         <div className="space-y-2">
@@ -190,14 +213,24 @@ export function HorizontalBarChart({
                 const barColor = item.color ?? color;
                 return (
                     <div key={i}>
-                        <div className="flex items-center justify-between text-xs mb-0.5">
-                            <span className="truncate text-muted-foreground max-w-[60%]">{item.label}</span>
-                            <span className="font-medium tabular-nums ml-2">{typeof item.value === 'number' && item.value % 1 !== 0 ? item.value.toFixed(1) : item.value}</span>
+                        <div className="mb-0.5 flex items-center justify-between text-xs">
+                            <span className="max-w-[60%] truncate text-muted-foreground">
+                                {item.label}
+                            </span>
+                            <span className="ml-2 font-medium tabular-nums">
+                                {typeof item.value === 'number' &&
+                                item.value % 1 !== 0
+                                    ? item.value.toFixed(1)
+                                    : item.value}
+                            </span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-muted/30">
                             <div
                                 className="h-full rounded-full transition-all"
-                                style={{ width: `${pct}%`, backgroundColor: barColor }}
+                                style={{
+                                    width: `${pct}%`,
+                                    backgroundColor: barColor,
+                                }}
                             />
                         </div>
                     </div>
@@ -266,7 +299,9 @@ export function ProgressRing({
                 </text>
             </svg>
             {label && (
-                <span className="text-xs text-muted-foreground mt-1">{label}</span>
+                <span className="mt-1 text-xs text-muted-foreground">
+                    {label}
+                </span>
             )}
         </div>
     );
@@ -286,7 +321,11 @@ export function MiniBarChart({
     height?: number;
 }) {
     if (!data || data.length === 0) {
-        return <p className="py-4 text-center text-sm text-muted-foreground">No data available.</p>;
+        return (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+                No data available.
+            </p>
+        );
     }
 
     const maxVal = Math.max(...data.map((d) => d.value), 1);
@@ -303,7 +342,10 @@ export function MiniBarChart({
                 viewBox={`0 0 ${Math.max(totalWidth + 20, 100)} ${height + 8}`}
             >
                 {data.map((item, i) => {
-                    const barHeight = Math.max((item.value / maxVal) * chartHeight, 3);
+                    const barHeight = Math.max(
+                        (item.value / maxVal) * chartHeight,
+                        3,
+                    );
                     const x = 10 + i * (barWidth + gap);
                     const y = chartHeight - barHeight;
                     return (

@@ -3,7 +3,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from '@inertiajs/react';
-import { CalendarClock, CheckCircle2, ClipboardList, ListTodo } from 'lucide-react';
+import {
+    CalendarClock,
+    CheckCircle2,
+    ClipboardList,
+    ListTodo,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import {
@@ -42,9 +47,24 @@ const CATEGORIES = ['general', 'compliance', 'it', 'payroll', 'induction'];
 const UNASSIGNED = '__none__';
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Details', blurb: 'Title, category & notes', icon: ClipboardList },
-    { key: 'assignment', label: 'Assignment & timing', blurb: 'Owner, due date, flags', icon: CalendarClock },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Title, category & notes',
+        icon: ClipboardList,
+    },
+    {
+        key: 'assignment',
+        label: 'Assignment & timing',
+        blurb: 'Owner, due date, flags',
+        icon: CalendarClock,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: CheckCircle2,
+    },
 ];
 
 const blankData = () => ({
@@ -90,7 +110,9 @@ export function TaskFormDialog({
                       due_date: task.due_date ?? '',
                       is_required: task.is_required,
                       sign_off_required: task.sign_off_required,
-                      assigned_to_user_id: task.assigned_to_user_id ? String(task.assigned_to_user_id) : UNASSIGNED,
+                      assigned_to_user_id: task.assigned_to_user_id
+                          ? String(task.assigned_to_user_id)
+                          : UNASSIGNED,
                   }
                 : blankData(),
         );
@@ -105,16 +127,24 @@ export function TaskFormDialog({
     const ownerName =
         form.data.assigned_to_user_id === UNASSIGNED
             ? 'Unassigned'
-            : (owners.find((o) => String(o.id) === form.data.assigned_to_user_id)?.name ?? 'Unassigned');
+            : (owners.find(
+                  (o) => String(o.id) === form.data.assigned_to_user_id,
+              )?.name ?? 'Unassigned');
 
     const submit = () => {
         form.transform((data) => ({
             ...data,
             description: data.description || null,
             due_date: data.due_date || null,
-            assigned_to_user_id: data.assigned_to_user_id === UNASSIGNED ? null : data.assigned_to_user_id,
+            assigned_to_user_id:
+                data.assigned_to_user_id === UNASSIGNED
+                    ? null
+                    : data.assigned_to_user_id,
         }));
-        const opts = { preserveScroll: true, onSuccess: () => setDone(true) } as const;
+        const opts = {
+            preserveScroll: true,
+            onSuccess: () => setDone(true),
+        } as const;
         if (task) {
             form.patch(`/hr/onboarding/tasks/${task.id}`, opts);
         } else {
@@ -134,7 +164,11 @@ export function TaskFormDialog({
             open={open}
             onClose={onClose}
             title={task ? 'Edit task' : 'Add task'}
-            description={task ? 'Update this task or reassign its owner.' : 'Ad-hoc task for this checklist.'}
+            description={
+                task
+                    ? 'Update this task or reassign its owner.'
+                    : 'Ad-hoc task for this checklist.'
+            }
             railIcon={ListTodo}
             railTitle={task ? 'Edit task' : 'Add task'}
             railSub="Onboarding checklist"
@@ -148,13 +182,17 @@ export function TaskFormDialog({
                         title={task ? 'Task updated' : 'Task added'}
                         blurb={
                             <>
-                                “{form.data.title || 'Task'}” is {task ? 'updated' : 'now on this checklist'}.
+                                “{form.data.title || 'Task'}” is{' '}
+                                {task ? 'updated' : 'now on this checklist'}.
                             </>
                         }
                         actions={
                             <>
                                 {!task ? (
-                                    <Button variant="outline" onClick={addAnother}>
+                                    <Button
+                                        variant="outline"
+                                        onClick={addAnother}
+                                    >
                                         Add another task
                                     </Button>
                                 ) : null}
@@ -177,11 +215,21 @@ export function TaskFormDialog({
                         Cancel
                     </Button>
                     {wizard.isLast ? (
-                        <Button onClick={submit} disabled={form.processing || !canContinue}>
-                            {form.processing ? 'Saving…' : task ? 'Save task' : 'Add task'}
+                        <Button
+                            onClick={submit}
+                            disabled={form.processing || !canContinue}
+                        >
+                            {form.processing
+                                ? 'Saving…'
+                                : task
+                                  ? 'Save task'
+                                  : 'Add task'}
                         </Button>
                     ) : (
-                        <Button onClick={wizard.next} disabled={wizard.index === 0 && !canContinue}>
+                        <Button
+                            onClick={wizard.next}
+                            disabled={wizard.index === 0 && !canContinue}
+                        >
                             Continue
                         </Button>
                     )}
@@ -199,7 +247,9 @@ export function TaskFormDialog({
                         <Field label="Title" required error={form.errors.title}>
                             <Input
                                 value={form.data.title}
-                                onChange={(e) => form.setData('title', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('title', e.target.value)
+                                }
                                 placeholder="e.g. Order uniform"
                             />
                         </Field>
@@ -218,7 +268,9 @@ export function TaskFormDialog({
                             <Textarea
                                 rows={3}
                                 value={form.data.description}
-                                onChange={(e) => form.setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('description', e.target.value)
+                                }
                                 placeholder="Optional details…"
                             />
                         </Field>
@@ -234,10 +286,15 @@ export function TaskFormDialog({
                         blurb="Who owns this task, when it's due and how strict it is."
                     />
                     <div className="grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Owner" error={form.errors.assigned_to_user_id}>
+                        <Field
+                            label="Owner"
+                            error={form.errors.assigned_to_user_id}
+                        >
                             <SelectInput
                                 value={form.data.assigned_to_user_id}
-                                onChange={(v) => form.setData('assigned_to_user_id', v)}
+                                onChange={(v) =>
+                                    form.setData('assigned_to_user_id', v)
+                                }
                                 placeholder="Unassigned"
                                 options={[
                                     { value: UNASSIGNED, label: 'Unassigned' },
@@ -252,7 +309,9 @@ export function TaskFormDialog({
                             <Input
                                 type="date"
                                 value={form.data.due_date}
-                                onChange={(e) => form.setData('due_date', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('due_date', e.target.value)
+                                }
                             />
                         </Field>
                     </div>
@@ -260,14 +319,21 @@ export function TaskFormDialog({
                         <label className="flex items-center gap-2 text-sm">
                             <Checkbox
                                 checked={form.data.is_required}
-                                onCheckedChange={(c) => form.setData('is_required', Boolean(c))}
+                                onCheckedChange={(c) =>
+                                    form.setData('is_required', Boolean(c))
+                                }
                             />
                             Required
                         </label>
                         <label className="flex items-center gap-2 text-sm">
                             <Checkbox
                                 checked={form.data.sign_off_required}
-                                onCheckedChange={(c) => form.setData('sign_off_required', Boolean(c))}
+                                onCheckedChange={(c) =>
+                                    form.setData(
+                                        'sign_off_required',
+                                        Boolean(c),
+                                    )
+                                }
                             />
                             Sign-off required
                         </label>
@@ -283,16 +349,41 @@ export function TaskFormDialog({
                         blurb="Check the details, then confirm below."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={ClipboardList} title="Details" onEdit={() => wizard.goTo(0)}>
+                        <ReviewCard
+                            icon={ClipboardList}
+                            title="Details"
+                            onEdit={() => wizard.goTo(0)}
+                        >
                             <ReviewRow label="Title" value={form.data.title} />
-                            <ReviewRow label="Category" value={prettyLabel(form.data.category)} />
-                            <ReviewRow label="Description" value={form.data.description} />
+                            <ReviewRow
+                                label="Category"
+                                value={prettyLabel(form.data.category)}
+                            />
+                            <ReviewRow
+                                label="Description"
+                                value={form.data.description}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={CalendarClock} title="Assignment & timing" onEdit={() => wizard.goTo(1)}>
+                        <ReviewCard
+                            icon={CalendarClock}
+                            title="Assignment & timing"
+                            onEdit={() => wizard.goTo(1)}
+                        >
                             <ReviewRow label="Owner" value={ownerName} />
-                            <ReviewRow label="Due date" value={form.data.due_date} />
-                            <ReviewRow label="Required" value={form.data.is_required ? 'Yes' : 'No'} />
-                            <ReviewRow label="Sign-off" value={form.data.sign_off_required ? 'Yes' : 'No'} />
+                            <ReviewRow
+                                label="Due date"
+                                value={form.data.due_date}
+                            />
+                            <ReviewRow
+                                label="Required"
+                                value={form.data.is_required ? 'Yes' : 'No'}
+                            />
+                            <ReviewRow
+                                label="Sign-off"
+                                value={
+                                    form.data.sign_off_required ? 'Yes' : 'No'
+                                }
+                            />
                         </ReviewCard>
                     </div>
                 </WizardStepPane>

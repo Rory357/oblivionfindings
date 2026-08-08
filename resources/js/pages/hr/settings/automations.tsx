@@ -1,3 +1,5 @@
+import { SettingsTabs } from '@/components/hr';
+import { PageHero, PageLayout } from '@/components/page';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -22,11 +24,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero, PageLayout } from '@/components/page';
-import { SettingsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Settings } from 'lucide-react';
 import { useState } from 'react';
 
@@ -86,7 +86,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusClass: Record<string, string> = {
-    success: 'border-status-success/30 text-status-success bg-status-success-bg',
+    success:
+        'border-status-success/30 text-status-success bg-status-success-bg',
     failed: 'border-status-critical/30 text-status-critical bg-status-critical-bg',
     skipped: 'border-border/30 text-muted-foreground bg-muted-foreground/10',
 };
@@ -310,13 +311,17 @@ export default function HrAutomationsPage({
             <Head title="HR Automations" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={Settings}
                         title="HR Automations"
                         description="Configure rules that fire actions when HR events occur."
                         stats={[
                             { label: 'Rules', value: rules.length },
-                            { label: 'Active', value: rules.filter((r) => r.is_active).length },
+                            {
+                                label: 'Active',
+                                value: rules.filter((r) => r.is_active).length,
+                            },
                         ]}
                     />
                 }

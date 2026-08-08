@@ -1,17 +1,7 @@
+import { FLEET_COLORS, MiniBarChart } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetStatCard } from '@/components/fleet-stat-card';
-import { MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
 import PageShell from '@/components/page-shell';
-import {
-    FleetAttentionStrip,
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,12 +14,22 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { formatDate, formatDurationMinutes } from '@/lib/fleet-utils';
+import {
+    FleetAttentionStrip,
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Calendar,
     Car,
     Clock,
-    List,
     MapPin,
     Plus,
     Search,
@@ -37,7 +37,6 @@ import {
     Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { formatDate, formatDateTime, formatDurationMinutes } from '@/lib/fleet-utils';
 import {
     OutingWizard,
     type ClientOption,
@@ -101,10 +100,13 @@ type Props = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-    planned: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    planned:
+        'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     active: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary',
-    completed: 'bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground',
-    cancelled: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+    completed:
+        'bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground',
+    cancelled:
+        'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
 };
 
 const PURPOSE_LABELS: Record<string, string> = {
@@ -115,14 +117,39 @@ const PURPOSE_LABELS: Record<string, string> = {
     shopping: 'Shopping',
 };
 
-export default function OutingsIndex({ outings, filters, stats, hero, chart_data, can, clients, vehicles, drivers, auth_user }: Props) {
+export default function OutingsIndex({
+    outings,
+    filters,
+    stats,
+    hero,
+    chart_data,
+    can,
+    clients,
+    vehicles,
+    drivers,
+    auth_user,
+}: Props) {
     const safeOutings = outings?.data ?? [];
-    const safeMeta = outings?.meta ?? { current_page: 1, last_page: 1, total: 0 };
+    const safeMeta = outings?.meta ?? {
+        current_page: 1,
+        last_page: 1,
+        total: 0,
+    };
     const safeLinks = outings?.links ?? [];
-    const safeStats = stats ?? { outings_this_week: 0, residents_this_week: 0, avg_duration_minutes: 0, upcoming: 0 };
+    const safeStats = stats ?? {
+        outings_this_week: 0,
+        residents_this_week: 0,
+        avg_duration_minutes: 0,
+        upcoming: 0,
+    };
     const safeHero = hero ?? {
-        planned_today: 0, active_now: 0, residents_out_now: 0, completed_7d: 0,
-        past_return: 0, overdue_returns: 0, critical_alerts: 0,
+        planned_today: 0,
+        active_now: 0,
+        residents_out_now: 0,
+        completed_7d: 0,
+        past_return: 0,
+        overdue_returns: 0,
+        critical_alerts: 0,
     };
     const safeChartData = chart_data ?? [];
 
@@ -140,10 +167,14 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
     };
 
     const applyFilters = (newFilters: Record<string, string>) => {
-        router.get('/fleet-assets/outings', {
-            ...filters,
-            ...newFilters,
-        }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/fleet-assets/outings',
+            {
+                ...filters,
+                ...newFilters,
+            },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -159,12 +190,15 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={MapPin} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Community access · outings</HeroStatusPill>
+                            <HeroStatusPill>
+                                Community access · outings
+                            </HeroStatusPill>
                             <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
                                 Community Outings
                             </h1>
                             <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Plan and manage resident outings and community access trips.
+                                Plan and manage resident outings and community
+                                access trips.
                             </p>
                         </div>
                         <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
@@ -183,8 +217,16 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                             <HeroClusterTile
                                 label="Residents out now"
                                 value={fmt(safeHero.residents_out_now)}
-                                caption={(safeHero.past_return ?? 0) > 0 ? `${safeHero.past_return} past return` : 'not yet returned'}
-                                tone={(safeHero.past_return ?? 0) > 0 ? 'critical' : 'neutral'}
+                                caption={
+                                    (safeHero.past_return ?? 0) > 0
+                                        ? `${safeHero.past_return} past return`
+                                        : 'not yet returned'
+                                }
+                                tone={
+                                    (safeHero.past_return ?? 0) > 0
+                                        ? 'critical'
+                                        : 'neutral'
+                                }
                             />
                             <HeroClusterTile
                                 label="Completed 7d"
@@ -200,7 +242,9 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                         overdueReturns={safeHero.overdue_returns ?? 0}
                         outingsPastReturn={safeHero.past_return ?? 0}
                         criticalAlerts={safeHero.critical_alerts ?? 0}
-                        hrefs={{ outings: '/fleet-assets/outings?status=active' }}
+                        hrefs={{
+                            outings: '/fleet-assets/outings?status=active',
+                        }}
                     />
                     {can.manage && (
                         <div className="flex flex-wrap items-center gap-2">
@@ -231,7 +275,13 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                     />
                     <FleetStatCard
                         label="Avg Duration"
-                        value={safeStats.avg_duration_minutes > 0 ? formatDurationMinutes(safeStats.avg_duration_minutes) : '---'}
+                        value={
+                            safeStats.avg_duration_minutes > 0
+                                ? formatDurationMinutes(
+                                      safeStats.avg_duration_minutes,
+                                  )
+                                : '---'
+                        }
                         icon={Clock}
                         color="amber"
                     />
@@ -248,7 +298,9 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                     {safeChartData.some((entry) => entry.value > 0) && (
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">Outings by Day of Week</CardTitle>
+                                <CardTitle className="text-sm">
+                                    Outings by Day of Week
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <MiniBarChart
@@ -267,12 +319,15 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                         <CardContent>
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                 <div className="relative sm:col-span-2">
-                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
+                                        onChange={(e) =>
+                                            setSearch(e.target.value)
+                                        }
                                         onKeyDown={(e) => {
-                                            if (e.key === 'Enter') applyFilters({ search });
+                                            if (e.key === 'Enter')
+                                                applyFilters({ search });
                                         }}
                                         placeholder="Search outings..."
                                         className="pl-9"
@@ -280,28 +335,52 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                                 </div>
                                 <Select
                                     value={filters?.status ?? 'all'}
-                                    onValueChange={(v) => applyFilters({ status: v === 'all' ? '' : v })}
+                                    onValueChange={(v) =>
+                                        applyFilters({
+                                            status: v === 'all' ? '' : v,
+                                        })
+                                    }
                                 >
-                                    <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Status" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All Statuses</SelectItem>
-                                        <SelectItem value="planned">Planned</SelectItem>
-                                        <SelectItem value="active">Active</SelectItem>
-                                        <SelectItem value="completed">Completed</SelectItem>
-                                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                                        <SelectItem value="all">
+                                            All Statuses
+                                        </SelectItem>
+                                        <SelectItem value="planned">
+                                            Planned
+                                        </SelectItem>
+                                        <SelectItem value="active">
+                                            Active
+                                        </SelectItem>
+                                        <SelectItem value="completed">
+                                            Completed
+                                        </SelectItem>
+                                        <SelectItem value="cancelled">
+                                            Cancelled
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <div className="flex gap-2">
                                     <Input
                                         type="date"
                                         value={filters?.date_from ?? ''}
-                                        onChange={(e) => applyFilters({ date_from: e.target.value })}
+                                        onChange={(e) =>
+                                            applyFilters({
+                                                date_from: e.target.value,
+                                            })
+                                        }
                                         className="text-xs"
                                     />
                                     <Input
                                         type="date"
                                         value={filters?.date_to ?? ''}
-                                        onChange={(e) => applyFilters({ date_to: e.target.value })}
+                                        onChange={(e) =>
+                                            applyFilters({
+                                                date_to: e.target.value,
+                                            })
+                                        }
                                         className="text-xs"
                                     />
                                 </div>
@@ -316,72 +395,141 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
                                 <FleetResponsiveTable>
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-muted/30">
-                                            <th className="px-4 py-3 text-left font-medium">Date</th>
-                                            <th className="px-4 py-3 text-left font-medium">Title</th>
-                                            <th className="px-4 py-3 text-left font-medium">Destination</th>
-                                            <th className="px-4 py-3 text-left font-medium">Residents</th>
-                                            <th className="px-4 py-3 text-left font-medium">Vehicle</th>
-                                            <th className="px-4 py-3 text-left font-medium">Driver</th>
-                                            <th className="px-4 py-3 text-left font-medium">Status</th>
-                                            <th className="px-4 py-3 text-left font-medium">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {safeOutings.map((outing) => (
-                                            <tr key={outing.id} className="border-b last:border-0 hover:bg-muted/20">
-                                                <td data-fleet-row-time className="px-4 py-3 text-xs whitespace-nowrap">
-                                                    {formatDate(outing.planned_departure)}
-                                                </td>
-                                                <td data-fleet-row-identity className="px-4 py-3">
-                                                    <Link href={`/fleet-assets/outings/${outing.id}`} className="font-medium text-primary hover:underline dark:text-primary">
-                                                        {outing.title}
-                                                    </Link>
-                                                    {outing.purpose && (
-                                                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                                                            {PURPOSE_LABELS[outing.purpose] ?? outing.purpose}
-                                                        </p>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs">{outing.destination}</td>
-                                                <td className="px-4 py-3">
-                                                    <Badge variant="outline" className="text-[10px]">
-                                                        <Users className="mr-1 h-3 w-3" />
-                                                        {outing.resident_count}
-                                                    </Badge>
-                                                </td>
-                                                <td className="px-4 py-3 text-xs">
-                                                    {outing.asset ? (
-                                                        <span className="flex items-center gap-1">
-                                                            <Car className="h-3 w-3 text-muted-foreground" />
-                                                            {outing.asset.name}
-                                                        </span>
-                                                    ) : '---'}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs">
-                                                    {outing.driver ? (
-                                                        <span className="flex items-center gap-1">
-                                                            <User className="h-3 w-3 text-muted-foreground" />
-                                                            {outing.driver.name}
-                                                        </span>
-                                                    ) : '---'}
-                                                </td>
-                                                <td data-fleet-row-status className="px-4 py-3">
-                                                    <Badge className={`text-[10px] ${STATUS_COLORS[outing.status] ?? STATUS_COLORS.planned}`}>
-                                                        {outing.status}
-                                                    </Badge>
-                                                </td>
-                                                <td data-fleet-row-action className="px-4 py-3">
-                                                    <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                                                        <Link href={`/fleet-assets/outings/${outing.id}`}>View</Link>
-                                                    </Button>
-                                                </td>
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b bg-muted/30">
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Date
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Title
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Destination
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Residents
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Vehicle
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Driver
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Status
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Actions
+                                                </th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {safeOutings.map((outing) => (
+                                                <tr
+                                                    key={outing.id}
+                                                    className="border-b last:border-0 hover:bg-muted/20"
+                                                >
+                                                    <td
+                                                        data-fleet-row-time
+                                                        className="px-4 py-3 text-xs whitespace-nowrap"
+                                                    >
+                                                        {formatDate(
+                                                            outing.planned_departure,
+                                                        )}
+                                                    </td>
+                                                    <td
+                                                        data-fleet-row-identity
+                                                        className="px-4 py-3"
+                                                    >
+                                                        <Link
+                                                            href={`/fleet-assets/outings/${outing.id}`}
+                                                            className="font-medium text-primary hover:underline dark:text-primary"
+                                                        >
+                                                            {outing.title}
+                                                        </Link>
+                                                        {outing.purpose && (
+                                                            <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                                                {PURPOSE_LABELS[
+                                                                    outing
+                                                                        .purpose
+                                                                ] ??
+                                                                    outing.purpose}
+                                                            </p>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs">
+                                                        {outing.destination}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="text-[10px]"
+                                                        >
+                                                            <Users className="mr-1 h-3 w-3" />
+                                                            {
+                                                                outing.resident_count
+                                                            }
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs">
+                                                        {outing.asset ? (
+                                                            <span className="flex items-center gap-1">
+                                                                <Car className="h-3 w-3 text-muted-foreground" />
+                                                                {
+                                                                    outing.asset
+                                                                        .name
+                                                                }
+                                                            </span>
+                                                        ) : (
+                                                            '---'
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs">
+                                                        {outing.driver ? (
+                                                            <span className="flex items-center gap-1">
+                                                                <User className="h-3 w-3 text-muted-foreground" />
+                                                                {
+                                                                    outing
+                                                                        .driver
+                                                                        .name
+                                                                }
+                                                            </span>
+                                                        ) : (
+                                                            '---'
+                                                        )}
+                                                    </td>
+                                                    <td
+                                                        data-fleet-row-status
+                                                        className="px-4 py-3"
+                                                    >
+                                                        <Badge
+                                                            className={`text-[10px] ${STATUS_COLORS[outing.status] ?? STATUS_COLORS.planned}`}
+                                                        >
+                                                            {outing.status}
+                                                        </Badge>
+                                                    </td>
+                                                    <td
+                                                        data-fleet-row-action
+                                                        className="px-4 py-3"
+                                                    >
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 text-xs"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/fleet-assets/outings/${outing.id}`}
+                                                            >
+                                                                View
+                                                            </Link>
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </FleetResponsiveTable>
                             </div>
 
@@ -389,18 +537,29 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                             {safeMeta.last_page > 1 && (
                                 <div className="flex items-center justify-between border-t px-4 py-3">
                                     <p className="text-xs text-muted-foreground">
-                                        Page {safeMeta.current_page} of {safeMeta.last_page} ({safeMeta.total} total)
+                                        Page {safeMeta.current_page} of{' '}
+                                        {safeMeta.last_page} ({safeMeta.total}{' '}
+                                        total)
                                     </p>
                                     <div className="flex gap-1">
                                         {safeLinks.map((link, i) => (
                                             <Button
                                                 key={i}
-                                                variant={link.active ? 'default' : 'outline'}
+                                                variant={
+                                                    link.active
+                                                        ? 'default'
+                                                        : 'outline'
+                                                }
                                                 size="sm"
                                                 className="h-7 text-xs"
                                                 disabled={!link.url}
-                                                onClick={() => link.url && router.get(link.url)}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
+                                                onClick={() =>
+                                                    link.url &&
+                                                    router.get(link.url)
+                                                }
+                                                dangerouslySetInnerHTML={{
+                                                    __html: link.label,
+                                                }}
                                             />
                                         ))}
                                     </div>
@@ -415,8 +574,14 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                                 icon={MapPin}
                                 title="No Outings Yet"
                                 description="Plan community outings, medical appointments, and social activities for your residents."
-                                actionLabel={can.manage ? 'Plan First Outing' : undefined}
-                                actionHref={can.manage ? '/fleet-assets/outings?new=1' : undefined}
+                                actionLabel={
+                                    can.manage ? 'Plan First Outing' : undefined
+                                }
+                                actionHref={
+                                    can.manage
+                                        ? '/fleet-assets/outings?new=1'
+                                        : undefined
+                                }
                             />
                         </CardContent>
                     </Card>

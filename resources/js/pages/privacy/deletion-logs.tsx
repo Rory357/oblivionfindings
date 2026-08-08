@@ -1,10 +1,16 @@
 import { PageHero, PageLayout } from '@/components/page';
-import AppLayout from '@/layouts/app-layout';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { History, Trash2 } from 'lucide-react';
 
@@ -20,7 +26,11 @@ export default function DeletionLogs({ logs, filters }: Props) {
     const ANY = '__any__';
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/privacy/deletion-logs', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/privacy/deletion-logs',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     const formatDate = (dateString: string) =>
@@ -33,10 +43,12 @@ export default function DeletionLogs({ logs, filters }: Props) {
         });
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Data & Privacy', href: '/privacy/dashboard' },
-            { title: 'Deletion Logs', href: '/privacy/deletion-logs' },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Data & Privacy', href: '/privacy/dashboard' },
+                { title: 'Deletion Logs', href: '/privacy/deletion-logs' },
+            ]}
+        >
             <Head title="Deletion Logs" />
 
             <PageLayout
@@ -45,9 +57,7 @@ export default function DeletionLogs({ logs, filters }: Props) {
                         icon={History}
                         title="Deletion Logs"
                         description="Audit trail of data deletion operations performed under retention policies"
-                        stats={[
-                            { label: 'Total', value: logs.length },
-                        ]}
+                        stats={[{ label: 'Total', value: logs.length }]}
                     />
                 }
             >
@@ -58,27 +68,51 @@ export default function DeletionLogs({ logs, filters }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <Input
                                 placeholder="Search by reference or description"
                                 value={filters.q || ''}
-                                onChange={(e) => onFilter({ q: e.target.value })}
+                                onChange={(e) =>
+                                    onFilter({ q: e.target.value })
+                                }
                             />
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Model Type</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Model Type
+                            </Label>
                             <Select
                                 value={filters.model_type ?? ANY}
-                                onValueChange={(v) => onFilter({ model_type: v === ANY ? undefined : v })}
+                                onValueChange={(v) =>
+                                    onFilter({
+                                        model_type: v === ANY ? undefined : v,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Model Type" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Model Type" />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={ANY}>All Types</SelectItem>
-                                    <SelectItem value="Client">Client</SelectItem>
-                                    <SelectItem value="ClientDocument">Client Document</SelectItem>
-                                    <SelectItem value="ClientNote">Client Note</SelectItem>
-                                    <SelectItem value="Incident">Incident</SelectItem>
-                                    <SelectItem value="AuditLog">Audit Log</SelectItem>
+                                    <SelectItem value={ANY}>
+                                        All Types
+                                    </SelectItem>
+                                    <SelectItem value="Client">
+                                        Client
+                                    </SelectItem>
+                                    <SelectItem value="ClientDocument">
+                                        Client Document
+                                    </SelectItem>
+                                    <SelectItem value="ClientNote">
+                                        Client Note
+                                    </SelectItem>
+                                    <SelectItem value="Incident">
+                                        Incident
+                                    </SelectItem>
+                                    <SelectItem value="AuditLog">
+                                        Audit Log
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -94,18 +128,27 @@ export default function DeletionLogs({ logs, filters }: Props) {
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
                                             <Trash2 className="h-4 w-4 text-status-critical" />
-                                            <span className="font-medium">{log.model_type ?? 'Unknown'}</span>
+                                            <span className="font-medium">
+                                                {log.model_type ?? 'Unknown'}
+                                            </span>
                                             {log.model_id && (
-                                                <Badge variant="outline">#{log.model_id}</Badge>
+                                                <Badge variant="outline">
+                                                    #{log.model_id}
+                                                </Badge>
                                             )}
                                         </div>
                                         {log.reason && (
-                                            <p className="mt-1 text-sm text-muted-foreground">{log.reason}</p>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                {log.reason}
+                                            </p>
                                         )}
                                         <div className="mt-1 text-xs text-muted-foreground">
-                                            {log.deleted_at && formatDate(log.deleted_at)}
-                                            {log.deleted_by_name && ` by ${log.deleted_by_name}`}
-                                            {log.policy_name && ` (Policy: ${log.policy_name})`}
+                                            {log.deleted_at &&
+                                                formatDate(log.deleted_at)}
+                                            {log.deleted_by_name &&
+                                                ` by ${log.deleted_by_name}`}
+                                            {log.policy_name &&
+                                                ` (Policy: ${log.policy_name})`}
                                         </div>
                                     </div>
                                 </div>

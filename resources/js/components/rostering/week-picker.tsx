@@ -1,15 +1,4 @@
 import {
-    type ReactNode,
-    type RefObject,
-    type KeyboardEvent as ReactKeyboardEvent,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from 'react';
-import { createPortal } from 'react-dom';
-import {
     ChevronLeft,
     ChevronRight,
     Copy,
@@ -21,9 +10,20 @@ import {
     Wand2,
     Zap,
 } from 'lucide-react';
+import {
+    type KeyboardEvent as ReactKeyboardEvent,
+    type ReactNode,
+    type RefObject,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
+import { createPortal } from 'react-dom';
 
-import { cn } from '@/lib/utils';
 import { Button as GuardrailButton } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const MONTHS = [
     'January',
@@ -87,7 +87,12 @@ function fmtDayShortYear(d: Date) {
 
 export function formatWeekRange(weekStart: Date) {
     const end = addDaysWP(weekStart, 6);
-    return { startLabel: fmtDayShort(weekStart), endLabel: fmtDayShortYear(end), start: weekStart, end };
+    return {
+        startLabel: fmtDayShort(weekStart),
+        endLabel: fmtDayShortYear(end),
+        start: weekStart,
+        end,
+    };
 }
 
 export function weekNumberISO(d: Date): number {
@@ -249,10 +254,17 @@ export function WeekPicker({
         return rows;
     }, [viewMonth]);
 
-    const goMonth = useCallback((delta: number) =>
-        setViewMonth(
-            new Date(viewMonth.getFullYear(), viewMonth.getMonth() + delta, 1),
-        ), [viewMonth]);
+    const goMonth = useCallback(
+        (delta: number) =>
+            setViewMonth(
+                new Date(
+                    viewMonth.getFullYear(),
+                    viewMonth.getMonth() + delta,
+                    1,
+                ),
+            ),
+        [viewMonth],
+    );
 
     const focusWeek = useCallback((weekStart: Date) => {
         setHoverWeek(weekStart);
@@ -268,9 +280,7 @@ export function WeekPicker({
         });
     }, []);
 
-    const handleDialogKeyDown = (
-        event: ReactKeyboardEvent<HTMLDivElement>,
-    ) => {
+    const handleDialogKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'ArrowLeft') {
             event.preventDefault();
             goMonth(-1);
@@ -314,7 +324,7 @@ export function WeekPicker({
             tabIndex={-1}
             className={cn(
                 'fixed z-50 w-[360px] rounded-[14px] border border-border bg-popover p-3.5 text-popover-foreground shadow-lg outline-none',
-                'animate-in fade-in-0 slide-in-from-top-1 zoom-in-95 duration-150',
+                'animate-in duration-150 fade-in-0 zoom-in-95 slide-in-from-top-1',
             )}
             style={{ top: pos.top, left: pos.left }}
             role="dialog"
@@ -323,10 +333,10 @@ export function WeekPicker({
         >
             <div className="mb-3 flex items-center gap-3 rounded-[11px] bg-gradient-to-br from-primary/90 to-primary p-3 text-primary-foreground shadow-sm">
                 <div className="flex min-w-[50px] flex-col items-center rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/20 px-2 py-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider opacity-80">
+                    <span className="text-[10px] font-semibold tracking-wider uppercase opacity-80">
                         Wk
                     </span>
-                    <span className="text-[22px] font-extrabold tabular-nums leading-none">
+                    <span className="text-[22px] leading-none font-extrabold tabular-nums">
                         {weekNumberISO(focusedWeek)}
                     </span>
                 </div>
@@ -338,24 +348,22 @@ export function WeekPicker({
                     </div>
                     <div className="mt-0.5 text-[11px] opacity-80">
                         {isThisWeek ? (
-                                            <span className="text-primary-foreground/90">
+                            <span className="text-primary-foreground/90">
                                 ● Current week
                             </span>
                         ) : (
                             <span>{focusedYear} · ISO week</span>
                         )}
                         {hoverWeek ? (
-                            <span className="opacity-80">
-                                {' '}
-                                · click to jump
-                            </span>
+                            <span className="opacity-80"> · click to jump</span>
                         ) : null}
                     </div>
                 </div>
             </div>
 
             <div className="mb-2.5 flex items-center justify-between">
-                <GuardrailButton unstyled
+                <GuardrailButton
+                    unstyled
                     type="button"
                     onClick={() => goMonth(-1)}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -366,7 +374,8 @@ export function WeekPicker({
                 <div className="text-sm font-bold">
                     {MONTHS[viewMonth.getMonth()]} {viewMonth.getFullYear()}
                 </div>
-                <GuardrailButton unstyled
+                <GuardrailButton
+                    unstyled
                     type="button"
                     onClick={() => goMonth(+1)}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -376,7 +385,7 @@ export function WeekPicker({
                 </GuardrailButton>
             </div>
 
-            <div className="mb-1 grid grid-cols-[32px_repeat(7,1fr)] text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground/70">
+            <div className="mb-1 grid grid-cols-[32px_repeat(7,1fr)] text-[10.5px] font-bold tracking-wider text-muted-foreground/70 uppercase">
                 <span className="text-center">Wk</span>
                 {DAYS_SHORT.map((d) => (
                     <span key={d} className="text-center">
@@ -387,14 +396,18 @@ export function WeekPicker({
 
             <div className="flex flex-col gap-0.5">
                 {grid.map((row) => {
-                    const isSelected = sameDay(row.weekStart, selectedWeekStart);
+                    const isSelected = sameDay(
+                        row.weekStart,
+                        selectedWeekStart,
+                    );
                     const isHover =
                         hoverWeek && sameDay(row.weekStart, hoverWeek);
                     const containsToday = row.days.some((d) =>
                         sameDay(d, today),
                     );
                     return (
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             type="button"
                             key={ymd(row.weekStart)}
                             className={cn(
@@ -413,10 +426,14 @@ export function WeekPicker({
                                 onSelect(row.weekStart);
                                 onClose();
                             }}
-                            onContextMenu={showContextMenu ? (e) => openCtx(e, row.weekStart) : undefined}
+                            onContextMenu={
+                                showContextMenu
+                                    ? (e) => openCtx(e, row.weekStart)
+                                    : undefined
+                            }
                             aria-label={`Select ${weekLabel(row.weekStart)} starting ${fmtDayShort(row.weekStart)}`}
                         >
-                            <span className="py-1.5 text-center text-[10.5px] font-bold tabular-nums text-muted-foreground/70">
+                            <span className="py-1.5 text-center text-[10.5px] font-bold text-muted-foreground/70 tabular-nums">
                                 {weekNumberISO(row.weekStart)}
                             </span>
                             {row.days.map((d, i) => {
@@ -449,14 +466,15 @@ export function WeekPicker({
 
             <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
                 {showContextMenu ? (
-                    <span className="text-[11px] italic text-muted-foreground/80">
+                    <span className="text-[11px] text-muted-foreground/80 italic">
                         Right-click a week for options
                     </span>
                 ) : (
                     <span />
                 )}
                 <div className="flex items-center gap-2">
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         onClick={() => {
                             onSelect(startOfWeek(today));
@@ -466,7 +484,8 @@ export function WeekPicker({
                     >
                         This week
                     </GuardrailButton>
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         onClick={onClose}
                         className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
@@ -513,7 +532,10 @@ function WeekRowContextMenu({
 
     useEffect(() => {
         const onDown = (e: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+            if (
+                menuRef.current &&
+                !menuRef.current.contains(e.target as Node)
+            ) {
                 onClose();
             }
         };
@@ -599,12 +621,12 @@ function WeekRowContextMenu({
     return (
         <div
             ref={menuRef}
-            className="absolute z-50 w-[270px] rounded-[12px] border border-border bg-popover p-1.5 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 duration-100"
+            className="absolute z-50 w-[270px] animate-in rounded-[12px] border border-border bg-popover p-1.5 text-popover-foreground shadow-lg duration-100 fade-in-0 zoom-in-95"
             style={{ top: ctx.y, left: ctx.x }}
             role="menu"
         >
-            <div className="mb-1 flex items-center gap-2 px-2 py-1.5 border-b border-border/60">
-                <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+            <div className="mb-1 flex items-center gap-2 border-b border-border/60 px-2 py-1.5">
+                <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase">
                     {wk}
                 </span>
                 <span className="text-[11px] text-muted-foreground">

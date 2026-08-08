@@ -59,7 +59,7 @@ final class InfluxDbTimeSeriesStore implements TimeSeriesStore
         CarbonImmutable $to,
     ): array {
         $this->assertReference($externalKey, $tier);
-        if ($to->lessThan($from)) {
+        if ($to->lessThanOrEqualTo($from)) {
             throw new TimeSeriesUnavailable('Time-series query range is invalid.');
         }
 
@@ -102,7 +102,7 @@ final class InfluxDbTimeSeriesStore implements TimeSeriesStore
         CarbonImmutable $to,
     ): void {
         $this->assertReference($externalKey, $tier);
-        if ($to->lessThan($from)) {
+        if ($to->lessThanOrEqualTo($from)) {
             throw new TimeSeriesUnavailable('Time-series deletion range is invalid.');
         }
 

@@ -1,17 +1,40 @@
-import { Head, router } from '@inertiajs/react';
-import { PageProps, type BreadcrumbItem } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import { ReportsTabsFooter } from '@/components/finance';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Printer, Activity, ArrowUpCircle, ArrowDownCircle, TrendingUp, Wallet } from 'lucide-react';
-import { useState, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { chartColor } from '@/components/finance/chart-palette';
 import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { PageProps, type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import {
+    Activity,
+    ArrowDownCircle,
+    ArrowUpCircle,
+    Printer,
+    TrendingUp,
+    Wallet,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
 interface CashFlowEntry {
     account_name: string;
@@ -38,7 +61,11 @@ interface Props extends PageProps {
 }
 
 const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'long', year: 'numeric' });
+    new Date(date).toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+    });
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance' },
@@ -74,7 +101,10 @@ function CashFlowSection({
             ))}
             {entries.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={2} className="pl-8 text-muted-foreground">
+                    <TableCell
+                        colSpan={2}
+                        className="pl-8 text-muted-foreground"
+                    >
                         No activity.
                     </TableCell>
                 </TableRow>
@@ -109,7 +139,11 @@ export default function CashFlow({ report, filters }: Props) {
             { name: 'Investing', amount: report.total_investing },
             { name: 'Financing', amount: report.total_financing },
         ],
-        [report.total_operating, report.total_investing, report.total_financing],
+        [
+            report.total_operating,
+            report.total_investing,
+            report.total_financing,
+        ],
     );
 
     const cashCompareData = useMemo(
@@ -126,18 +160,36 @@ export default function CashFlow({ report, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Activity}
                         title="Cash Flow Statement"
                         description="Cash inflows and outflows across operating, investing, and financing activities."
                         stats={[
-                            { label: 'Operating', value: formatMoney(report.total_operating) },
-                            { label: 'Investing', value: formatMoney(report.total_investing) },
-                            { label: 'Financing', value: formatMoney(report.total_financing) },
-                            { label: 'Net Change', value: formatMoney(report.net_cash_change) },
+                            {
+                                label: 'Operating',
+                                value: formatMoney(report.total_operating),
+                            },
+                            {
+                                label: 'Investing',
+                                value: formatMoney(report.total_investing),
+                            },
+                            {
+                                label: 'Financing',
+                                value: formatMoney(report.total_financing),
+                            },
+                            {
+                                label: 'Net Change',
+                                value: formatMoney(report.net_cash_change),
+                            },
                         ]}
                         actions={
-                            <Button variant="outline" size="sm" onClick={() => window.print()} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.print()}
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
                                 <Printer className="mr-1 h-4 w-4" />
                                 Print
                             </Button>
@@ -166,7 +218,9 @@ export default function CashFlow({ report, filters }: Props) {
                                 />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Operating</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Operating
+                                </p>
                                 <p
                                     className={`text-2xl font-bold ${
                                         report.total_operating >= 0
@@ -197,7 +251,9 @@ export default function CashFlow({ report, filters }: Props) {
                                 />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Investing</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Investing
+                                </p>
                                 <p
                                     className={`text-2xl font-bold ${
                                         report.total_investing >= 0
@@ -228,7 +284,9 @@ export default function CashFlow({ report, filters }: Props) {
                                 />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Financing</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Financing
+                                </p>
                                 <p
                                     className={`text-2xl font-bold ${
                                         report.total_financing >= 0
@@ -259,7 +317,9 @@ export default function CashFlow({ report, filters }: Props) {
                                 />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Net Cash Change</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Net Cash Change
+                                </p>
                                 <p
                                     className={`text-2xl font-bold ${
                                         report.net_cash_change >= 0
@@ -278,7 +338,9 @@ export default function CashFlow({ report, filters }: Props) {
                 <Card>
                     <CardContent className="flex items-end gap-4 pt-6">
                         <div>
-                            <label className="mb-1 block text-sm font-medium">Start Date</label>
+                            <label className="mb-1 block text-sm font-medium">
+                                Start Date
+                            </label>
                             <Input
                                 type="date"
                                 value={startDate}
@@ -287,7 +349,9 @@ export default function CashFlow({ report, filters }: Props) {
                             />
                         </div>
                         <div>
-                            <label className="mb-1 block text-sm font-medium">End Date</label>
+                            <label className="mb-1 block text-sm font-medium">
+                                End Date
+                            </label>
                             <Input
                                 type="date"
                                 value={endDate}
@@ -304,21 +368,47 @@ export default function CashFlow({ report, filters }: Props) {
                     {/* Activity Bar Chart */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Cash Flow by Activity</CardTitle>
+                            <CardTitle className="text-base">
+                                Cash Flow by Activity
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="h-64">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={barData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
+                                    <BarChart
+                                        data={barData}
+                                        margin={{
+                                            top: 5,
+                                            right: 20,
+                                            bottom: 5,
+                                            left: 20,
+                                        }}
+                                    >
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" />
-                                        <YAxis tickFormatter={(v) => formatMoney(v)} />
-                                        <Tooltip formatter={(value?: number) => [formatMoney(value ?? 0), 'Amount']} />
-                                        <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                                        <YAxis
+                                            tickFormatter={(v) =>
+                                                formatMoney(v)
+                                            }
+                                        />
+                                        <Tooltip
+                                            formatter={(value?: number) => [
+                                                formatMoney(value ?? 0),
+                                                'Amount',
+                                            ]}
+                                        />
+                                        <Bar
+                                            dataKey="amount"
+                                            radius={[4, 4, 0, 0]}
+                                        >
                                             {barData.map((entry, index) => (
                                                 <Cell
                                                     key={`cell-${index}`}
-                                                    fill={entry.amount >= 0 ? 'var(--status-success)' : 'var(--status-critical)'}
+                                                    fill={
+                                                        entry.amount >= 0
+                                                            ? 'var(--status-success)'
+                                                            : 'var(--status-critical)'
+                                                    }
                                                 />
                                             ))}
                                         </Bar>
@@ -331,17 +421,39 @@ export default function CashFlow({ report, filters }: Props) {
                     {/* Opening vs Closing Cash */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Opening vs Closing Cash</CardTitle>
+                            <CardTitle className="text-base">
+                                Opening vs Closing Cash
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="h-64">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={cashCompareData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
+                                    <BarChart
+                                        data={cashCompareData}
+                                        margin={{
+                                            top: 5,
+                                            right: 20,
+                                            bottom: 5,
+                                            left: 20,
+                                        }}
+                                    >
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" />
-                                        <YAxis tickFormatter={(v) => formatMoney(v)} />
-                                        <Tooltip formatter={(value?: number) => [formatMoney(value ?? 0), 'Cash']} />
-                                        <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                                        <YAxis
+                                            tickFormatter={(v) =>
+                                                formatMoney(v)
+                                            }
+                                        />
+                                        <Tooltip
+                                            formatter={(value?: number) => [
+                                                formatMoney(value ?? 0),
+                                                'Cash',
+                                            ]}
+                                        />
+                                        <Bar
+                                            dataKey="amount"
+                                            radius={[4, 4, 0, 0]}
+                                        >
                                             <Cell fill={chartColor(0)} />
                                             <Cell fill={chartColor(1)} />
                                         </Bar>
@@ -356,7 +468,8 @@ export default function CashFlow({ report, filters }: Props) {
                 <Card>
                     <CardHeader>
                         <CardTitle>
-                            Cash Flow: {formatDate(report.start_date)} to {formatDate(report.end_date)}
+                            Cash Flow: {formatDate(report.start_date)} to{' '}
+                            {formatDate(report.end_date)}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -364,7 +477,9 @@ export default function CashFlow({ report, filters }: Props) {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
+                                    <TableHead className="text-right">
+                                        Amount
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

@@ -98,7 +98,7 @@ class WebhookReceiverTest extends TestCase
     public function test_valid_hardware_webhook_is_persisted_and_routed(): void
     {
         $key = 'unifi-secret-1234';
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $this->createProviderConnection(provider: 'unifi', key: $key);
         $this->mapProviderToSite('unifi', $site);
         $this->mockRouting(times: 1);
@@ -113,7 +113,6 @@ class WebhookReceiverTest extends TestCase
         $this->consumeStagedEvent($site->id);
 
         $this->assertDatabaseHas('integration_events', [
-            'tenant_id' => 1,
             'site_id' => $site->id,
             'provider' => 'unifi',
             'source_event_id' => 'evt-1001',
@@ -125,7 +124,7 @@ class WebhookReceiverTest extends TestCase
     public function test_duplicate_source_event_id_is_idempotent_across_the_application(): void
     {
         $key = 'unifi-secret-1234';
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $this->createProviderConnection(provider: 'unifi', key: $key);
         $this->mapProviderToSite('unifi', $site);
         $this->mockRouting(times: 1);
@@ -144,11 +143,11 @@ class WebhookReceiverTest extends TestCase
         $this->assertDatabaseCount('integration_events', 1);
     }
 
-    public function test_same_provider_source_event_id_is_duplicate_across_sites(): void
+    public function test_same_provider_source_event_id_is_an_application_wide_duplicate_across_canonical_sites(): void
     {
         $providerKey = 'application-provider-key-1234';
-        $firstSite = Site::factory()->create(['tenant_id' => 1]);
-        $secondSite = Site::factory()->create(['tenant_id' => 2]);
+        $firstSite = Site::factory()->create();
+        $secondSite = Site::factory()->create();
         $this->createProviderConnection(provider: 'unifi', key: $providerKey);
         $this->mapProviderToSite('unifi', $firstSite);
         $this->mapProviderToSite('unifi', $secondSite);
@@ -166,7 +165,6 @@ class WebhookReceiverTest extends TestCase
             ->assertJson(['status' => 'duplicate']);
 
         $this->assertDatabaseHas('integration_events', [
-            'tenant_id' => 1,
             'site_id' => $firstSite->id,
             'source_event_id' => 'evt-shared',
         ]);
@@ -186,6 +184,22 @@ class WebhookReceiverTest extends TestCase
         $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key))
             ->assertUnprocessable();
 
+        $this->assertDatabaseCount('integration_events', 0);
+    }
+
+    public function test_authenticated_webhook_cannot_reactivate_an_archived_site_mapping(): void
+    {
+        $key = 'unifi-secret-1234';
+        $site = Site::factory()->create(['archived_at' => now()]);
+        $this->createProviderConnection(provider: 'unifi', key: $key);
+        $this->mapProviderToSite('unifi', $site);
+        $this->mockRouting(times: 0);
+
+        $payload = $this->payload(siteId: $site->id);
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key))
+            ->assertUnprocessable();
+
+        $this->assertDatabaseCount('monitoring_outbox', 0);
         $this->assertDatabaseCount('integration_events', 0);
     }
 
@@ -239,7 +253,6 @@ class WebhookReceiverTest extends TestCase
     private function createProviderConnection(string $provider, string $key): IntegrationProviderConnection
     {
         return IntegrationProviderConnection::create([
-            'tenant_id' => 1,
             'provider' => $provider,
             'secret_encrypted' => Crypt::encryptString($key),
             'secret_last4' => substr($key, -4),
@@ -250,7 +263,6 @@ class WebhookReceiverTest extends TestCase
     private function mapProviderToSite(string $provider, Site $site): IntegrationSiteConfig
     {
         return IntegrationSiteConfig::create([
-            'tenant_id' => 1,
             'site_id' => $site->id,
             'provider' => $provider,
             'mapped_external_site_id' => 'unifi-site-'.$site->id,

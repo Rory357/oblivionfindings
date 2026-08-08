@@ -1,3 +1,16 @@
+import {
+    CompensationHero,
+    CompensationTabs,
+    type CompensationHeroStats,
+} from '@/components/hr';
+import {
+    ReviewBuilderDialog,
+    type ReviewBuilderBand,
+    type ReviewBuilderEmployee,
+    type ReviewCycleOption,
+} from '@/components/hr/review-builder-dialog';
+import { StatusBadge } from '@/components/hr/status-badge';
+import { PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -17,15 +30,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageLayout } from '@/components/page';
-import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
-import { StatusBadge } from '@/components/hr/status-badge';
-import {
-    ReviewBuilderDialog,
-    type ReviewBuilderBand,
-    type ReviewBuilderEmployee,
-    type ReviewCycleOption,
-} from '@/components/hr/review-builder-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { ClipboardCheck, Eye, Plus } from 'lucide-react';
@@ -122,13 +126,20 @@ export default function CompensationReviews({
                             onFilter({ status: v === NONE ? null : v })
                         }
                     >
-                        <SelectTrigger className="w-full sm:max-w-xs" aria-label="Filter by status">
+                        <SelectTrigger
+                            className="w-full sm:max-w-xs"
+                            aria-label="Filter by status"
+                        >
                             <SelectValue placeholder="All statuses" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value={NONE}>All statuses</SelectItem>
                             {statuses.map((s) => (
-                                <SelectItem key={s} value={s} className="capitalize">
+                                <SelectItem
+                                    key={s}
+                                    value={s}
+                                    className="capitalize"
+                                >
                                     {s.replace(/_/g, ' ')}
                                 </SelectItem>
                             ))}
@@ -163,20 +174,40 @@ export default function CompensationReviews({
                                             <TableCell className="font-medium">
                                                 {review.title}
                                             </TableCell>
-                                            <TableCell>{getCycleLabel(review.review_cycle)}</TableCell>
-                                            <TableCell>{formatDate(review.effective_date)}</TableCell>
-                                            <TableCell className="tabular-nums">{review.items_count}</TableCell>
+                                            <TableCell>
+                                                {getCycleLabel(
+                                                    review.review_cycle,
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {formatDate(
+                                                    review.effective_date,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="tabular-nums">
+                                                {review.items_count}
+                                            </TableCell>
                                             <TableCell>
                                                 <StatusBadge
                                                     status={review.status}
-                                                    tone={review.status === 'applied' ? 'info' : undefined}
+                                                    tone={
+                                                        review.status ===
+                                                        'applied'
+                                                            ? 'info'
+                                                            : undefined
+                                                    }
                                                 />
                                             </TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
                                                 {review.creator?.name ?? '—'}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8"
+                                                    asChild
+                                                >
                                                     <Link
                                                         href={`/hr/compensation/reviews/${review.id}`}
                                                         aria-label={`View ${review.title}`}
@@ -194,7 +225,11 @@ export default function CompensationReviews({
                 ) : (
                     <EmptyState
                         icon={ClipboardCheck}
-                        heading={filters.status ? 'No reviews match this status' : 'No pay reviews yet'}
+                        heading={
+                            filters.status
+                                ? 'No reviews match this status'
+                                : 'No pay reviews yet'
+                        }
                         description={
                             filters.status
                                 ? 'Try clearing the status filter.'
@@ -202,7 +237,10 @@ export default function CompensationReviews({
                         }
                         action={
                             can.manage && !filters.status ? (
-                                <Button size="sm" onClick={() => setBuilderOpen(true)}>
+                                <Button
+                                    size="sm"
+                                    onClick={() => setBuilderOpen(true)}
+                                >
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     New review
                                 </Button>

@@ -212,12 +212,33 @@ class ItMajorIncidentController extends Controller
 
     public function status(Request $request, ItMajorIncident $majorIncident)
     {
+        $this->assertCanViewStatus($request, $majorIncident);
+
+        return Inertia::render('it/major-incidents/status', [
+            'status' => $this->statusPayload($majorIncident),
+        ]);
+    }
+
+    public function statusJson(Request $request, ItMajorIncident $majorIncident)
+    {
+        $this->assertCanViewStatus($request, $majorIncident);
+
+        return response()->json($this->statusPayload($majorIncident));
+    }
+
+    private function assertCanViewStatus(Request $request, ItMajorIncident $majorIncident): void
+    {
         $user = $request->user();
         abort_unless($this->workAccess->canViewMajorIncidentStatus($user, $majorIncident), 404);
         $this->authorize('viewStatus', $majorIncident);
-        $majorIncident->load('ticket');
+    }
 
-        return response()->json([
+    /** @return array<string, mixed> */
+    private function statusPayload(ItMajorIncident $majorIncident): array
+    {
+        $majorIncident->loadMissing('ticket');
+
+        return [
             'reference' => $majorIncident->ticket->reference,
             'title' => $majorIncident->ticket->title,
             'severity' => $majorIncident->severity,
@@ -238,7 +259,7 @@ class ItMajorIncidentController extends Controller
                     'service_status' => $update->service_status,
                     'published_at' => $update->published_at?->toIso8601String(),
                 ])->values(),
-        ]);
+        ];
     }
 
     /** @return array<string, mixed> */

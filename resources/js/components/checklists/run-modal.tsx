@@ -23,12 +23,15 @@ type RespState = Record<number, { value: string; notes: string }>;
 
 function isFail(item: RunItemDef, value: string | undefined): boolean {
     if (value == null || value === '') return false;
-    if (item.response_type === 'yes_no' || item.response_type === 'yes_no_na') return value === 'no';
+    if (item.response_type === 'yes_no' || item.response_type === 'yes_no_na')
+        return value === 'no';
     if (item.response_type === 'pass_fail') return value === 'fail';
     if (item.response_type === 'numeric') {
         const cfg = item.response_config ?? {};
         const n = Number(value);
-        return (cfg.min != null && n < cfg.min) || (cfg.max != null && n > cfg.max);
+        return (
+            (cfg.min != null && n < cfg.min) || (cfg.max != null && n > cfg.max)
+        );
     }
     return false;
 }
@@ -37,11 +40,20 @@ function isAnswered(value: string | undefined): boolean {
     return value != null && value !== '';
 }
 
-export function RunModal({ runId, onClose }: { runId: number; onClose: () => void }) {
+export function RunModal({
+    runId,
+    onClose,
+}: {
+    runId: number;
+    onClose: () => void;
+}) {
     const cfg = useChecklistConfig();
     const page = usePage();
-    const runDetail = (page.props as { runDetail?: RunDetail | null }).runDetail ?? null;
-    const userName = (page.props as { auth?: { user?: { name?: string } } })?.auth?.user?.name ?? '';
+    const runDetail =
+        (page.props as { runDetail?: RunDetail | null }).runDetail ?? null;
+    const userName =
+        (page.props as { auth?: { user?: { name?: string } } })?.auth?.user
+            ?.name ?? '';
 
     const ready = runDetail && runDetail.id === runId;
     const [resp, setResp] = useState<RespState>({});
@@ -51,7 +63,12 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
 
     // Pull the run's full detail without leaving the page.
     useEffect(() => {
-        router.reload({ only: ['runDetail'], data: { run: runId }, preserveState: true, preserveScroll: true });
+        router.reload({
+            only: ['runDetail'],
+            data: { run: runId },
+            preserveState: true,
+            preserveScroll: true,
+        });
     }, [runId]);
 
     // Seed local state once the matching detail arrives.
@@ -59,7 +76,10 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
         if (!ready || !runDetail) return;
         const seed: RespState = {};
         runDetail.responses.forEach((r) => {
-            seed[r.template_item_id] = { value: r.response_value ?? '', notes: r.notes ?? '' };
+            seed[r.template_item_id] = {
+                value: r.response_value ?? '',
+                notes: r.notes ?? '',
+            };
         });
         setResp(seed);
     }, [ready, runDetail]);
@@ -72,16 +92,30 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
     const items = useMemo(() => runDetail?.items ?? [], [runDetail?.items]);
     const readOnly = runDetail?.status === 'completed' || !cfg.can.run;
 
-    const answered = items.filter((it) => isAnswered(resp[it.id]?.value)).length;
+    const answered = items.filter((it) =>
+        isAnswered(resp[it.id]?.value),
+    ).length;
     const pct = items.length ? Math.round((answered / items.length) * 100) : 0;
     const failed = items.filter((it) => isFail(it, resp[it.id]?.value));
     const hazardItems = failed.filter((it) => it.failure_creates_hazard);
     const damageItems = failed.filter((it) => it.failure_creates_damage);
     const requiredItems = items.filter((it) => it.is_required);
-    const requiredDone = requiredItems.every((it) => isAnswered(resp[it.id]?.value));
+    const requiredDone = requiredItems.every((it) =>
+        isAnswered(resp[it.id]?.value),
+    );
 
-    const set = (id: number, patch: Partial<{ value: string; notes: string }>) =>
-        setResp((p) => ({ ...p, [id]: { value: p[id]?.value ?? '', notes: p[id]?.notes ?? '', ...patch } }));
+    const set = (
+        id: number,
+        patch: Partial<{ value: string; notes: string }>,
+    ) =>
+        setResp((p) => ({
+            ...p,
+            [id]: {
+                value: p[id]?.value ?? '',
+                notes: p[id]?.notes ?? '',
+                ...patch,
+            },
+        }));
 
     const close = () => {
         setShow(false);
@@ -91,14 +125,21 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
     const payload = useMemo(
         () =>
             items
-                .filter((it) => isAnswered(resp[it.id]?.value) || resp[it.id]?.notes)
+                .filter(
+                    (it) =>
+                        isAnswered(resp[it.id]?.value) || resp[it.id]?.notes,
+                )
                 .map((it) => ({
                     template_item_id: it.id,
                     response_value: resp[it.id]?.value ?? null,
                     notes: resp[it.id]?.notes || null,
                     is_failed: isFail(it, resp[it.id]?.value),
-                    create_hazard: isFail(it, resp[it.id]?.value) && it.failure_creates_hazard,
-                    create_damage: isFail(it, resp[it.id]?.value) && it.failure_creates_damage,
+                    create_hazard:
+                        isFail(it, resp[it.id]?.value) &&
+                        it.failure_creates_hazard,
+                    create_damage:
+                        isFail(it, resp[it.id]?.value) &&
+                        it.failure_creates_damage,
                 })),
         [items, resp],
     );
@@ -109,7 +150,11 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
         router.post(
             `/checklists/runs/${runDetail.id}/responses`,
             { responses: payload },
-            { preserveScroll: true, onSuccess: close, onFinish: () => setSubmitting(false) },
+            {
+                preserveScroll: true,
+                onSuccess: close,
+                onFinish: () => setSubmitting(false),
+            },
         );
     };
 
@@ -118,16 +163,30 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
         setSubmitting(true);
         router.post(
             `/checklists/runs/${runDetail.id}/complete`,
-            { responses: payload, signature_name: signature, overall_notes: null },
-            { preserveScroll: true, onSuccess: close, onFinish: () => setSubmitting(false) },
+            {
+                responses: payload,
+                signature_name: signature,
+                overall_notes: null,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: close,
+                onFinish: () => setSubmitting(false),
+            },
         );
     };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
             <div
-                className={cn('absolute inset-0 transition-opacity duration-200', show ? 'opacity-100' : 'opacity-0')}
-                style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }}
+                className={cn(
+                    'absolute inset-0 transition-opacity duration-200',
+                    show ? 'opacity-100' : 'opacity-0',
+                )}
+                style={{
+                    background: 'rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(2px)',
+                }}
                 onClick={close}
             />
             <div
@@ -147,9 +206,13 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
                         <div className="shrink-0 border-b border-border bg-card">
                             <div className="flex items-start justify-between gap-3 p-5 pb-3">
                                 <div className="flex min-w-0 items-start gap-3">
-                                    <CategoryIcon category={runDetail!.template.category} box={42} size={21} />
+                                    <CategoryIcon
+                                        category={runDetail!.template.category}
+                                        box={42}
+                                        size={21}
+                                    />
                                     <div className="min-w-0">
-                                        <h2 className="text-base font-semibold leading-snug">
+                                        <h2 className="text-base leading-snug font-semibold">
                                             {runDetail!.template.name}
                                         </h2>
                                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
@@ -158,33 +221,49 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
                                                 {runDetail!.site.name}
                                             </span>
                                             <span>·</span>
-                                            {freqLabel(cfg, runDetail!.template.frequency)}
+                                            {freqLabel(
+                                                cfg,
+                                                runDetail!.template.frequency,
+                                            )}
                                         </div>
                                     </div>
                                 </div>
-                                <Button variant="ghost" size="icon" onClick={close}>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={close}
+                                >
                                     <X className="h-4 w-4" />
                                 </Button>
                             </div>
                             <div className="flex items-center gap-3 px-5 pb-4">
                                 <Progress value={pct} className="flex-1" />
-                                <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                                <span className="text-xs font-medium text-muted-foreground tabular-nums">
                                     {answered}/{items.length} · {pct}%
                                 </span>
                             </div>
-                            {hazardItems.length > 0 || damageItems.length > 0 ? (
+                            {hazardItems.length > 0 ||
+                            damageItems.length > 0 ? (
                                 <div className="space-y-1 border-t border-border bg-status-critical-bg px-5 py-2 text-xs font-medium text-status-critical">
                                     {hazardItems.length > 0 ? (
                                         <div className="flex items-center gap-2">
                                             <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
-                                            {hazardItems.length} failed check{hazardItems.length === 1 ? '' : 's'} will raise a hazard on{' '}
+                                            {hazardItems.length} failed check
+                                            {hazardItems.length === 1
+                                                ? ''
+                                                : 's'}{' '}
+                                            will raise a hazard on{' '}
                                             {runDetail!.site.name}
                                         </div>
                                     ) : null}
                                     {damageItems.length > 0 ? (
                                         <div className="flex items-center gap-2">
                                             <Wrench className="h-3.5 w-3.5 shrink-0" />
-                                            {damageItems.length} failed check{damageItems.length === 1 ? '' : 's'} will log a damage report on{' '}
+                                            {damageItems.length} failed check
+                                            {damageItems.length === 1
+                                                ? ''
+                                                : 's'}{' '}
+                                            will log a damage report on{' '}
                                             {runDetail!.site.name}
                                         </div>
                                     ) : null}
@@ -225,10 +304,14 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
                                 <div className="flex flex-col gap-3">
                                     {runDetail!.template.flags?.sign ? (
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xs font-medium text-muted-foreground">Sign-off</span>
+                                            <span className="text-xs font-medium text-muted-foreground">
+                                                Sign-off
+                                            </span>
                                             <input
                                                 value={signature}
-                                                onChange={(e) => setSignature(e.target.value)}
+                                                onChange={(e) =>
+                                                    setSignature(e.target.value)
+                                                }
                                                 placeholder="Your name"
                                                 className="h-8 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30"
                                             />
@@ -238,22 +321,31 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
                                         <div className="text-xs text-muted-foreground">
                                             {failed.length > 0 ? (
                                                 <span className="font-medium text-status-warning">
-                                                    {failed.length} flagged ·{' '}
+                                                    {failed.length} flagged
+                                                    ·{' '}
                                                 </span>
                                             ) : null}
-                                            {answered} of {items.length} answered
+                                            {answered} of {items.length}{' '}
+                                            answered
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Button
                                                 variant="outline"
                                                 onClick={save}
-                                                disabled={submitting || payload.length === 0}
+                                                disabled={
+                                                    submitting ||
+                                                    payload.length === 0
+                                                }
                                             >
                                                 Save &amp; close
                                             </Button>
                                             <Button
                                                 onClick={complete}
-                                                disabled={submitting || !requiredDone || !signature.trim()}
+                                                disabled={
+                                                    submitting ||
+                                                    !requiredDone ||
+                                                    !signature.trim()
+                                                }
                                             >
                                                 <CheckCircle2 className="h-4 w-4" />
                                                 Complete run
@@ -292,7 +384,9 @@ function RunItem({
         <div
             className={cn(
                 'rounded-lg border bg-card p-3.5 transition',
-                fail ? 'border-status-critical/40 bg-status-critical-bg/40' : 'border-border',
+                fail
+                    ? 'border-status-critical/40 bg-status-critical-bg/40'
+                    : 'border-border',
             )}
         >
             <div className="flex items-start gap-2.5">
@@ -301,26 +395,43 @@ function RunItem({
                 </span>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-start gap-1.5">
-                        <p className="text-sm font-medium leading-snug">{item.question}</p>
+                        <p className="text-sm leading-snug font-medium">
+                            {item.question}
+                        </p>
                         {item.failure_creates_hazard ? (
-                            <span title="Failure raises a hazard" className="mt-0.5 shrink-0 text-status-critical">
+                            <span
+                                title="Failure raises a hazard"
+                                className="mt-0.5 shrink-0 text-status-critical"
+                            >
                                 <TriangleAlert className="h-3 w-3" />
                             </span>
                         ) : null}
                         {item.failure_creates_damage ? (
-                            <span title="Failure logs a damage report" className="mt-0.5 shrink-0 text-status-warning">
+                            <span
+                                title="Failure logs a damage report"
+                                className="mt-0.5 shrink-0 text-status-warning"
+                            >
                                 <Wrench className="h-3 w-3" />
                             </span>
                         ) : null}
                     </div>
                     {item.guidance ? (
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">{item.guidance}</p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                            {item.guidance}
+                        </p>
                     ) : null}
                     {!item.is_required ? (
-                        <span className="text-[11px] text-muted-foreground">Optional</span>
+                        <span className="text-[11px] text-muted-foreground">
+                            Optional
+                        </span>
                     ) : null}
                     <div className="mt-2.5">
-                        <RunInput item={item} value={value} readOnly={readOnly} onChange={onValue} />
+                        <RunInput
+                            item={item}
+                            value={value}
+                            readOnly={readOnly}
+                            onChange={onValue}
+                        />
                     </div>
                     {(item.response_type === 'yes_no' ||
                         item.response_type === 'yes_no_na' ||
@@ -354,7 +465,10 @@ function RunInput({
     if (item.response_type === 'numeric') {
         const cfg = item.response_config ?? {};
         const has = value !== '' && value != null;
-        const out = has && ((cfg.min != null && Number(value) < cfg.min) || (cfg.max != null && Number(value) > cfg.max));
+        const out =
+            has &&
+            ((cfg.min != null && Number(value) < cfg.min) ||
+                (cfg.max != null && Number(value) > cfg.max));
         return (
             <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -365,10 +479,16 @@ function RunInput({
                     placeholder="0"
                     className={cn(
                         'h-9 w-28 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-60',
-                        out ? 'border-status-critical text-status-critical' : 'border-input',
+                        out
+                            ? 'border-status-critical text-status-critical'
+                            : 'border-input',
                     )}
                 />
-                {cfg.unit ? <span className="text-sm text-muted-foreground">{cfg.unit}</span> : null}
+                {cfg.unit ? (
+                    <span className="text-sm text-muted-foreground">
+                        {cfg.unit}
+                    </span>
+                ) : null}
                 {cfg.min != null ? (
                     <span className="text-xs text-muted-foreground">
                         safe range {cfg.min}–{cfg.max}
@@ -402,16 +522,23 @@ function RunInput({
     if (item.response_type === 'photo') {
         const has = value === 'photo';
         return (
-            <Button unstyled
+            <Button
+                unstyled
                 type="button"
                 disabled={readOnly}
                 onClick={() => onChange(has ? '' : 'photo')}
                 className={cn(
                     'flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm transition disabled:opacity-60',
-                    has ? 'border-status-success bg-status-success-bg text-status-success' : 'border-input text-muted-foreground hover:bg-accent',
+                    has
+                        ? 'border-status-success bg-status-success-bg text-status-success'
+                        : 'border-input text-muted-foreground hover:bg-accent',
                 )}
             >
-                {has ? <CheckCircle2 className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+                {has ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                    <Camera className="h-4 w-4" />
+                )}
                 {has ? 'Photo attached' : 'Add photo'}
             </Button>
         );
@@ -423,7 +550,13 @@ function RunInput({
             : item.response_type === 'pass_fail'
               ? (['pass', 'fail'] as const)
               : (['yes', 'no'] as const);
-    const labels: Record<string, string> = { yes: 'Pass', no: 'Fail', na: 'N/A', pass: 'Pass', fail: 'Fail' };
+    const labels: Record<string, string> = {
+        yes: 'Pass',
+        no: 'Fail',
+        na: 'N/A',
+        pass: 'Pass',
+        fail: 'Fail',
+    };
     return (
         <div className="flex flex-wrap items-center gap-1.5">
             {opts.map((o) => {
@@ -431,7 +564,8 @@ function RunInput({
                 const positive = o === 'yes' || o === 'pass';
                 const negative = o === 'no' || o === 'fail';
                 return (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         key={o}
                         type="button"
                         disabled={readOnly}

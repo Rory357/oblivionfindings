@@ -11,7 +11,6 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -434,7 +433,10 @@ export default function FamilyDashboard({
                 hero={
                     <PageHero
                         avatar={{
-                            src: client.avatar ?? client.profile_photo_url ?? null,
+                            src:
+                                client.avatar ??
+                                client.profile_photo_url ??
+                                null,
                             fallback: getInitials(fullName),
                         }}
                         title={`${greeting.emoji} ${greeting.text}!`}
@@ -477,170 +479,142 @@ export default function FamilyDashboard({
                     </PageHero>
                 }
             >
-                <Dialog
-                    open={bookingOpen}
-                    onOpenChange={setBookingOpen}
-                >
-                            <DialogContent className="sm:max-w-md">
-                                <DialogHeader>
-                                    <DialogTitle>Request a Visit</DialogTitle>
-                                    <DialogDescription>
-                                        Submit a visit request to see {name}.
-                                        The care team will review and confirm.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <form
-                                    onSubmit={submitVisit}
-                                    className="space-y-4"
+                <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Request a Visit</DialogTitle>
+                            <DialogDescription>
+                                Submit a visit request to see {name}. The care
+                                team will review and confirm.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={submitVisit} className="space-y-4">
+                            <div>
+                                <Label htmlFor="visit-date">Date *</Label>
+                                <Input
+                                    id="visit-date"
+                                    type="date"
+                                    value={form.data.requested_date}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'requested_date',
+                                            e.target.value,
+                                        )
+                                    }
+                                    min={new Date().toISOString().split('T')[0]}
+                                />
+                                {form.errors.requested_date && (
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {form.errors.requested_date}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <Label htmlFor="time-start">From</Label>
+                                    <Input
+                                        id="time-start"
+                                        type="time"
+                                        value={form.data.preferred_time_start}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'preferred_time_start',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="time-end">To</Label>
+                                    <Input
+                                        id="time-end"
+                                        type="time"
+                                        value={form.data.preferred_time_end}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'preferred_time_end',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <Label>Visit Type *</Label>
+                                <div className="mt-2 grid grid-cols-3 gap-2">
+                                    {(
+                                        [
+                                            'in_person',
+                                            'video_call',
+                                            'outing',
+                                        ] as const
+                                    ).map((type) => {
+                                        const visitType =
+                                            visitTypeLabels[type] ??
+                                            visitTypeLabels.in_person!;
+                                        const { label, icon: Icon } = visitType;
+                                        const selected =
+                                            form.data.visit_type === type;
+                                        return (
+                                            <Button
+                                                key={type}
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    form.setData(
+                                                        'visit_type',
+                                                        type,
+                                                    )
+                                                }
+                                                className={`h-auto flex-col gap-1.5 rounded-lg border-2 p-3 text-xs font-medium ${
+                                                    selected
+                                                        ? 'border-primary bg-primary/5 text-primary'
+                                                        : 'border-border text-muted-foreground hover:border-primary/30'
+                                                }`}
+                                            >
+                                                <Icon className="h-5 w-5" />
+                                                {label}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div>
+                                <Label htmlFor="visit-notes">Notes</Label>
+                                <textarea
+                                    id="visit-notes"
+                                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                    rows={3}
+                                    placeholder="Any special requests or things to note..."
+                                    value={form.data.notes}
+                                    onChange={(e) =>
+                                        form.setData('notes', e.target.value)
+                                    }
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setBookingOpen(false)}
                                 >
-                                    <div>
-                                        <Label htmlFor="visit-date">
-                                            Date *
-                                        </Label>
-                                        <Input
-                                            id="visit-date"
-                                            type="date"
-                                            value={form.data.requested_date}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'requested_date',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            min={
-                                                new Date()
-                                                    .toISOString()
-                                                    .split('T')[0]
-                                            }
-                                        />
-                                        {form.errors.requested_date && (
-                                            <p className="mt-1 text-xs text-status-critical">
-                                                {form.errors.requested_date}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <Label htmlFor="time-start">
-                                                From
-                                            </Label>
-                                            <Input
-                                                id="time-start"
-                                                type="time"
-                                                value={
-                                                    form.data
-                                                        .preferred_time_start
-                                                }
-                                                onChange={(e) =>
-                                                    form.setData(
-                                                        'preferred_time_start',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label htmlFor="time-end">To</Label>
-                                            <Input
-                                                id="time-end"
-                                                type="time"
-                                                value={
-                                                    form.data.preferred_time_end
-                                                }
-                                                onChange={(e) =>
-                                                    form.setData(
-                                                        'preferred_time_end',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Label>Visit Type *</Label>
-                                        <div className="mt-2 grid grid-cols-3 gap-2">
-                                            {(
-                                                [
-                                                    'in_person',
-                                                    'video_call',
-                                                    'outing',
-                                                ] as const
-                                            ).map((type) => {
-                                                const visitType =
-                                                    visitTypeLabels[type] ??
-                                                    visitTypeLabels.in_person!;
-                                                const { label, icon: Icon } =
-                                                    visitType;
-                                                const selected =
-                                                    form.data.visit_type ===
-                                                    type;
-                                                return (
-                                                    <Button
-                                                        key={type}
-                                                        type="button"
-                                                        variant="outline"
-                                                        onClick={() =>
-                                                            form.setData(
-                                                                'visit_type',
-                                                                type,
-                                                            )
-                                                        }
-                                                        className={`h-auto flex-col gap-1.5 rounded-lg border-2 p-3 text-xs font-medium ${
-                                                            selected
-                                                                ? 'border-primary bg-primary/5 text-primary'
-                                                                : 'border-border text-muted-foreground hover:border-primary/30'
-                                                        }`}
-                                                    >
-                                                        <Icon className="h-5 w-5" />
-                                                        {label}
-                                                    </Button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="visit-notes">
-                                            Notes
-                                        </Label>
-                                        <textarea
-                                            id="visit-notes"
-                                            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                            rows={3}
-                                            placeholder="Any special requests or things to note..."
-                                            value={form.data.notes}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'notes',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                    <div className="flex justify-end gap-2 pt-2">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() =>
-                                                setBookingOpen(false)
-                                            }
-                                        >
-                                            Cancel
-                                        </Button>
-                                        <Button
-                                            type="submit"
-                                            disabled={
-                                                form.processing ||
-                                                !form.data.requested_date
-                                            }
-                                        >
-                                            {form.processing
-                                                ? 'Submitting...'
-                                                : 'Submit Request'}
-                                        </Button>
-                                    </div>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={
+                                        form.processing ||
+                                        !form.data.requested_date
+                                    }
+                                >
+                                    {form.processing
+                                        ? 'Submitting...'
+                                        : 'Submit Request'}
+                                </Button>
+                            </div>
+                        </form>
+                    </DialogContent>
+                </Dialog>
 
                 {/* ── Quick Actions Bar ────────────────────────── */}
                 <div className="flex flex-wrap gap-2 sm:gap-3">

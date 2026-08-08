@@ -1,7 +1,10 @@
 import PageShell from '@/components/page-shell';
-import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
-import { CompactHeroStat, FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
+import AppLayout from '@/layouts/app-layout';
+import {
+    CompactHeroStat,
+    FleetCompactHero,
+} from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head } from '@inertiajs/react';
 
 export default function FleetMapsUsage({ rows, reverse_geocode }) {
@@ -23,12 +26,24 @@ export default function FleetMapsUsage({ rows, reverse_geocode }) {
                     backLabel="Reports"
                     stats={
                         <>
-                            <CompactHeroStat label="Total calls" value={String(totalUsage)} tone="neutral" />
-                            <CompactHeroStat label="Contexts" value={String(rows?.length ?? 0)} tone="neutral" />
+                            <CompactHeroStat
+                                label="Total calls"
+                                value={String(totalUsage)}
+                                tone="neutral"
+                            />
+                            <CompactHeroStat
+                                label="Contexts"
+                                value={String(rows?.length ?? 0)}
+                                tone="neutral"
+                            />
                             <CompactHeroStat
                                 label="Reverse geocode"
                                 value={reverse_geocode?.enabled ? 'On' : 'Off'}
-                                tone={reverse_geocode?.enabled ? 'success' : 'neutral'}
+                                tone={
+                                    reverse_geocode?.enabled
+                                        ? 'success'
+                                        : 'neutral'
+                                }
                             />
                         </>
                     }
@@ -47,14 +62,15 @@ export default function FleetMapsUsage({ rows, reverse_geocode }) {
                                 Cache TTL: {reverse_geocode.cache_ttl_days} days
                             </span>
                             <span>
-                                Rate limit: {reverse_geocode.rate_limit_per_minute}/min
+                                Rate limit:{' '}
+                                {reverse_geocode.rate_limit_per_minute}/min
                             </span>
                         </div>
                     ) : (
                         <div className="text-muted-foreground">
                             Not enabled. Reverse geocoding is currently disabled
-                            to control cost. Enable FLEET_REVERSE_GEOCODE_ENABLED
-                            when ready.
+                            to control cost. Enable
+                            FLEET_REVERSE_GEOCODE_ENABLED when ready.
                         </div>
                     )}
                 </div>

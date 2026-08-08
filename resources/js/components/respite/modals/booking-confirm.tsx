@@ -132,7 +132,10 @@ export function ConfirmBookingModal({
     };
 
     return (
-        <Dialog open={booking != null} onOpenChange={(open) => !open && onClose()}>
+        <Dialog
+            open={booking != null}
+            onOpenChange={(open) => !open && onClose()}
+        >
             <DialogContent className="max-w-xl">
                 {booking ? (
                     <>
@@ -141,7 +144,8 @@ export function ConfirmBookingModal({
                                 Confirm {booking.client}
                             </DialogTitle>
                             <DialogDescription className="text-left">
-                                Capture consent authority, rights, advocate offer and agreement before confirmation.
+                                Capture consent authority, rights, advocate
+                                offer and agreement before confirmation.
                             </DialogDescription>
                         </div>
 
@@ -229,11 +233,16 @@ export function ConfirmBookingModal({
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {CAPACITY_BASES.map(([value, label]) => (
-                                            <SelectItem key={value} value={value}>
-                                                {label}
-                                            </SelectItem>
-                                        ))}
+                                        {CAPACITY_BASES.map(
+                                            ([value, label]) => (
+                                                <SelectItem
+                                                    key={value}
+                                                    value={value}
+                                                >
+                                                    {label}
+                                                </SelectItem>
+                                            ),
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -247,11 +256,16 @@ export function ConfirmBookingModal({
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {FORMAT_OPTIONS.map(([value, label]) => (
-                                            <SelectItem key={value} value={value}>
-                                                {label}
-                                            </SelectItem>
-                                        ))}
+                                        {FORMAT_OPTIONS.map(
+                                            ([value, label]) => (
+                                                <SelectItem
+                                                    key={value}
+                                                    value={value}
+                                                >
+                                                    {label}
+                                                </SelectItem>
+                                            ),
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>

@@ -84,10 +84,12 @@ export function AmendmentDrawer({
         <Sheet open={entryId != null} onOpenChange={(o) => !o && onClose()}>
             <SheetContent className="flex w-[430px] max-w-[92vw] flex-col gap-0 p-0">
                 <SheetHeader className="space-y-1 border-b border-border px-[22px] py-5 text-left">
-                    <span className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                    <span className="text-[10.5px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
                         Amendment history
                     </span>
-                    <SheetTitle className="text-[18px] font-bold">{staffName}</SheetTitle>
+                    <SheetTitle className="text-[18px] font-bold">
+                        {staffName}
+                    </SheetTitle>
                     <SheetDescription className="text-[12.5px]">
                         {subtitle}
                     </SheetDescription>
@@ -128,9 +130,13 @@ export function AmendmentDrawer({
                                                 <span className="font-bold">
                                                     {a.amended_by}
                                                 </span>{' '}
-                                                {EVENT_FIELDS.includes(a.field_name) ? (
+                                                {EVENT_FIELDS.includes(
+                                                    a.field_name,
+                                                ) ? (
                                                     <span className="font-semibold">
-                                                        {fieldLabel(a.field_name)}
+                                                        {fieldLabel(
+                                                            a.field_name,
+                                                        )}
                                                     </span>
                                                 ) : (
                                                     <>
@@ -138,7 +144,9 @@ export function AmendmentDrawer({
                                                             changed
                                                         </span>{' '}
                                                         <span className="font-semibold">
-                                                            {fieldLabel(a.field_name)}
+                                                            {fieldLabel(
+                                                                a.field_name,
+                                                            )}
                                                         </span>
                                                     </>
                                                 )}

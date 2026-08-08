@@ -71,6 +71,20 @@ return [
         // string generator on the integration hub page. Runtime override via
         // AppSetting key `queclink.public_hostname`.
         'public_hostname' => env('QUECLINK_PUBLIC_HOSTNAME'),
+        'listener' => [
+            'max_connections' => env('QUECLINK_MAX_CONNECTIONS', 256),
+            'max_connections_per_source' => env('QUECLINK_MAX_CONNECTIONS_PER_SOURCE', 64),
+            'max_tracked_sources' => env('QUECLINK_MAX_TRACKED_SOURCES', 4096),
+            'connection_attempts_per_window' => env('QUECLINK_CONNECTION_ATTEMPTS_PER_WINDOW', 120),
+            'connection_window_seconds' => env('QUECLINK_CONNECTION_WINDOW_SECONDS', 60),
+            'idle_timeout_seconds' => env('QUECLINK_IDLE_TIMEOUT_SECONDS', 900),
+            'max_frame_bytes' => env('QUECLINK_MAX_FRAME_BYTES', 16384),
+            'max_buffer_bytes' => env('QUECLINK_MAX_BUFFER_BYTES', 32768),
+            'frames_per_window' => env('QUECLINK_FRAMES_PER_WINDOW', 240),
+            'invalid_frames_per_window' => env('QUECLINK_INVALID_FRAMES_PER_WINDOW', 20),
+            'frame_window_seconds' => env('QUECLINK_FRAME_WINDOW_SECONDS', 60),
+            'raw_frame_retention_days' => env('QUECLINK_RAW_FRAME_RETENTION_DAYS', 30),
+        ],
     ],
 
     'xero' => [

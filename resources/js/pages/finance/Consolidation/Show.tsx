@@ -1,26 +1,8 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, router } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import {
     Dialog,
     DialogContent,
@@ -30,12 +12,38 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Building2, Plus, Trash2, Play, Eye, ArrowLeftRight, Calendar, Hash } from 'lucide-react';
-import { FormEvent, useState } from 'react';
-import { Link } from '@inertiajs/react';
-import { PageHero, PageLayout } from '@/components/page';
-import { ConfirmDialog, formatMoney } from '@/components/finance';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import {
+    ArrowLeftRight,
+    Building2,
+    Calendar,
+    Eye,
+    Hash,
+    Play,
+    Plus,
+    Trash2,
+} from 'lucide-react';
+import { FormEvent, useState } from 'react';
 
 type Entity = {
     id: number;
@@ -124,35 +132,53 @@ function AddEntityDialog({ groupId }: { groupId: number }) {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Add Entity to Group</DialogTitle>
-                    <DialogDescription>Add a subsidiary or related entity for consolidation.</DialogDescription>
+                    <DialogDescription>
+                        Add a subsidiary or related entity for consolidation.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                            <Label htmlFor="entity-org-id">Organisation ID *</Label>
+                            <Label htmlFor="entity-org-id">
+                                Organisation ID *
+                            </Label>
                             <Input
                                 id="entity-org-id"
                                 type="number"
                                 value={data.organization_id}
-                                onChange={(e) => setData('organization_id', e.target.value)}
+                                onChange={(e) =>
+                                    setData('organization_id', e.target.value)
+                                }
                                 placeholder="Organisation ID"
                             />
-                            {errors.organization_id && <p className="text-sm text-destructive">{errors.organization_id}</p>}
+                            {errors.organization_id && (
+                                <p className="text-sm text-destructive">
+                                    {errors.organization_id}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="entity-name">Entity Name *</Label>
                             <Input
                                 id="entity-name"
                                 value={data.entity_name}
-                                onChange={(e) => setData('entity_name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('entity_name', e.target.value)
+                                }
                                 placeholder="e.g. NZ Care Ltd"
                             />
-                            {errors.entity_name && <p className="text-sm text-destructive">{errors.entity_name}</p>}
+                            {errors.entity_name && (
+                                <p className="text-sm text-destructive">
+                                    {errors.entity_name}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-1.5">
-                            <Label htmlFor="entity-ownership">Ownership %</Label>
+                            <Label htmlFor="entity-ownership">
+                                Ownership %
+                            </Label>
                             <Input
                                 id="entity-ownership"
                                 type="number"
@@ -160,23 +186,40 @@ function AddEntityDialog({ groupId }: { groupId: number }) {
                                 max="100"
                                 step="0.01"
                                 value={data.ownership_percentage}
-                                onChange={(e) => setData('ownership_percentage', e.target.value)}
+                                onChange={(e) =>
+                                    setData(
+                                        'ownership_percentage',
+                                        e.target.value,
+                                    )
+                                }
                             />
-                            {errors.ownership_percentage && <p className="text-sm text-destructive">{errors.ownership_percentage}</p>}
+                            {errors.ownership_percentage && (
+                                <p className="text-sm text-destructive">
+                                    {errors.ownership_percentage}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="entity-method">Consolidation Method</Label>
+                            <Label htmlFor="entity-method">
+                                Consolidation Method
+                            </Label>
                             <Select
                                 value={data.consolidation_method}
-                                onValueChange={(val) => setData('consolidation_method', val)}
+                                onValueChange={(val) =>
+                                    setData('consolidation_method', val)
+                                }
                             >
                                 <SelectTrigger id="entity-method">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="full">Full</SelectItem>
-                                    <SelectItem value="proportional">Proportional</SelectItem>
-                                    <SelectItem value="equity">Equity</SelectItem>
+                                    <SelectItem value="proportional">
+                                        Proportional
+                                    </SelectItem>
+                                    <SelectItem value="equity">
+                                        Equity
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -185,13 +228,24 @@ function AddEntityDialog({ groupId }: { groupId: number }) {
                             <Input
                                 id="entity-currency"
                                 value={data.currency_code}
-                                onChange={(e) => setData('currency_code', e.target.value.toUpperCase())}
+                                onChange={(e) =>
+                                    setData(
+                                        'currency_code',
+                                        e.target.value.toUpperCase(),
+                                    )
+                                }
                                 maxLength={3}
                             />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Adding...' : 'Add Entity'}
                         </Button>
@@ -227,7 +281,9 @@ function RunConsolidationDialog({ groupId }: { groupId: number }) {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Run Consolidation</DialogTitle>
-                    <DialogDescription>Consolidate financials for the selected period.</DialogDescription>
+                    <DialogDescription>
+                        Consolidate financials for the selected period.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -237,9 +293,15 @@ function RunConsolidationDialog({ groupId }: { groupId: number }) {
                                 id="run-from"
                                 type="date"
                                 value={data.period_from}
-                                onChange={(e) => setData('period_from', e.target.value)}
+                                onChange={(e) =>
+                                    setData('period_from', e.target.value)
+                                }
                             />
-                            {errors.period_from && <p className="text-sm text-destructive">{errors.period_from}</p>}
+                            {errors.period_from && (
+                                <p className="text-sm text-destructive">
+                                    {errors.period_from}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="run-to">Period To *</Label>
@@ -247,14 +309,30 @@ function RunConsolidationDialog({ groupId }: { groupId: number }) {
                                 id="run-to"
                                 type="date"
                                 value={data.period_to}
-                                onChange={(e) => setData('period_to', e.target.value)}
+                                onChange={(e) =>
+                                    setData('period_to', e.target.value)
+                                }
                             />
-                            {errors.period_to && <p className="text-sm text-destructive">{errors.period_to}</p>}
+                            {errors.period_to && (
+                                <p className="text-sm text-destructive">
+                                    {errors.period_to}
+                                </p>
+                            )}
                         </div>
                     </div>
-                    {(errors as any).consolidation && <p className="text-sm text-destructive">{(errors as any).consolidation}</p>}
+                    {(errors as any).consolidation && (
+                        <p className="text-sm text-destructive">
+                            {(errors as any).consolidation}
+                        </p>
+                    )}
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Running...' : 'Run Consolidation'}
                         </Button>
@@ -266,10 +344,19 @@ function RunConsolidationDialog({ groupId }: { groupId: number }) {
 }
 
 function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(dateStr).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
-export default function ConsolidationShow({ group, entities, recentRuns, mappings }: PageProps) {
+export default function ConsolidationShow({
+    group,
+    entities,
+    recentRuns,
+    mappings,
+}: PageProps) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Consolidation', href: '/finance/consolidation' },
@@ -281,18 +368,25 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
 
     function confirmRemoveEntity() {
         if (!removeTarget) return;
-        router.delete(`/finance/consolidation/${group.id}/entities/${removeTarget.id}`, {
-            onStart: () => setRemoving(true),
-            onFinish: () => setRemoving(false),
-            onSuccess: () => setRemoveTarget(null),
-        });
+        router.delete(
+            `/finance/consolidation/${group.id}/entities/${removeTarget.id}`,
+            {
+                onStart: () => setRemoving(true),
+                onFinish: () => setRemoving(false),
+                onSuccess: () => setRemoveTarget(null),
+            },
+        );
     }
 
     // KPI calculations
     const activeEntities = entities.filter((e) => e.is_active).length;
     const completedRuns = recentRuns.filter((r) => r.status === 'completed');
-    const lastRunDate = completedRuns.length > 0 ? completedRuns[0].created_at : null;
-    const totalEliminations = recentRuns.reduce((sum, r) => sum + r.eliminations_count, 0);
+    const lastRunDate =
+        completedRuns.length > 0 ? completedRuns[0].created_at : null;
+    const totalEliminations = recentRuns.reduce(
+        (sum, r) => sum + r.eliminations_count,
+        0,
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -300,19 +394,28 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/consolidation"
                         title={group.name}
                         description={
                             <>
-                                {group.description && <span className="block">{group.description}</span>}
-                                <span className="text-sm">Base currency: {group.base_currency_code}</span>
+                                {group.description && (
+                                    <span className="block">
+                                        {group.description}
+                                    </span>
+                                )}
+                                <span className="text-sm">
+                                    Base currency: {group.base_currency_code}
+                                </span>
                             </>
                         }
                         actions={
                             <>
-                                <Link href={`/finance/intercompany/${group.id}`}>
+                                <Link
+                                    href={`/finance/intercompany/${group.id}`}
+                                >
                                     <Button variant="outline" size="sm">
                                         <ArrowLeftRight className="mr-2 h-4 w-4" />
                                         Intercompany
@@ -325,13 +428,19 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                 }
             >
                 {/* KPI Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
-                                <p className="text-sm text-muted-foreground">Active Entities</p>
-                                <p className="text-2xl font-bold mt-1">{activeEntities}</p>
-                                <p className="text-xs text-muted-foreground mt-1">{entities.length} total</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Active Entities
+                                </p>
+                                <p className="mt-1 text-2xl font-bold">
+                                    {activeEntities}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    {entities.length} total
+                                </p>
                             </div>
                             <Building2 className="h-8 w-8 text-muted-foreground/50" />
                         </CardContent>
@@ -339,11 +448,17 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                     <Card>
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
-                                <p className="text-sm text-muted-foreground">Last Consolidation Run</p>
-                                <p className="text-2xl font-bold mt-1">
-                                    {lastRunDate ? formatDate(lastRunDate) : 'None'}
+                                <p className="text-sm text-muted-foreground">
+                                    Last Consolidation Run
                                 </p>
-                                <p className="text-xs text-muted-foreground mt-1">{completedRuns.length} completed runs</p>
+                                <p className="mt-1 text-2xl font-bold">
+                                    {lastRunDate
+                                        ? formatDate(lastRunDate)
+                                        : 'None'}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    {completedRuns.length} completed runs
+                                </p>
                             </div>
                             <Calendar className="h-8 w-8 text-muted-foreground/50" />
                         </CardContent>
@@ -351,9 +466,15 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                     <Card>
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
-                                <p className="text-sm text-muted-foreground">Total Eliminations</p>
-                                <p className="text-2xl font-bold mt-1">{totalEliminations}</p>
-                                <p className="text-xs text-muted-foreground mt-1">across all runs</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Total Eliminations
+                                </p>
+                                <p className="mt-1 text-2xl font-bold">
+                                    {totalEliminations}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    across all runs
+                                </p>
                             </div>
                             <Hash className="h-8 w-8 text-muted-foreground/50" />
                         </CardContent>
@@ -381,36 +502,59 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                                     <TableHead>Method</TableHead>
                                     <TableHead>Currency</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="text-right">
+                                        Actions
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {entities.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                                            No entities added yet. Add your first subsidiary or related entity.
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            No entities added yet. Add your
+                                            first subsidiary or related entity.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     entities.map((entity) => (
                                         <TableRow key={entity.id}>
-                                            <TableCell className="font-medium">{entity.entity_name}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">{entity.organization_id}</TableCell>
-                                            <TableCell>{entity.ownership_percentage}%</TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline">{methodLabels[entity.consolidation_method]}</Badge>
+                                            <TableCell className="font-medium">
+                                                {entity.entity_name}
                                             </TableCell>
-                                            <TableCell className="font-mono text-sm">{entity.currency_code}</TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {entity.organization_id}
+                                            </TableCell>
+                                            <TableCell>
+                                                {entity.ownership_percentage}%
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">
+                                                    {
+                                                        methodLabels[
+                                                            entity
+                                                                .consolidation_method
+                                                        ]
+                                                    }
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="font-mono text-sm">
+                                                {entity.currency_code}
+                                            </TableCell>
                                             <TableCell>
                                                 <Badge
                                                     variant="outline"
                                                     className={
                                                         entity.is_active
-                                                            ? 'bg-status-success-bg text-status-success border-status-success/30'
-                                                            : 'bg-muted-foreground/10 text-muted-foreground border-border/30'
+                                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                                            : 'border-border/30 bg-muted-foreground/10 text-muted-foreground'
                                                     }
                                                 >
-                                                    {entity.is_active ? 'Active' : 'Inactive'}
+                                                    {entity.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -418,7 +562,9 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                                                     variant="ghost"
                                                     size="icon"
                                                     aria-label={`Remove ${entity.entity_name}`}
-                                                    onClick={() => setRemoveTarget(entity)}
+                                                    onClick={() =>
+                                                        setRemoveTarget(entity)
+                                                    }
                                                 >
                                                     <Trash2 className="h-4 w-4 text-destructive" />
                                                 </Button>
@@ -445,42 +591,64 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                                 <TableRow>
                                     <TableHead>Period</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Revenue</TableHead>
-                                    <TableHead className="text-right">Expenses</TableHead>
+                                    <TableHead className="text-right">
+                                        Revenue
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Expenses
+                                    </TableHead>
                                     <TableHead>Eliminations</TableHead>
                                     <TableHead>Created By</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="text-right">
+                                        Actions
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {recentRuns.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                                            No consolidation runs yet. Run your first consolidation.
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            No consolidation runs yet. Run your
+                                            first consolidation.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     recentRuns.map((run) => (
                                         <TableRow key={run.id}>
                                             <TableCell className="text-sm">
-                                                {run.period_from} to {run.period_to}
+                                                {run.period_from} to{' '}
+                                                {run.period_to}
                                             </TableCell>
                                             <TableCell>
-                                                <StatusBadge status={run.status} />
+                                                <StatusBadge
+                                                    status={run.status}
+                                                />
                                             </TableCell>
                                             <TableCell className="text-right font-mono text-sm">
                                                 {formatMoney(run.total_revenue)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono text-sm">
-                                                {formatMoney(run.total_expenses)}
+                                                {formatMoney(
+                                                    run.total_expenses,
+                                                )}
                                             </TableCell>
-                                            <TableCell>{run.eliminations_count}</TableCell>
+                                            <TableCell>
+                                                {run.eliminations_count}
+                                            </TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
                                                 {run.created_by || '-'}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <Link href={`/finance/consolidation/${group.id}/runs/${run.id}`}>
-                                                    <Button variant="ghost" size="icon">
+                                                <Link
+                                                    href={`/finance/consolidation/${group.id}/runs/${run.id}`}
+                                                >
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                    >
                                                         <Eye className="h-4 w-4" />
                                                     </Button>
                                                 </Link>
@@ -504,8 +672,8 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                         <span className="font-medium text-foreground">
                             {removeTarget?.entity_name}
                         </span>{' '}
-                        from this consolidation group. Its account mappings will no longer be
-                        included in future runs.
+                        from this consolidation group. Its account mappings will
+                        no longer be included in future runs.
                     </>
                 }
                 confirmLabel="Remove entity"

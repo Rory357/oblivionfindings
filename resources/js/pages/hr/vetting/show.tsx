@@ -150,7 +150,8 @@ export default function VettingShow({ check, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref="/hr/compliance/vetting"
                         title={

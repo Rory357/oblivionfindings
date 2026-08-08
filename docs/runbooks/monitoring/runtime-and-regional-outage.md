@@ -64,6 +64,50 @@ Afterward, retain the normal read-only diagnosis above plus
 `php artisan monitoring:central-site-readiness --all --json` as deployment
 evidence. Do not claim live readiness from configuration installation alone.
 
+For a one-shot V09 runtime/dependency preflight, run
+`scripts/monitoring/verify-runtime.ps1` with the session cookie supplied only
+through `MONITORING_HEALTH_SESSION_COOKIE` and `-HealthUrl` set to the exact
+HTTPS `/security-devices/runtime-health` route on port 443. The verifier rejects URL
+userinfo, query strings, fragments and every other path, bypasses caches, and
+does not follow redirects while carrying the cookie. A `configuration_only`
+result confirms only repository/runtime configuration; that configuration-only result is not runtime evidence. A
+`verified` result additionally requires all eight workers, all eight queue
+components and all three listeners to be current, both storage surfaces to be
+available, the independent heartbeat to be sent, and a fresh UTC observation.
+This one-shot result does not replace the sustained A02/L05 observation or the
+external watchdog outage/recovery record.
+
+For the sustained A02/L05 release observation, use the read-only verifier from
+the deployed release. Supply the authenticated health session through the
+environment so it is not placed in shell history or command arguments:
+
+```bash
+export MONITORING_HEALTH_SESSION_COOKIE='authorised-cookie-value'
+bash scripts/monitoring/verify-central-runtime.sh \
+  --application-path=/var/www/oblivionfindings \
+  --supervisord-config=/etc/supervisor/supervisord.conf \
+  --health-url=https://oblivion.example/security-devices/runtime-health \
+  --samples=15 \
+  --interval-seconds=60
+unset MONITORING_HEALTH_SESSION_COOKIE
+```
+
+The verifier is read-only and refuses a token sample. Every sample must find
+the exact eight worker groups and three listener groups fully running, the
+authenticated runtime operational, a fresh UTC runtime observation that
+advances between samples, all listeners current, the independent heartbeat
+sent, and every configured direct monitor at each operational Site to have current durable central-runtime evidence
+with no collector. A single healthy monitor cannot conceal another configured
+direct monitor that is stale or has never produced durable evidence. The exact
+opaque direct-monitor roster must remain stable, and by the final sample every
+member of that roster must have produced new durable evidence since the
+observation began; disabling or replacing a check cannot make the observation
+pass. The request explicitly bypasses intermediary caches and rejects
+stale or replayed health payloads. It prints only aggregate counts and
+timestamps; retain that result with the external watchdog's separately
+captured alert and recovery timeline. Never retain the cookie or the detailed
+Site readiness payload in release evidence.
+
 ## Independent total-outage signal
 
 Configure an independently hosted dead-man monitor outside the Oblivion Findings application, database, Redis, SD-WAN, and primary hosting region. Set `MONITORING_EXTERNAL_HEARTBEAT_ENABLED=true`, put the provider's unguessable heartbeat URL in `MONITORING_EXTERNAL_HEARTBEAT_URL`, and allowlist only its exact lowercase public host in `MONITORING_EXTERNAL_HEARTBEAT_ALLOWED_HOSTS`. The target must be public HTTPS on port 443, use a non-root path, return a 2xx response without a redirect, and must not use query-string credentials. Treat the URL path as a secret: do not copy it into tickets, screenshots, logs, or incident channels.

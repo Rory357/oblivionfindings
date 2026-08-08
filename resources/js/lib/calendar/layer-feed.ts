@@ -94,10 +94,46 @@ export interface CalendarLayerMeta {
 }
 
 export const LAYER_META: Record<CalendarLayer, CalendarLayerMeta> = {
-    event: { layer: 'event', label: 'Company & HR events', color: 'category-hr', editable: true, on: true },
-    leave: { layer: 'leave', label: "Leave / who's off", color: 'status-neutral', editable: false, on: true },
-    shift: { layer: 'shift', label: 'Shifts & coverage', color: 'live', editable: false, on: true },
-    holiday: { layer: 'holiday', label: 'Public holidays', color: 'status-warning', editable: false, on: true },
-    compliance: { layer: 'compliance', label: 'Compliance renewals', color: 'status-critical', editable: false, on: false },
-    milestone: { layer: 'milestone', label: 'People milestones', color: 'category-finance', editable: false, on: false },
+    event: {
+        layer: 'event',
+        label: 'Company & HR events',
+        color: 'category-hr',
+        editable: true,
+        on: true,
+    },
+    leave: {
+        layer: 'leave',
+        label: "Leave / who's off",
+        color: 'status-neutral',
+        editable: false,
+        on: true,
+    },
+    shift: {
+        layer: 'shift',
+        label: 'Shifts & coverage',
+        color: 'live',
+        editable: false,
+        on: true,
+    },
+    holiday: {
+        layer: 'holiday',
+        label: 'Public holidays',
+        color: 'status-warning',
+        editable: false,
+        on: true,
+    },
+    compliance: {
+        layer: 'compliance',
+        label: 'Compliance renewals',
+        color: 'status-critical',
+        editable: false,
+        on: false,
+    },
+    milestone: {
+        layer: 'milestone',
+        label: 'People milestones',
+        color: 'category-finance',
+        editable: false,
+        on: false,
+    },
 };

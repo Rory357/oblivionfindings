@@ -133,6 +133,7 @@ export type TrackingWorkspaceData = {
         retentionDays: number;
     };
     overview: {
+        countsComplete: boolean;
         inventory: {
             total: number;
             personal_safety: number;
@@ -157,6 +158,7 @@ export type TrackingWorkspaceData = {
         inventoryTotal: number;
         inventoryShown: number;
         inventoryTruncated: boolean;
+        attentionFilter: { key: string; label: string } | null;
         devices: TrackingDevice[];
         markers: MapMarker[];
         geofences: TrackingGeofence[];
@@ -235,6 +237,7 @@ const groupIcon = {
 
 function Overview({ data }: { data: TrackingWorkspaceData }) {
     const { inventory } = data.overview;
+    const bounded = !data.overview.countsComplete;
 
     return (
         <div className="space-y-5">
@@ -248,20 +251,35 @@ function Overview({ data }: { data: TrackingWorkspaceData }) {
                             One technical register, separated by the purpose and
                             module that owns each tracked subject.
                         </p>
+                        {bounded ? (
+                            <p className="mt-2 text-xs font-medium text-status-warning">
+                                Counts below describe the first 100 visible
+                                candidates and may be incomplete. Open a purpose
+                                view or the canonical inventory to narrow the
+                                estate.
+                            </p>
+                        ) : null}
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <Summary
                             label="tracking devices"
                             value={inventory.total}
+                            bounded={bounded}
                         />
                         <Summary
                             label="personal safety"
                             value={inventory.personal_safety}
+                            bounded={bounded}
                         />
-                        <Summary label="Fleet" value={inventory.fleet} />
+                        <Summary
+                            label="Fleet"
+                            value={inventory.fleet}
+                            bounded={bounded}
+                        />
                         <Summary
                             label="asset tracking"
                             value={inventory.assets}
+                            bounded={bounded}
                         />
                     </div>
                 </CardContent>
@@ -300,7 +318,8 @@ function Overview({ data }: { data: TrackingWorkspaceData }) {
                                         </span>
                                         <div>
                                             <h3 className="font-semibold">
-                                                {group.label} ({group.count})
+                                                {group.label} ({group.count}
+                                                {bounded ? ' shown' : ''})
                                             </h3>
                                             <p className="mt-1 text-sm text-muted-foreground">
                                                 {group.description}
@@ -342,7 +361,8 @@ function Overview({ data }: { data: TrackingWorkspaceData }) {
                                 <p className="font-semibold">
                                     {action.label}{' '}
                                     <span className="text-primary">
-                                        ({action.count})
+                                        ({action.count}
+                                        {bounded ? ' shown' : ''})
                                     </span>
                                 </p>
                                 <p className="mt-1 text-sm text-muted-foreground">
@@ -357,11 +377,20 @@ function Overview({ data }: { data: TrackingWorkspaceData }) {
     );
 }
 
-function Summary({ label, value }: { label: string; value: number }) {
+function Summary({
+    label,
+    value,
+    bounded,
+}: {
+    label: string;
+    value: number;
+    bounded: boolean;
+}) {
     return (
         <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
             <p className="text-lg font-bold">
                 {value} {label}
+                {bounded ? ' shown' : ''}
             </p>
         </div>
     );
@@ -848,10 +877,27 @@ export function TrackingWorkspacePanels({
                                             : data.activeTab.label}
                                     </h2>
                                     <p className="text-sm text-muted-foreground">
-                                        {data.activeTab.inventoryShown} of{' '}
-                                        {data.activeTab.inventoryTotal}{' '}
-                                        authorised trackers shown.
+                                        {data.activeTab.inventoryTruncated
+                                            ? `${data.activeTab.inventoryShown} matching authorised trackers shown from the first 100 visible candidates; this list may be incomplete.`
+                                            : `${data.activeTab.inventoryShown} of ${data.activeTab.inventoryTotal} authorised trackers shown.`}
                                     </p>
+                                    {data.activeTab.attentionFilter ? (
+                                        <p className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                                            <span className="font-medium">
+                                                Filtered to:{' '}
+                                                {
+                                                    data.activeTab
+                                                        .attentionFilter.label
+                                                }
+                                            </span>
+                                            <Link
+                                                href={`/security-devices/tracking?tab=${tab}`}
+                                                className="frontline-focus rounded-sm text-primary underline-offset-4 hover:underline"
+                                            >
+                                                Clear attention filter
+                                            </Link>
+                                        </p>
+                                    ) : null}
                                 </div>
                                 <DeviceGrid devices={data.activeTab.devices} />
                             </section>

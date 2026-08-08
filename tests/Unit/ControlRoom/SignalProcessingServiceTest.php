@@ -426,18 +426,22 @@ class SignalProcessingServiceTest extends TestCase
     public function test_submitted_incident_signal_synchronises_the_existing_hs_event_alert_backlink(): void
     {
         $actor = User::factory()->create();
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'reported_by' => $actor->id,
             'status' => 'submitted',
             'submitted_at' => now()->subMinute(),
             'severity' => 'high',
+            'immediate_action_taken' => 'Client assessed immediately, medication support paused, and clinical advice requested.',
             'control_room_alert_id' => null,
             'hs_event_id' => null,
         ]));
         $event = HsEvent::factory()->forClientIncident($incident)->create([
             'created_by' => $actor->id,
+            'severity' => 'high',
             'control_room_alert_id' => null,
         ]);
         $incident->updateQuietly(['hs_event_id' => $event->id]);
@@ -447,6 +451,7 @@ class SignalProcessingServiceTest extends TestCase
             'signal_type_code' => 'medication.incident',
             'idempotency_key' => 'submitted-existing-hs-backlink',
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'normalized_data' => ['incident_id' => $incident->id],
             'severity_hint' => 'high',
             'occurred_at' => now(),
@@ -468,13 +473,16 @@ class SignalProcessingServiceTest extends TestCase
     public function test_critical_trusted_signal_promotes_the_complete_existing_medium_journey(): void
     {
         $actor = User::factory()->create();
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'reported_by' => $actor->id,
             'status' => 'submitted',
             'submitted_at' => now()->subMinute(),
             'severity' => 'medium',
+            'immediate_action_taken' => 'Client assessed and made safe while the medication discrepancy was escalated for clinical review.',
             'control_room_alert_id' => null,
             'hs_event_id' => null,
         ]));
@@ -498,6 +506,7 @@ class SignalProcessingServiceTest extends TestCase
             'signal_type_code' => 'medication.incident',
             'idempotency_key' => 'critical-existing-medium-journey',
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'normalized_data' => ['incident_id' => $incident->id],
             'severity_hint' => 'critical',
             'occurred_at' => now(),

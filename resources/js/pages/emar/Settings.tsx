@@ -24,7 +24,14 @@ import {
 import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Pencil, Plus, Settings2, ShieldCheck, Stethoscope, Trash2 } from 'lucide-react';
+import {
+    Pencil,
+    Plus,
+    Settings2,
+    ShieldCheck,
+    Stethoscope,
+    Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -73,7 +80,13 @@ function blankForm(matchTypes: Option[]): FormState {
     };
 }
 
-export default function EmarSettings({ rules, sites, observationOptions, matchTypes, can }: Props) {
+export default function EmarSettings({
+    rules,
+    sites,
+    observationOptions,
+    matchTypes,
+    can,
+}: Props) {
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<Rule | null>(null);
     const [saving, setSaving] = useState(false);
@@ -114,11 +127,18 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
 
     function submit() {
         if (!form.match_value.trim()) {
-            toast.error('Enter a keyword to match (e.g. Warfarin, Intravenous).');
+            toast.error(
+                'Enter a keyword to match (e.g. Warfarin, Intravenous).',
+            );
             return;
         }
-        if (!form.requires_countersign && form.required_observations.length === 0) {
-            toast.error('A rule must require a countersignature and/or at least one observation.');
+        if (
+            !form.requires_countersign &&
+            form.required_observations.length === 0
+        ) {
+            toast.error(
+                'A rule must require a countersignature and/or at least one observation.',
+            );
             return;
         }
 
@@ -146,8 +166,11 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
     }
 
     function remove(rule: Rule) {
-        if (!window.confirm(`Remove the rule for "${rule.match_value}"?`)) return;
-        router.delete(`/emar/settings/rules/${rule.id}`, { preserveScroll: true });
+        if (!window.confirm(`Remove the rule for "${rule.match_value}"?`))
+            return;
+        router.delete(`/emar/settings/rules/${rule.id}`, {
+            preserveScroll: true,
+        });
     }
 
     return (
@@ -163,7 +186,8 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
             <PageShell>
                 <div className="mb-4 flex items-center justify-between gap-4">
                     <p className="text-sm text-muted-foreground">
-                        {rules.length} rule{rules.length === 1 ? '' : 's'} configured
+                        {rules.length} rule{rules.length === 1 ? '' : 's'}{' '}
+                        configured
                     </p>
                     {can.manage && (
                         <Button onClick={openCreate} size="sm">
@@ -175,51 +199,92 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
 
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Active &amp; inactive rules</CardTitle>
+                        <CardTitle className="text-sm font-medium">
+                            Active &amp; inactive rules
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b text-left text-xs font-medium text-muted-foreground">
-                                        <th className="pb-2 pr-4">Match</th>
-                                        <th className="pb-2 pr-4">Keyword</th>
-                                        <th className="pb-2 pr-4">Scope</th>
-                                        <th className="pb-2 pr-4">Requirements</th>
-                                        <th className="pb-2 pr-4">Status</th>
-                                        {can.manage && <th className="pb-2 text-right">Actions</th>}
+                                        <th className="pr-4 pb-2">Match</th>
+                                        <th className="pr-4 pb-2">Keyword</th>
+                                        <th className="pr-4 pb-2">Scope</th>
+                                        <th className="pr-4 pb-2">
+                                            Requirements
+                                        </th>
+                                        <th className="pr-4 pb-2">Status</th>
+                                        {can.manage && (
+                                            <th className="pb-2 text-right">
+                                                Actions
+                                            </th>
+                                        )}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {rules.map((rule) => (
-                                        <tr key={rule.id} className="border-b last:border-0">
-                                            <td className="py-2.5 pr-4 font-medium">{matchTypeLabel(rule.match_type)}</td>
-                                            <td className="py-2.5 pr-4">{rule.match_value}</td>
+                                        <tr
+                                            key={rule.id}
+                                            className="border-b last:border-0"
+                                        >
+                                            <td className="py-2.5 pr-4 font-medium">
+                                                {matchTypeLabel(
+                                                    rule.match_type,
+                                                )}
+                                            </td>
+                                            <td className="py-2.5 pr-4">
+                                                {rule.match_value}
+                                            </td>
                                             <td className="py-2.5 pr-4 text-muted-foreground">
                                                 {rule.site_name ?? 'All sites'}
                                             </td>
                                             <td className="py-2.5 pr-4">
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {rule.requires_countersign && (
-                                                        <Badge variant="secondary" className="gap-1">
-                                                            <ShieldCheck className="h-3 w-3" /> Countersign
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className="gap-1"
+                                                        >
+                                                            <ShieldCheck className="h-3 w-3" />{' '}
+                                                            Countersign
                                                         </Badge>
                                                     )}
-                                                    {rule.required_observations.map((obs) => (
-                                                        <Badge key={obs} variant="outline" className="gap-1">
-                                                            <Stethoscope className="h-3 w-3" />
-                                                            {observationLabel(obs)}
-                                                        </Badge>
-                                                    ))}
+                                                    {rule.required_observations.map(
+                                                        (obs) => (
+                                                            <Badge
+                                                                key={obs}
+                                                                variant="outline"
+                                                                className="gap-1"
+                                                            >
+                                                                <Stethoscope className="h-3 w-3" />
+                                                                {observationLabel(
+                                                                    obs,
+                                                                )}
+                                                            </Badge>
+                                                        ),
+                                                    )}
                                                     {!rule.requires_countersign &&
-                                                        rule.required_observations.length === 0 && (
-                                                            <span className="text-muted-foreground">—</span>
+                                                        rule
+                                                            .required_observations
+                                                            .length === 0 && (
+                                                            <span className="text-muted-foreground">
+                                                                —
+                                                            </span>
                                                         )}
                                                 </div>
                                             </td>
                                             <td className="py-2.5 pr-4">
-                                                <Badge variant={rule.active ? 'default' : 'outline'}>
-                                                    {rule.active ? 'Active' : 'Inactive'}
+                                                <Badge
+                                                    variant={
+                                                        rule.active
+                                                            ? 'default'
+                                                            : 'outline'
+                                                    }
+                                                >
+                                                    {rule.active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
                                                 </Badge>
                                             </td>
                                             {can.manage && (
@@ -230,7 +295,9 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
                                                             variant="ghost"
                                                             className="h-8 w-8"
                                                             aria-label="Edit rule"
-                                                            onClick={() => openEdit(rule)}
+                                                            onClick={() =>
+                                                                openEdit(rule)
+                                                            }
                                                         >
                                                             <Pencil className="h-4 w-4" />
                                                         </Button>
@@ -239,7 +306,9 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
                                                             variant="ghost"
                                                             className="h-8 w-8 text-status-critical"
                                                             aria-label="Remove rule"
-                                                            onClick={() => remove(rule)}
+                                                            onClick={() =>
+                                                                remove(rule)
+                                                            }
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
@@ -250,9 +319,14 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
                                     ))}
                                     {rules.length === 0 && (
                                         <tr>
-                                            <td colSpan={can.manage ? 6 : 5} className="py-10 text-center text-muted-foreground">
-                                                No administration rules yet. Add one to require countersigning or
-                                                observations for matching medications.
+                                            <td
+                                                colSpan={can.manage ? 6 : 5}
+                                                className="py-10 text-center text-muted-foreground"
+                                            >
+                                                No administration rules yet. Add
+                                                one to require countersigning or
+                                                observations for matching
+                                                medications.
                                             </td>
                                         </tr>
                                     )}
@@ -266,10 +340,13 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>{editing ? 'Edit rule' : 'Add administration rule'}</DialogTitle>
+                        <DialogTitle>
+                            {editing ? 'Edit rule' : 'Add administration rule'}
+                        </DialogTitle>
                         <DialogDescription>
-                            Matching is case-insensitive. A name/route rule matches when the medication contains the
-                            keyword; an NZULM rule matches the exact code.
+                            Matching is case-insensitive. A name/route rule
+                            matches when the medication contains the keyword; an
+                            NZULM rule matches the exact code.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -281,9 +358,18 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
                                     <Button
                                         key={type.value}
                                         type="button"
-                                        variant={form.match_type === type.value ? 'default' : 'outline'}
+                                        variant={
+                                            form.match_type === type.value
+                                                ? 'default'
+                                                : 'outline'
+                                        }
                                         size="sm"
-                                        onClick={() => setForm((c) => ({ ...c, match_type: type.value }))}
+                                        onClick={() =>
+                                            setForm((c) => ({
+                                                ...c,
+                                                match_type: type.value,
+                                            }))
+                                        }
                                     >
                                         {type.label}
                                     </Button>
@@ -296,7 +382,12 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
                             <Input
                                 id="match-value"
                                 value={form.match_value}
-                                onChange={(e) => setForm((c) => ({ ...c, match_value: e.target.value }))}
+                                onChange={(e) =>
+                                    setForm((c) => ({
+                                        ...c,
+                                        match_value: e.target.value,
+                                    }))
+                                }
                                 placeholder={
                                     form.match_type === 'route'
                                         ? 'e.g. Intravenous'
@@ -311,15 +402,22 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
                             <Label>Applies to</Label>
                             <Select
                                 value={form.site_id}
-                                onValueChange={(value) => setForm((c) => ({ ...c, site_id: value }))}
+                                onValueChange={(value) =>
+                                    setForm((c) => ({ ...c, site_id: value }))
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={GLOBAL_SITE}>All sites (global)</SelectItem>
+                                    <SelectItem value={GLOBAL_SITE}>
+                                        All sites (global)
+                                    </SelectItem>
                                     {sites.map((site) => (
-                                        <SelectItem key={site.id} value={site.id.toString()}>
+                                        <SelectItem
+                                            key={site.id}
+                                            value={site.id.toString()}
+                                        >
                                             {site.name}
                                         </SelectItem>
                                     ))}
@@ -329,26 +427,41 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
 
                         <div className="flex items-center justify-between rounded-md border p-3">
                             <div>
-                                <p className="text-sm font-medium">Require countersignature</p>
+                                <p className="text-sm font-medium">
+                                    Require countersignature
+                                </p>
                                 <p className="text-xs text-muted-foreground">
-                                    A second checker must authenticate at administration.
+                                    A second checker must authenticate at
+                                    administration.
                                 </p>
                             </div>
                             <Switch
                                 checked={form.requires_countersign}
                                 onCheckedChange={(checked) =>
-                                    setForm((c) => ({ ...c, requires_countersign: checked }))
+                                    setForm((c) => ({
+                                        ...c,
+                                        requires_countersign: checked,
+                                    }))
                                 }
                             />
                         </div>
 
                         <div className="space-y-2 rounded-md border p-3">
-                            <p className="text-sm font-medium">Require observation at sign-off</p>
+                            <p className="text-sm font-medium">
+                                Require observation at sign-off
+                            </p>
                             {observationOptions.map((obs) => (
-                                <label key={obs.value} className="flex items-center gap-2 text-sm">
+                                <label
+                                    key={obs.value}
+                                    className="flex items-center gap-2 text-sm"
+                                >
                                     <Checkbox
-                                        checked={form.required_observations.includes(obs.value)}
-                                        onCheckedChange={() => toggleObservation(obs.value)}
+                                        checked={form.required_observations.includes(
+                                            obs.value,
+                                        )}
+                                        onCheckedChange={() =>
+                                            toggleObservation(obs.value)
+                                        }
                                     />
                                     {obs.label}
                                 </label>
@@ -359,13 +472,19 @@ export default function EmarSettings({ rules, sites, observationOptions, matchTy
                             <p className="text-sm font-medium">Active</p>
                             <Switch
                                 checked={form.active}
-                                onCheckedChange={(checked) => setForm((c) => ({ ...c, active: checked }))}
+                                onCheckedChange={(checked) =>
+                                    setForm((c) => ({ ...c, active: checked }))
+                                }
                             />
                         </div>
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                            disabled={saving}
+                        >
                             Cancel
                         </Button>
                         <Button onClick={submit} disabled={saving}>

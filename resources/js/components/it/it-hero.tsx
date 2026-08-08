@@ -21,6 +21,7 @@ export interface ItHeroSummary {
         breached: number;
         awaiting_reply: number;
         resolved_30d: number;
+        measured_30d?: number;
         met_30d: number;
         by_status: Record<string, number>;
     };
@@ -299,7 +300,7 @@ export function ItHero({
                         ) : (
                             <ComplianceRing
                                 met={t.met_30d}
-                                resolved={t.resolved_30d}
+                                measured={t.measured_30d ?? t.resolved_30d}
                             />
                         )}
                     </div>
@@ -412,16 +413,16 @@ function StatusDonut({
     );
 }
 
-/** 30-day SLA compliance — share of settled tickets that met their target. */
-function ComplianceRing({ met, resolved }: { met: number; resolved: number }) {
-    if (resolved === 0) {
+/** 30-day SLA compliance — share of measured settled tickets that met target. */
+function ComplianceRing({ met, measured }: { met: number; measured: number }) {
+    if (measured === 0) {
         return (
             <p className="mt-6 text-center text-xs text-primary-foreground/60">
-                No tickets resolved in the last 30 days yet.
+                No measured SLA outcomes in the last 30 days yet.
             </p>
         );
     }
-    const pct = Math.round((met / resolved) * 100);
+    const pct = Math.round((met / measured) * 100);
     const r = 42;
     const c = 2 * Math.PI * r;
     const dash = `${((pct / 100) * c).toFixed(2)} ${c.toFixed(2)}`;
@@ -471,8 +472,8 @@ function ComplianceRing({ met, resolved }: { met: number; resolved: number }) {
             </div>
             <p className="flex-1 text-[11.5px] leading-relaxed text-primary-foreground/80">
                 <span className="font-bold tabular-nums">{met}</span> of{' '}
-                <span className="font-bold tabular-nums">{resolved}</span>{' '}
-                tickets settled within SLA this month.
+                <span className="font-bold tabular-nums">{measured}</span>{' '}
+                measured tickets settled within SLA in the last 30 days.
             </p>
         </div>
     );

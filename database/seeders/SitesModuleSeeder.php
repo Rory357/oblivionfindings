@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\AppSetting;
 use App\Models\Site;
 use App\Models\SiteChecklistTemplate;
-use App\Models\SiteHouseRoom;
+use App\Services\Sites\SitePhysicalRoomService;
+use Illuminate\Database\Seeder;
 
 class SitesModuleSeeder extends Seeder
 {
@@ -707,9 +707,7 @@ class SitesModuleSeeder extends Seeder
             }
 
             foreach ($defaultRooms as $i => $name) {
-                SiteHouseRoom::create([
-                    'site_id' => $site->id,
-                    'tenant_id' => $site->tenant_id,
+                app(SitePhysicalRoomService::class)->createResidentialRoom($site, [
                     'name' => $name,
                     'is_active' => true,
                     'sort_order' => $i,

@@ -54,7 +54,13 @@ export type RecruitmentSupport = {
     roles: { value: string; label: string }[];
     hiring_managers: { id: number; name: string; email: string }[];
     interview_kits: { id: number; name: string; role: string | null }[];
-    positions: { id: number; label: string; role: string | null; employment_type: string | null; vacancies: number }[];
+    positions: {
+        id: number;
+        label: string;
+        role: string | null;
+        employment_type: string | null;
+        vacancies: number;
+    }[];
     sources: string[];
     employment_types: string[];
     document_categories: Record<string, string>;
@@ -129,7 +135,11 @@ function Toggle({
             </button>
             <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-bold">{title}</div>
-                {sub ? <div className="text-[11.5px] text-muted-foreground">{sub}</div> : null}
+                {sub ? (
+                    <div className="text-[11.5px] text-muted-foreground">
+                        {sub}
+                    </div>
+                ) : null}
             </div>
         </div>
     );
@@ -208,21 +218,53 @@ export function RecruitmentWizards({
     const ctx = state.context ?? {};
     switch (state.kind) {
         case 'add':
-            return <AddCandidateWizard onClose={onClose} support={support} ctx={ctx} />;
+            return (
+                <AddCandidateWizard
+                    onClose={onClose}
+                    support={support}
+                    ctx={ctx}
+                />
+            );
         case 'requisition':
-            return <RequisitionWizard onClose={onClose} support={support} ctx={ctx} />;
+            return (
+                <RequisitionWizard
+                    onClose={onClose}
+                    support={support}
+                    ctx={ctx}
+                />
+            );
         case 'interview':
-            return <InterviewWizard onClose={onClose} support={support} ctx={ctx} />;
+            return (
+                <InterviewWizard
+                    onClose={onClose}
+                    support={support}
+                    ctx={ctx}
+                />
+            );
         case 'offer':
-            return <OfferWizard onClose={onClose} support={support} ctx={ctx} />;
+            return (
+                <OfferWizard onClose={onClose} support={support} ctx={ctx} />
+            );
         case 'convert':
-            return <ConvertWizard onClose={onClose} support={support} ctx={ctx} />;
+            return (
+                <ConvertWizard onClose={onClose} support={support} ctx={ctx} />
+            );
         case 'reference':
-            return <ReferenceWizard onClose={onClose} support={support} ctx={ctx} />;
+            return (
+                <ReferenceWizard
+                    onClose={onClose}
+                    support={support}
+                    ctx={ctx}
+                />
+            );
         case 'reject':
-            return <RejectWizard onClose={onClose} support={support} ctx={ctx} />;
+            return (
+                <RejectWizard onClose={onClose} support={support} ctx={ctx} />
+            );
         case 'document':
-            return <DocumentWizard onClose={onClose} support={support} ctx={ctx} />;
+            return (
+                <DocumentWizard onClose={onClose} support={support} ctx={ctx} />
+            );
         default:
             return null;
     }
@@ -258,8 +300,18 @@ function AddCandidateWizard({ onClose, support }: WizProps) {
     });
 
     const steps: WizardStep[] = [
-        { key: 'person', label: 'Person & application', blurb: 'Name, email, source', icon: UserPlus },
-        { key: 'review', label: 'Review', blurb: 'Confirm & add', icon: CheckCircle2 },
+        {
+            key: 'person',
+            label: 'Person & application',
+            blurb: 'Name, email, source',
+            icon: UserPlus,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Confirm & add',
+            icon: CheckCircle2,
+        },
     ];
 
     const canSubmit =
@@ -279,7 +331,9 @@ function AddCandidateWizard({ onClose, support }: WizProps) {
             onSuccess: (page) => {
                 const f = (page.props as { flash?: { error?: string } }).flash;
                 if (f?.error) {
-                    toast.error('Could not add candidate', { description: f.error });
+                    toast.error('Could not add candidate', {
+                        description: f.error,
+                    });
                     return;
                 }
                 toast.success('Candidate added to the pipeline');
@@ -317,40 +371,78 @@ function AddCandidateWizard({ onClose, support }: WizProps) {
                     wizard={wizard}
                     onBack={wizard.back}
                     primaryLabel={wizard.isLast ? 'Add candidate' : 'Continue'}
-                    primaryDisabled={wizard.isLast && (!canSubmit || form.processing)}
+                    primaryDisabled={
+                        wizard.isLast && (!canSubmit || form.processing)
+                    }
                     onPrimary={() => (wizard.isLast ? submit() : wizard.next())}
                 />
             }
         >
             {wizard.index === 0 ? (
                 <WizardStepPane>
-                    <StepHead icon={UserPlus} title="Person & application" blurb="Add someone to the pipeline manually, with privacy consent captured." />
+                    <StepHead
+                        icon={UserPlus}
+                        title="Person & application"
+                        blurb="Add someone to the pipeline manually, with privacy consent captured."
+                    />
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Txt label="First name" value={form.data.first_name} onChange={(v) => form.setData('first_name', v)} />
-                        <Txt label="Last name" value={form.data.last_name} onChange={(v) => form.setData('last_name', v)} />
+                        <Txt
+                            label="First name"
+                            value={form.data.first_name}
+                            onChange={(v) => form.setData('first_name', v)}
+                        />
+                        <Txt
+                            label="Last name"
+                            value={form.data.last_name}
+                            onChange={(v) => form.setData('last_name', v)}
+                        />
                     </div>
                     <div className="mt-3">
-                        <Txt label="Email" type="email" value={form.data.personal_email} onChange={(v) => form.setData('personal_email', v)} />
+                        <Txt
+                            label="Email"
+                            type="email"
+                            value={form.data.personal_email}
+                            onChange={(v) => form.setData('personal_email', v)}
+                        />
                     </div>
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Txt label="Phone" hint="(optional)" value={form.data.personal_phone} onChange={(v) => form.setData('personal_phone', v)} />
+                        <Txt
+                            label="Phone"
+                            hint="(optional)"
+                            value={form.data.personal_phone}
+                            onChange={(v) => form.setData('personal_phone', v)}
+                        />
                         <Field label="Source">
                             <SelectInput
                                 value={form.data.source}
                                 onChange={(v) => form.setData('source', v)}
                                 placeholder="Select source"
-                                options={support.sources.map((s) => ({ value: s, label: srcLabel(s) }))}
+                                options={support.sources.map((s) => ({
+                                    value: s,
+                                    label: srcLabel(s),
+                                }))}
                             />
                         </Field>
                     </div>
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Txt label="Applying for" hint="(optional)" value={form.data.position_title} onChange={(v) => form.setData('position_title', v)} placeholder="e.g. Support Worker" />
+                        <Txt
+                            label="Applying for"
+                            hint="(optional)"
+                            value={form.data.position_title}
+                            onChange={(v) => form.setData('position_title', v)}
+                            placeholder="e.g. Support Worker"
+                        />
                         <Field label="Preferred site" hint="(optional)">
                             <SelectInput
                                 value={form.data.target_site_id}
-                                onChange={(v) => form.setData('target_site_id', v)}
+                                onChange={(v) =>
+                                    form.setData('target_site_id', v)
+                                }
                                 placeholder="Any site"
-                                options={support.sites.map((s) => ({ value: String(s.id), label: s.name }))}
+                                options={support.sites.map((s) => ({
+                                    value: String(s.id),
+                                    label: s.name,
+                                }))}
                             />
                         </Field>
                     </div>
@@ -366,14 +458,40 @@ function AddCandidateWizard({ onClose, support }: WizProps) {
                 </WizardStepPane>
             ) : (
                 <WizardStepPane>
-                    <StepHead icon={CheckCircle2} title="Review" blurb="Check everything before you add them." />
-                    <ReviewCard icon={UserPlus} title="Candidate" onEdit={() => wizard.goTo(0)}>
-                        <ReviewRow label="Name" value={`${form.data.first_name} ${form.data.last_name}`.trim()} />
-                        <ReviewRow label="Email" value={form.data.personal_email} />
-                        <ReviewRow label="Phone" value={form.data.personal_phone} />
-                        <ReviewRow label="Source" value={srcLabel(form.data.source)} />
-                        <ReviewRow label="Applying for" value={form.data.position_title} />
-                        <ReviewRow label="Consent" value={consent ? 'Captured' : 'Not captured'} />
+                    <StepHead
+                        icon={CheckCircle2}
+                        title="Review"
+                        blurb="Check everything before you add them."
+                    />
+                    <ReviewCard
+                        icon={UserPlus}
+                        title="Candidate"
+                        onEdit={() => wizard.goTo(0)}
+                    >
+                        <ReviewRow
+                            label="Name"
+                            value={`${form.data.first_name} ${form.data.last_name}`.trim()}
+                        />
+                        <ReviewRow
+                            label="Email"
+                            value={form.data.personal_email}
+                        />
+                        <ReviewRow
+                            label="Phone"
+                            value={form.data.personal_phone}
+                        />
+                        <ReviewRow
+                            label="Source"
+                            value={srcLabel(form.data.source)}
+                        />
+                        <ReviewRow
+                            label="Applying for"
+                            value={form.data.position_title}
+                        />
+                        <ReviewRow
+                            label="Consent"
+                            value={consent ? 'Captured' : 'Not captured'}
+                        />
                     </ReviewCard>
                     {!canSubmit ? <NeedConsent /> : null}
                     {flash?.error ? <FlashErr msg={flash.error} /> : null}
@@ -413,11 +531,36 @@ function RequisitionWizard({ onClose, support }: WizProps) {
     const [requiresApproval, setRequiresApproval] = useState(false);
 
     const steps: WizardStep[] = [
-        { key: 'role', label: 'Role & position', blurb: 'Seat & title', icon: Briefcase },
-        { key: 'desc', label: 'Job description', blurb: 'Summary & detail', icon: FileText },
-        { key: 'team', label: 'Hiring team', blurb: 'Manager & kit', icon: Users },
-        { key: 'post', label: 'Posting', blurb: 'Channels & dates', icon: Megaphone },
-        { key: 'review', label: 'Review', blurb: 'Confirm & create', icon: CheckCircle2 },
+        {
+            key: 'role',
+            label: 'Role & position',
+            blurb: 'Seat & title',
+            icon: Briefcase,
+        },
+        {
+            key: 'desc',
+            label: 'Job description',
+            blurb: 'Summary & detail',
+            icon: FileText,
+        },
+        {
+            key: 'team',
+            label: 'Hiring team',
+            blurb: 'Manager & kit',
+            icon: Users,
+        },
+        {
+            key: 'post',
+            label: 'Posting',
+            blurb: 'Channels & dates',
+            icon: Megaphone,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Confirm & create',
+            icon: CheckCircle2,
+        },
     ];
 
     const pickPosition = (id: string) => {
@@ -425,10 +568,12 @@ function RequisitionWizard({ onClose, support }: WizProps) {
         form.setData('position_id', id);
         const pos = support.positions.find((p) => String(p.id) === id);
         if (pos && form.data.title === '') form.setData('title', pos.label);
-        if (pos?.employment_type) form.setData('employment_type', pos.employment_type);
+        if (pos?.employment_type)
+            form.setData('employment_type', pos.employment_type);
     };
 
-    const canSubmit = form.data.title.trim() !== '' && form.data.description.trim() !== '';
+    const canSubmit =
+        form.data.title.trim() !== '' && form.data.description.trim() !== '';
 
     const submit = () => {
         form.transform((d) => ({
@@ -443,14 +588,18 @@ function RequisitionWizard({ onClose, support }: WizProps) {
             salary_range_max: d.salary_range_max || undefined,
             show_salary: showSalary,
             requires_approval: requiresApproval,
-            screening_questions: screeningQuestions.map((q) => q.trim()).filter((q) => q !== ''),
+            screening_questions: screeningQuestions
+                .map((q) => q.trim())
+                .filter((q) => q !== ''),
         }));
         form.post('/hr/recruitment/jobs', {
             preserveScroll: true,
             onSuccess: (page) => {
                 const f = (page.props as { flash?: { error?: string } }).flash;
                 if (f?.error) {
-                    toast.error('Could not create requisition', { description: f.error });
+                    toast.error('Could not create requisition', {
+                        description: f.error,
+                    });
                     return;
                 }
                 toast.success('Requisition created as a draft');
@@ -495,40 +644,69 @@ function RequisitionWizard({ onClose, support }: WizProps) {
                 <FooterNav
                     wizard={wizard}
                     onBack={wizard.back}
-                    primaryLabel={wizard.isLast ? 'Create requisition' : 'Continue'}
-                    primaryDisabled={wizard.isLast && (!canSubmit || form.processing)}
+                    primaryLabel={
+                        wizard.isLast ? 'Create requisition' : 'Continue'
+                    }
+                    primaryDisabled={
+                        wizard.isLast && (!canSubmit || form.processing)
+                    }
                     onPrimary={() => (wizard.isLast ? submit() : wizard.next())}
                 />
             }
         >
             {wizard.index === 0 ? (
                 <WizardStepPane>
-                    <StepHead icon={Briefcase} title="Role & position" blurb="Pick the establishment seat this role fills — it writes position_id so hires land in a real vacancy." />
+                    <StepHead
+                        icon={Briefcase}
+                        title="Role & position"
+                        blurb="Pick the establishment seat this role fills — it writes position_id so hires land in a real vacancy."
+                    />
                     {support.positions.length > 0 ? (
                         <div className="mb-4">
-                            <div className="mb-2 text-[12px] font-bold">Establishment seat</div>
+                            <div className="mb-2 text-[12px] font-bold">
+                                Establishment seat
+                            </div>
                             <TilePicker
                                 value={positionId}
                                 onChange={pickPosition}
-                                options={support.positions.slice(0, 8).map((p) => ({
-                                    key: String(p.id),
-                                    label: p.label,
-                                    description: p.role ?? undefined,
-                                    meta: p.vacancies > 0 ? `${p.vacancies} vacant` : 'No open seat',
-                                }))}
+                                options={support.positions
+                                    .slice(0, 8)
+                                    .map((p) => ({
+                                        key: String(p.id),
+                                        label: p.label,
+                                        description: p.role ?? undefined,
+                                        meta:
+                                            p.vacancies > 0
+                                                ? `${p.vacancies} vacant`
+                                                : 'No open seat',
+                                    }))}
                             />
                         </div>
                     ) : null}
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
-                        <Txt label="Role title" value={form.data.title} onChange={(v) => form.setData('title', v)} />
-                        <Txt label="Openings" type="number" value={form.data.openings} onChange={(v) => form.setData('openings', v)} />
+                        <Txt
+                            label="Role title"
+                            value={form.data.title}
+                            onChange={(v) => form.setData('title', v)}
+                        />
+                        <Txt
+                            label="Openings"
+                            type="number"
+                            value={form.data.openings}
+                            onChange={(v) => form.setData('openings', v)}
+                        />
                     </div>
                     <div className="mt-3">
                         <Field label="Employment type">
                             <Segmented
                                 value={form.data.employment_type}
-                                onChange={(v) => form.setData('employment_type', v)}
-                                options={support.employment_types.map((t) => ({ value: t, label: srcLabel(t) }))}
+                                onChange={(v) =>
+                                    form.setData('employment_type', v)
+                                }
+                                options={support.employment_types.map((t) => ({
+                                    value: t,
+                                    label: srcLabel(t),
+                                }))}
                             />
                         </Field>
                     </div>
@@ -537,30 +715,76 @@ function RequisitionWizard({ onClose, support }: WizProps) {
 
             {wizard.index === 1 ? (
                 <WizardStepPane>
-                    <StepHead icon={FileText} title="Job description" blurb="What the role does and who you're looking for. A description is required to create the requisition." />
-                    <Area label="Summary" value={form.data.summary} onChange={(v) => form.setData('summary', v)} placeholder="One-line summary for the ad" />
+                    <StepHead
+                        icon={FileText}
+                        title="Job description"
+                        blurb="What the role does and who you're looking for. A description is required to create the requisition."
+                    />
+                    <Area
+                        label="Summary"
+                        value={form.data.summary}
+                        onChange={(v) => form.setData('summary', v)}
+                        placeholder="One-line summary for the ad"
+                    />
                     <div className="mt-3">
-                        <Area label="Description" value={form.data.description} onChange={(v) => form.setData('description', v)} placeholder="Full role description (required)" />
+                        <Area
+                            label="Description"
+                            value={form.data.description}
+                            onChange={(v) => form.setData('description', v)}
+                            placeholder="Full role description (required)"
+                        />
                     </div>
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Area label="Responsibilities" value={form.data.responsibilities} onChange={(v) => form.setData('responsibilities', v)} />
-                        <Area label="Requirements" value={form.data.requirements} onChange={(v) => form.setData('requirements', v)} />
+                        <Area
+                            label="Responsibilities"
+                            value={form.data.responsibilities}
+                            onChange={(v) =>
+                                form.setData('responsibilities', v)
+                            }
+                        />
+                        <Area
+                            label="Requirements"
+                            value={form.data.requirements}
+                            onChange={(v) => form.setData('requirements', v)}
+                        />
                     </div>
                     <div className="mt-4">
-                        <Field label="Screening questions" hint="(optional · asked on the application form)">
+                        <Field
+                            label="Screening questions"
+                            hint="(optional · asked on the application form)"
+                        >
                             <div className="flex flex-col gap-2">
                                 {screeningQuestions.map((q, i) => (
-                                    <div key={i} className="flex items-center gap-2">
-                                        <span className="grid h-7 w-7 flex-none place-items-center rounded-md bg-muted text-[12px] font-bold text-muted-foreground">{i + 1}</span>
+                                    <div
+                                        key={i}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <span className="grid h-7 w-7 flex-none place-items-center rounded-md bg-muted text-[12px] font-bold text-muted-foreground">
+                                            {i + 1}
+                                        </span>
                                         <input
                                             value={q}
-                                            onChange={(e) => setScreeningQuestions((rows) => rows.map((r, idx) => (idx === i ? e.target.value : r)))}
+                                            onChange={(e) =>
+                                                setScreeningQuestions((rows) =>
+                                                    rows.map((r, idx) =>
+                                                        idx === i
+                                                            ? e.target.value
+                                                            : r,
+                                                    ),
+                                                )
+                                            }
                                             placeholder="e.g. Do you hold a current NZ driver licence?"
                                             className="h-9 flex-1 rounded-md border border-border bg-card px-3 text-[13px] outline-none focus:border-primary"
                                         />
                                         <button
                                             type="button"
-                                            onClick={() => setScreeningQuestions((rows) => rows.filter((_, idx) => idx !== i))}
+                                            onClick={() =>
+                                                setScreeningQuestions((rows) =>
+                                                    rows.filter(
+                                                        (_, idx) => idx !== i,
+                                                    ),
+                                                )
+                                            }
                                             aria-label="Remove question"
                                             className="grid h-9 w-9 flex-none place-items-center rounded-md text-muted-foreground hover:bg-muted"
                                         >
@@ -570,10 +794,16 @@ function RequisitionWizard({ onClose, support }: WizProps) {
                                 ))}
                                 <button
                                     type="button"
-                                    onClick={() => setScreeningQuestions((rows) => [...rows, ''])}
+                                    onClick={() =>
+                                        setScreeningQuestions((rows) => [
+                                            ...rows,
+                                            '',
+                                        ])
+                                    }
                                     className="inline-flex w-fit items-center gap-1.5 text-[13px] font-semibold text-primary hover:underline"
                                 >
-                                    <Plus className="h-3.5 w-3.5" /> Add question
+                                    <Plus className="h-3.5 w-3.5" /> Add
+                                    question
                                 </button>
                             </div>
                         </Field>
@@ -583,22 +813,36 @@ function RequisitionWizard({ onClose, support }: WizProps) {
 
             {wizard.index === 2 ? (
                 <WizardStepPane>
-                    <StepHead icon={Users} title="Hiring team" blurb="Who owns this hire and which scorecard the panel uses." />
+                    <StepHead
+                        icon={Users}
+                        title="Hiring team"
+                        blurb="Who owns this hire and which scorecard the panel uses."
+                    />
                     <Field label="Hiring manager" hint="(optional)">
                         <SelectInput
                             value={form.data.hiring_manager_user_id}
-                            onChange={(v) => form.setData('hiring_manager_user_id', v)}
+                            onChange={(v) =>
+                                form.setData('hiring_manager_user_id', v)
+                            }
                             placeholder="Assign later"
-                            options={support.hiring_managers.map((m) => ({ value: String(m.id), label: m.name }))}
+                            options={support.hiring_managers.map((m) => ({
+                                value: String(m.id),
+                                label: m.name,
+                            }))}
                         />
                     </Field>
                     <div className="mt-3">
                         <Field label="Default interview kit" hint="(optional)">
                             <SelectInput
                                 value={form.data.default_interview_kit_id}
-                                onChange={(v) => form.setData('default_interview_kit_id', v)}
+                                onChange={(v) =>
+                                    form.setData('default_interview_kit_id', v)
+                                }
                                 placeholder="No default kit"
-                                options={support.interview_kits.map((k) => ({ value: String(k.id), label: k.name }))}
+                                options={support.interview_kits.map((k) => ({
+                                    value: String(k.id),
+                                    label: k.name,
+                                }))}
                             />
                         </Field>
                     </div>
@@ -607,8 +851,15 @@ function RequisitionWizard({ onClose, support }: WizProps) {
 
             {wizard.index === 3 ? (
                 <WizardStepPane>
-                    <StepHead icon={Megaphone} title="Posting" blurb="Track where you'll advertise this role and when applications close." />
-                    <Field label="Posting channels" hint="manual record — we don't post to these sites for you">
+                    <StepHead
+                        icon={Megaphone}
+                        title="Posting"
+                        blurb="Track where you'll advertise this role and when applications close."
+                    />
+                    <Field
+                        label="Posting channels"
+                        hint="manual record — we don't post to these sites for you"
+                    >
                         <div className="flex flex-wrap gap-2">
                             {Object.keys(channelLabels).map((c) => {
                                 const on = channels.includes(c);
@@ -617,10 +868,20 @@ function RequisitionWizard({ onClose, support }: WizProps) {
                                         key={c}
                                         type="button"
                                         aria-pressed={on}
-                                        onClick={() => setChannels((prev) => (on ? prev.filter((x) => x !== c) : [...prev, c]))}
+                                        onClick={() =>
+                                            setChannels((prev) =>
+                                                on
+                                                    ? prev.filter(
+                                                          (x) => x !== c,
+                                                      )
+                                                    : [...prev, c],
+                                            )
+                                        }
                                         className={cn(
                                             'rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
-                                            on ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:border-primary/50',
+                                            on
+                                                ? 'border-primary bg-primary/10 text-primary'
+                                                : 'border-border bg-card hover:border-primary/50',
                                         )}
                                     >
                                         {channelLabels[c]}
@@ -630,31 +891,92 @@ function RequisitionWizard({ onClose, support }: WizProps) {
                         </div>
                     </Field>
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <Txt label="Salary min" hint="($)" value={form.data.salary_range_min} onChange={(v) => form.setData('salary_range_min', v)} />
-                        <Txt label="Salary max" hint="($)" value={form.data.salary_range_max} onChange={(v) => form.setData('salary_range_max', v)} />
+                        <Txt
+                            label="Salary min"
+                            hint="($)"
+                            value={form.data.salary_range_min}
+                            onChange={(v) =>
+                                form.setData('salary_range_min', v)
+                            }
+                        />
+                        <Txt
+                            label="Salary max"
+                            hint="($)"
+                            value={form.data.salary_range_max}
+                            onChange={(v) =>
+                                form.setData('salary_range_max', v)
+                            }
+                        />
                         <div className="max-w-[220px]">
-                            <Txt label="Closing date" hint="(optional)" type="date" value={form.data.closing_at} onChange={(v) => form.setData('closing_at', v)} />
+                            <Txt
+                                label="Closing date"
+                                hint="(optional)"
+                                type="date"
+                                value={form.data.closing_at}
+                                onChange={(v) => form.setData('closing_at', v)}
+                            />
                         </div>
                     </div>
                     <div className="mt-3 flex flex-col gap-2">
-                        <Toggle checked={showSalary} onChange={setShowSalary} title="Show salary on the ad" sub="Display the pay range to candidates on the careers page." />
-                        <Toggle checked={requiresApproval} onChange={setRequiresApproval} title="Requires approval before publishing" sub="Routes to the hiring manager for sign-off before it goes live." />
+                        <Toggle
+                            checked={showSalary}
+                            onChange={setShowSalary}
+                            title="Show salary on the ad"
+                            sub="Display the pay range to candidates on the careers page."
+                        />
+                        <Toggle
+                            checked={requiresApproval}
+                            onChange={setRequiresApproval}
+                            title="Requires approval before publishing"
+                            sub="Routes to the hiring manager for sign-off before it goes live."
+                        />
                     </div>
                 </WizardStepPane>
             ) : null}
 
             {wizard.index === 4 ? (
                 <WizardStepPane>
-                    <StepHead icon={CheckCircle2} title="Review" blurb="Check everything before you create it." />
-                    <ReviewCard icon={Briefcase} title="Requisition" onEdit={() => wizard.goTo(0)}>
+                    <StepHead
+                        icon={CheckCircle2}
+                        title="Review"
+                        blurb="Check everything before you create it."
+                    />
+                    <ReviewCard
+                        icon={Briefcase}
+                        title="Requisition"
+                        onEdit={() => wizard.goTo(0)}
+                    >
                         <ReviewRow label="Title" value={form.data.title} />
-                        <ReviewRow label="Seat" value={support.positions.find((p) => String(p.id) === positionId)?.label} />
-                        <ReviewRow label="Openings" value={form.data.openings} />
-                        <ReviewRow label="Type" value={srcLabel(form.data.employment_type)} />
-                        <ReviewRow label="Channels" value={channels.map((c) => channelLabels[c]).join(', ')} />
-                        <ReviewRow label="Closes" value={form.data.closing_at} />
+                        <ReviewRow
+                            label="Seat"
+                            value={
+                                support.positions.find(
+                                    (p) => String(p.id) === positionId,
+                                )?.label
+                            }
+                        />
+                        <ReviewRow
+                            label="Openings"
+                            value={form.data.openings}
+                        />
+                        <ReviewRow
+                            label="Type"
+                            value={srcLabel(form.data.employment_type)}
+                        />
+                        <ReviewRow
+                            label="Channels"
+                            value={channels
+                                .map((c) => channelLabels[c])
+                                .join(', ')}
+                        />
+                        <ReviewRow
+                            label="Closes"
+                            value={form.data.closing_at}
+                        />
                     </ReviewCard>
-                    {!canSubmit ? <Hint msg="A title and description are required." /> : null}
+                    {!canSubmit ? (
+                        <Hint msg="A title and description are required." />
+                    ) : null}
                 </WizardStepPane>
             ) : null}
         </WizardShell>
@@ -676,8 +998,18 @@ function InterviewWizard({ onClose, support, ctx }: WizProps) {
     });
 
     const steps: WizardStep[] = [
-        { key: 'panel', label: 'Panel & time', blurb: 'When & how', icon: CalendarPlus },
-        { key: 'review', label: 'Review', blurb: 'Confirm & book', icon: CheckCircle2 },
+        {
+            key: 'panel',
+            label: 'Panel & time',
+            blurb: 'When & how',
+            icon: CalendarPlus,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Confirm & book',
+            icon: CheckCircle2,
+        },
     ];
 
     const canSubmit = form.data.date !== '' && Boolean(ctx.applicationId);
@@ -689,22 +1021,34 @@ function InterviewWizard({ onClose, support, ctx }: WizProps) {
             duration_minutes: Number(d.duration_minutes) || 45,
             interview_type: d.interview_type,
         }));
-        form.post(`/hr/recruitment/applications/${ctx.applicationId}/interviews`, {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                const f = (page.props as { flash?: { error?: string } }).flash;
-                if (f?.error) {
-                    toast.error('Could not schedule interview', { description: f.error });
-                    return;
-                }
-                toast.success('Interview scheduled');
-                setDone(true);
+        form.post(
+            `/hr/recruitment/applications/${ctx.applicationId}/interviews`,
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const f = (page.props as { flash?: { error?: string } })
+                        .flash;
+                    if (f?.error) {
+                        toast.error('Could not schedule interview', {
+                            description: f.error,
+                        });
+                        return;
+                    }
+                    toast.success('Interview scheduled');
+                    setDone(true);
+                },
             },
-        });
+        );
     };
 
     if (done) {
-        return <WizardSuccessShell onClose={onClose} title="Interview scheduled" blurb="It now shows on the Interviews tab for the week. Panellists and the candidate can be notified from there." />;
+        return (
+            <WizardSuccessShell
+                onClose={onClose}
+                title="Interview scheduled"
+                blurb="It now shows on the Interviews tab for the week. Panellists and the candidate can be notified from there."
+            />
+        );
     }
 
     return (
@@ -726,23 +1070,41 @@ function InterviewWizard({ onClose, support, ctx }: WizProps) {
                     wizard={wizard}
                     onBack={wizard.back}
                     primaryLabel={wizard.isLast ? 'Schedule' : 'Continue'}
-                    primaryDisabled={wizard.isLast && (!canSubmit || form.processing)}
+                    primaryDisabled={
+                        wizard.isLast && (!canSubmit || form.processing)
+                    }
                     onPrimary={() => (wizard.isLast ? submit() : wizard.next())}
                 />
             }
         >
             {wizard.index === 0 ? (
                 <WizardStepPane>
-                    <StepHead icon={CalendarPlus} title="Panel & time" blurb={`Book the interview${ctx.candidateName ? ` for ${ctx.candidateName}` : ''}.`} />
+                    <StepHead
+                        icon={CalendarPlus}
+                        title="Panel & time"
+                        blurb={`Book the interview${ctx.candidateName ? ` for ${ctx.candidateName}` : ''}.`}
+                    />
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Txt label="Date" type="date" value={form.data.date} onChange={(v) => form.setData('date', v)} />
-                        <Txt label="Time" type="time" value={form.data.time} onChange={(v) => form.setData('time', v)} />
+                        <Txt
+                            label="Date"
+                            type="date"
+                            value={form.data.date}
+                            onChange={(v) => form.setData('date', v)}
+                        />
+                        <Txt
+                            label="Time"
+                            type="time"
+                            value={form.data.time}
+                            onChange={(v) => form.setData('time', v)}
+                        />
                     </div>
                     <div className="mt-3">
                         <Field label="Interview type">
                             <Segmented
                                 value={form.data.interview_type}
-                                onChange={(v) => form.setData('interview_type', v)}
+                                onChange={(v) =>
+                                    form.setData('interview_type', v)
+                                }
                                 options={[
                                     { value: 'phone', label: 'Phone' },
                                     { value: 'video', label: 'Video' },
@@ -756,24 +1118,48 @@ function InterviewWizard({ onClose, support, ctx }: WizProps) {
                         <Field label="Duration (minutes)">
                             <SelectInput
                                 value={form.data.duration_minutes}
-                                onChange={(v) => form.setData('duration_minutes', v)}
+                                onChange={(v) =>
+                                    form.setData('duration_minutes', v)
+                                }
                                 placeholder="Duration"
-                                options={['30', '45', '60', '90'].map((m) => ({ value: m, label: `${m} min` }))}
+                                options={['30', '45', '60', '90'].map((m) => ({
+                                    value: m,
+                                    label: `${m} min`,
+                                }))}
                             />
                         </Field>
                     </div>
                 </WizardStepPane>
             ) : (
                 <WizardStepPane>
-                    <StepHead icon={CheckCircle2} title="Review" blurb="Confirm the interview details." />
-                    <ReviewCard icon={CalendarPlus} title="Interview" onEdit={() => wizard.goTo(0)}>
-                        <ReviewRow label="Candidate" value={ctx.candidateName} />
+                    <StepHead
+                        icon={CheckCircle2}
+                        title="Review"
+                        blurb="Confirm the interview details."
+                    />
+                    <ReviewCard
+                        icon={CalendarPlus}
+                        title="Interview"
+                        onEdit={() => wizard.goTo(0)}
+                    >
+                        <ReviewRow
+                            label="Candidate"
+                            value={ctx.candidateName}
+                        />
                         <ReviewRow label="Date" value={form.data.date} />
                         <ReviewRow label="Time" value={form.data.time} />
-                        <ReviewRow label="Type" value={srcLabel(form.data.interview_type)} />
-                        <ReviewRow label="Duration" value={`${form.data.duration_minutes} min`} />
+                        <ReviewRow
+                            label="Type"
+                            value={srcLabel(form.data.interview_type)}
+                        />
+                        <ReviewRow
+                            label="Duration"
+                            value={`${form.data.duration_minutes} min`}
+                        />
                     </ReviewCard>
-                    {!ctx.applicationId ? <Hint msg="This candidate has no application to attach the interview to." /> : null}
+                    {!ctx.applicationId ? (
+                        <Hint msg="This candidate has no application to attach the interview to." />
+                    ) : null}
                 </WizardStepPane>
             )}
         </WizardShell>
@@ -810,15 +1196,31 @@ function OfferWizard({ onClose, support, ctx }: WizProps) {
         hours_per_week: '40',
         proposed_start_date: '',
         primary_site_id: ctx.siteId ? String(ctx.siteId) : '',
-        conditions: 'This offer is conditional on satisfactory pre-employment safety checks (right to work, Police vetting, Children’s Act 2014 safety check and reference checks).',
+        conditions:
+            'This offer is conditional on satisfactory pre-employment safety checks (right to work, Police vetting, Children’s Act 2014 safety check and reference checks).',
         offer_letter: null,
     });
 
     const steps: WizardStep[] = [
-        { key: 'seat', label: 'Position & seat', blurb: 'Role & seat', icon: Briefcase },
+        {
+            key: 'seat',
+            label: 'Position & seat',
+            blurb: 'Role & seat',
+            icon: Briefcase,
+        },
         { key: 'terms', label: 'Terms', blurb: 'Pay & start', icon: PenLine },
-        { key: 'letter', label: 'Offer letter', blurb: 'Upload', icon: FileText },
-        { key: 'review', label: 'Review', blurb: 'Confirm & draft', icon: CheckCircle2 },
+        {
+            key: 'letter',
+            label: 'Offer letter',
+            blurb: 'Upload',
+            icon: FileText,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Confirm & draft',
+            icon: CheckCircle2,
+        },
     ];
 
     const canSubmit =
@@ -841,7 +1243,9 @@ function OfferWizard({ onClose, support, ctx }: WizProps) {
             onSuccess: (page) => {
                 const f = (page.props as { flash?: { error?: string } }).flash;
                 if (f?.error) {
-                    toast.error('Could not create offer', { description: f.error });
+                    toast.error('Could not create offer', {
+                        description: f.error,
+                    });
                     return;
                 }
                 toast.success('Offer drafted');
@@ -852,7 +1256,13 @@ function OfferWizard({ onClose, support, ctx }: WizProps) {
     };
 
     if (done) {
-        return <WizardSuccessShell onClose={onClose} title="Offer drafted 🎉" blurb="The offer is saved as a draft on the Offers tab. Send it to email the candidate their portal link." />;
+        return (
+            <WizardSuccessShell
+                onClose={onClose}
+                title="Offer drafted 🎉"
+                blurb="The offer is saved as a draft on the Offers tab. Send it to email the candidate their portal link."
+            />
+        );
     }
 
     return (
@@ -874,30 +1284,53 @@ function OfferWizard({ onClose, support, ctx }: WizProps) {
                     wizard={wizard}
                     onBack={wizard.back}
                     primaryLabel={wizard.isLast ? 'Create offer' : 'Continue'}
-                    primaryDisabled={wizard.isLast && (!canSubmit || form.processing)}
+                    primaryDisabled={
+                        wizard.isLast && (!canSubmit || form.processing)
+                    }
                     onPrimary={() => (wizard.isLast ? submit() : wizard.next())}
                 />
             }
         >
             {wizard.index === 0 ? (
                 <WizardStepPane>
-                    <StepHead icon={Briefcase} title="Position & seat" blurb="Confirm the candidate and the seat this offer fills." />
-                    <Txt label="Position title" value={form.data.position_title} onChange={(v) => form.setData('position_title', v)} />
+                    <StepHead
+                        icon={Briefcase}
+                        title="Position & seat"
+                        blurb="Confirm the candidate and the seat this offer fills."
+                    />
+                    <Txt
+                        label="Position title"
+                        value={form.data.position_title}
+                        onChange={(v) => form.setData('position_title', v)}
+                    />
                     {support.positions.length > 0 ? (
                         <div className="mt-3">
-                            <Field label="Establishment seat" hint="(writes position_id)">
+                            <Field
+                                label="Establishment seat"
+                                hint="(writes position_id)"
+                            >
                                 <SelectInput
                                     value={form.data.position_id}
-                                    onChange={(v) => form.setData('position_id', v)}
+                                    onChange={(v) =>
+                                        form.setData('position_id', v)
+                                    }
                                     placeholder="Link a seat"
-                                    options={support.positions.map((p) => ({ value: String(p.id), label: `${p.label}${p.vacancies > 0 ? ` · ${p.vacancies} vacant` : ''}` }))}
+                                    options={support.positions.map((p) => ({
+                                        value: String(p.id),
+                                        label: `${p.label}${p.vacancies > 0 ? ` · ${p.vacancies} vacant` : ''}`,
+                                    }))}
                                 />
                             </Field>
                         </div>
                     ) : null}
                     {form.data.position_id ? (
                         <SeatPanel
-                            ok={(support.positions.find((p) => String(p.id) === form.data.position_id)?.vacancies ?? 0) > 0}
+                            ok={
+                                (support.positions.find(
+                                    (p) =>
+                                        String(p.id) === form.data.position_id,
+                                )?.vacancies ?? 0) > 0
+                            }
                         />
                     ) : null}
                 </WizardStepPane>
@@ -905,29 +1338,63 @@ function OfferWizard({ onClose, support, ctx }: WizProps) {
 
             {wizard.index === 1 ? (
                 <WizardStepPane>
-                    <StepHead icon={PenLine} title="Terms" blurb="Pay, hours and start date — NZD, en-NZ." />
+                    <StepHead
+                        icon={PenLine}
+                        title="Terms"
+                        blurb="Pay, hours and start date — NZD, en-NZ."
+                    />
                     <Field label="Employment type">
                         <Segmented
                             value={form.data.employment_type}
                             onChange={(v) => form.setData('employment_type', v)}
-                            options={support.employment_types.map((t) => ({ value: t, label: srcLabel(t) }))}
+                            options={support.employment_types.map((t) => ({
+                                value: t,
+                                label: srcLabel(t),
+                            }))}
                         />
                     </Field>
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Txt label="Hourly rate ($)" hint="(or salary)" value={form.data.hourly_rate} onChange={(v) => form.setData('hourly_rate', v)} />
-                        <Txt label="Annual salary ($)" hint="(or hourly)" value={form.data.annual_salary} onChange={(v) => form.setData('annual_salary', v)} />
+                        <Txt
+                            label="Hourly rate ($)"
+                            hint="(or salary)"
+                            value={form.data.hourly_rate}
+                            onChange={(v) => form.setData('hourly_rate', v)}
+                        />
+                        <Txt
+                            label="Annual salary ($)"
+                            hint="(or hourly)"
+                            value={form.data.annual_salary}
+                            onChange={(v) => form.setData('annual_salary', v)}
+                        />
                     </div>
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Txt label="Hours / week" type="number" value={form.data.hours_per_week} onChange={(v) => form.setData('hours_per_week', v)} />
-                        <Txt label="Start date" type="date" value={form.data.proposed_start_date} onChange={(v) => form.setData('proposed_start_date', v)} />
+                        <Txt
+                            label="Hours / week"
+                            type="number"
+                            value={form.data.hours_per_week}
+                            onChange={(v) => form.setData('hours_per_week', v)}
+                        />
+                        <Txt
+                            label="Start date"
+                            type="date"
+                            value={form.data.proposed_start_date}
+                            onChange={(v) =>
+                                form.setData('proposed_start_date', v)
+                            }
+                        />
                     </div>
                     <div className="mt-3">
                         <Field label="Primary site" required>
                             <SelectInput
                                 value={form.data.primary_site_id}
-                                onChange={(v) => form.setData('primary_site_id', v)}
+                                onChange={(v) =>
+                                    form.setData('primary_site_id', v)
+                                }
                                 placeholder="Select site"
-                                options={support.sites.map((s) => ({ value: String(s.id), label: s.name }))}
+                                options={support.sites.map((s) => ({
+                                    value: String(s.id),
+                                    label: s.name,
+                                }))}
                             />
                         </Field>
                     </div>
@@ -936,7 +1403,11 @@ function OfferWizard({ onClose, support, ctx }: WizProps) {
 
             {wizard.index === 2 ? (
                 <WizardStepPane>
-                    <StepHead icon={FileText} title="Offer letter" blurb="Upload a signed copy, or skip and generate later." />
+                    <StepHead
+                        icon={FileText}
+                        title="Offer letter"
+                        blurb="Upload a signed copy, or skip and generate later."
+                    />
                     <FileTile
                         file={form.data.offer_letter}
                         onPick={(f) => {
@@ -947,28 +1418,84 @@ function OfferWizard({ onClose, support, ctx }: WizProps) {
                         hint="PDF, DOC up to 20MB · optional"
                     />
                     <div className="mt-3">
-                        <Area label="Conditions of offer" value={form.data.conditions} onChange={(v) => form.setData('conditions', v)} />
+                        <Area
+                            label="Conditions of offer"
+                            value={form.data.conditions}
+                            onChange={(v) => form.setData('conditions', v)}
+                        />
                     </div>
                 </WizardStepPane>
             ) : null}
 
             {wizard.index === 3 ? (
                 <WizardStepPane>
-                    <StepHead icon={CheckCircle2} title="Review" blurb="Check the offer before drafting it." />
-                    <ReviewCard icon={Send} title="Offer" onEdit={() => wizard.goTo(0)}>
-                        <ReviewRow label="Candidate" value={ctx.candidateName} />
-                        <ReviewRow label="Position" value={form.data.position_title} />
-                        <ReviewRow label="Type" value={srcLabel(form.data.employment_type)} />
-                        <ReviewRow label="Pay" value={form.data.hourly_rate ? `$${form.data.hourly_rate} / hr` : form.data.annual_salary ? `$${form.data.annual_salary} / yr` : undefined} />
-                        <ReviewRow label="Hours/wk" value={form.data.hours_per_week} />
-                        <ReviewRow label="Start" value={form.data.proposed_start_date} />
-                        <ReviewRow label="Site" value={support.sites.find((s) => String(s.id) === form.data.primary_site_id)?.name} />
-                        <ReviewRow label="Letter" value={form.data.offer_letter ? form.data.offer_letter.name : 'Generate later'} />
+                    <StepHead
+                        icon={CheckCircle2}
+                        title="Review"
+                        blurb="Check the offer before drafting it."
+                    />
+                    <ReviewCard
+                        icon={Send}
+                        title="Offer"
+                        onEdit={() => wizard.goTo(0)}
+                    >
+                        <ReviewRow
+                            label="Candidate"
+                            value={ctx.candidateName}
+                        />
+                        <ReviewRow
+                            label="Position"
+                            value={form.data.position_title}
+                        />
+                        <ReviewRow
+                            label="Type"
+                            value={srcLabel(form.data.employment_type)}
+                        />
+                        <ReviewRow
+                            label="Pay"
+                            value={
+                                form.data.hourly_rate
+                                    ? `$${form.data.hourly_rate} / hr`
+                                    : form.data.annual_salary
+                                      ? `$${form.data.annual_salary} / yr`
+                                      : undefined
+                            }
+                        />
+                        <ReviewRow
+                            label="Hours/wk"
+                            value={form.data.hours_per_week}
+                        />
+                        <ReviewRow
+                            label="Start"
+                            value={form.data.proposed_start_date}
+                        />
+                        <ReviewRow
+                            label="Site"
+                            value={
+                                support.sites.find(
+                                    (s) =>
+                                        String(s.id) ===
+                                        form.data.primary_site_id,
+                                )?.name
+                            }
+                        />
+                        <ReviewRow
+                            label="Letter"
+                            value={
+                                form.data.offer_letter
+                                    ? form.data.offer_letter.name
+                                    : 'Generate later'
+                            }
+                        />
                     </ReviewCard>
                     <div className="mt-2 rounded-xl border border-border bg-muted px-3.5 py-2.5 text-[12.5px] text-muted-foreground">
-                        Delivery: drafts the offer. Use <strong className="text-foreground">Send</strong> on the Offers tab to email the candidate their portal link.
+                        Delivery: drafts the offer. Use{' '}
+                        <strong className="text-foreground">Send</strong> on the
+                        Offers tab to email the candidate their portal link.
                     </div>
-                    {!canSubmit ? <Hint msg="A position title, start date and primary site are required." /> : null}
+                    {!canSubmit ? (
+                        <Hint msg="A position title, start date and primary site are required." />
+                    ) : null}
                 </WizardStepPane>
             ) : null}
         </WizardShell>
@@ -977,13 +1504,37 @@ function OfferWizard({ onClose, support, ctx }: WizProps) {
 
 function SeatPanel({ ok }: { ok: boolean }) {
     return (
-        <div className={cn('mt-3 flex gap-2.5 rounded-xl border p-3', ok ? 'border-status-success/30 bg-status-success-bg' : 'border-status-warning/35 bg-status-warning-bg')}>
-            <ShieldCheck className={cn('mt-0.5 h-4 w-4 shrink-0', ok ? 'text-status-success' : 'text-status-warning')} />
-            <div className={cn('text-[12.5px]', ok ? 'text-status-success' : 'text-status-warning')}>
+        <div
+            className={cn(
+                'mt-3 flex gap-2.5 rounded-xl border p-3',
+                ok
+                    ? 'border-status-success/30 bg-status-success-bg'
+                    : 'border-status-warning/35 bg-status-warning-bg',
+            )}
+        >
+            <ShieldCheck
+                className={cn(
+                    'mt-0.5 h-4 w-4 shrink-0',
+                    ok ? 'text-status-success' : 'text-status-warning',
+                )}
+            />
+            <div
+                className={cn(
+                    'text-[12.5px]',
+                    ok ? 'text-status-success' : 'text-status-warning',
+                )}
+            >
                 {ok ? (
-                    <><strong>Seat available.</strong> This offer writes position_id so the hire fills a budgeted vacancy.</>
+                    <>
+                        <strong>Seat available.</strong> This offer writes
+                        position_id so the hire fills a budgeted vacancy.
+                    </>
                 ) : (
-                    <><strong>No open seat.</strong> This position has no actionable vacancy against budget — proceed only if establishment is being expanded.</>
+                    <>
+                        <strong>No open seat.</strong> This position has no
+                        actionable vacancy against budget — proceed only if
+                        establishment is being expanded.
+                    </>
                 )}
             </div>
         </div>
@@ -1008,9 +1559,12 @@ function ConvertWizard({ onClose, ctx }: WizProps) {
             {
                 preserveScroll: true,
                 onSuccess: (page) => {
-                    const f = (page.props as { flash?: { error?: string } }).flash;
+                    const f = (page.props as { flash?: { error?: string } })
+                        .flash;
                     if (f?.error) {
-                        toast.error('Could not convert', { description: f.error });
+                        toast.error('Could not convert', {
+                            description: f.error,
+                        });
                         return;
                     }
                     toast.success('Employee profile created 🎉');
@@ -1023,10 +1577,23 @@ function ConvertWizard({ onClose, ctx }: WizProps) {
     };
 
     if (done) {
-        return <WizardSuccessShell onClose={onClose} title="Hired & onboarding started 🎉" blurb="An employee profile was created and onboarding kicked off. The candidate now appears in People." />;
+        return (
+            <WizardSuccessShell
+                onClose={onClose}
+                title="Hired & onboarding started 🎉"
+                blurb="An employee profile was created and onboarding kicked off. The candidate now appears in People."
+            />
+        );
     }
 
-    const steps: WizardStep[] = [{ key: 'confirm', label: 'Confirm hire', blurb: 'Account & access', icon: UserCheck }];
+    const steps: WizardStep[] = [
+        {
+            key: 'confirm',
+            label: 'Confirm hire',
+            blurb: 'Account & access',
+            icon: UserCheck,
+        },
+    ];
 
     return (
         <WizardShell
@@ -1053,37 +1620,75 @@ function ConvertWizard({ onClose, ctx }: WizProps) {
             }
         >
             <WizardStepPane>
-                <StepHead icon={UserCheck} title="Confirm hire & access" blurb="This is the front door to a new staff account — idempotent and audited." />
+                <StepHead
+                    icon={UserCheck}
+                    title="Confirm hire & access"
+                    blurb="This is the front door to a new staff account — idempotent and audited."
+                />
                 <div className="mb-3 flex items-center gap-3 rounded-xl border border-border p-3.5">
-                    <span className="grid h-11 w-11 place-items-center rounded-full bg-status-success text-white text-sm font-bold">
+                    <span className="grid h-11 w-11 place-items-center rounded-full bg-status-success text-sm font-bold text-white">
                         {initials(ctx.candidateName ?? '?')}
                     </span>
                     <div className="flex-1">
-                        <div className="text-[15px] font-bold">{ctx.candidateName ?? 'Candidate'}</div>
-                        <div className="text-[12px] text-muted-foreground">{ctx.role ?? 'Offer accepted'} · ready to convert</div>
+                        <div className="text-[15px] font-bold">
+                            {ctx.candidateName ?? 'Candidate'}
+                        </div>
+                        <div className="text-[12px] text-muted-foreground">
+                            {ctx.role ?? 'Offer accepted'} · ready to convert
+                        </div>
                     </div>
-                    <span className="rounded-md bg-status-success-bg px-2.5 py-1 text-[11px] font-bold text-status-success">Accepted</span>
+                    <span className="rounded-md bg-status-success-bg px-2.5 py-1 text-[11px] font-bold text-status-success">
+                        Accepted
+                    </span>
                 </div>
                 <div className="flex flex-col gap-2.5">
-                    <CreateLine icon={UserCheck} label="Employee profile" sub="HrEmployeeProfile created (or updated) idempotently" />
-                    <CreateLine icon={Users} label="Login account" sub="A User record so they can sign in on day one" />
-                    <CreateLine icon={ShieldCheck} label="Onboarding kicked off" sub="Onboarding checklist + welcome email" />
+                    <CreateLine
+                        icon={UserCheck}
+                        label="Employee profile"
+                        sub="HrEmployeeProfile created (or updated) idempotently"
+                    />
+                    <CreateLine
+                        icon={Users}
+                        label="Login account"
+                        sub="A User record so they can sign in on day one"
+                    />
+                    <CreateLine
+                        icon={ShieldCheck}
+                        label="Onboarding kicked off"
+                        sub="Onboarding checklist + welcome email"
+                    />
                 </div>
                 {!canEmployees ? (
                     <div className="mt-3 flex gap-2.5 rounded-xl border border-status-warning/35 bg-status-warning-bg p-3">
                         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
                         <div className="text-[12.5px] text-status-warning">
-                            <strong>Segregation of duties.</strong> Creating a system login also requires <code className="rounded bg-white/50 px-1 py-0.5 text-[11.5px]">hr.employees.manage</code>, which you don't currently hold. The conversion may stop at profile creation.
+                            <strong>Segregation of duties.</strong> Creating a
+                            system login also requires{' '}
+                            <code className="rounded bg-white/50 px-1 py-0.5 text-[11.5px]">
+                                hr.employees.manage
+                            </code>
+                            , which you don't currently hold. The conversion may
+                            stop at profile creation.
                         </div>
                     </div>
                 ) : null}
-                {!ctx.offerId ? <Hint msg="No accepted offer is linked to convert." /> : null}
+                {!ctx.offerId ? (
+                    <Hint msg="No accepted offer is linked to convert." />
+                ) : null}
             </WizardStepPane>
         </WizardShell>
     );
 }
 
-function CreateLine({ icon: Icon, label, sub }: { icon: LucideIcon; label: string; sub: string }) {
+function CreateLine({
+    icon: Icon,
+    label,
+    sub,
+}: {
+    icon: LucideIcon;
+    label: string;
+    sub: string;
+}) {
     return (
         <div className="flex items-center gap-3 rounded-xl border border-border p-3">
             <span className="grid h-7 w-7 place-items-center rounded-md bg-status-success-bg text-status-success">
@@ -1111,32 +1716,58 @@ function ReferenceWizard({ onClose, ctx }: WizProps) {
         referee_relationship: 'former_manager',
     });
 
-    const canSubmit = form.data.referee_name.trim() !== '' && Boolean(ctx.applicationId);
+    const canSubmit =
+        form.data.referee_name.trim() !== '' && Boolean(ctx.applicationId);
 
     const submit = () => {
         if (!ctx.applicationId) return;
-        form.transform((d) => ({ ...d, referee_relationship: srcLabel(d.referee_relationship) }));
-        form.post(`/hr/recruitment/applications/${ctx.applicationId}/references`, {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                const f = (page.props as { flash?: { error?: string } }).flash;
-                if (f?.error) {
-                    toast.error('Could not request reference', { description: f.error });
-                    return;
-                }
-                toast.success('Reference check requested');
-                setDone(true);
+        form.transform((d) => ({
+            ...d,
+            referee_relationship: srcLabel(d.referee_relationship),
+        }));
+        form.post(
+            `/hr/recruitment/applications/${ctx.applicationId}/references`,
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const f = (page.props as { flash?: { error?: string } })
+                        .flash;
+                    if (f?.error) {
+                        toast.error('Could not request reference', {
+                            description: f.error,
+                        });
+                        return;
+                    }
+                    toast.success('Reference check requested');
+                    setDone(true);
+                },
             },
-        });
+        );
     };
 
     if (done) {
-        return <WizardSuccessShell onClose={onClose} title="Reference requested" blurb="The reference check is logged as pending on the candidate's dossier. It gates the offer stage until complete." />;
+        return (
+            <WizardSuccessShell
+                onClose={onClose}
+                title="Reference requested"
+                blurb="The reference check is logged as pending on the candidate's dossier. It gates the offer stage until complete."
+            />
+        );
     }
 
     const steps: WizardStep[] = [
-        { key: 'referee', label: 'Referee', blurb: 'Who to contact', icon: UserCheck },
-        { key: 'review', label: 'Review', blurb: 'Confirm & request', icon: CheckCircle2 },
+        {
+            key: 'referee',
+            label: 'Referee',
+            blurb: 'Who to contact',
+            icon: UserCheck,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Confirm & request',
+            icon: CheckCircle2,
+        },
     ];
 
     return (
@@ -1157,29 +1788,57 @@ function ReferenceWizard({ onClose, ctx }: WizProps) {
                 <FooterNav
                     wizard={wizard}
                     onBack={wizard.back}
-                    primaryLabel={wizard.isLast ? 'Request reference' : 'Continue'}
-                    primaryDisabled={wizard.isLast && (!canSubmit || form.processing)}
+                    primaryLabel={
+                        wizard.isLast ? 'Request reference' : 'Continue'
+                    }
+                    primaryDisabled={
+                        wizard.isLast && (!canSubmit || form.processing)
+                    }
                     onPrimary={() => (wizard.isLast ? submit() : wizard.next())}
                 />
             }
         >
             {wizard.index === 0 ? (
                 <WizardStepPane>
-                    <StepHead icon={UserCheck} title="Referee" blurb={`Who should we contact to verify ${ctx.candidateName ?? 'the candidate'}?`} />
+                    <StepHead
+                        icon={UserCheck}
+                        title="Referee"
+                        blurb={`Who should we contact to verify ${ctx.candidateName ?? 'the candidate'}?`}
+                    />
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Txt label="Referee name" value={form.data.referee_name} onChange={(v) => form.setData('referee_name', v)} />
-                        <Txt label="Phone" hint="(optional)" value={form.data.referee_phone} onChange={(v) => form.setData('referee_phone', v)} />
+                        <Txt
+                            label="Referee name"
+                            value={form.data.referee_name}
+                            onChange={(v) => form.setData('referee_name', v)}
+                        />
+                        <Txt
+                            label="Phone"
+                            hint="(optional)"
+                            value={form.data.referee_phone}
+                            onChange={(v) => form.setData('referee_phone', v)}
+                        />
                     </div>
                     <div className="mt-3">
-                        <Txt label="Referee email" type="email" value={form.data.referee_email} onChange={(v) => form.setData('referee_email', v)} placeholder="referee@email.co.nz" />
+                        <Txt
+                            label="Referee email"
+                            type="email"
+                            value={form.data.referee_email}
+                            onChange={(v) => form.setData('referee_email', v)}
+                            placeholder="referee@email.co.nz"
+                        />
                     </div>
                     <div className="mt-3">
                         <Field label="Relationship to candidate">
                             <Segmented
                                 value={form.data.referee_relationship}
-                                onChange={(v) => form.setData('referee_relationship', v)}
+                                onChange={(v) =>
+                                    form.setData('referee_relationship', v)
+                                }
                                 options={[
-                                    { value: 'former_manager', label: 'Former manager' },
+                                    {
+                                        value: 'former_manager',
+                                        label: 'Former manager',
+                                    },
                                     { value: 'colleague', label: 'Colleague' },
                                     { value: 'character', label: 'Character' },
                                 ]}
@@ -1189,14 +1848,36 @@ function ReferenceWizard({ onClose, ctx }: WizProps) {
                 </WizardStepPane>
             ) : (
                 <WizardStepPane>
-                    <StepHead icon={CheckCircle2} title="Review" blurb="Confirm the referee details." />
-                    <ReviewCard icon={UserCheck} title="Referee" onEdit={() => wizard.goTo(0)}>
-                        <ReviewRow label="Name" value={form.data.referee_name} />
-                        <ReviewRow label="Email" value={form.data.referee_email} />
-                        <ReviewRow label="Phone" value={form.data.referee_phone} />
-                        <ReviewRow label="Relationship" value={srcLabel(form.data.referee_relationship)} />
+                    <StepHead
+                        icon={CheckCircle2}
+                        title="Review"
+                        blurb="Confirm the referee details."
+                    />
+                    <ReviewCard
+                        icon={UserCheck}
+                        title="Referee"
+                        onEdit={() => wizard.goTo(0)}
+                    >
+                        <ReviewRow
+                            label="Name"
+                            value={form.data.referee_name}
+                        />
+                        <ReviewRow
+                            label="Email"
+                            value={form.data.referee_email}
+                        />
+                        <ReviewRow
+                            label="Phone"
+                            value={form.data.referee_phone}
+                        />
+                        <ReviewRow
+                            label="Relationship"
+                            value={srcLabel(form.data.referee_relationship)}
+                        />
                     </ReviewCard>
-                    {!ctx.applicationId ? <Hint msg="This candidate has no application to attach the reference to." /> : null}
+                    {!ctx.applicationId ? (
+                        <Hint msg="This candidate has no application to attach the reference to." />
+                    ) : null}
                 </WizardStepPane>
             )}
         </WizardShell>
@@ -1207,7 +1888,14 @@ function ReferenceWizard({ onClose, ctx }: WizProps) {
 /*  Reject                                                            */
 /* ================================================================== */
 
-const REJECT_REASONS = ['Not enough experience', 'Values mismatch', 'Failed safety check', 'Position filled', 'Withdrew', 'Other'];
+const REJECT_REASONS = [
+    'Not enough experience',
+    'Values mismatch',
+    'Failed safety check',
+    'Position filled',
+    'Withdrew',
+    'Other',
+];
 
 function RejectWizard({ onClose, ctx }: WizProps) {
     const [done, setDone] = useState(false);
@@ -1242,10 +1930,23 @@ function RejectWizard({ onClose, ctx }: WizProps) {
     };
 
     if (done) {
-        return <WizardSuccessShell onClose={onClose} title="Application closed" blurb="The candidate has been moved out of the active pipeline and the reason recorded to the audit trail." />;
+        return (
+            <WizardSuccessShell
+                onClose={onClose}
+                title="Application closed"
+                blurb="The candidate has been moved out of the active pipeline and the reason recorded to the audit trail."
+            />
+        );
     }
 
-    const steps: WizardStep[] = [{ key: 'reason', label: 'Reason & options', blurb: 'Record a reason', icon: XCircle }];
+    const steps: WizardStep[] = [
+        {
+            key: 'reason',
+            label: 'Reason & options',
+            blurb: 'Record a reason',
+            icon: XCircle,
+        },
+    ];
 
     return (
         <WizardShell
@@ -1272,7 +1973,11 @@ function RejectWizard({ onClose, ctx }: WizProps) {
             }
         >
             <WizardStepPane>
-                <StepHead icon={XCircle} title="Reason & options" blurb={`Close out ${ctx.candidateName ?? 'this'}'s application. A reason is recorded to the audit trail.`} />
+                <StepHead
+                    icon={XCircle}
+                    title="Reason & options"
+                    blurb={`Close out ${ctx.candidateName ?? 'this'}'s application. A reason is recorded to the audit trail.`}
+                />
                 <Field label="Reason" required>
                     <div className="flex flex-wrap gap-2">
                         {REJECT_REASONS.map((r) => {
@@ -1285,7 +1990,9 @@ function RejectWizard({ onClose, ctx }: WizProps) {
                                     onClick={() => setReason(r)}
                                     className={cn(
                                         'rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
-                                        on ? 'border-status-critical bg-status-critical-bg text-status-critical' : 'border-border bg-card hover:border-status-critical/50',
+                                        on
+                                            ? 'border-status-critical bg-status-critical-bg text-status-critical'
+                                            : 'border-border bg-card hover:border-status-critical/50',
                                     )}
                                 >
                                     {r}
@@ -1295,7 +2002,11 @@ function RejectWizard({ onClose, ctx }: WizProps) {
                     </div>
                 </Field>
                 <div className="mt-3">
-                    <Area label="Internal note (not shared with candidate)" value={note} onChange={setNote} />
+                    <Area
+                        label="Internal note (not shared with candidate)"
+                        value={note}
+                        onChange={setNote}
+                    />
                 </div>
                 <div className="mt-3 flex flex-col gap-2">
                     <Toggle
@@ -1311,7 +2022,9 @@ function RejectWizard({ onClose, ctx }: WizProps) {
                         sub="Optional — a warm, brand-consistent decline."
                     />
                 </div>
-                {!ctx.applicationId ? <Hint msg="This candidate has no application to reject." /> : null}
+                {!ctx.applicationId ? (
+                    <Hint msg="This candidate has no application to reject." />
+                ) : null}
             </WizardStepPane>
         </WizardShell>
     );
@@ -1324,14 +2037,22 @@ function RejectWizard({ onClose, ctx }: WizProps) {
 function DocumentWizard({ onClose, support, ctx }: WizProps) {
     const [done, setDone] = useState(false);
     const cats = Object.entries(support.document_categories);
-    const form = useForm<{ file: File | null; category: string; expires_at: string; notes: string }>({
+    const form = useForm<{
+        file: File | null;
+        category: string;
+        expires_at: string;
+        notes: string;
+    }>({
         file: null,
         category: cats[0]?.[0] ?? 'cv',
         expires_at: '',
         notes: '',
     });
 
-    const canSubmit = Boolean(form.data.file) && form.data.category !== '' && Boolean(ctx.candidateId);
+    const canSubmit =
+        Boolean(form.data.file) &&
+        form.data.category !== '' &&
+        Boolean(ctx.candidateId);
 
     const submit = () => {
         if (!ctx.candidateId) return;
@@ -1351,10 +2072,23 @@ function DocumentWizard({ onClose, support, ctx }: WizProps) {
     };
 
     if (done) {
-        return <WizardSuccessShell onClose={onClose} title="Document uploaded" blurb="It's attached to the candidate and transfers to their staff record automatically on hire." />;
+        return (
+            <WizardSuccessShell
+                onClose={onClose}
+                title="Document uploaded"
+                blurb="It's attached to the candidate and transfers to their staff record automatically on hire."
+            />
+        );
     }
 
-    const steps: WizardStep[] = [{ key: 'file', label: 'File & category', blurb: 'Attach a document', icon: Upload }];
+    const steps: WizardStep[] = [
+        {
+            key: 'file',
+            label: 'File & category',
+            blurb: 'Attach a document',
+            icon: Upload,
+        },
+    ];
 
     return (
         <WizardShell
@@ -1381,8 +2115,17 @@ function DocumentWizard({ onClose, support, ctx }: WizProps) {
             }
         >
             <WizardStepPane>
-                <StepHead icon={Upload} title="File & category" blurb={`Attach a document to ${ctx.candidateName ?? 'the candidate'}.`} />
-                <FileTile file={form.data.file} onPick={(f) => form.setData('file', f)} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" hint="PDF, DOC or image up to 20MB" />
+                <StepHead
+                    icon={Upload}
+                    title="File & category"
+                    blurb={`Attach a document to ${ctx.candidateName ?? 'the candidate'}.`}
+                />
+                <FileTile
+                    file={form.data.file}
+                    onPick={(f) => form.setData('file', f)}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    hint="PDF, DOC or image up to 20MB"
+                />
                 <div className="mt-3">
                     <Field label="Category" required>
                         <div className="flex flex-wrap gap-2">
@@ -1393,10 +2136,14 @@ function DocumentWizard({ onClose, support, ctx }: WizProps) {
                                         key={key}
                                         type="button"
                                         aria-pressed={on}
-                                        onClick={() => form.setData('category', key)}
+                                        onClick={() =>
+                                            form.setData('category', key)
+                                        }
                                         className={cn(
                                             'rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
-                                            on ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:border-primary/50',
+                                            on
+                                                ? 'border-primary bg-primary/10 text-primary'
+                                                : 'border-border bg-card hover:border-primary/50',
                                         )}
                                     >
                                         {label}
@@ -1407,7 +2154,13 @@ function DocumentWizard({ onClose, support, ctx }: WizProps) {
                     </Field>
                 </div>
                 <div className="mt-3 max-w-[220px]">
-                    <Txt label="Expiry date" hint="(optional)" type="date" value={form.data.expires_at} onChange={(v) => form.setData('expires_at', v)} />
+                    <Txt
+                        label="Expiry date"
+                        hint="(optional)"
+                        type="date"
+                        value={form.data.expires_at}
+                        onChange={(v) => form.setData('expires_at', v)}
+                    />
                 </div>
             </WizardStepPane>
         </WizardShell>
@@ -1420,7 +2173,11 @@ function DocumentWizard({ onClose, support, ctx }: WizProps) {
 
 function CancelBtn({ onClick }: { onClick: () => void }) {
     return (
-        <button type="button" onClick={onClick} className="h-[38px] rounded-[10px] border border-border bg-card px-4 text-[13px] font-semibold hover:bg-muted">
+        <button
+            type="button"
+            onClick={onClick}
+            className="h-[38px] rounded-[10px] border border-border bg-card px-4 text-[13px] font-semibold hover:bg-muted"
+        >
             Cancel
         </button>
     );
@@ -1442,7 +2199,11 @@ function FooterNav({
     return (
         <>
             {!wizard.isFirst ? (
-                <button type="button" onClick={onBack} className="h-[38px] rounded-[10px] border border-border bg-card px-4 text-[13px] font-semibold hover:bg-muted">
+                <button
+                    type="button"
+                    onClick={onBack}
+                    className="h-[38px] rounded-[10px] border border-border bg-card px-4 text-[13px] font-semibold hover:bg-muted"
+                >
                     Back
                 </button>
             ) : null}
@@ -1458,7 +2219,15 @@ function FooterNav({
     );
 }
 
-function WizardSuccessShell({ onClose, title, blurb }: { onClose: () => void; title: string; blurb: ReactNode }) {
+function WizardSuccessShell({
+    onClose,
+    title,
+    blurb,
+}: {
+    onClose: () => void;
+    title: string;
+    blurb: ReactNode;
+}) {
     return (
         <WizardShell
             open
@@ -1468,7 +2237,9 @@ function WizardSuccessShell({ onClose, title, blurb }: { onClose: () => void; ti
             railIcon={Sparkles}
             railTitle=""
             railSub=""
-            steps={[{ key: 'done', label: 'Done', blurb: '', icon: CheckCircle2 }]}
+            steps={[
+                { key: 'done', label: 'Done', blurb: '', icon: CheckCircle2 },
+            ]}
             stepIndex={0}
             onStepClick={() => undefined}
             success={
@@ -1476,7 +2247,11 @@ function WizardSuccessShell({ onClose, title, blurb }: { onClose: () => void; ti
                     title={title}
                     blurb={blurb}
                     actions={
-                        <button type="button" onClick={onClose} className="h-[38px] rounded-[10px] bg-primary px-5 text-[13px] font-bold text-primary-foreground">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="h-[38px] rounded-[10px] bg-primary px-5 text-[13px] font-bold text-primary-foreground"
+                        >
                             Done
                         </button>
                     }
@@ -1506,8 +2281,12 @@ function FileTile({
                 className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted p-6 text-center hover:border-primary/50"
             >
                 <Upload className="h-6 w-6 text-primary" />
-                <div className="text-[13px] font-semibold">{file ? file.name : 'Drop a file or click to browse'}</div>
-                <div className="text-[11.5px] text-muted-foreground">{hint}</div>
+                <div className="text-[13px] font-semibold">
+                    {file ? file.name : 'Drop a file or click to browse'}
+                </div>
+                <div className="text-[11.5px] text-muted-foreground">
+                    {hint}
+                </div>
             </button>
             <input
                 ref={ref}
@@ -1521,13 +2300,23 @@ function FileTile({
 }
 
 function Hint({ msg }: { msg: string }) {
-    return <div className="mt-3 rounded-lg border border-status-warning/35 bg-status-warning-bg px-3 py-2 text-[12.5px] text-status-warning">{msg}</div>;
+    return (
+        <div className="mt-3 rounded-lg border border-status-warning/35 bg-status-warning-bg px-3 py-2 text-[12.5px] text-status-warning">
+            {msg}
+        </div>
+    );
 }
 
 function NeedConsent() {
-    return <Hint msg="Capture privacy consent and complete the required fields to add the candidate." />;
+    return (
+        <Hint msg="Capture privacy consent and complete the required fields to add the candidate." />
+    );
 }
 
 function FlashErr({ msg }: { msg: string }) {
-    return <div className="mt-3 rounded-lg border border-status-critical/35 bg-status-critical-bg px-3 py-2 text-[12.5px] text-status-critical">{msg}</div>;
+    return (
+        <div className="mt-3 rounded-lg border border-status-critical/35 bg-status-critical-bg px-3 py-2 text-[12.5px] text-status-critical">
+            {msg}
+        </div>
+    );
 }

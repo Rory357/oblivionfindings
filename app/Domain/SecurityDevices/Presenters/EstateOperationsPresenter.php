@@ -21,7 +21,9 @@ use App\Models\Site;
 use App\Models\SiteContact;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 class EstateOperationsPresenter
@@ -31,6 +33,7 @@ class EstateOperationsPresenter
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
         private readonly ItWorkAccessService $itAccess,
+        private readonly ControlRoomAlertAccessService $controlRoomAccess,
     ) {}
 
     /** @return array<string, mixed> */
@@ -48,11 +51,17 @@ class EstateOperationsPresenter
             'offline' => $devices->where('status.value', DeviceStatus::Offline->value)->count(),
             'degraded' => $devices->where('status.value', DeviceStatus::Degraded->value)->count(),
             'lowBattery' => $devices->filter(fn (Device $device) => $device->battery_level !== null && $device->battery_level <= 20)->count(),
-            'overdueMaintenance' => $maintenance->filter(fn (DeviceMaintenanceRecord $record) => $this->isOverdue($record))->count(),
+            'overdueMaintenance' => $context['canViewMaintenance']
+                ? $maintenance->filter(fn (DeviceMaintenanceRecord $record) => $this->isOverdue($record))->count()
+                : null,
             'serviceDueOverdue' => $devices->filter(fn (Device $device) => $device->next_service_due?->isPast())->count(),
             'serviceDueIn30d' => $devices->filter(fn (Device $device) => $device->next_service_due?->betweenIncluded(now(), now()->addDays(30)))->count(),
-            'criticalEvents24h' => $activeEvents->where('severity', 'critical')->count(),
-            'warningEvents24h' => $activeEvents->where('severity', 'warning')->count(),
+            'criticalEvents24h' => $context['canViewEvents']
+                ? $activeEvents->where('severity', 'critical')->count()
+                : null,
+            'warningEvents24h' => $context['canViewEvents']
+                ? $activeEvents->where('severity', 'warning')->count()
+                : null,
         ];
 
         $domainSummary = collect(DeviceDomain::cases())->map(function (DeviceDomain $domain) use ($devices): array {
@@ -177,6 +186,7 @@ class EstateOperationsPresenter
         $relationships = $deviceIds === []
             ? collect()
             : DeviceRelationship::query()
+                ->active()
                 ->with(['parent:id,name', 'child:id,name'])
                 ->whereIn('parent_device_id', $deviceIds)
                 ->whereIn('child_device_id', $deviceIds)
@@ -193,7 +203,7 @@ class EstateOperationsPresenter
                     ['wan', 'sd-wan', 'sd_wan', 'router', 'gateway', 'firewall', 'edge'],
                 );
             })
-            ->map(fn (Device $device) => $this->deviceRow($device))
+            ->map(fn (Device $device) => $this->deviceRow($device, $context['canViewEvents']))
             ->values();
 
         $groups = $deviceIds === []
@@ -226,15 +236,10 @@ class EstateOperationsPresenter
         $alerts = $this->alertsForSite($context, (int) $site->id)
             ->sortByDesc('triggered_at')
             ->take(20)
-            ->map(fn (ControlRoomAlert $alert) => [
-                'id' => $alert->id,
-                'reference' => $alert->reference_number,
-                'title' => $alert->alert_type,
-                'severity' => $alert->severity,
-                'status' => $alert->status,
-                'triggered_at' => $alert->triggered_at?->toIso8601String(),
-                'href' => "/control-room/alerts/{$alert->id}",
-            ])
+            ->map(fn (ControlRoomAlert $alert) => $this->controlRoomAlertRow(
+                $alert,
+                $context['readableAlertIds']->contains((int) $alert->id),
+            ))
             ->values();
 
         $itWork = $this->ticketsForSite($context, (int) $site->id)
@@ -278,7 +283,9 @@ class EstateOperationsPresenter
                 'is_active' => (bool) $site->is_active,
             ],
             'summary' => $summary,
-            'devices' => $devices->map(fn (Device $device) => $this->deviceRow($device))->values(),
+            'devices' => $devices
+                ->map(fn (Device $device) => $this->deviceRow($device, $context['canViewEvents']))
+                ->values(),
             'wan' => [
                 'known' => $wanDevices->isNotEmpty(),
                 'label' => $wanDevices->isNotEmpty()
@@ -303,18 +310,28 @@ class EstateOperationsPresenter
             'deviceGroups' => $groups,
             'monitoring' => [
                 'total_devices' => $devices->count(),
-                'monitored_devices' => $devices->filter(fn (Device $device) => $device->monitors->isNotEmpty())->count(),
-                'unmonitored_devices' => $devices->filter(fn (Device $device) => $device->monitors->isEmpty())->count(),
-                'failed_monitors' => $monitors->whereIn('state', [MonitorState::Failed->value, MonitorState::Degraded->value])->count(),
-                'uncertain_monitors' => $monitors->whereIn('state', [MonitorState::Unknown->value, MonitorState::Stale->value, MonitorState::Pending->value])->count(),
+                'monitored_devices' => $context['canViewEvents']
+                    ? $devices->filter(fn (Device $device) => $device->monitors->isNotEmpty())->count()
+                    : null,
+                'unmonitored_devices' => $context['canViewEvents']
+                    ? $devices->filter(fn (Device $device) => $device->monitors->isEmpty())->count()
+                    : null,
+                'failed_monitors' => $context['canViewEvents']
+                    ? $monitors->whereIn('state', [MonitorState::Failed->value, MonitorState::Degraded->value])->count()
+                    : null,
+                'uncertain_monitors' => $context['canViewEvents']
+                    ? $monitors->whereIn('state', [MonitorState::Unknown->value, MonitorState::Stale->value, MonitorState::Pending->value])->count()
+                    : null,
                 'monitors' => $monitors,
             ],
             'alerts' => $alerts,
             'itWork' => $itWork,
-            'maintenance' => $maintenance,
-            'collectors' => $this->collectorsForSite($context, (int) $site->id)
-                ->map(fn (MonitoringCollector $collector) => $this->collectorRow($collector))
-                ->values(),
+            'maintenance' => $context['canViewMaintenance'] ? $maintenance : collect(),
+            'collectors' => $context['canViewEvents']
+                ? $this->collectorsForSite($context, (int) $site->id)
+                    ->map(fn (MonitoringCollector $collector) => $this->collectorRow($collector))
+                    ->values()
+                : collect(),
             'changes' => $this->recentChanges($context, (int) $site->id),
             'contacts' => SiteContact::query()
                 ->where('site_id', $site->id)
@@ -333,6 +350,7 @@ class EstateOperationsPresenter
             'can' => [
                 'view_control_room' => $context['canControlRoom'],
                 'view_it_work' => $context['canIt'],
+                'view_site_profile' => Gate::forUser($viewer)->allows('view', $site),
                 'export' => $viewer->canDo('securityDevices.reports.view'),
             ],
         ];
@@ -425,7 +443,7 @@ class EstateOperationsPresenter
         $collectors = $this->collectorsForSite($context, (int) $site->id);
         $tickets = $this->ticketsForSite($context, (int) $site->id);
         $alerts = $this->alertsForSite($context, (int) $site->id);
-        $collector = $this->collectorSummary($collectors);
+        $collector = $context['canViewEvents'] ? $this->collectorSummary($collectors) : null;
         $attention = $devices->filter(fn (Device $device) => $this->deviceNeedsAttention($device));
         $failedMonitors = $monitors->filter(fn ($monitor) => in_array(
             $monitor->current_state?->value,
@@ -448,7 +466,7 @@ class EstateOperationsPresenter
             $unmonitored->isNotEmpty(),
             $uncertainMonitors->isNotEmpty(),
             $overdue->isNotEmpty(),
-            $collector['state'] === 'stale' => 'warning',
+            ($collector['state'] ?? null) === 'stale' => 'warning',
             default => 'healthy',
         };
 
@@ -473,16 +491,16 @@ class EstateOperationsPresenter
             'devices' => $devices->count(),
             'attention_devices' => $attention->count(),
             'offline_devices' => $devices->filter(fn (Device $device) => $device->status?->value === DeviceStatus::Offline->value)->count(),
-            'monitored_devices' => $monitored->count(),
-            'unmonitored_devices' => $unmonitored->count(),
-            'coverage_percent' => $devices->isEmpty()
-                ? null
-                : (int) round(($monitored->count() / $devices->count()) * 100),
-            'failed_monitors' => $failedMonitors->count(),
-            'active_findings' => $events->count(),
+            'monitored_devices' => $context['canViewEvents'] ? $monitored->count() : null,
+            'unmonitored_devices' => $context['canViewEvents'] ? $unmonitored->count() : null,
+            'coverage_percent' => $context['canViewEvents'] && $devices->isNotEmpty()
+                ? (int) round(($monitored->count() / $devices->count()) * 100)
+                : null,
+            'failed_monitors' => $context['canViewEvents'] ? $failedMonitors->count() : null,
+            'active_findings' => $context['canViewEvents'] ? $events->count() : null,
             'active_control_room_alerts' => $context['canControlRoom'] ? $alerts->count() : null,
             'open_it_work' => $context['canIt'] ? $tickets->count() : null,
-            'overdue_maintenance' => $overdue->count(),
+            'overdue_maintenance' => $context['canViewMaintenance'] ? $overdue->count() : null,
             'collector' => $collector,
             'last_change_at' => $latestChange?->toIso8601String(),
             'requires_action' => in_array($health, ['critical', 'warning'], true),
@@ -493,6 +511,14 @@ class EstateOperationsPresenter
     /** @return array<string, mixed> */
     private function context(User $viewer, ?array $onlySiteIds = null): array
     {
+        $canIt = $viewer->canDo('it.view');
+        $canViewModule = $viewer->canDo('securityDevices.viewAny');
+        $canViewDevices = $canViewModule && $viewer->canDo('securityDevices.devices.view');
+        $canViewEvents = $canViewModule && $viewer->canDo('securityDevices.events.view');
+        $canViewMaintenance = $canViewModule && (
+            $viewer->canDo('securityDevices.maintenance.view')
+            || $viewer->canDo('securityDevices.maintenance.manage')
+        );
         $siteIds = $this->access->accessibleSiteIds($viewer);
         if ($onlySiteIds !== null) {
             $siteIds = array_values(array_intersect($siteIds, $onlySiteIds));
@@ -508,16 +534,20 @@ class EstateOperationsPresenter
                 ->orderBy('name')
                 ->get();
 
-        $deviceQuery = $this->access->visibleDevices($viewer)
-            ->with([
-                'assignments' => fn ($query) => $query->active(),
-                'monitors' => fn ($query) => $query->where('is_enabled', true),
-            ]);
-        $devices = $deviceQuery->get();
+        $devices = ! $canViewDevices
+            ? collect()
+            : $this->access->visibleDevices($viewer)
+                ->with([
+                    'assignments' => fn ($query) => $query->active(),
+                    'monitors' => fn ($query) => $canViewEvents
+                        ? $query->where('is_enabled', true)
+                        : $query->whereRaw('1 = 0'),
+                ])
+                ->get();
         $deviceIds = $devices->pluck('id');
         $deviceSiteMap = $this->deviceSiteMap($devices, $sites->pluck('id')->all());
 
-        $activeEvents = $deviceIds->isEmpty()
+        $activeEvents = ! $canViewEvents || $deviceIds->isEmpty()
             ? collect()
             : DeviceEvent::query()
                 ->with('device:id,name')
@@ -526,7 +556,7 @@ class EstateOperationsPresenter
                 ->where('occurred_at', '>=', now()->subHours(self::ACTIVE_EVENT_WINDOW_HOURS))
                 ->get();
 
-        $maintenance = $deviceIds->isEmpty()
+        $maintenance = ! $canViewMaintenance || $deviceIds->isEmpty()
             ? collect()
             : DeviceMaintenanceRecord::query()
                 ->with('device:id,name')
@@ -534,17 +564,12 @@ class EstateOperationsPresenter
                 ->whereNotIn('status', ['completed', 'cancelled'])
                 ->get();
 
-        $collectors = $siteIds === []
+        $collectors = ! $canViewEvents || $siteIds === []
             ? collect()
             : MonitoringCollector::query()
                 ->whereIn('site_id', $siteIds)
                 ->get();
 
-        $canIt = $viewer->canDo('it.view');
-        $canViewDevices = $viewer->canDo('securityDevices.devices.view');
-        $canViewEvents = $viewer->canDo('securityDevices.events.view');
-        $canViewMaintenance = $viewer->canDo('securityDevices.maintenance.view')
-            || $viewer->canDo('securityDevices.maintenance.manage');
         $ticketQuery = ItTicket::query()
             ->whereIn('status', ItTicket::OPEN_STATUSES)
             ->with(['links' => fn ($query) => $query->whereIn('relationship', ['affected_site', 'affected_device'])]);
@@ -564,6 +589,7 @@ class EstateOperationsPresenter
                 ->with('device:id,canonical_device_id')
                 ->get()
             : collect();
+        $readableAlertIds = $this->controlRoomAccess->readableIds($alerts, $viewer);
 
         return compact(
             'sites',
@@ -574,12 +600,47 @@ class EstateOperationsPresenter
             'collectors',
             'tickets',
             'alerts',
+            'readableAlertIds',
             'canIt',
             'canViewDevices',
             'canViewEvents',
             'canViewMaintenance',
             'canControlRoom',
         );
+    }
+
+    /** @return array<string, mixed> */
+    private function controlRoomAlertRow(ControlRoomAlert $alert, bool $readable): array
+    {
+        if (! $readable) {
+            return [
+                'id' => $alert->id,
+                'reference' => null,
+                'title' => 'Control Room alert',
+                'severity' => null,
+                'status' => null,
+                'triggered_at' => null,
+                'href' => null,
+                'access' => [
+                    'state' => 'restricted',
+                    'label' => 'Control Room alert access required',
+                ],
+            ];
+        }
+
+        return [
+            'id' => $alert->id,
+            'reference' => $alert->reference_number,
+            'title' => $alert->alert_type,
+            'severity' => $alert->severity,
+            'status' => $alert->status,
+            'triggered_at' => $alert->triggered_at?->toIso8601String(),
+            'href' => "/control-room/alerts/{$alert->id}",
+            'access' => [
+                'state' => 'available',
+                'label' => 'Open Control Room alert',
+            ],
+        ];
     }
 
     /** @param Collection<int, Device> $devices @param array<int, int> $allowedSiteIds @return Collection<int, int> */
@@ -733,16 +794,18 @@ class EstateOperationsPresenter
     }
 
     /** @return array<string, mixed> */
-    private function deviceRow(Device $device): array
+    private function deviceRow(Device $device, bool $canViewMonitoring): array
     {
         $assignment = $device->assignments->first();
         $states = $device->monitors->pluck('current_state.value');
-        $monitoringState = match (true) {
-            $device->monitors->isEmpty() => 'unmonitored',
-            $states->contains(fn ($state) => in_array($state, [MonitorState::Failed->value, MonitorState::Degraded->value], true)) => 'attention',
-            $states->contains(fn ($state) => in_array($state, [MonitorState::Unknown->value, MonitorState::Stale->value, MonitorState::Pending->value], true)) => 'unknown',
-            default => 'healthy',
-        };
+        $monitoringState = $canViewMonitoring
+            ? match (true) {
+                $device->monitors->isEmpty() => 'unmonitored',
+                $states->contains(fn ($state) => in_array($state, [MonitorState::Failed->value, MonitorState::Degraded->value], true)) => 'attention',
+                $states->contains(fn ($state) => in_array($state, [MonitorState::Unknown->value, MonitorState::Stale->value, MonitorState::Pending->value], true)) => 'unknown',
+                default => 'healthy',
+            }
+        : null;
 
         return [
             'id' => $device->id,
@@ -763,7 +826,7 @@ class EstateOperationsPresenter
             'assigned_to' => $assignment
                 ? ucfirst($assignment->assignable_type).' #'.$assignment->assignable_id
                 : null,
-            'monitor_count' => $device->monitors->count(),
+            'monitor_count' => $canViewMonitoring ? $device->monitors->count() : null,
             'monitoring_state' => $monitoringState,
             'href' => "/security-devices/devices/{$device->id}",
         ];

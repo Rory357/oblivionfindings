@@ -113,11 +113,15 @@ export function matchesTab(med: MedRow, tab: string): boolean {
 
 /** A simple client-side dose-time preview from a free-text frequency. The real
  *  schedule is computed server-side (DoseSchedulingService) on save. */
-export function previewDoseTimes(frequency: string, isPrn: boolean): string[] | null {
+export function previewDoseTimes(
+    frequency: string,
+    isPrn: boolean,
+): string[] | null {
     if (isPrn) return null;
     const f = frequency.toLowerCase();
     if (/\b(stat|once only|prn|as needed|as required)\b/.test(f)) return null;
-    if (/four times|qid|4x/.test(f)) return ['08:00', '12:00', '16:00', '20:00'];
+    if (/four times|qid|4x/.test(f))
+        return ['08:00', '12:00', '16:00', '20:00'];
     if (/three times|tds|tid|3x/.test(f)) return ['08:00', '13:00', '18:00'];
     if (/twice|bd|bid|2x/.test(f)) return ['08:00', '20:00'];
     if (/once|daily|od|mane|1x/.test(f)) return ['08:00'];

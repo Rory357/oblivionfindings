@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +12,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -20,7 +20,6 @@ import {
     Briefcase,
     CheckCircle2,
     DollarSign,
-    FileSignature,
     FileText,
     Mail,
     MapPin,
@@ -111,9 +110,11 @@ const recColors: Record<string, string> = {
 };
 
 const refStatusColors: Record<string, string> = {
-    completed: 'border-status-success/30 text-status-success bg-status-success-bg',
+    completed:
+        'border-status-success/30 text-status-success bg-status-success-bg',
     received: 'border-status-info/30 text-status-info bg-status-info-bg',
-    requested: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
+    requested:
+        'border-status-warning/30 text-status-warning bg-status-warning-bg',
     pending: 'border-border/30 text-muted-foreground bg-muted-foreground/10',
 };
 
@@ -222,7 +223,8 @@ export default function CreateOffer({ application, sites, roles }: Props) {
             <Head title={`Create Offer - ${candidateName}`} />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         avatar={{ fallback: initials }}
                         title="Prepare Offer"
                         description={`${candidateName} · ${application.position_title}`}

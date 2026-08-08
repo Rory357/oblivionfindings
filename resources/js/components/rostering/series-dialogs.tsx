@@ -13,6 +13,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -20,7 +21,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 /* ------------------------------------------------------------------ */
 /*  Types — mirror App\Services\Operations\ShiftSeriesPresenter@detail */
@@ -125,9 +125,12 @@ function formatTimeRange(startsAt?: string | null, endsAt?: string | null) {
 
 function StatTile({ label, value }: { label: string; value: number }) {
     return (
-        <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-3 text-center">
+        <GuardrailCard
+            unstyled
+            className="rounded-xl border border-border bg-card p-3 text-center"
+        >
             <div className="text-xl font-bold tabular-nums">{value}</div>
-            <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="mt-0.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                 {label}
             </div>
         </GuardrailCard>
@@ -201,8 +204,13 @@ function DetailBody({
     onOpenChange: (open: boolean) => void;
     canManage: boolean;
 }) {
-    const { series, stats, upcomingOccurrences, recentOccurrences, coverageAlignment } =
-        detail;
+    const {
+        series,
+        stats,
+        upcomingOccurrences,
+        recentOccurrences,
+        coverageAlignment,
+    } = detail;
     const [cancelOpen, setCancelOpen] = useState(false);
     const [processing, setProcessing] = useState(false);
 
@@ -274,7 +282,8 @@ function DetailBody({
                         </span>
                         <span aria-hidden>·</span>
                         <span>
-                            {series.start_date ?? '—'} → {series.end_date ?? '—'}
+                            {series.start_date ?? '—'} →{' '}
+                            {series.end_date ?? '—'}
                         </span>
                     </div>
                 </div>
@@ -289,7 +298,8 @@ function DetailBody({
                             Cancel future
                         </Button>
                     ) : null}
-                    <Button unstyled
+                    <Button
+                        unstyled
                         type="button"
                         onClick={() => onOpenChange(false)}
                         aria-label="Close"
@@ -338,10 +348,10 @@ function DetailBody({
                 </div>
                 {series.notes ? (
                     <div className="mt-2 rounded-xl border border-border p-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                             Pattern notes
                         </div>
-                        <p className="mt-1 whitespace-pre-wrap text-sm">
+                        <p className="mt-1 text-sm whitespace-pre-wrap">
                             {series.notes}
                         </p>
                     </div>
@@ -350,7 +360,7 @@ function DetailBody({
                 {/* Coverage drift */}
                 {coverageAlignment.linked_rule_issues.length > 0 ? (
                     <div className="mt-4 rounded-xl border border-status-critical/30 bg-status-critical-bg p-3">
-                        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-status-critical">
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-status-critical uppercase">
                             <AlertTriangle className="h-3.5 w-3.5" /> Coverage
                             drift
                         </div>
@@ -359,8 +369,8 @@ function DetailBody({
                                 .slice(0, 3)
                                 .map((issue, i) => (
                                     <li key={i}>
-                                        {issue.rule_name} — {issue.window_label}:
-                                        missing {issue.missing_staff}
+                                        {issue.rule_name} — {issue.window_label}
+                                        : missing {issue.missing_staff}
                                     </li>
                                 ))}
                         </ul>
@@ -428,8 +438,8 @@ function DetailBody({
                             This cancels all {stats.remaining_occurrences}{' '}
                             remaining active occurrence
                             {stats.remaining_occurrences === 1 ? '' : 's'} in
-                            this series and marks the series cancelled. Completed
-                            shifts are untouched.
+                            this series and marks the series cancelled.
+                            Completed shifts are untouched.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -454,7 +464,7 @@ function DetailBody({
 function SummaryCell({ label, value }: { label: string; value: string }) {
     return (
         <div className="rounded-xl border border-border p-3">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                 {label}
             </div>
             <div className="mt-0.5 text-sm font-medium capitalize">{value}</div>
@@ -487,7 +497,7 @@ function OccurrenceRow({
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold capitalize text-muted-foreground">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground capitalize">
                         {occ.status.replace(/_/g, ' ')}
                     </span>
                     {occ.incidents_count > 0 ? (
@@ -510,7 +520,8 @@ function OccurrenceRow({
                     Open shift
                 </a>
                 {canManage && onCancel ? (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         type="button"
                         onClick={onCancel}
                         className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[12px] font-semibold text-muted-foreground hover:bg-accent"
@@ -519,7 +530,8 @@ function OccurrenceRow({
                     </Button>
                 ) : null}
                 {canManage && onReopen ? (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         type="button"
                         onClick={onReopen}
                         className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[12px] font-semibold text-muted-foreground hover:bg-accent"

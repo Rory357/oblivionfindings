@@ -3,13 +3,13 @@ import { Link } from '@inertiajs/react';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { cn } from '@/lib/utils';
 
-import type { MyDayResident } from '../lib/types';
 import {
     type StreamItem,
     groupByTime,
     nowHourMinute,
     nowRuleIndex,
 } from '../lib/stream-grouping';
+import type { MyDayResident } from '../lib/types';
 
 import { NowRule } from './now-rule';
 import { StreamItemRow } from './stream-item';
@@ -65,14 +65,20 @@ export function WhatsNextRail({
     // only has one entry) point at the lone resident; only fall back to the
     // org-wide care-plan list when an explicit `carePlanHref` is provided.
     const resolvedCarePlanHref =
-        carePlanHref
-        ?? (activeResident ? `/clients/${activeResident.id}?tab=care_plans` : null)
-        ?? (residents.length === 1 ? `/clients/${residents[0].id}?tab=care_plans` : null);
+        carePlanHref ??
+        (activeResident
+            ? `/clients/${activeResident.id}?tab=care_plans`
+            : null) ??
+        (residents.length === 1
+            ? `/clients/${residents[0].id}?tab=care_plans`
+            : null);
 
     return (
         <section data-test="my-day-whats-next">
             <div className="mb-3 flex flex-wrap items-baseline gap-3 px-1">
-                <h2 className="text-lg font-semibold tracking-tight">{t('whats_next')}</h2>
+                <h2 className="text-lg font-semibold tracking-tight">
+                    {t('whats_next')}
+                </h2>
                 <span className="text-xs text-muted-foreground">
                     {activeName
                         ? t('todays_care_for', { name: activeName })
@@ -98,7 +104,9 @@ export function WhatsNextRail({
                     const isNow = bucket.time === wallClock;
                     return (
                         <div key={bucket.time}>
-                            {insertNowAt === idx && !isNow ? <NowRule time={wallClock} /> : null}
+                            {insertNowAt === idx && !isNow ? (
+                                <NowRule time={wallClock} />
+                            ) : null}
                             <TimeBlock
                                 time={bucket.time}
                                 items={bucket.items}
@@ -115,7 +123,9 @@ export function WhatsNextRail({
                         </div>
                     );
                 })}
-                {insertNowAt === -1 && buckets.length > 0 ? <NowRule time={wallClock} /> : null}
+                {insertNowAt === -1 && buckets.length > 0 ? (
+                    <NowRule time={wallClock} />
+                ) : null}
             </div>
             <p className="mt-2 px-1 text-[11px] text-text-faint">
                 {t('right_click_tip')}
@@ -158,7 +168,7 @@ function TimeBlock({
         >
             <div
                 className={cn(
-                    'border-r border-border px-4 py-3.5 text-base font-semibold tabular-nums tracking-tight',
+                    'border-r border-border px-4 py-3.5 text-base font-semibold tracking-tight tabular-nums',
                     isNow ? 'text-primary' : 'text-muted-foreground',
                 )}
             >
@@ -171,7 +181,11 @@ function TimeBlock({
                         item={item}
                         isNow={isNow}
                         showResident={showResident}
-                        resident={item.clientId ? residentById.get(item.clientId) : undefined}
+                        resident={
+                            item.clientId
+                                ? residentById.get(item.clientId)
+                                : undefined
+                        }
                         onToggleTask={onToggleTask}
                         onGiveMed={onGiveMed}
                         onRefuseMed={onRefuseMed}

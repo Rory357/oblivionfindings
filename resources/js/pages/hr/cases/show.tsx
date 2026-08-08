@@ -2,8 +2,8 @@ import {
     CaseEventWizard,
     DisciplinaryCreateWizard,
     DisciplinaryEditWizard,
-    type CaseOption,
     type CaseIncidentOption,
+    type CaseOption,
     type CaseStaffOption,
     type DisciplinaryActionForm,
     type GoodFaithCheckOption,
@@ -333,7 +333,8 @@ export default function HrCaseShow({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref="/hr/cases"
                         title={
@@ -415,9 +416,7 @@ export default function HrCaseShow({
                             </div>
                             <Button
                                 size="sm"
-                                onClick={() =>
-                                    router.visit(offboardingCta.url)
-                                }
+                                onClick={() => router.visit(offboardingCta.url)}
                             >
                                 {offboardingCta.label}
                             </Button>

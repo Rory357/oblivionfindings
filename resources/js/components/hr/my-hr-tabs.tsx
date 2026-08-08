@@ -7,8 +7,8 @@ import {
     HeartHandshake,
     LayoutDashboard,
     Megaphone,
-    MessagesSquare,
     MessageSquare,
+    MessagesSquare,
     Receipt,
     ScrollText,
     Star,
@@ -64,7 +64,12 @@ const TAB_URLS: Record<MyHrTab, string> = {
  * the fully-designed surfaces; the rest follow in the same strip.
  */
 const ITEMS: Omit<HrTabItem, 'badge'>[] = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, tone: 'primary' },
+    {
+        id: 'overview',
+        label: 'Overview',
+        icon: LayoutDashboard,
+        tone: 'primary',
+    },
     { id: 'leave', label: 'Leave', icon: CalendarDays, tone: 'success' },
     { id: 'time', label: 'Time & Shifts', icon: Clock, tone: 'violet' },
     { id: 'one', label: '1:1s', icon: MessagesSquare, tone: 'info' },
@@ -74,7 +79,12 @@ const ITEMS: Omit<HrTabItem, 'badge'>[] = [
     { id: 'directory', label: 'Directory', icon: Users, tone: 'info' },
     { id: 'expenses', label: 'Expenses', icon: Receipt, tone: 'warning' },
     { id: 'payslips', label: 'Payslips', icon: Wallet, tone: 'success' },
-    { id: 'benefits', label: 'Benefits', icon: HeartHandshake, tone: 'success' },
+    {
+        id: 'benefits',
+        label: 'Benefits',
+        icon: HeartHandshake,
+        tone: 'success',
+    },
     { id: 'training', label: 'Training', icon: GraduationCap, tone: 'violet' },
     { id: 'policies', label: 'Policies', icon: ScrollText, tone: 'warning' },
     { id: 'reviews', label: 'Reviews', icon: Star, tone: 'info' },

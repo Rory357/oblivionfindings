@@ -4,7 +4,6 @@ import {
     HorizontalBarChart,
     MiniBarChart,
 } from '@/components/fleet-charts';
-import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +27,7 @@ import {
     HeroShell,
     HeroStatusPill,
 } from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { HeroActionButton } from '@/pages/fleet-assets/maintenance/components/hero-action-button';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -36,8 +36,8 @@ import {
     CalendarClock,
     Check,
     ChevronDown,
-    ChevronUp,
     ChevronsUpDown,
+    ChevronUp,
     Clock,
     Loader2,
     Plus,
@@ -85,8 +85,18 @@ type Props = {
 };
 
 const serviceScheduleSteps = [
-    { key: 'schedule', label: 'Asset & interval', blurb: 'Set the recurring service rule', icon: CalendarClock },
-    { key: 'review', label: 'Review', blurb: 'Confirm before creating', icon: Check },
+    {
+        key: 'schedule',
+        label: 'Asset & interval',
+        blurb: 'Set the recurring service rule',
+        icon: CalendarClock,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm before creating',
+        icon: Check,
+    },
 ] as const;
 
 function isDueSoon(dateStr: string | null): boolean {
@@ -147,7 +157,9 @@ function SchedulesHero({
             <div className="flex flex-wrap items-center gap-4">
                 <HeroMedallion icon={CalendarClock} />
                 <div className="min-w-0">
-                    <HeroStatusPill>Maintenance · service schedules</HeroStatusPill>
+                    <HeroStatusPill>
+                        Maintenance · service schedules
+                    </HeroStatusPill>
                     <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
                         Service Schedules
                     </h1>
@@ -295,8 +307,10 @@ export default function SchedulesIndex({
     };
     const canReviewSchedule = Boolean(
         form.data.name.trim() &&
-            form.data.asset_id &&
-            (form.data.interval_km || form.data.interval_days || form.data.next_due_at),
+        form.data.asset_id &&
+        (form.data.interval_km ||
+            form.data.interval_days ||
+            form.data.next_due_at),
     );
     const selectedScheduleAsset = (assets ?? []).find(
         (asset) => String(asset.id) === form.data.asset_id,
@@ -343,25 +357,44 @@ export default function SchedulesIndex({
             steps={serviceScheduleSteps}
             stepIndex={scheduleStepIndex}
             onStepClick={(index) => {
-                if (index === 0 || canReviewSchedule) setScheduleStepIndex(index);
+                if (index === 0 || canReviewSchedule)
+                    setScheduleStepIndex(index);
             }}
             footerStart={
-                <Button type="button" variant="outline" onClick={closeScheduleDialog}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={closeScheduleDialog}
+                >
                     Cancel
                 </Button>
             }
             footerEnd={
                 scheduleStepIndex === 0 ? (
-                    <Button type="button" disabled={!canReviewSchedule} onClick={() => setScheduleStepIndex(1)}>
+                    <Button
+                        type="button"
+                        disabled={!canReviewSchedule}
+                        onClick={() => setScheduleStepIndex(1)}
+                    >
                         Continue
                     </Button>
                 ) : (
                     <>
-                        <Button type="button" variant="outline" onClick={() => setScheduleStepIndex(0)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setScheduleStepIndex(0)}
+                        >
                             Back
                         </Button>
-                        <Button type="button" onClick={handleCreate} disabled={form.processing}>
-                            {form.processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        <Button
+                            type="button"
+                            onClick={handleCreate}
+                            disabled={form.processing}
+                        >
+                            {form.processing ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
                             Create schedule
                         </Button>
                     </>
@@ -371,95 +404,151 @@ export default function SchedulesIndex({
             {scheduleStepIndex === 0 ? (
                 <WizardStepPane>
                     <div className="grid gap-4">
-                    <div>
-                        <label htmlFor="service-schedule-name" className="text-sm font-medium">Name *</label>
-                        <Input
-                            id="service-schedule-name"
-                            value={form.data.name}
-                            onChange={(e) =>
-                                form.setData('name', e.target.value)
-                            }
-                            placeholder="e.g. Oil Change"
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="service-schedule-asset" className="text-sm font-medium">Asset *</label>
-                        <Select
-                            value={form.data.asset_id}
-                            onValueChange={(v) => form.setData('asset_id', v)}
-                        >
-                            <SelectTrigger id="service-schedule-asset">
-                                <SelectValue placeholder="Select asset" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {(assets ?? []).map((a) => (
-                                    <SelectItem key={a.id} value={String(a.id)}>
-                                        {a.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div>
-                        <label htmlFor="service-schedule-km" className="text-sm font-medium">
-                            Interval (km)
-                        </label>
-                        <Input
-                            id="service-schedule-km"
-                            type="number"
-                            value={form.data.interval_km}
-                            onChange={(e) =>
-                                form.setData('interval_km', e.target.value)
-                            }
-                            placeholder="e.g. 10000"
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="service-schedule-days" className="text-sm font-medium">
-                            Interval (days)
-                        </label>
-                        <Input
-                            id="service-schedule-days"
-                            type="number"
-                            value={form.data.interval_days}
-                            onChange={(e) =>
-                                form.setData('interval_days', e.target.value)
-                            }
-                            placeholder="e.g. 180"
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="service-schedule-due" className="text-sm font-medium">
-                            Next Due Date
-                        </label>
-                        <Input
-                            id="service-schedule-due"
-                            type="date"
-                            value={form.data.next_due_at}
-                            onChange={(e) =>
-                                form.setData('next_due_at', e.target.value)
-                            }
-                        />
-                    </div>
-                    {form.errors.name && (
-                        <p className="mt-1 text-xs text-destructive">
-                            {form.errors.name}
-                        </p>
-                    )}
-                    {form.errors.asset_id && (
-                        <p className="mt-1 text-xs text-destructive">
-                            {form.errors.asset_id}
-                        </p>
-                    )}
+                        <div>
+                            <label
+                                htmlFor="service-schedule-name"
+                                className="text-sm font-medium"
+                            >
+                                Name *
+                            </label>
+                            <Input
+                                id="service-schedule-name"
+                                value={form.data.name}
+                                onChange={(e) =>
+                                    form.setData('name', e.target.value)
+                                }
+                                placeholder="e.g. Oil Change"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                htmlFor="service-schedule-asset"
+                                className="text-sm font-medium"
+                            >
+                                Asset *
+                            </label>
+                            <Select
+                                value={form.data.asset_id}
+                                onValueChange={(v) =>
+                                    form.setData('asset_id', v)
+                                }
+                            >
+                                <SelectTrigger id="service-schedule-asset">
+                                    <SelectValue placeholder="Select asset" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(assets ?? []).map((a) => (
+                                        <SelectItem
+                                            key={a.id}
+                                            value={String(a.id)}
+                                        >
+                                            {a.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label
+                                htmlFor="service-schedule-km"
+                                className="text-sm font-medium"
+                            >
+                                Interval (km)
+                            </label>
+                            <Input
+                                id="service-schedule-km"
+                                type="number"
+                                value={form.data.interval_km}
+                                onChange={(e) =>
+                                    form.setData('interval_km', e.target.value)
+                                }
+                                placeholder="e.g. 10000"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                htmlFor="service-schedule-days"
+                                className="text-sm font-medium"
+                            >
+                                Interval (days)
+                            </label>
+                            <Input
+                                id="service-schedule-days"
+                                type="number"
+                                value={form.data.interval_days}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'interval_days',
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="e.g. 180"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                htmlFor="service-schedule-due"
+                                className="text-sm font-medium"
+                            >
+                                Next Due Date
+                            </label>
+                            <Input
+                                id="service-schedule-due"
+                                type="date"
+                                value={form.data.next_due_at}
+                                onChange={(e) =>
+                                    form.setData('next_due_at', e.target.value)
+                                }
+                            />
+                        </div>
+                        {form.errors.name && (
+                            <p className="mt-1 text-xs text-destructive">
+                                {form.errors.name}
+                            </p>
+                        )}
+                        {form.errors.asset_id && (
+                            <p className="mt-1 text-xs text-destructive">
+                                {form.errors.asset_id}
+                            </p>
+                        )}
                     </div>
                 </WizardStepPane>
             ) : (
                 <WizardStepPane>
                     <dl className="grid gap-4 rounded-xl border border-border bg-card/70 p-4 text-sm sm:grid-cols-2">
-                        <div><dt className="text-muted-foreground">Schedule</dt><dd className="font-medium">{form.data.name.trim()}</dd></div>
-                        <div><dt className="text-muted-foreground">Asset</dt><dd className="font-medium">{selectedScheduleAsset?.name ?? 'Selected asset'}</dd></div>
-                        <div><dt className="text-muted-foreground">Distance interval</dt><dd className="font-medium">{form.data.interval_km ? `${form.data.interval_km} km` : 'Not set'}</dd></div>
-                        <div><dt className="text-muted-foreground">Time interval</dt><dd className="font-medium">{form.data.interval_days ? `${form.data.interval_days} days` : 'Not set'}</dd></div>
+                        <div>
+                            <dt className="text-muted-foreground">Schedule</dt>
+                            <dd className="font-medium">
+                                {form.data.name.trim()}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground">Asset</dt>
+                            <dd className="font-medium">
+                                {selectedScheduleAsset?.name ??
+                                    'Selected asset'}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground">
+                                Distance interval
+                            </dt>
+                            <dd className="font-medium">
+                                {form.data.interval_km
+                                    ? `${form.data.interval_km} km`
+                                    : 'Not set'}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground">
+                                Time interval
+                            </dt>
+                            <dd className="font-medium">
+                                {form.data.interval_days
+                                    ? `${form.data.interval_days} days`
+                                    : 'Not set'}
+                            </dd>
+                        </div>
                     </dl>
                 </WizardStepPane>
             )}
@@ -489,9 +578,7 @@ export default function SchedulesIndex({
                         title="No service schedules"
                         description="Set up recurring maintenance reminders to keep your fleet in top condition."
                         actionLabel={can.manage ? 'Create Schedule' : undefined}
-                        onAction={
-                            can.manage ? openScheduleDialog : undefined
-                        }
+                        onAction={can.manage ? openScheduleDialog : undefined}
                     />
                     {createScheduleDialog}
                 </PageShell>
@@ -653,200 +740,215 @@ export default function SchedulesIndex({
                 {/* Schedule Table */}
                 <div className="overflow-hidden rounded-lg border">
                     <FleetResponsiveTable>
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
-                                {renderSortHeader('name', 'Schedule Name')}
-                                <th className="px-4 py-3 text-left font-medium">
-                                    Asset
-                                </th>
-                                <th className="px-4 py-3 text-left font-medium">
-                                    Interval
-                                </th>
-                                <th className="px-4 py-3 text-left font-medium">
-                                    Last Completed
-                                </th>
-                                {renderSortHeader('next_due_at', 'Next Due')}
-                                <th className="px-4 py-3 text-left font-medium">
-                                    Days Until
-                                </th>
-                                <th className="px-4 py-3 text-left font-medium">
-                                    Progress
-                                </th>
-                                <th className="px-4 py-3 text-right font-medium">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {allSchedules.map((schedule) => {
-                                const days = daysUntilDue(schedule.next_due_at);
-                                const progressPct = kmProgressPct(schedule);
-                                const dueSoon =
-                                    isDueSoon(schedule.next_due_at) &&
-                                    !schedule.is_overdue;
-                                return (
-                                    <tr
-                                        key={schedule.id}
-                                        className={`border-b transition-colors hover:bg-muted/30 ${
-                                            schedule.is_overdue
-                                                ? 'border-l-4 border-l-red-500 bg-status-critical-bg'
-                                                : dueSoon
-                                                  ? 'border-l-4 border-l-amber-500'
-                                                  : ''
-                                        }`}
-                                    >
-                                        <td data-fleet-row-identity className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <Clock className="h-4 w-4 text-muted-foreground" />
-                                                <span className="font-medium">
-                                                    {schedule.name}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {schedule.asset ? (
-                                                <Link
-                                                    href={`/fleet-assets/assets/${schedule.asset.id}`}
-                                                    className="text-primary hover:underline"
-                                                >
-                                                    {schedule.asset.name}
-                                                </Link>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    ---
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-muted-foreground">
-                                            {schedule.interval_km &&
-                                                `${formatDistance(schedule.interval_km)}`}
-                                            {schedule.interval_km &&
-                                                schedule.interval_days &&
-                                                ' / '}
-                                            {schedule.interval_days &&
-                                                `${schedule.interval_days} days`}
-                                            {!schedule.interval_km &&
-                                                !schedule.interval_days &&
-                                                '---'}
-                                        </td>
-                                        <td className="px-4 py-3 text-muted-foreground">
-                                            {schedule.last_completed_at
-                                                ? formatDate(
-                                                      schedule.last_completed_at,
-                                                  )
-                                                : '---'}
-                                        </td>
-                                        <td data-fleet-row-status data-fleet-row-time className="px-4 py-3">
-                                            {schedule.next_due_at ? (
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
+                                    {renderSortHeader('name', 'Schedule Name')}
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Asset
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Interval
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Last Completed
+                                    </th>
+                                    {renderSortHeader(
+                                        'next_due_at',
+                                        'Next Due',
+                                    )}
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Days Until
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Progress
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {allSchedules.map((schedule) => {
+                                    const days = daysUntilDue(
+                                        schedule.next_due_at,
+                                    );
+                                    const progressPct = kmProgressPct(schedule);
+                                    const dueSoon =
+                                        isDueSoon(schedule.next_due_at) &&
+                                        !schedule.is_overdue;
+                                    return (
+                                        <tr
+                                            key={schedule.id}
+                                            className={`border-b transition-colors hover:bg-muted/30 ${
+                                                schedule.is_overdue
+                                                    ? 'border-l-4 border-l-red-500 bg-status-critical-bg'
+                                                    : dueSoon
+                                                      ? 'border-l-4 border-l-amber-500'
+                                                      : ''
+                                            }`}
+                                        >
+                                            <td
+                                                data-fleet-row-identity
+                                                className="px-4 py-3"
+                                            >
                                                 <div className="flex items-center gap-2">
-                                                    <span>
-                                                        {formatDate(
-                                                            schedule.next_due_at,
+                                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                                    <span className="font-medium">
+                                                        {schedule.name}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {schedule.asset ? (
+                                                    <Link
+                                                        href={`/fleet-assets/assets/${schedule.asset.id}`}
+                                                        className="text-primary hover:underline"
+                                                    >
+                                                        {schedule.asset.name}
+                                                    </Link>
+                                                ) : (
+                                                    <span className="text-muted-foreground">
+                                                        ---
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {schedule.interval_km &&
+                                                    `${formatDistance(schedule.interval_km)}`}
+                                                {schedule.interval_km &&
+                                                    schedule.interval_days &&
+                                                    ' / '}
+                                                {schedule.interval_days &&
+                                                    `${schedule.interval_days} days`}
+                                                {!schedule.interval_km &&
+                                                    !schedule.interval_days &&
+                                                    '---'}
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {schedule.last_completed_at
+                                                    ? formatDate(
+                                                          schedule.last_completed_at,
+                                                      )
+                                                    : '---'}
+                                            </td>
+                                            <td
+                                                data-fleet-row-status
+                                                data-fleet-row-time
+                                                className="px-4 py-3"
+                                            >
+                                                {schedule.next_due_at ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <span>
+                                                            {formatDate(
+                                                                schedule.next_due_at,
+                                                            )}
+                                                        </span>
+                                                        {schedule.is_overdue && (
+                                                            <Badge
+                                                                variant="destructive"
+                                                                className="text-[10px] font-bold"
+                                                            >
+                                                                <AlertTriangle className="mr-1 h-3 w-3" />
+                                                                Overdue
+                                                            </Badge>
+                                                        )}
+                                                        {dueSoon && (
+                                                            <Badge
+                                                                variant="default"
+                                                                className="text-[10px]"
+                                                            >
+                                                                Due soon
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-muted-foreground">
+                                                        ---
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {days !== null ? (
+                                                    <span
+                                                        className={`text-xs font-medium ${
+                                                            schedule.is_overdue
+                                                                ? 'text-status-critical dark:text-status-critical'
+                                                                : dueSoon
+                                                                  ? 'text-status-warning dark:text-status-warning'
+                                                                  : 'text-muted-foreground'
+                                                        }`}
+                                                    >
+                                                        {daysUntilLabel(
+                                                            days,
+                                                            schedule.is_overdue,
                                                         )}
                                                     </span>
-                                                    {schedule.is_overdue && (
-                                                        <Badge
-                                                            variant="destructive"
-                                                            className="text-[10px] font-bold"
-                                                        >
-                                                            <AlertTriangle className="mr-1 h-3 w-3" />
-                                                            Overdue
-                                                        </Badge>
-                                                    )}
-                                                    {dueSoon && (
-                                                        <Badge
-                                                            variant="default"
-                                                            className="text-[10px]"
-                                                        >
-                                                            Due soon
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    ---
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {days !== null ? (
-                                                <span
-                                                    className={`text-xs font-medium ${
-                                                        schedule.is_overdue
-                                                            ? 'text-status-critical dark:text-status-critical'
-                                                            : dueSoon
-                                                              ? 'text-status-warning dark:text-status-warning'
-                                                              : 'text-muted-foreground'
-                                                    }`}
-                                                >
-                                                    {daysUntilLabel(
-                                                        days,
-                                                        schedule.is_overdue,
-                                                    )}
-                                                </span>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    ---
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {progressPct !== null ? (
-                                                <div className="flex items-center gap-1.5">
-                                                    <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
-                                                        <div
-                                                            className="h-full rounded-full bg-primary"
-                                                            style={{
-                                                                width: `${progressPct}%`,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-[10px] text-muted-foreground tabular-nums">
-                                                        {progressPct}%
+                                                ) : (
+                                                    <span className="text-muted-foreground">
+                                                        ---
                                                     </span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground">
-                                                    ---
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td data-fleet-row-action className="px-4 py-3 text-right">
-                                            {can.manage ? (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-7 gap-1 text-xs"
-                                                    disabled={
-                                                        markingId ===
-                                                        schedule.id
-                                                    }
-                                                    onClick={() =>
-                                                        handleMarkComplete(
-                                                            schedule.id,
-                                                        )
-                                                    }
-                                                >
-                                                    {markingId ===
-                                                    schedule.id ? (
-                                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                                    ) : (
-                                                        <Check className="h-3 w-3" />
-                                                    )}
-                                                    Mark Complete
-                                                </Button>
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground">
-                                                    View only
-                                                </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {progressPct !== null ? (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
+                                                            <div
+                                                                className="h-full rounded-full bg-primary"
+                                                                style={{
+                                                                    width: `${progressPct}%`,
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                                                            {progressPct}%
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        ---
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td
+                                                data-fleet-row-action
+                                                className="px-4 py-3 text-right"
+                                            >
+                                                {can.manage ? (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 gap-1 text-xs"
+                                                        disabled={
+                                                            markingId ===
+                                                            schedule.id
+                                                        }
+                                                        onClick={() =>
+                                                            handleMarkComplete(
+                                                                schedule.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        {markingId ===
+                                                        schedule.id ? (
+                                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                                        ) : (
+                                                            <Check className="h-3 w-3" />
+                                                        )}
+                                                        Mark Complete
+                                                    </Button>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        View only
+                                                    </span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </FleetResponsiveTable>
                 </div>
 

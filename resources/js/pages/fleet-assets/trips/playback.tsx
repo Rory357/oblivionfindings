@@ -1,7 +1,6 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import LeafletMap from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
-import { CompactHeroStat, FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +14,10 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
+import {
+    CompactHeroStat,
+    FleetCompactHero,
+} from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, router } from '@inertiajs/react';
 import { CheckCircle, Clock, MapPin, Trash2, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -50,7 +53,11 @@ interface Props {
     can: { manage: boolean };
 }
 
-export default function FleetTripPlayback({ trip, driver_sessions, can }: Props) {
+export default function FleetTripPlayback({
+    trip,
+    driver_sessions,
+    can,
+}: Props) {
     const [points, setPoints] = useState<{ lat: number; lng: number }[]>([]);
     const [selectedDriver, setSelectedDriver] = useState(
         trip.driver_session_id?.toString() || '',
@@ -65,7 +72,10 @@ export default function FleetTripPlayback({ trip, driver_sessions, can }: Props)
             .then((data) => {
                 const rows = (data.points ?? [])
                     .filter((p: any) => p.lat && p.lng)
-                    .map((p: any) => ({ lat: Number(p.lat), lng: Number(p.lng) }));
+                    .map((p: any) => ({
+                        lat: Number(p.lat),
+                        lng: Number(p.lng),
+                    }));
                 setPoints(rows);
             })
             .catch(() => setPoints([]));
@@ -75,15 +85,22 @@ export default function FleetTripPlayback({ trip, driver_sessions, can }: Props)
         points.length > 0
             ? { lat: points[0].lat, lng: points[0].lng }
             : trip.start_latitude && trip.start_longitude
-              ? { lat: Number(trip.start_latitude), lng: Number(trip.start_longitude) }
+              ? {
+                    lat: Number(trip.start_latitude),
+                    lng: Number(trip.start_longitude),
+                }
               : { lat: -36.8485, lng: 174.7633 };
 
     const handleClose = () => {
         setProcessing(true);
-        router.post(`/fleet/trips/${trip.id}/close`, {}, {
-            preserveScroll: true,
-            onFinish: () => setProcessing(false),
-        });
+        router.post(
+            `/fleet/trips/${trip.id}/close`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setProcessing(false),
+            },
+        );
     };
 
     const handleDelete = () => {
@@ -130,7 +147,10 @@ export default function FleetTripPlayback({ trip, driver_sessions, can }: Props)
                                 {trip.status}
                             </Badge>
                             {trip.consent_blocked && (
-                                <Badge variant="outline" className="border-status-warning/30 text-status-warning">
+                                <Badge
+                                    variant="outline"
+                                    className="border-status-warning/30 text-status-warning"
+                                >
                                     Consent Blocked
                                 </Badge>
                             )}
@@ -140,11 +160,23 @@ export default function FleetTripPlayback({ trip, driver_sessions, can }: Props)
                         <>
                             <CompactHeroStat
                                 label="Distance"
-                                value={trip.distance_km ? `${trip.distance_km} km` : '-'}
+                                value={
+                                    trip.distance_km
+                                        ? `${trip.distance_km} km`
+                                        : '-'
+                                }
                                 tone="neutral"
                             />
-                            <CompactHeroStat label="Duration" value={formatDuration(trip.duration_s)} tone="neutral" />
-                            <CompactHeroStat label="Route points" value={String(points.length)} tone="neutral" />
+                            <CompactHeroStat
+                                label="Duration"
+                                value={formatDuration(trip.duration_s)}
+                                tone="neutral"
+                            />
+                            <CompactHeroStat
+                                label="Route points"
+                                value={String(points.length)}
+                                tone="neutral"
+                            />
                         </>
                     }
                     actions={
@@ -200,7 +232,9 @@ export default function FleetTripPlayback({ trip, driver_sessions, can }: Props)
                                         </Label>
                                         <p className="flex items-center gap-2 font-medium">
                                             <MapPin className="h-4 w-4" />
-                                            {trip.distance_km ? `${trip.distance_km} km` : '-'}
+                                            {trip.distance_km
+                                                ? `${trip.distance_km} km`
+                                                : '-'}
                                         </p>
                                     </div>
                                     <div>
@@ -244,17 +278,23 @@ export default function FleetTripPlayback({ trip, driver_sessions, can }: Props)
                                     </div>
                                 )}
 
-                                {trip.start_latitude && trip.start_longitude && (
-                                    <div>
-                                        <Label className="text-xs text-muted-foreground">
-                                            Start Location
-                                        </Label>
-                                        <p className="text-sm text-muted-foreground">
-                                            {Number(trip.start_latitude).toFixed(5)},{' '}
-                                            {Number(trip.start_longitude).toFixed(5)}
-                                        </p>
-                                    </div>
-                                )}
+                                {trip.start_latitude &&
+                                    trip.start_longitude && (
+                                        <div>
+                                            <Label className="text-xs text-muted-foreground">
+                                                Start Location
+                                            </Label>
+                                            <p className="text-sm text-muted-foreground">
+                                                {Number(
+                                                    trip.start_latitude,
+                                                ).toFixed(5)}
+                                                ,{' '}
+                                                {Number(
+                                                    trip.start_longitude,
+                                                ).toFixed(5)}
+                                            </p>
+                                        </div>
+                                    )}
 
                                 {trip.end_latitude && trip.end_longitude && (
                                     <div>
@@ -262,8 +302,13 @@ export default function FleetTripPlayback({ trip, driver_sessions, can }: Props)
                                             End Location
                                         </Label>
                                         <p className="text-sm text-muted-foreground">
-                                            {Number(trip.end_latitude).toFixed(5)},{' '}
-                                            {Number(trip.end_longitude).toFixed(5)}
+                                            {Number(trip.end_latitude).toFixed(
+                                                5,
+                                            )}
+                                            ,{' '}
+                                            {Number(trip.end_longitude).toFixed(
+                                                5,
+                                            )}
                                         </p>
                                     </div>
                                 )}
@@ -272,7 +317,9 @@ export default function FleetTripPlayback({ trip, driver_sessions, can }: Props)
                                     <Label className="text-xs text-muted-foreground">
                                         Route Points
                                     </Label>
-                                    <p className="font-medium">{points.length} points</p>
+                                    <p className="font-medium">
+                                        {points.length} points
+                                    </p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -297,8 +344,11 @@ export default function FleetTripPlayback({ trip, driver_sessions, can }: Props)
                                                     key={ds.id}
                                                     value={ds.id.toString()}
                                                 >
-                                                    {ds.user?.name || 'Unknown'} -{' '}
-                                                    {formatDateTime(ds.started_at)}
+                                                    {ds.user?.name || 'Unknown'}{' '}
+                                                    -{' '}
+                                                    {formatDateTime(
+                                                        ds.started_at,
+                                                    )}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

@@ -30,24 +30,101 @@ export type InjuryTypeOption = {
 
 /** The 15 canonical injury_type values (matches ReturnToWorkController). */
 export const INJURY_TYPES: InjuryTypeOption[] = [
-    { key: 'strain', label: 'Muscle strain', description: 'Soft-tissue / muscle', icon: Activity },
-    { key: 'laceration', label: 'Laceration', description: 'Cut or open wound', icon: Slice },
-    { key: 'fracture', label: 'Fracture', description: 'Broken bone', icon: Bone },
-    { key: 'burn', label: 'Burn', description: 'Heat / friction / chemical', icon: Flame },
-    { key: 'contusion', label: 'Contusion / bruise', description: 'Bruise or crush', icon: CircleDot },
-    { key: 'concussion', label: 'Concussion', description: 'Head injury', icon: Brain },
-    { key: 'repetitive_strain', label: 'Repetitive strain', description: 'Overuse / RSI', icon: RefreshCw },
-    { key: 'chemical_exposure', label: 'Chemical exposure', description: 'Substance contact', icon: FlaskConical },
-    { key: 'biological_exposure', label: 'Biological exposure', description: 'Bodily fluids', icon: Biohazard },
-    { key: 'needle_stick', label: 'Needle-stick', description: 'Sharps injury', icon: Syringe },
-    { key: 'slip_trip_fall', label: 'Slip / trip / fall', description: 'Loss of footing', icon: PersonStanding },
-    { key: 'manual_handling', label: 'Manual handling', description: 'Lifting / moving', icon: Package },
-    { key: 'psychological', label: 'Psychological', description: 'Stress / trauma', icon: BrainCircuit },
-    { key: 'illness', label: 'Work illness', description: 'Work-related', icon: Thermometer },
-    { key: 'other', label: 'Other', description: 'Not listed', icon: HelpCircle },
+    {
+        key: 'strain',
+        label: 'Muscle strain',
+        description: 'Soft-tissue / muscle',
+        icon: Activity,
+    },
+    {
+        key: 'laceration',
+        label: 'Laceration',
+        description: 'Cut or open wound',
+        icon: Slice,
+    },
+    {
+        key: 'fracture',
+        label: 'Fracture',
+        description: 'Broken bone',
+        icon: Bone,
+    },
+    {
+        key: 'burn',
+        label: 'Burn',
+        description: 'Heat / friction / chemical',
+        icon: Flame,
+    },
+    {
+        key: 'contusion',
+        label: 'Contusion / bruise',
+        description: 'Bruise or crush',
+        icon: CircleDot,
+    },
+    {
+        key: 'concussion',
+        label: 'Concussion',
+        description: 'Head injury',
+        icon: Brain,
+    },
+    {
+        key: 'repetitive_strain',
+        label: 'Repetitive strain',
+        description: 'Overuse / RSI',
+        icon: RefreshCw,
+    },
+    {
+        key: 'chemical_exposure',
+        label: 'Chemical exposure',
+        description: 'Substance contact',
+        icon: FlaskConical,
+    },
+    {
+        key: 'biological_exposure',
+        label: 'Biological exposure',
+        description: 'Bodily fluids',
+        icon: Biohazard,
+    },
+    {
+        key: 'needle_stick',
+        label: 'Needle-stick',
+        description: 'Sharps injury',
+        icon: Syringe,
+    },
+    {
+        key: 'slip_trip_fall',
+        label: 'Slip / trip / fall',
+        description: 'Loss of footing',
+        icon: PersonStanding,
+    },
+    {
+        key: 'manual_handling',
+        label: 'Manual handling',
+        description: 'Lifting / moving',
+        icon: Package,
+    },
+    {
+        key: 'psychological',
+        label: 'Psychological',
+        description: 'Stress / trauma',
+        icon: BrainCircuit,
+    },
+    {
+        key: 'illness',
+        label: 'Work illness',
+        description: 'Work-related',
+        icon: Thermometer,
+    },
+    {
+        key: 'other',
+        label: 'Other',
+        description: 'Not listed',
+        icon: HelpCircle,
+    },
 ];
 
-const TYPE_BY_KEY: Record<string, InjuryTypeOption> = Object.fromEntries(INJURY_TYPES.map((t) => [t.key, t]));
+const TYPE_BY_KEY: Record<string, InjuryTypeOption> = Object.fromEntries(
+    INJURY_TYPES.map((t) => [t.key, t]),
+);
 
 export function injuryTypeLabel(key: string | null | undefined): string {
     if (!key) return '—';
@@ -72,7 +149,10 @@ export const TREATMENT_OPTIONS: { value: string; label: string }[] = [
 
 export function treatmentLabel(value: string | null | undefined): string {
     if (!value) return '—';
-    return TREATMENT_OPTIONS.find((t) => t.value === value)?.label ?? value.replace(/_/g, ' ');
+    return (
+        TREATMENT_OPTIONS.find((t) => t.value === value)?.label ??
+        value.replace(/_/g, ' ')
+    );
 }
 
 /** severity → tone (uses register-row-kit TONE_BG/TONE_DOT keys). */
@@ -96,16 +176,45 @@ export function severityLabel(value: string | null | undefined): string {
 }
 
 /** Canonical lifecycle order. */
-export const STATUS_ORDER = ['reported', 'under_treatment', 'return_to_work', 'recovered', 'closed'] as const;
+export const STATUS_ORDER = [
+    'reported',
+    'under_treatment',
+    'return_to_work',
+    'recovered',
+    'closed',
+] as const;
 export type InjuryStatus = (typeof STATUS_ORDER)[number];
 
 /** status → label + chip/dot classes (info aliases primary; return_to_work uses the teal --live). */
-export const STATUS_META: Record<string, { label: string; chip: string; dot: string }> = {
-    reported: { label: 'Reported', chip: 'bg-status-warning-bg text-status-warning', dot: 'bg-status-warning' },
-    under_treatment: { label: 'Under treatment', chip: 'bg-status-info-bg text-status-info', dot: 'bg-status-info' },
-    return_to_work: { label: 'Return to work', chip: 'bg-live-bg text-live', dot: 'bg-live' },
-    recovered: { label: 'Recovered', chip: 'bg-status-success-bg text-status-success', dot: 'bg-status-success' },
-    closed: { label: 'Closed', chip: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground' },
+export const STATUS_META: Record<
+    string,
+    { label: string; chip: string; dot: string }
+> = {
+    reported: {
+        label: 'Reported',
+        chip: 'bg-status-warning-bg text-status-warning',
+        dot: 'bg-status-warning',
+    },
+    under_treatment: {
+        label: 'Under treatment',
+        chip: 'bg-status-info-bg text-status-info',
+        dot: 'bg-status-info',
+    },
+    return_to_work: {
+        label: 'Return to work',
+        chip: 'bg-live-bg text-live',
+        dot: 'bg-live',
+    },
+    recovered: {
+        label: 'Recovered',
+        chip: 'bg-status-success-bg text-status-success',
+        dot: 'bg-status-success',
+    },
+    closed: {
+        label: 'Closed',
+        chip: 'bg-muted text-muted-foreground',
+        dot: 'bg-muted-foreground',
+    },
 };
 
 export function statusLabel(value: string | null | undefined): string {
@@ -113,10 +222,18 @@ export function statusLabel(value: string | null | undefined): string {
     return STATUS_META[value]?.label ?? value.replace(/_/g, ' ');
 }
 
-export function injuryReference(injury: { id: number; reference?: string | null; reference_number?: string | null }): string {
+export function injuryReference(injury: {
+    id: number;
+    reference?: string | null;
+    reference_number?: string | null;
+}): string {
     // Stored ticket number (INJ-YYYY-NNNN) since 2026-07; WI-<id> only for
     // rows that predate the backfill. The RTW payloads send it as `reference`.
-    return injury.reference ?? injury.reference_number ?? `WI-${String(injury.id).padStart(4, '0')}`;
+    return (
+        injury.reference ??
+        injury.reference_number ??
+        `WI-${String(injury.id).padStart(4, '0')}`
+    );
 }
 
 /** ACC claim kinds for the premium document upload. */

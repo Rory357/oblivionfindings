@@ -344,10 +344,15 @@ test('affected services Sites devices alerts incidents and problems use canonica
         ->assertJsonPath('linked_context.changes.0.href', "/it/changes/{$change->id}");
 
     $incident->update(['requester_user_id' => $this->requester->id]);
+    $change->ticket()->update(['requester_user_id' => $this->requester->id]);
     $this->actingAs($this->requester)
         ->getJson("/it/tickets/{$incident->id}")
         ->assertOk()
-        ->assertJsonCount(0, 'linked_context.changes');
+        ->assertJsonPath('linked_context.changes.0.reference', $change->ticket->reference)
+        ->assertJsonPath('linked_context.changes.0.href', null)
+        ->assertJsonPath('linked_context.changes.0.workspace_access.state', 'restricted')
+        ->assertJsonPath('linked_context.changes.0.workspace_access.message', 'IT workspace access is required to open this record.')
+        ->assertJsonPath('linked_context.changes.0.ticket_href', "/it/tickets/{$change->ticket_id}");
 
     $this->actingAs($this->agent)
         ->get("/it/changes/{$change->id}")

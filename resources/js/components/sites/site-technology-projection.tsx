@@ -18,6 +18,7 @@ import {
     ExternalLink,
     Network,
     RadioTower,
+    ShieldAlert,
     TicketCheck,
     Wrench,
 } from 'lucide-react';
@@ -31,8 +32,8 @@ type DeviceItem = {
     health_status: string;
     provider: string | null;
     last_seen_at: string | null;
-    monitor_count: number;
-    monitoring_state: string;
+    monitor_count: number | null;
+    monitoring_state: string | null;
     href: string;
 };
 
@@ -50,20 +51,20 @@ export type SiteTechnologyProjection = {
         devices: number;
         attention_devices: number;
         offline_devices: number;
-        monitored_devices: number;
-        unmonitored_devices: number;
+        monitored_devices: number | null;
+        unmonitored_devices: number | null;
         coverage_percent: number | null;
-        failed_monitors: number;
-        active_findings: number;
+        failed_monitors: number | null;
+        active_findings: number | null;
         active_control_room_alerts: number | null;
         open_it_work: number | null;
-        overdue_maintenance: number;
+        overdue_maintenance: number | null;
         collector: {
             state: string;
             label: string;
             count: number;
             last_seen_at: string | null;
-        };
+        } | null;
         last_change_at: string | null;
     };
     wan: {
@@ -93,10 +94,10 @@ export type SiteTechnologyProjection = {
     };
     monitoring: {
         total_devices: number;
-        monitored_devices: number;
-        unmonitored_devices: number;
-        failed_monitors: number;
-        uncertain_monitors: number;
+        monitored_devices: number | null;
+        unmonitored_devices: number | null;
+        failed_monitors: number | null;
+        uncertain_monitors: number | null;
         issues: Array<{
             id: number;
             device_id: number;
@@ -145,12 +146,14 @@ export type SiteTechnologyProjection = {
     links: {
         full: string;
         devices: string;
-        monitoring: string;
-        maintenance: string;
+        monitoring: string | null;
+        maintenance: string | null;
     };
     can: {
         view_control_room: boolean;
         view_it_work: boolean;
+        view_monitoring: boolean;
+        view_maintenance: boolean;
         view_room_placement: boolean;
     };
 };
@@ -189,14 +192,18 @@ function DeviceRow({ device }: { device: DeviceItem }) {
                     {[
                         device.category,
                         device.provider,
-                        `${device.monitor_count} monitors`,
+                        device.monitor_count !== null
+                            ? `${device.monitor_count} monitors`
+                            : null,
                     ]
                         .filter(Boolean)
                         .join(' · ')}
                 </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-                <OperationalStateBadge state={device.monitoring_state} />
+                {device.monitoring_state ? (
+                    <OperationalStateBadge state={device.monitoring_state} />
+                ) : null}
                 <ArrowRight
                     className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
                     aria-hidden
@@ -270,7 +277,7 @@ export function SiteTechnologyProjectionPanel({
                 />
                 <Stat
                     label="Active findings"
-                    value={summary.active_findings}
+                    value={summary.active_findings ?? 'Restricted'}
                     icon={BellRing}
                 />
                 <Stat
@@ -322,39 +329,57 @@ export function SiteTechnologyProjectionPanel({
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <CoverageIndicator
-                                percent={summary.coverage_percent}
-                                monitored={summary.monitored_devices}
-                                total={summary.devices}
-                            />
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                <div className="rounded-lg bg-muted/40 p-3">
-                                    <p className="text-xs text-muted-foreground">
-                                        Failed monitors
-                                    </p>
-                                    <p className="mt-1 font-semibold">
-                                        {summary.failed_monitors}
-                                    </p>
+                            {data.can.view_monitoring &&
+                            data.links.monitoring ? (
+                                <>
+                                    <CoverageIndicator
+                                        percent={summary.coverage_percent}
+                                        monitored={
+                                            summary.monitored_devices ?? 0
+                                        }
+                                        total={summary.devices}
+                                    />
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                        <div className="rounded-lg bg-muted/40 p-3">
+                                            <p className="text-xs text-muted-foreground">
+                                                Failed monitors
+                                            </p>
+                                            <p className="mt-1 font-semibold">
+                                                {summary.failed_monitors}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-lg bg-muted/40 p-3">
+                                            <p className="text-xs text-muted-foreground">
+                                                Not monitored
+                                            </p>
+                                            <p className="mt-1 font-semibold">
+                                                {summary.unmonitored_devices}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full"
+                                    >
+                                        <Link href={data.links.monitoring}>
+                                            Open monitoring
+                                        </Link>
+                                    </Button>
+                                </>
+                            ) : (
+                                <div className="flex items-start gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                                    <ShieldAlert
+                                        className="mt-0.5 h-4 w-4 shrink-0"
+                                        aria-hidden
+                                    />
+                                    <span>
+                                        Monitoring access is required to view
+                                        coverage, findings, and monitor status.
+                                    </span>
                                 </div>
-                                <div className="rounded-lg bg-muted/40 p-3">
-                                    <p className="text-xs text-muted-foreground">
-                                        Not monitored
-                                    </p>
-                                    <p className="mt-1 font-semibold">
-                                        {summary.unmonitored_devices}
-                                    </p>
-                                </div>
-                            </div>
-                            <Button
-                                asChild
-                                variant="outline"
-                                size="sm"
-                                className="w-full"
-                            >
-                                <Link href={data.links.monitoring}>
-                                    Open monitoring
-                                </Link>
-                            </Button>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -396,18 +421,40 @@ export function SiteTechnologyProjectionPanel({
                                 />
                             </div>
                             <div className="flex items-start justify-between gap-3 border-t pt-3">
-                                <div>
-                                    <p className="font-medium">Collector</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {summary.collector.label}
-                                        {summary.collector.last_seen_at
-                                            ? ` · ${formatDateTime(summary.collector.last_seen_at)}`
-                                            : ''}
-                                    </p>
-                                </div>
-                                <OperationalStateBadge
-                                    state={summary.collector.state}
-                                />
+                                {data.can.view_monitoring &&
+                                summary.collector ? (
+                                    <>
+                                        <div>
+                                            <p className="font-medium">
+                                                Collector
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {summary.collector.label}
+                                                {summary.collector.last_seen_at
+                                                    ? ` · ${formatDateTime(summary.collector.last_seen_at)}`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                        <OperationalStateBadge
+                                            state={summary.collector.state}
+                                        />
+                                    </>
+                                ) : (
+                                    <div className="flex items-start gap-2 text-muted-foreground">
+                                        <ShieldAlert
+                                            className="mt-0.5 h-4 w-4 shrink-0"
+                                            aria-hidden
+                                        />
+                                        <div>
+                                            <p className="font-medium">
+                                                Collector restricted
+                                            </p>
+                                            <p className="text-xs">
+                                                Monitoring access is required.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div className="flex items-start justify-between gap-3 border-t pt-3">
                                 <div>
@@ -529,12 +576,27 @@ export function SiteTechnologyProjectionPanel({
                             <Wrench className="h-4 w-4" aria-hidden />
                             Maintenance
                         </CardTitle>
-                        <Button asChild variant="ghost" size="sm">
-                            <Link href={data.links.maintenance}>View all</Link>
-                        </Button>
+                        {data.can.view_maintenance && data.links.maintenance ? (
+                            <Button asChild variant="ghost" size="sm">
+                                <Link href={data.links.maintenance}>
+                                    View all
+                                </Link>
+                            </Button>
+                        ) : null}
                     </CardHeader>
                     <CardContent className="space-y-2">
-                        {data.maintenance.length === 0 ? (
+                        {!data.can.view_maintenance ? (
+                            <div className="flex items-start gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                                <ShieldAlert
+                                    className="mt-0.5 h-4 w-4 shrink-0"
+                                    aria-hidden
+                                />
+                                <span>
+                                    Maintenance access is required to view this
+                                    queue.
+                                </span>
+                            </div>
+                        ) : data.maintenance.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
                                 No open Device maintenance for this Site.
                             </p>

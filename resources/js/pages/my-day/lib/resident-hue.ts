@@ -20,7 +20,10 @@ export function residentHue(clientId: number | string): number {
 /**
  * Compose a resident's initials from first/last name.
  */
-export function residentInitials(firstName: string, lastName?: string | null): string {
+export function residentInitials(
+    firstName: string,
+    lastName?: string | null,
+): string {
     const a = firstName?.charAt(0) ?? '';
     const b = lastName?.charAt(0) ?? '';
     return `${a}${b}`.toUpperCase();

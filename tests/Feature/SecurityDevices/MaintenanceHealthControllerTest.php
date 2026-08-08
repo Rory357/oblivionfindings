@@ -286,6 +286,24 @@ class MaintenanceHealthControllerTest extends TestCase
             ->assertSessionHasErrors(['type']);
     }
 
+    public function test_non_completed_records_cannot_claim_completion_evidence(): void
+    {
+        $device = Device::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/devices/{$device->id}/maintenance", [
+                'type' => 'inspection',
+                'status' => 'scheduled',
+                'description' => 'Contradictory completion evidence',
+                'completed_at' => now()->subHour()->toIso8601String(),
+            ])
+            ->assertSessionHasErrors('completed_at');
+
+        $this->assertDatabaseMissing('device_maintenance_records', [
+            'description' => 'Contradictory completion evidence',
+        ]);
+    }
+
     public function test_maintenance_mutations_allow_authorized_unassigned_stock(): void
     {
 
@@ -383,6 +401,57 @@ class MaintenanceHealthControllerTest extends TestCase
         $this->assertEquals('completed', $record->status);
         $this->assertNotNull($record->completed_at);
         $this->assertEquals($this->admin->id, $record->performed_by_user_id);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'security_devices.maintenance.completed',
+            'auditable_id' => $record->id,
+        ]);
+    }
+
+    public function test_completed_and_cancelled_maintenance_history_is_terminal_and_immutable(): void
+    {
+        $device = Device::factory()->create();
+        $completed = DeviceMaintenanceRecord::create([
+            'device_id' => $device->id,
+            'type' => 'inspection',
+            'status' => 'completed',
+            'description' => 'Completed evidence',
+            'completed_at' => now()->subHour(),
+            'performed_by_user_id' => $this->admin->id,
+        ]);
+        $completedAt = $completed->completed_at;
+        $cancelled = DeviceMaintenanceRecord::create([
+            'device_id' => $device->id,
+            'type' => 'repair',
+            'status' => 'cancelled',
+            'description' => 'Cancelled evidence',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->put("/security-devices/maintenance/{$completed->id}", [
+                'status' => 'scheduled',
+                'description' => 'Rewritten evidence',
+            ])
+            ->assertSessionHasErrors('status');
+        $this->actingAs($this->admin)
+            ->post("/security-devices/maintenance/{$completed->id}/complete")
+            ->assertSessionHasErrors('status');
+        $this->actingAs($this->admin)
+            ->put("/security-devices/maintenance/{$cancelled->id}", [
+                'status' => 'in_progress',
+            ])
+            ->assertSessionHasErrors('status');
+
+        $this->assertSame('Completed evidence', $completed->fresh()->description);
+        $this->assertTrue($completedAt->equalTo($completed->fresh()->completed_at));
+        $this->assertSame('cancelled', $cancelled->fresh()->status);
+
+        $mutationBlocked = false;
+        try {
+            $completed->refresh()->update(['notes' => 'Direct rewrite']);
+        } catch (\UnexpectedValueException $exception) {
+            $mutationBlocked = str_contains($exception->getMessage(), 'immutable');
+        }
+        $this->assertTrue($mutationBlocked);
     }
 
     public function test_complete_requires_manage_permission(): void

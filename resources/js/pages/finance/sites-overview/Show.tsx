@@ -1,6 +1,7 @@
 import { chartColor } from '@/components/finance/chart-palette';
 import { formatMoney } from '@/components/finance/money';
 import { OverviewTabsFooter } from '@/components/finance/overview-hub';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -25,7 +26,6 @@ import {
     CalendarDays,
     ExternalLink,
 } from 'lucide-react';
-import { PageHero, PageLayout } from '@/components/page';
 import { useMemo, useState } from 'react';
 import {
     Bar,
@@ -97,7 +97,9 @@ const numericSortValue = (row: SiteRow, key: SortKey) => {
     return 0;
 };
 
-const budgetVariant = (status: string): 'critical' | 'warning' | 'success' | 'neutral' => {
+const budgetVariant = (
+    status: string,
+): 'critical' | 'warning' | 'success' | 'neutral' => {
     switch (status) {
         case 'over_budget':
             return 'critical';
@@ -111,7 +113,12 @@ const budgetVariant = (status: string): 'critical' | 'warning' | 'success' | 'ne
 };
 
 const statusBadge = (status: string) => (
-    <StatusBadge variant={budgetVariant(status)} size="sm" label={status === 'on_track' ? 'On Track' : undefined} status={status} />
+    <StatusBadge
+        variant={budgetVariant(status)}
+        size="sm"
+        label={status === 'on_track' ? 'On Track' : undefined}
+        status={status}
+    />
 );
 
 export default function SitesFinancialOverview({
@@ -149,8 +156,10 @@ export default function SitesFinancialOverview({
             }
 
             return (
-                numericSortValue(a, sort.key) - numericSortValue(b, sort.key)
-            ) * dir;
+                (numericSortValue(a, sort.key) -
+                    numericSortValue(b, sort.key)) *
+                dir
+            );
         });
     }, [sites, sort]);
 
@@ -199,9 +208,22 @@ export default function SitesFinancialOverview({
                         title="All-Sites Comparison"
                         description={`Cost, budget variance and category mix across ${kpis.site_count} ${kpis.site_count === 1 ? 'site' : 'sites'} for the selected period.`}
                         stats={[
-                            { label: 'Total cost', value: money(kpis.total_cost) },
-                            { label: 'Sites over budget', value: kpis.sites_over_budget, tone: kpis.sites_over_budget > 0 ? 'warning' : undefined },
-                            { label: 'Avg cost / site', value: money(kpis.avg_cost_per_site) },
+                            {
+                                label: 'Total cost',
+                                value: money(kpis.total_cost),
+                            },
+                            {
+                                label: 'Sites over budget',
+                                value: kpis.sites_over_budget,
+                                tone:
+                                    kpis.sites_over_budget > 0
+                                        ? 'warning'
+                                        : undefined,
+                            },
+                            {
+                                label: 'Avg cost / site',
+                                value: money(kpis.avg_cost_per_site),
+                            },
                             { label: 'Sites', value: kpis.site_count },
                         ]}
                         footer={<OverviewTabsFooter active="by-site" />}
@@ -222,7 +244,9 @@ export default function SitesFinancialOverview({
                                     <Input
                                         type="date"
                                         value={to}
-                                        onChange={(event) => setTo(event.target.value)}
+                                        onChange={(event) =>
+                                            setTo(event.target.value)
+                                        }
                                     />
                                 </div>
                                 <Button
@@ -238,7 +262,6 @@ export default function SitesFinancialOverview({
                     />
                 }
             >
-
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">

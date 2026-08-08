@@ -1,4 +1,8 @@
 import { OperationalStateBadge } from '@/components/security-devices/estate-operations';
+import {
+    SiteProfileAccessRequired,
+    type SiteProfileAccess,
+} from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { formatDate, formatDateTime } from '@/lib/datetime';
@@ -13,6 +17,7 @@ import {
     ExternalLink,
     HeartPulse,
     LaptopMinimalCheck,
+    LockKeyhole,
     RadioTower,
     Stethoscope,
     UserRound,
@@ -53,7 +58,12 @@ type HealthcareDevice = {
     deviceHref: string;
     client: { id: number; displayName: string; href: string } | null;
     location: {
-        site: { id: number; name: string; href: string };
+        site: {
+            id: number;
+            name: string;
+            href: string | null;
+            access: SiteProfileAccess;
+        };
         room: { id: number; name: string } | null;
     } | null;
     assignment: {
@@ -105,13 +115,14 @@ type FlowGroup = {
 export type HealthcareWorkspaceData = {
     permissions: {
         clientContext: boolean;
+        clinicalMonitoring: boolean;
         maintenance: boolean;
         it: boolean;
     };
     boundary: {
         title: string;
         description: string;
-        clinicalHref: string;
+        clinicalHref: string | null;
     };
     overview: {
         inventory: {
@@ -175,13 +186,20 @@ function Boundary({ data }: { data: HealthcareWorkspaceData['boundary'] }) {
                         </p>
                     </div>
                 </div>
-                <Link
-                    href={data.clinicalHref}
-                    className="inline-flex min-h-11 shrink-0 items-center gap-1.5 self-start rounded-lg px-2 text-sm font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                >
-                    Open Client Health Monitoring
-                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                </Link>
+                {data.clinicalHref ? (
+                    <Link
+                        href={data.clinicalHref}
+                        className="inline-flex min-h-11 shrink-0 items-center gap-1.5 self-start rounded-lg px-2 text-sm font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                        Open Client Health Monitoring
+                        <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                ) : (
+                    <div className="inline-flex min-h-11 shrink-0 items-center gap-1.5 self-start rounded-lg px-2 text-sm font-medium text-muted-foreground">
+                        <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                        Client Health Monitoring access required
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
@@ -375,12 +393,25 @@ function HealthcareDeviceCard({ device }: { device: HealthcareDevice }) {
                 {device.location ? (
                     <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <Link
-                            href={device.location.site.href}
-                            className="font-medium text-primary hover:underline"
-                        >
-                            {device.location.site.name}
-                        </Link>
+                        {device.location.site.href &&
+                        device.location.site.access.state === 'available' ? (
+                            <Link
+                                href={device.location.site.href}
+                                className="font-medium text-primary hover:underline"
+                            >
+                                {device.location.site.name}
+                            </Link>
+                        ) : (
+                            <>
+                                <span className="font-medium">
+                                    {device.location.site.name}
+                                </span>
+                                <SiteProfileAccessRequired
+                                    label={device.location.site.access.label}
+                                    className="min-h-0 text-xs"
+                                />
+                            </>
+                        )}
                         {device.location.room ? (
                             <span className="text-muted-foreground">
                                 • {device.location.room.name}

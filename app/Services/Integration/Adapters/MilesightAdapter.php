@@ -27,6 +27,7 @@ use App\Services\Integration\MilesightOperationalBridgeService;
 use App\Services\Integration\SyncResult;
 use App\Support\SafeOperationalData;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -44,7 +45,7 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
     /**
      * Default base URL for the Milesight Development Platform.
      * Operators can override via IntegrationProviderConnection.config['base_url']
-     * (e.g. for a self-hosted gateway bridge).
+     * only when its exact host is in the deployment allowlist.
      */
     private const DEFAULT_BASE_URL = 'https://mdp-api.milesight.com';
 
@@ -205,7 +206,10 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
             ->active()
             ->where('site_id', $siteId)
             ->where('mapped_external_site_id', $applicationId)
-            ->whereHas('site')
+            ->whereHas('site', fn ($site) => $site
+                ->where('is_active', true)
+                ->where(fn ($operational) => $operational->whereNull('archived')->orWhere('archived', false))
+                ->whereNull('archived_at'))
             ->exists()) {
             throw new WebhookRejected('site_identity', 422);
         }
@@ -436,6 +440,16 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
                 $result->processed++;
 
                 try {
+                    if (! $this->deviceSyncScopeStillUsable(
+                        (int) $providerConnection->id,
+                        (int) $siteConfig->id,
+                        (int) $siteConfig->site_id,
+                        $mappedApplicationId,
+                    )) {
+                        $result->error = SafeOperationalData::failureSummary();
+
+                        return $result;
+                    }
                     $synced = $this->bridge->syncInventoryDevice($siteConfig, $payload);
                     $synced['created'] ? $result->created++ : $result->updated++;
                 } catch (\Throwable $e) {
@@ -457,6 +471,31 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
         }
 
         return $result;
+    }
+
+    private function deviceSyncScopeStillUsable(
+        int $connectionId,
+        int $siteConfigId,
+        int $siteId,
+        string $mappedApplicationId,
+    ): bool {
+        return IntegrationProviderConnection::query()
+            ->whereKey($connectionId)
+            ->forProvider($this->provider())
+            ->connected()
+            ->exists()
+            && IntegrationSiteConfig::query()
+                ->whereKey($siteConfigId)
+                ->forProvider($this->provider())
+                ->active()
+                ->where('site_id', $siteId)
+                ->where('mapped_external_site_id', $mappedApplicationId)
+                ->whereRaw("TRIM(`mapped_external_site_id`) <> ''")
+                ->whereHas('site', fn ($site) => $site
+                    ->where('is_active', true)
+                    ->where(fn ($operational) => $operational->whereNull('archived')->orWhere('archived', false))
+                    ->whereNull('archived_at'))
+                ->exists();
     }
 
     public function collectObservations(
@@ -561,22 +600,36 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
     private function resolveBaseUrl(IntegrationProviderConnection $connection): string
     {
         $config = is_array($connection->config) ? $connection->config : [];
-        $candidate = $config['base_url'] ?? self::DEFAULT_BASE_URL;
+        $candidate = trim((string) ($config['base_url'] ?? self::DEFAULT_BASE_URL));
 
-        $parts = parse_url((string) $candidate);
+        $parts = parse_url($candidate);
+        $host = is_array($parts) ? strtolower((string) ($parts['host'] ?? '')) : '';
+        $allowedHosts = array_values(array_filter(
+            config('integration-capabilities.milesight.allowed_hosts', []),
+            static fn (mixed $allowedHost): bool => is_string($allowedHost) && $allowedHost !== '',
+        ));
+
         if (! is_array($parts)
             || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
-            || blank($parts['host'] ?? null)
+            || $host === ''
+            || filter_var($host, FILTER_VALIDATE_IP) !== false
+            || preg_match('/\A(?=.{1,253}\z)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\z/D', $host) !== 1
+            || ! in_array($host, $allowedHosts, true)
             || isset($parts['user'])
-            || isset($parts['pass'])) {
+            || isset($parts['pass'])
+            || isset($parts['query'])
+            || isset($parts['fragment'])
+            || (isset($parts['port']) && (int) $parts['port'] !== 443)
+            || (isset($parts['path']) && ! in_array($parts['path'], ['', '/'], true))) {
             throw new \RuntimeException('Milesight endpoint configuration is invalid.');
         }
 
-        return rtrim((string) $candidate, '/');
+        return 'https://'.$host;
     }
 
     private function accessToken(IntegrationProviderConnection $connection): ?string
     {
+        $baseUrl = $this->resolveBaseUrl($connection);
         $clientSecret = $this->providerSecret($connection);
         $config = is_array($connection->config) ? $connection->config : [];
         $clientId = $this->scalarString($config['client_id'] ?? null);
@@ -584,10 +637,11 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
             return null;
         }
 
-        $response = Http::asForm()
+        $response = $this->providerRequest()
+            ->asForm()
             ->acceptJson()
             ->timeout(10)
-            ->post($this->resolveBaseUrl($connection).'/oauth/token', [
+            ->post($baseUrl.'/oauth/token', [
                 'client_id' => $clientId,
                 'client_secret' => $clientSecret,
                 'grant_type' => 'client_credentials',
@@ -618,7 +672,8 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
         $pageNumber = 1;
 
         while ($pageNumber <= self::MAX_PAGES) {
-            $response = Http::withToken($accessToken)
+            $response = $this->providerRequest()
+                ->withToken($accessToken)
                 ->acceptJson()
                 ->timeout(20)
                 ->post($baseUrl.'/device/openapi/v1/devices/search', [
@@ -860,6 +915,11 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
             && preg_match('/^[1-9]\d{0,4}$/', (string) $value) === 1
             ? min(86400, (int) $value)
             : 300;
+    }
+
+    private function providerRequest(): PendingRequest
+    {
+        return Http::withoutRedirecting();
     }
 
     private function scalarString(mixed $value): ?string

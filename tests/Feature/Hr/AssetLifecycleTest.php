@@ -2,15 +2,19 @@
 
 use App\Domain\Hr\Models\HrAsset;
 use App\Domain\Hr\Models\HrAssetAssignment;
+use App\Domain\Hr\Models\HrAssetDocument;
 use App\Domain\Hr\Models\HrAssetMaintenanceLog;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\AssetService;
+use App\Models\Asset;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -36,8 +40,8 @@ function makeAsset(array $overrides = []): HrAsset
 {
     return HrAsset::query()->create(array_merge([
         'asset_tag' => 'AT-'.fake()->unique()->numberBetween(1000, 999999),
-        'name' => 'Test Laptop',
-        'category' => 'laptop',
+        'name' => 'Test Uniform',
+        'category' => 'uniform',
         'status' => 'available',
     ], $overrides));
 }
@@ -197,6 +201,136 @@ test('asset lifecycle transitions re-read locked state instead of trusting stale
     expect(HrAssetAssignment::query()->where('asset_id', $asset->id)->count())->toBe(0)
         ->and($asset->fresh()->status)->toBe('assigned');
 });
+
+test('non-HR-owned rows fail closed at every HR lifecycle boundary', function (string $ownership) {
+    $makeReadOnly = function (string $status) use ($ownership): HrAsset {
+        $attributes = [
+            'asset_tag' => strtoupper($ownership).'-'.fake()->unique()->numberBetween(10000, 99999),
+            'name' => match ($ownership) {
+                'fleet' => 'Fleet-owned vehicle projection',
+                'orphaned-fleet' => 'Unreconciled vehicle history',
+                default => 'Historical laptop record',
+            },
+            'category' => $ownership === 'technology' ? 'laptop' : 'vehicle',
+            'status' => $status,
+            'qr_token' => null,
+        ];
+
+        if ($ownership === 'fleet') {
+            $attributes['fleet_asset_id'] = Asset::factory()->create([
+                'site_id' => $this->site->id,
+                'category' => 'vehicle',
+            ])->id;
+        }
+
+        return HrAsset::query()->create($attributes);
+    };
+
+    $service = app(AssetService::class);
+    $available = $makeReadOnly('available');
+
+    expect(fn () => $service->assignAsset($available, $this->hrProfile, [
+        'assigned_by' => $this->hr->id,
+    ]))->toThrow(LogicException::class)
+        ->and(fn () => $service->logMaintenance($available, [
+            'type' => 'repair',
+            'performed_by' => $this->hr->id,
+        ]))->toThrow(LogicException::class)
+        ->and(fn () => $service->sendToMaintenance($available))->toThrow(LogicException::class)
+        ->and(fn () => $service->retireAsset($available))->toThrow(LogicException::class)
+        ->and(fn () => $service->ensureQrToken($available))->toThrow(LogicException::class);
+
+    expect($available->fresh()->status)->toBe('available')
+        ->and($available->fresh()->qr_token)->toBeNull()
+        ->and(HrAssetAssignment::query()->where('asset_id', $available->id)->exists())->toBeFalse()
+        ->and(HrAssetMaintenanceLog::query()->where('asset_id', $available->id)->exists())->toBeFalse();
+
+    $maintenance = $makeReadOnly('maintenance');
+    expect(fn () => $service->returnToService($maintenance))->toThrow(LogicException::class)
+        ->and(fn () => $service->returnFromMaintenance($maintenance))->toThrow(LogicException::class)
+        ->and($maintenance->fresh()->status)->toBe('maintenance');
+
+    $assigned = $makeReadOnly('assigned');
+    $assignment = HrAssetAssignment::query()->create([
+        'asset_id' => $assigned->id,
+        'employee_profile_id' => $this->hrProfile->id,
+        'assigned_at' => now(),
+        'assigned_by' => $this->hr->id,
+    ]);
+
+    expect(fn () => $service->returnAsset($assignment, [
+        'returned_at' => now(),
+    ]))->toThrow(LogicException::class)
+        ->and($assignment->fresh()->returned_at)->toBeNull()
+        ->and($assigned->fresh()->status)->toBe('assigned');
+})->with([
+    'Fleet-linked projection' => 'fleet',
+    'unreconciled Fleet history' => 'orphaned-fleet',
+    'historical technology row' => 'technology',
+]);
+
+test('HTTP edit assignment bulk and document paths cannot bypass canonical lifecycle ownership', function (string $ownership) {
+    Storage::fake('local');
+
+    $fleetAsset = $ownership === 'fleet'
+        ? Asset::factory()->create([
+            'site_id' => $this->site->id,
+            'category' => 'vehicle',
+        ])
+        : null;
+    $asset = HrAsset::query()->create([
+        'asset_tag' => strtoupper($ownership).'-HTTP-GUARD',
+        'name' => $ownership === 'fleet' ? 'Fleet projection' : 'Historical laptop',
+        'category' => $ownership === 'fleet' ? 'vehicle' : 'laptop',
+        'status' => 'available',
+        'fleet_asset_id' => $fleetAsset?->id,
+    ]);
+
+    $updateResponse = $this->actingAs($this->hr)
+        ->put("/hr/assets/{$asset->id}", [
+            'asset_tag' => $asset->asset_tag,
+            'name' => 'Attempted replacement name',
+            'category' => $asset->category,
+            'fleet_asset_id' => $fleetAsset?->id,
+        ]);
+
+    $assignResponse = $this->actingAs($this->hr)
+        ->post("/hr/assets/{$asset->id}/assign", [
+            'employee_profile_id' => $this->hrProfile->id,
+            'assigned_at' => today()->toDateString(),
+        ]);
+
+    $bulkResponse = $this->actingAs($this->hr)
+        ->post('/hr/assets/bulk', [
+            'action' => 'set-category',
+            'ids' => [$asset->id],
+            'category' => 'uniform',
+        ]);
+
+    $documentResponse = $this->actingAs($this->hr)
+        ->post("/hr/assets/{$asset->id}/documents", [
+            'title' => 'Attempted new document',
+            'category' => 'manual',
+            'file' => UploadedFile::fake()->create('manual.pdf', 10, 'application/pdf'),
+        ]);
+
+    foreach ([$updateResponse, $assignResponse, $bulkResponse, $documentResponse] as $response) {
+        if ($ownership === 'fleet') {
+            $response->assertNotFound();
+        } else {
+            $response->assertSessionHas('error');
+        }
+    }
+
+    expect($asset->fresh()->name)->not->toBe('Attempted replacement name')
+        ->and($asset->fresh()->category)->toBe($ownership === 'fleet' ? 'vehicle' : 'laptop')
+        ->and($asset->fresh()->status)->toBe('available')
+        ->and(HrAssetAssignment::query()->where('asset_id', $asset->id)->exists())->toBeFalse()
+        ->and(HrAssetDocument::query()->where('asset_id', $asset->id)->exists())->toBeFalse();
+})->with([
+    'Fleet-linked projection controller guards' => 'fleet',
+    'historical technology controller guards' => 'technology',
+]);
 
 test('duplicate maintenance and inconsistent active-assignment retirement fail closed', function () {
     $asset = makeAsset(['asset_tag' => 'AT-LOCKED-LIFECYCLE']);

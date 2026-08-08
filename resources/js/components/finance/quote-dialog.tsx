@@ -1,5 +1,12 @@
 import { useForm } from '@inertiajs/react';
-import { Calculator, FileText, ListChecks, Plus, Receipt, Trash2 } from 'lucide-react';
+import {
+    Calculator,
+    FileText,
+    ListChecks,
+    Plus,
+    Receipt,
+    Trash2,
+} from 'lucide-react';
 import { useMemo } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -18,7 +25,11 @@ import {
     useWizard,
 } from './wizard';
 
-export type QuoteClientOption = { id: number; first_name: string; last_name: string };
+export type QuoteClientOption = {
+    id: number;
+    first_name: string;
+    last_name: string;
+};
 
 /** A price book with its rate items, for the "add from price book" quick-fill. */
 export type QuotePriceBookItem = {
@@ -55,10 +66,17 @@ type LineForm = {
     unit_price: string;
 };
 
-const emptyLine = (): LineForm => ({ description: '', quantity: '1', unit_price: '' });
+const emptyLine = (): LineForm => ({
+    description: '',
+    quantity: '1',
+    unit_price: '',
+});
 
 const money = (n: number | string) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(n || 0));
+    new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency: 'NZD',
+    }).format(Number(n || 0));
 
 /**
  * Quote wizard — the multi-line AR quote as an Add-Client-grade stepper modal.
@@ -87,13 +105,38 @@ export function QuoteDialog({
 
     const STEPS: readonly WizardStep[] = isEdit
         ? [
-              { key: 'details', label: 'Details', blurb: 'Client & title', icon: FileText },
-              { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ListChecks },
+              {
+                  key: 'details',
+                  label: 'Details',
+                  blurb: 'Client & title',
+                  icon: FileText,
+              },
+              {
+                  key: 'review',
+                  label: 'Review',
+                  blurb: 'Confirm & save',
+                  icon: ListChecks,
+              },
           ]
         : [
-              { key: 'details', label: 'Details', blurb: 'Client & title', icon: FileText },
-              { key: 'lines', label: 'Line items', blurb: 'What you are quoting', icon: Receipt },
-              { key: 'review', label: 'Review', blurb: 'Confirm & create', icon: ListChecks },
+              {
+                  key: 'details',
+                  label: 'Details',
+                  blurb: 'Client & title',
+                  icon: FileText,
+              },
+              {
+                  key: 'lines',
+                  label: 'Line items',
+                  blurb: 'What you are quoting',
+                  icon: Receipt,
+              },
+              {
+                  key: 'review',
+                  label: 'Review',
+                  blurb: 'Confirm & create',
+                  icon: ListChecks,
+              },
           ];
 
     const wizard = useWizard(STEPS.length);
@@ -105,32 +148,43 @@ export function QuoteDialog({
         valid_until: string;
         notes: string;
         lines: LineForm[];
-    }>(quote ? {
-        client_id: quote.client_id != null ? String(quote.client_id) : '',
-        title: quote.title ?? '',
-        valid_until: quote.valid_until ? String(quote.valid_until).slice(0, 10) : '',
-        notes: quote.notes ?? '',
-        lines: quote.lines.length
-            ? quote.lines.map((l) => ({
-                  description: l.description ?? '',
-                  quantity: String(l.quantity ?? '1'),
-                  unit_price: String(l.unit_price ?? ''),
-              }))
-            : [emptyLine()],
-    } : {
-        client_id: '',
-        title: '',
-        valid_until: '',
-        notes: '',
-        lines: [emptyLine()],
-    });
+    }>(
+        quote
+            ? {
+                  client_id:
+                      quote.client_id != null ? String(quote.client_id) : '',
+                  title: quote.title ?? '',
+                  valid_until: quote.valid_until
+                      ? String(quote.valid_until).slice(0, 10)
+                      : '',
+                  notes: quote.notes ?? '',
+                  lines: quote.lines.length
+                      ? quote.lines.map((l) => ({
+                            description: l.description ?? '',
+                            quantity: String(l.quantity ?? '1'),
+                            unit_price: String(l.unit_price ?? ''),
+                        }))
+                      : [emptyLine()],
+              }
+            : {
+                  client_id: '',
+                  title: '',
+                  valid_until: '',
+                  notes: '',
+                  lines: [emptyLine()],
+              },
+    );
     const { data, setData, processing, errors } = form;
     // Server-side validation keys line-item errors under `line_items.*`, which the
     // form-field-typed `errors` object doesn't know about — read them via a cast.
     const lineErrors = errors as Record<string, string | undefined>;
 
-    const clientOptions = clients.map((c) => ({ value: String(c.id), label: `${c.first_name} ${c.last_name}` }));
-    const clientLabel = clientOptions.find((c) => c.value === data.client_id)?.label ?? '—';
+    const clientOptions = clients.map((c) => ({
+        value: String(c.id),
+        label: `${c.first_name} ${c.last_name}`,
+    }));
+    const clientLabel =
+        clientOptions.find((c) => c.value === data.client_id)?.label ?? '—';
 
     // Flatten every price-book item into one "add from price book" list.
     const priceBookOptions = useMemo(
@@ -162,7 +216,10 @@ export function QuoteDialog({
     const addLine = () => setData('lines', [...data.lines, emptyLine()]);
     const removeLine = (i: number) => {
         if (data.lines.length <= 1) return;
-        setData('lines', data.lines.filter((_, idx) => idx !== i));
+        setData(
+            'lines',
+            data.lines.filter((_, idx) => idx !== i),
+        );
     };
     const addFromPriceBook = (key: string) => {
         const opt = priceBookOptions.find((o) => o.value === key);
@@ -174,14 +231,23 @@ export function QuoteDialog({
         };
         // Replace a single empty starter line, else append.
         const onlyEmptyStarter =
-            data.lines.length === 1 && !data.lines[0].description.trim() && !data.lines[0].unit_price;
-        setData('lines', onlyEmptyStarter ? [newLine] : [...data.lines, newLine]);
+            data.lines.length === 1 &&
+            !data.lines[0].description.trim() &&
+            !data.lines[0].unit_price;
+        setData(
+            'lines',
+            onlyEmptyStarter ? [newLine] : [...data.lines, newLine],
+        );
     };
 
     const detailsValid = !!data.client_id && !!data.title.trim();
     const linesValid =
-        data.lines.every((l) => l.description.trim() && Number(l.unit_price) >= 0 && Number(l.quantity) > 0)
-        && totals.subtotal > 0;
+        data.lines.every(
+            (l) =>
+                l.description.trim() &&
+                Number(l.unit_price) >= 0 &&
+                Number(l.quantity) > 0,
+        ) && totals.subtotal > 0;
     const canContinueDetails = detailsValid;
     // Edit is header-only, so the wizard is complete once details are valid.
     const submitReady = isEdit ? detailsValid : detailsValid && linesValid;
@@ -230,27 +296,48 @@ export function QuoteDialog({
             open={open}
             onClose={close}
             title={isEdit ? 'Edit quote' : 'New quote'}
-            description={isEdit ? 'Update this draft quote' : 'Create a service quote for a client'}
+            description={
+                isEdit
+                    ? 'Update this draft quote'
+                    : 'Create a service quote for a client'
+            }
             railIcon={Calculator}
             railTitle={isEdit ? 'Edit Quote' : 'New Quote'}
             railSub="Quotes"
             steps={STEPS}
             stepIndex={index}
             onStepClick={goTo}
-            pct={submitReady ? 100 : Math.min(90, (detailsValid ? 50 : 0) + (linesValid ? 40 : 0))}
+            pct={
+                submitReady
+                    ? 100
+                    : Math.min(
+                          90,
+                          (detailsValid ? 50 : 0) + (linesValid ? 40 : 0),
+                      )
+            }
             pctLabel={isEdit ? 'Quote' : 'Total'}
             footerStart={
                 !isEdit ? (
                     <span className="text-[13px] text-muted-foreground">
-                        Total <span className="font-semibold text-foreground">{money(totals.total)}</span>
-                        <span className="ml-1">(incl. {money(totals.gst)} GST)</span>
+                        Total{' '}
+                        <span className="font-semibold text-foreground">
+                            {money(totals.total)}
+                        </span>
+                        <span className="ml-1">
+                            (incl. {money(totals.gst)} GST)
+                        </span>
                     </span>
                 ) : undefined
             }
             footerEnd={
                 <>
                     {!isFirst && (
-                        <Button type="button" variant="outline" onClick={back} disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={back}
+                            disabled={processing}
+                        >
                             Back
                         </Button>
                     )}
@@ -258,13 +345,20 @@ export function QuoteDialog({
                         <Button
                             type="button"
                             onClick={next}
-                            disabled={(index === 0 && !canContinueDetails) || (!isEdit && index === 1 && !linesValid)}
+                            disabled={
+                                (index === 0 && !canContinueDetails) ||
+                                (!isEdit && index === 1 && !linesValid)
+                            }
                         >
                             Continue
                         </Button>
                     )}
                     {isLast && (
-                        <Button type="button" onClick={submit} disabled={processing || !submitReady}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={processing || !submitReady}
+                        >
                             {isEdit ? 'Save changes' : 'Create quote'}
                         </Button>
                     )}
@@ -273,7 +367,11 @@ export function QuoteDialog({
         >
             {index === 0 && (
                 <div>
-                    <StepHead icon={FileText} title="Quote details" blurb="Who the quote is for, and what it covers." />
+                    <StepHead
+                        icon={FileText}
+                        title="Quote details"
+                        blurb="Who the quote is for, and what it covers."
+                    />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <Field label="Client" required error={errors.client_id}>
                             <SelectInput
@@ -283,24 +381,49 @@ export function QuoteDialog({
                                 options={clientOptions}
                             />
                         </Field>
-                        <Field label="Valid until" hint="optional" error={errors.valid_until}>
-                            <Input type="date" value={data.valid_until} onChange={(e) => setData('valid_until', e.target.value)} />
+                        <Field
+                            label="Valid until"
+                            hint="optional"
+                            error={errors.valid_until}
+                        >
+                            <Input
+                                type="date"
+                                value={data.valid_until}
+                                onChange={(e) =>
+                                    setData('valid_until', e.target.value)
+                                }
+                            />
                         </Field>
                         <Field label="Title" span required error={errors.title}>
                             <Input
                                 value={data.title}
-                                onChange={(e) => setData('title', e.target.value)}
+                                onChange={(e) =>
+                                    setData('title', e.target.value)
+                                }
                                 placeholder="e.g. Support Services Quote"
                             />
                         </Field>
-                        <Field label="Notes" span hint="optional" error={errors.notes}>
-                            <Textarea rows={2} value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder="Additional notes for the client" />
+                        <Field
+                            label="Notes"
+                            span
+                            hint="optional"
+                            error={errors.notes}
+                        >
+                            <Textarea
+                                rows={2}
+                                value={data.notes}
+                                onChange={(e) =>
+                                    setData('notes', e.target.value)
+                                }
+                                placeholder="Additional notes for the client"
+                            />
                         </Field>
                     </div>
                     {isEdit && (
                         <p className="mt-4 text-[13px] text-muted-foreground">
-                            Line items are locked once a quote exists — edit the header details here, or create a new
-                            quote to change what's being quoted.
+                            Line items are locked once a quote exists — edit the
+                            header details here, or create a new quote to change
+                            what's being quoted.
                         </p>
                     )}
                 </div>
@@ -308,8 +431,14 @@ export function QuoteDialog({
 
             {!isEdit && index === 1 && (
                 <div>
-                    <StepHead icon={Receipt} title="Line items" blurb="Each line is quoted net; GST is added at 15% on the total." />
-                    {typeof lineErrors.line_items === 'string' && <FieldErr>{lineErrors.line_items}</FieldErr>}
+                    <StepHead
+                        icon={Receipt}
+                        title="Line items"
+                        blurb="Each line is quoted net; GST is added at 15% on the total."
+                    />
+                    {typeof lineErrors.line_items === 'string' && (
+                        <FieldErr>{lineErrors.line_items}</FieldErr>
+                    )}
                     {priceBookOptions.length > 0 && (
                         <div className="mb-3 sm:max-w-xs">
                             <Field label="Add from price book" hint="optional">
@@ -317,7 +446,12 @@ export function QuoteDialog({
                                     value=""
                                     onChange={addFromPriceBook}
                                     placeholder="Pick a rate item"
-                                    options={priceBookOptions.map(({ value, label }) => ({ value, label }))}
+                                    options={priceBookOptions.map(
+                                        ({ value, label }) => ({
+                                            value,
+                                            label,
+                                        }),
+                                    )}
                                     ariaLabel="Add a line from a price book"
                                 />
                             </Field>
@@ -325,15 +459,35 @@ export function QuoteDialog({
                     )}
                     <div className="space-y-3">
                         {data.lines.map((line, i) => {
-                            const net = Number(line.quantity || 0) * Number(line.unit_price || 0);
+                            const net =
+                                Number(line.quantity || 0) *
+                                Number(line.unit_price || 0);
                             return (
                                 // eslint-disable-next-line no-restricted-syntax -- per-line field-group panel, not a content card
-                                <div key={i} className="rounded-xl border border-border bg-card/60 p-3">
+                                <div
+                                    key={i}
+                                    className="rounded-xl border border-border bg-card/60 p-3"
+                                >
                                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                        <Field label="Description" span required error={lineErrors[`line_items.${i}.description`]}>
+                                        <Field
+                                            label="Description"
+                                            span
+                                            required
+                                            error={
+                                                lineErrors[
+                                                    `line_items.${i}.description`
+                                                ]
+                                            }
+                                        >
                                             <Input
                                                 value={line.description}
-                                                onChange={(e) => updateLine(i, 'description', e.target.value)}
+                                                onChange={(e) =>
+                                                    updateLine(
+                                                        i,
+                                                        'description',
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 placeholder="e.g. Community access support — weekly"
                                             />
                                         </Field>
@@ -343,18 +497,35 @@ export function QuoteDialog({
                                                 min="0.01"
                                                 step="0.01"
                                                 value={line.quantity}
-                                                onChange={(e) => updateLine(i, 'quantity', e.target.value)}
+                                                onChange={(e) =>
+                                                    updateLine(
+                                                        i,
+                                                        'quantity',
+                                                        e.target.value,
+                                                    )
+                                                }
                                             />
                                         </Field>
-                                        <Field label="Unit price (ex GST)" required>
+                                        <Field
+                                            label="Unit price (ex GST)"
+                                            required
+                                        >
                                             <AmountField
                                                 value={line.unit_price}
-                                                onValueChange={(v) => updateLine(i, 'unit_price', v)}
+                                                onValueChange={(v) =>
+                                                    updateLine(
+                                                        i,
+                                                        'unit_price',
+                                                        v,
+                                                    )
+                                                }
                                                 aria-label={`Line ${i + 1} unit price`}
                                             />
                                         </Field>
                                         <Field label="Line net">
-                                            <div className="flex h-9 items-center px-1 text-sm font-medium tabular-nums">{money(net)}</div>
+                                            <div className="flex h-9 items-center px-1 text-sm font-medium tabular-nums">
+                                                {money(net)}
+                                            </div>
                                         </Field>
                                     </div>
                                     <div className="mt-2 flex justify-end">
@@ -366,38 +537,101 @@ export function QuoteDialog({
                                             disabled={data.lines.length <= 1}
                                             className="text-muted-foreground hover:text-status-critical"
                                         >
-                                            <Trash2 className="mr-1 h-4 w-4" /> Remove line
+                                            <Trash2 className="mr-1 h-4 w-4" />{' '}
+                                            Remove line
                                         </Button>
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
-                    <Button type="button" variant="outline" size="sm" onClick={addLine} className="mt-3">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addLine}
+                        className="mt-3"
+                    >
                         <Plus className="mr-1 h-4 w-4" /> Add line
                     </Button>
                     {/* eslint-disable-next-line no-restricted-syntax -- totals summary panel, not a content card */}
                     <div className="mt-4 space-y-1 rounded-xl border border-border bg-card/60 p-3 text-sm">
-                        <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="tabular-nums">{money(totals.subtotal)}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">GST (15%)</span><span className="tabular-nums">{money(totals.gst)}</span></div>
-                        <div className="flex justify-between border-t pt-1 font-semibold"><span>Total (NZD)</span><span className="tabular-nums">{money(totals.total)}</span></div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                                Subtotal
+                            </span>
+                            <span className="tabular-nums">
+                                {money(totals.subtotal)}
+                            </span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                                GST (15%)
+                            </span>
+                            <span className="tabular-nums">
+                                {money(totals.gst)}
+                            </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-1 font-semibold">
+                            <span>Total (NZD)</span>
+                            <span className="tabular-nums">
+                                {money(totals.total)}
+                            </span>
+                        </div>
                     </div>
                 </div>
             )}
 
             {index === reviewIndex && (
                 <div>
-                    <StepHead icon={ListChecks} title={isEdit ? 'Review & save' : 'Review & create'} blurb={isEdit ? 'Updates this draft quote.' : 'Creates a draft quote you can then send.'} />
+                    <StepHead
+                        icon={ListChecks}
+                        title={isEdit ? 'Review & save' : 'Review & create'}
+                        blurb={
+                            isEdit
+                                ? 'Updates this draft quote.'
+                                : 'Creates a draft quote you can then send.'
+                        }
+                    />
                     <ReviewCard icon={FileText} title="Quote">
                         <ReviewRow label="Client" value={clientLabel} />
                         <ReviewRow label="Title" value={data.title || '—'} />
-                        {data.valid_until && <ReviewRow label="Valid until" value={data.valid_until} />}
-                        {!isEdit && <ReviewRow label="Lines" value={String(data.lines.length)} />}
-                        {!isEdit && <ReviewRow label="Subtotal" value={money(totals.subtotal)} />}
-                        {!isEdit && <ReviewRow label="GST (15%)" value={money(totals.gst)} />}
-                        {!isEdit && <ReviewRow label="Total (NZD)" value={money(totals.total)} />}
+                        {data.valid_until && (
+                            <ReviewRow
+                                label="Valid until"
+                                value={data.valid_until}
+                            />
+                        )}
+                        {!isEdit && (
+                            <ReviewRow
+                                label="Lines"
+                                value={String(data.lines.length)}
+                            />
+                        )}
+                        {!isEdit && (
+                            <ReviewRow
+                                label="Subtotal"
+                                value={money(totals.subtotal)}
+                            />
+                        )}
+                        {!isEdit && (
+                            <ReviewRow
+                                label="GST (15%)"
+                                value={money(totals.gst)}
+                            />
+                        )}
+                        {!isEdit && (
+                            <ReviewRow
+                                label="Total (NZD)"
+                                value={money(totals.total)}
+                            />
+                        )}
                     </ReviewCard>
-                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">{isEdit ? 'Saving…' : 'Creating…'}</p>}
+                    {processing && (
+                        <p className="mt-3 text-[13px] text-muted-foreground">
+                            {isEdit ? 'Saving…' : 'Creating…'}
+                        </p>
+                    )}
                 </div>
             )}
         </WizardShell>

@@ -3,7 +3,12 @@ import { BarChart3, Bookmark, LayoutGrid, Users, Wrench } from 'lucide-react';
 
 import { HrTabs, type HrTabItem } from './hr-tabs';
 
-export type ReportsTab = 'index' | 'builder' | 'saved' | 'analytics' | 'headcount';
+export type ReportsTab =
+    | 'index'
+    | 'builder'
+    | 'saved'
+    | 'analytics'
+    | 'headcount';
 
 const TAB_URLS: Record<ReportsTab, string> = {
     index: '/hr/reports',
@@ -28,28 +33,53 @@ type HrCan = {
  * (Automations + Webhooks moved to the Settings hub.)
  */
 export function ReportsTabs({ active }: { active: ReportsTab }) {
-    const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth?.can
-        ?.hr;
+    const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth
+        ?.can?.hr;
 
     const all: Array<{ item: HrTabItem; show: boolean }> = [
         {
-            item: { id: 'index', label: 'Reports', icon: BarChart3, tone: 'primary' },
+            item: {
+                id: 'index',
+                label: 'Reports',
+                icon: BarChart3,
+                tone: 'primary',
+            },
             show: !!hr?.reports?.view,
         },
         {
-            item: { id: 'builder', label: 'Builder', icon: Wrench, tone: 'info' },
+            item: {
+                id: 'builder',
+                label: 'Builder',
+                icon: Wrench,
+                tone: 'info',
+            },
             show: !!hr?.reports?.view,
         },
         {
-            item: { id: 'saved', label: 'Saved', icon: Bookmark, tone: 'violet' },
+            item: {
+                id: 'saved',
+                label: 'Saved',
+                icon: Bookmark,
+                tone: 'violet',
+            },
             show: !!hr?.reports?.view,
         },
         {
-            item: { id: 'analytics', label: 'Analytics', icon: LayoutGrid, tone: 'success' },
+            item: {
+                id: 'analytics',
+                label: 'Analytics',
+                icon: LayoutGrid,
+                tone: 'success',
+            },
             show: !!hr?.analytics?.view,
         },
         {
-            item: { id: 'headcount', label: 'Headcount', icon: Users, tone: 'warning' },
+            item: {
+                id: 'headcount',
+                label: 'Headcount',
+                icon: Users,
+                tone: 'warning',
+            },
             show: !!hr?.analytics?.view,
         },
     ];

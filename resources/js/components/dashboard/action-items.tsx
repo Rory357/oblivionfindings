@@ -26,7 +26,7 @@ export function ActionItems({ items }: ActionItemsProps) {
                     <Link
                         key={item.label}
                         href={item.href}
-                        className="flex items-center gap-3 px-1 py-3 transition-colors hover:bg-muted/50 rounded-lg"
+                        className="flex items-center gap-3 rounded-lg px-1 py-3 transition-colors hover:bg-muted/50"
                     >
                         {done ? (
                             <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
@@ -42,7 +42,11 @@ export function ActionItems({ items }: ActionItemsProps) {
 
                         {!done && (
                             <Badge
-                                variant={item.variant === 'warning' ? 'destructive' : 'secondary'}
+                                variant={
+                                    item.variant === 'warning'
+                                        ? 'destructive'
+                                        : 'secondary'
+                                }
                                 className="min-w-[24px] justify-center"
                             >
                                 {item.count}

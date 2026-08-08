@@ -1,11 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -13,7 +11,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero, PageLayout } from '@/components/page';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 
 type ParentAccount = {
@@ -88,7 +88,11 @@ const subTypes: Record<string, { value: string; label: string }[]> = {
     ],
 };
 
-export default function AccountCreate({ parentAccounts, taxRates, fundingStreams }: PageProps) {
+export default function AccountCreate({
+    parentAccounts,
+    taxRates,
+    fundingStreams,
+}: PageProps) {
     const { data, setData, post, processing, errors } = useForm({
         code: '',
         name: '',
@@ -117,7 +121,7 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
         ? parentAccounts.filter((a) => a.type === data.type)
         : parentAccounts;
 
-    const currentSubTypes = data.type ? (subTypes[data.type] || []) : [];
+    const currentSubTypes = data.type ? subTypes[data.type] || [] : [];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -125,7 +129,8 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/accounts"
                         title="Create Account"
@@ -145,12 +150,16 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                                     <Input
                                         id="code"
                                         value={data.code}
-                                        onChange={(e) => setData('code', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('code', e.target.value)
+                                        }
                                         placeholder="e.g. 1000"
                                         maxLength={20}
                                     />
                                     {errors.code && (
-                                        <p className="text-sm text-destructive">{errors.code}</p>
+                                        <p className="text-sm text-destructive">
+                                            {errors.code}
+                                        </p>
                                     )}
                                 </div>
                                 <div className="space-y-1.5">
@@ -158,12 +167,16 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                                     <Input
                                         id="name"
                                         value={data.name}
-                                        onChange={(e) => setData('name', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('name', e.target.value)
+                                        }
                                         placeholder="e.g. Cash at Bank"
                                         maxLength={255}
                                     />
                                     {errors.name && (
-                                        <p className="text-sm text-destructive">{errors.name}</p>
+                                        <p className="text-sm text-destructive">
+                                            {errors.name}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -187,21 +200,28 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                                         </SelectTrigger>
                                         <SelectContent>
                                             {accountTypes.map((t) => (
-                                                <SelectItem key={t.value} value={t.value}>
+                                                <SelectItem
+                                                    key={t.value}
+                                                    value={t.value}
+                                                >
                                                     {t.label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {errors.type && (
-                                        <p className="text-sm text-destructive">{errors.type}</p>
+                                        <p className="text-sm text-destructive">
+                                            {errors.type}
+                                        </p>
                                     )}
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label>Sub Type</Label>
                                     <Select
                                         value={data.sub_type}
-                                        onValueChange={(value) => setData('sub_type', value)}
+                                        onValueChange={(value) =>
+                                            setData('sub_type', value)
+                                        }
                                         disabled={!data.type}
                                     >
                                         <SelectTrigger>
@@ -209,14 +229,19 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                                         </SelectTrigger>
                                         <SelectContent>
                                             {currentSubTypes.map((st) => (
-                                                <SelectItem key={st.value} value={st.value}>
+                                                <SelectItem
+                                                    key={st.value}
+                                                    value={st.value}
+                                                >
                                                     {st.label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {errors.sub_type && (
-                                        <p className="text-sm text-destructive">{errors.sub_type}</p>
+                                        <p className="text-sm text-destructive">
+                                            {errors.sub_type}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -225,7 +250,9 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                                 <Label>Parent Account</Label>
                                 <Select
                                     value={data.parent_id}
-                                    onValueChange={(value) => setData('parent_id', value)}
+                                    onValueChange={(value) =>
+                                        setData('parent_id', value)
+                                    }
                                     disabled={!data.type}
                                 >
                                     <SelectTrigger>
@@ -233,14 +260,19 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                                     </SelectTrigger>
                                     <SelectContent>
                                         {filteredParents.map((p) => (
-                                            <SelectItem key={p.id} value={String(p.id)}>
+                                            <SelectItem
+                                                key={p.id}
+                                                value={String(p.id)}
+                                            >
                                                 {p.code} - {p.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                                 {errors.parent_id && (
-                                    <p className="text-sm text-destructive">{errors.parent_id}</p>
+                                    <p className="text-sm text-destructive">
+                                        {errors.parent_id}
+                                    </p>
                                 )}
                             </div>
 
@@ -249,14 +281,22 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                                     <Label>Default Tax Rate</Label>
                                     <Select
                                         value={data.default_tax_rate_id}
-                                        onValueChange={(value) => setData('default_tax_rate_id', value)}
+                                        onValueChange={(value) =>
+                                            setData(
+                                                'default_tax_rate_id',
+                                                value,
+                                            )
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="None" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {taxRates.map((tr) => (
-                                                <SelectItem key={tr.id} value={String(tr.id)}>
+                                                <SelectItem
+                                                    key={tr.id}
+                                                    value={String(tr.id)}
+                                                >
                                                     {tr.name} ({tr.rate}%)
                                                 </SelectItem>
                                             ))}
@@ -267,14 +307,19 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                                     <Label>Funding Stream</Label>
                                     <Select
                                         value={data.funding_stream_id}
-                                        onValueChange={(value) => setData('funding_stream_id', value)}
+                                        onValueChange={(value) =>
+                                            setData('funding_stream_id', value)
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="None" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {fundingStreams.map((fs) => (
-                                                <SelectItem key={fs.id} value={String(fs.id)}>
+                                                <SelectItem
+                                                    key={fs.id}
+                                                    value={String(fs.id)}
+                                                >
                                                     {fs.code} - {fs.name}
                                                 </SelectItem>
                                             ))}
@@ -288,12 +333,16 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                                 <Textarea
                                     id="description"
                                     value={data.description}
-                                    onChange={(e) => setData('description', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('description', e.target.value)
+                                    }
                                     placeholder="Optional description for this account"
                                     rows={3}
                                 />
                                 {errors.description && (
-                                    <p className="text-sm text-destructive">{errors.description}</p>
+                                    <p className="text-sm text-destructive">
+                                        {errors.description}
+                                    </p>
                                 )}
                             </div>
 
@@ -303,10 +352,16 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                                         id="gst_applicable"
                                         checked={data.gst_applicable}
                                         onCheckedChange={(checked) =>
-                                            setData('gst_applicable', checked === true)
+                                            setData(
+                                                'gst_applicable',
+                                                checked === true,
+                                            )
                                         }
                                     />
-                                    <Label htmlFor="gst_applicable" className="font-normal">
+                                    <Label
+                                        htmlFor="gst_applicable"
+                                        className="font-normal"
+                                    >
                                         GST Applicable
                                     </Label>
                                 </div>
@@ -315,10 +370,16 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                                         id="is_active"
                                         checked={data.is_active}
                                         onCheckedChange={(checked) =>
-                                            setData('is_active', checked === true)
+                                            setData(
+                                                'is_active',
+                                                checked === true,
+                                            )
                                         }
                                     />
-                                    <Label htmlFor="is_active" className="font-normal">
+                                    <Label
+                                        htmlFor="is_active"
+                                        className="font-normal"
+                                    >
                                         Active
                                     </Label>
                                 </div>
@@ -326,10 +387,14 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
 
                             <div className="flex justify-end gap-3">
                                 <Link href={'/finance/accounts'}>
-                                    <Button type="button" variant="outline">Cancel</Button>
+                                    <Button type="button" variant="outline">
+                                        Cancel
+                                    </Button>
                                 </Link>
                                 <Button type="submit" disabled={processing}>
-                                    {processing ? 'Creating...' : 'Create Account'}
+                                    {processing
+                                        ? 'Creating...'
+                                        : 'Create Account'}
                                 </Button>
                             </div>
                         </form>

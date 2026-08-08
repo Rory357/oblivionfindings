@@ -3,7 +3,11 @@
  * page content should keep the vertical space. Same app-primary gradient
  * chrome as HeroShell / the map page's slim band; semantic tokens only. */
 import { cn } from '@/lib/utils';
-import { DOT_CLASS, HeroStatusPill, type Tone } from '@/pages/fleet-assets/components/fleet-hero-kit';
+import {
+    DOT_CLASS,
+    HeroStatusPill,
+    type Tone,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Link } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 import { type ReactNode } from 'react';
@@ -23,14 +27,29 @@ export function CompactHeroStat({
 }) {
     const inner = (
         <>
-            <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT_CLASS[tone])} />
-            <span className="text-lg leading-none font-bold tabular-nums text-primary-foreground">{value}</span>
-            <span className="text-[10.5px] font-semibold tracking-wide text-primary-foreground/70 uppercase">{label}</span>
+            <span
+                className={cn(
+                    'h-1.5 w-1.5 shrink-0 rounded-full',
+                    DOT_CLASS[tone],
+                )}
+            />
+            <span className="text-lg leading-none font-bold text-primary-foreground tabular-nums">
+                {value}
+            </span>
+            <span className="text-[10.5px] font-semibold tracking-wide text-primary-foreground/70 uppercase">
+                {label}
+            </span>
         </>
     );
     const base = 'inline-flex items-center gap-1.5 rounded-lg px-2 py-1';
     return href ? (
-        <Link href={href} className={cn(base, 'transition-colors hover:bg-primary-foreground/15')}>
+        <Link
+            href={href}
+            className={cn(
+                base,
+                'transition-colors hover:bg-primary-foreground/15',
+            )}
+        >
             {inner}
         </Link>
     ) : (
@@ -73,12 +92,23 @@ export function FleetCompactHero({
                     </Link>
                 )}
                 <HeroStatusPill>{pill}</HeroStatusPill>
-                <h1 className="text-lg leading-none font-bold tracking-tight">{title}</h1>
+                <h1 className="text-lg leading-none font-bold tracking-tight">
+                    {title}
+                </h1>
                 {stats && (
-                    <div className="ml-auto flex flex-wrap items-center gap-1">{stats}</div>
+                    <div className="ml-auto flex flex-wrap items-center gap-1">
+                        {stats}
+                    </div>
                 )}
                 {actions && (
-                    <div className={cn('flex flex-wrap items-center gap-2', !stats && 'ml-auto')}>{actions}</div>
+                    <div
+                        className={cn(
+                            'flex flex-wrap items-center gap-2',
+                            !stats && 'ml-auto',
+                        )}
+                    >
+                        {actions}
+                    </div>
                 )}
             </div>
         </div>

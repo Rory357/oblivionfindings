@@ -15,8 +15,8 @@ import {
     Field,
     InfoCard,
     Ring,
-    SelectInput,
     Segmented,
+    SelectInput,
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
@@ -120,13 +120,62 @@ const TEMPLATES: {
     domain: string;
     icon: typeof Flag;
 }[] = [
-    { key: 'meal', label: 'Prepare a simple meal', description: 'Cook independently with fading prompts', title: 'Prepare a simple meal independently', domain: 'Daily living', icon: Utensils },
-    { key: 'bus', label: 'Travel independently', description: 'Catch the bus to the day programme', title: 'Catch the bus to day programme', domain: 'Independence', icon: Bus },
-    { key: 'meds', label: 'Manage own meds', description: 'Self-manage the morning routine', title: 'Manage own morning medication routine', domain: 'Health', icon: Pill },
-    { key: 'budget', label: 'Build a weekly budget', description: 'Plan spending with the key worker', title: 'Build a weekly budget with key worker', domain: 'Finance', icon: Wallet },
-    { key: 'group', label: 'Join a community group', description: 'Attend weekly, e.g. kapa haka', title: 'Attend a community group weekly', domain: 'Community', icon: Users },
-    { key: 'whanau', label: 'Reconnect with whānau', description: 'Visits or video calls monthly', title: 'Reconnect with whānau monthly', domain: 'Whānau', icon: Heart },
-    { key: 'custom', label: 'Write your own', description: 'Start from a blank, fully custom goal', title: '', domain: '', icon: Pencil },
+    {
+        key: 'meal',
+        label: 'Prepare a simple meal',
+        description: 'Cook independently with fading prompts',
+        title: 'Prepare a simple meal independently',
+        domain: 'Daily living',
+        icon: Utensils,
+    },
+    {
+        key: 'bus',
+        label: 'Travel independently',
+        description: 'Catch the bus to the day programme',
+        title: 'Catch the bus to day programme',
+        domain: 'Independence',
+        icon: Bus,
+    },
+    {
+        key: 'meds',
+        label: 'Manage own meds',
+        description: 'Self-manage the morning routine',
+        title: 'Manage own morning medication routine',
+        domain: 'Health',
+        icon: Pill,
+    },
+    {
+        key: 'budget',
+        label: 'Build a weekly budget',
+        description: 'Plan spending with the key worker',
+        title: 'Build a weekly budget with key worker',
+        domain: 'Finance',
+        icon: Wallet,
+    },
+    {
+        key: 'group',
+        label: 'Join a community group',
+        description: 'Attend weekly, e.g. kapa haka',
+        title: 'Attend a community group weekly',
+        domain: 'Community',
+        icon: Users,
+    },
+    {
+        key: 'whanau',
+        label: 'Reconnect with whānau',
+        description: 'Visits or video calls monthly',
+        title: 'Reconnect with whānau monthly',
+        domain: 'Whānau',
+        icon: Heart,
+    },
+    {
+        key: 'custom',
+        label: 'Write your own',
+        description: 'Start from a blank, fully custom goal',
+        title: '',
+        domain: '',
+        icon: Pencil,
+    },
 ];
 
 const STATUS_OPTIONS: { value: string; label: string; icon: typeof Flag }[] = [
@@ -136,11 +185,12 @@ const STATUS_OPTIONS: { value: string; label: string; icon: typeof Flag }[] = [
     { value: 'completed', label: 'Achieved', icon: CheckCircle2 },
 ];
 
-const PRIORITY_OPTIONS: { value: string; label: string; icon: typeof Flag }[] = [
-    { value: 'low', label: 'Low', icon: Circle },
-    { value: 'medium', label: 'Medium', icon: Flag },
-    { value: 'high', label: 'High', icon: AlertTriangle },
-];
+const PRIORITY_OPTIONS: { value: string; label: string; icon: typeof Flag }[] =
+    [
+        { value: 'low', label: 'Low', icon: Circle },
+        { value: 'medium', label: 'Medium', icon: Flag },
+        { value: 'high', label: 'High', icon: AlertTriangle },
+    ];
 
 const str = (v: unknown): string => String(v ?? '').trim();
 const opt = (v: unknown): string | undefined => (str(v) ? str(v) : undefined);
@@ -268,7 +318,9 @@ export function GoalWizardDialog({
                 onError: (errors: Record<string, string>) => {
                     setBusy(false);
                     const first = Object.values(errors ?? {})[0];
-                    toast.error(first ? String(first) : 'Something went wrong.');
+                    toast.error(
+                        first ? String(first) : 'Something went wrong.',
+                    );
                 },
             };
             if (method === 'delete') {
@@ -286,15 +338,50 @@ export function GoalWizardDialog({
         () =>
             managing
                 ? [
-                      { key: 'progress', label: 'Progress', blurb: 'Status & %', icon: Target },
-                      { key: 'steps', label: 'Sub-goals', blurb: 'Break it down', icon: RouteIcon },
-                      { key: 'hurdles', label: 'Hurdles', blurb: 'Issues & barriers', icon: ShieldAlert },
-                      { key: 'details', label: 'Details', blurb: 'Edit or remove', icon: Settings2 },
+                      {
+                          key: 'progress',
+                          label: 'Progress',
+                          blurb: 'Status & %',
+                          icon: Target,
+                      },
+                      {
+                          key: 'steps',
+                          label: 'Sub-goals',
+                          blurb: 'Break it down',
+                          icon: RouteIcon,
+                      },
+                      {
+                          key: 'hurdles',
+                          label: 'Hurdles',
+                          blurb: 'Issues & barriers',
+                          icon: ShieldAlert,
+                      },
+                      {
+                          key: 'details',
+                          label: 'Details',
+                          blurb: 'Edit or remove',
+                          icon: Settings2,
+                      },
                   ]
                 : [
-                      { key: 'goal', label: 'The goal', blurb: 'What & why', icon: Flag },
-                      { key: 'plan', label: 'First steps', blurb: 'Break it down', icon: RouteIcon },
-                      { key: '__review', label: 'Review & save', blurb: 'Confirm and save', icon: CheckCircle2 },
+                      {
+                          key: 'goal',
+                          label: 'The goal',
+                          blurb: 'What & why',
+                          icon: Flag,
+                      },
+                      {
+                          key: 'plan',
+                          label: 'First steps',
+                          blurb: 'Break it down',
+                          icon: RouteIcon,
+                      },
+                      {
+                          key: '__review',
+                          label: 'Review & save',
+                          blurb: 'Confirm and save',
+                          icon: CheckCircle2,
+                      },
                   ],
         [managing],
     );
@@ -396,9 +483,14 @@ export function GoalWizardDialog({
         setDetail((d) =>
             d ? { ...d, steps: d.steps.filter((s) => s.id !== step.id) } : d,
         );
-        mutate('delete', `${base}/${goal.id}/steps/${step.id}`, {}, {
-            onOk: () => void refetch(),
-        });
+        mutate(
+            'delete',
+            `${base}/${goal.id}/steps/${step.id}`,
+            {},
+            {
+                onOk: () => void refetch(),
+            },
+        );
     };
 
     const addHurdle = () => {
@@ -445,10 +537,15 @@ export function GoalWizardDialog({
 
     const deleteGoal = () => {
         if (!base || !goal) return;
-        mutate('delete', `${base}/${goal.id}`, {}, {
-            okToast: 'Goal removed',
-            close: true,
-        });
+        mutate(
+            'delete',
+            `${base}/${goal.id}`,
+            {},
+            {
+                okToast: 'Goal removed',
+                close: true,
+            },
+        );
     };
 
     /* ----------------------------------------------------------- footer */
@@ -459,7 +556,12 @@ export function GoalWizardDialog({
     const navButtons = (
         <>
             {stepIndex > 0 ? (
-                <Button type="button" variant="ghost" onClick={goBack} disabled={busy}>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={goBack}
+                    disabled={busy}
+                >
                     <ChevronLeft className="mr-1 h-4 w-4" /> Back
                 </Button>
             ) : null}
@@ -471,7 +573,12 @@ export function GoalWizardDialog({
         const reviewing = stepIndex === lastIndex;
         footerEnd = (
             <>
-                <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={busy}
+                >
                     Cancel
                 </Button>
                 {reviewing ? (
@@ -505,17 +612,40 @@ export function GoalWizardDialog({
         const onDetails = stepIndex === lastIndex;
         footerEnd = (
             <>
-                <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={busy}
+                >
                     Close
                 </Button>
                 {onProgress ? (
-                    <Button type="button" onClick={saveProgress} disabled={busy} data-test="goal-progress-save">
-                        {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}
+                    <Button
+                        type="button"
+                        onClick={saveProgress}
+                        disabled={busy}
+                        data-test="goal-progress-save"
+                    >
+                        {busy ? (
+                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Check className="mr-1.5 h-4 w-4" />
+                        )}
                         Save progress
                     </Button>
                 ) : onDetails ? (
-                    <Button type="button" onClick={saveDetails} disabled={busy} data-test="goal-details-save">
-                        {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}
+                    <Button
+                        type="button"
+                        onClick={saveDetails}
+                        disabled={busy}
+                        data-test="goal-details-save"
+                    >
+                        {busy ? (
+                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Check className="mr-1.5 h-4 w-4" />
+                        )}
                         Save changes
                     </Button>
                 ) : (
@@ -527,22 +657,23 @@ export function GoalWizardDialog({
         );
     }
 
-    const footerStart = managing && stepIndex === lastIndex ? (
-        <div className="flex items-center gap-3">
-            {navButtons}
-            <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setDeleteOpen(true)}
-                disabled={busy}
-                className="text-status-critical hover:text-status-critical"
-            >
-                <Trash2 className="mr-1.5 h-4 w-4" /> Delete goal
-            </Button>
-        </div>
-    ) : (
-        navButtons
-    );
+    const footerStart =
+        managing && stepIndex === lastIndex ? (
+            <div className="flex items-center gap-3">
+                {navButtons}
+                <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setDeleteOpen(true)}
+                    disabled={busy}
+                    className="text-status-critical hover:text-status-critical"
+                >
+                    <Trash2 className="mr-1.5 h-4 w-4" /> Delete goal
+                </Button>
+            </div>
+        ) : (
+            navButtons
+        );
 
     /* ------------------------------------------------------------- panes */
 
@@ -550,281 +681,569 @@ export function GoalWizardDialog({
 
     return (
         <>
-        <WizardShell
-            open={open}
-            onClose={() => !busy && onClose()}
-            title={managing ? 'Manage goal' : 'Add goal'}
-            description={managing ? 'Update progress, sub-goals and hurdles' : 'Create a goal on the path'}
-            railIcon={Flag}
-            railTitle={managing ? (goal?.title ?? 'Goal') : 'Add goal'}
-            railSub="Goals path"
-            steps={railSteps}
-            stepIndex={stepIndex}
-            onStepClick={(i) => setStepIndex(i)}
-            pct={managing ? livePct : null}
-            pctLabel={managing ? 'Progress' : 'Completeness'}
-            footerStart={footerStart}
-            footerEnd={footerEnd}
-        >
-            {/* ============================ CREATE ============================ */}
-            {!managing && stepKey === 'goal' ? (
-                <WizardStepPane key="goal">
-                    <StepHead icon={Flag} title="What is the goal?" blurb="Pick a starting point or write your own — in the client's words where possible." />
-                    {clientLabel ? <ClientChip label={clientLabel} /> : null}
-                    {!base ? (
-                        <InfoCard icon={AlertTriangle} tone="warn">
-                            No active care plan yet — create one on the Care &amp; Support Plan tab before adding goals.
-                        </InfoCard>
-                    ) : null}
-                    <p className="mb-1.5 text-sm font-medium">Start from</p>
-                    <TilePicker
-                        value={template}
-                        onChange={applyTemplate}
-                        cols={3}
-                        options={TEMPLATES.map((t) => ({
-                            key: t.key,
-                            label: t.label,
-                            description: t.description,
-                            icon: t.icon,
-                        }))}
-                    />
-                    <div className="mt-4 grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Goal" required span>
-                            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Prepare a simple meal independently" />
-                        </Field>
-                        <Field label="Domain" required>
-                            <SelectInput value={domain} onChange={setDomain} placeholder="Select a domain…" options={DOMAINS.map((d) => ({ value: d, label: d }))} />
-                        </Field>
-                        <Field label="Why it matters" span>
-                            <Textarea value={why} rows={2} onChange={(e) => setWhy(e.target.value)} placeholder="What makes this goal meaningful to the client?" />
-                        </Field>
-                    </div>
-                </WizardStepPane>
-            ) : null}
-
-            {!managing && stepKey === 'plan' ? (
-                <WizardStepPane key="plan">
-                    <StepHead icon={RouteIcon} title="How will we get there?" blurb="Add the first sub-goals. Progress is auto-calculated from these as they're completed." />
-                    <p className="mb-1.5 text-sm font-medium">Sub-goals</p>
-                    <div className="space-y-2">
-                        {newSteps.map((s, i) => (
-                            <div key={i} className="flex items-center gap-2">
-                                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">{i + 1}</span>
+            <WizardShell
+                open={open}
+                onClose={() => !busy && onClose()}
+                title={managing ? 'Manage goal' : 'Add goal'}
+                description={
+                    managing
+                        ? 'Update progress, sub-goals and hurdles'
+                        : 'Create a goal on the path'
+                }
+                railIcon={Flag}
+                railTitle={managing ? (goal?.title ?? 'Goal') : 'Add goal'}
+                railSub="Goals path"
+                steps={railSteps}
+                stepIndex={stepIndex}
+                onStepClick={(i) => setStepIndex(i)}
+                pct={managing ? livePct : null}
+                pctLabel={managing ? 'Progress' : 'Completeness'}
+                footerStart={footerStart}
+                footerEnd={footerEnd}
+            >
+                {/* ============================ CREATE ============================ */}
+                {!managing && stepKey === 'goal' ? (
+                    <WizardStepPane key="goal">
+                        <StepHead
+                            icon={Flag}
+                            title="What is the goal?"
+                            blurb="Pick a starting point or write your own — in the client's words where possible."
+                        />
+                        {clientLabel ? (
+                            <ClientChip label={clientLabel} />
+                        ) : null}
+                        {!base ? (
+                            <InfoCard icon={AlertTriangle} tone="warn">
+                                No active care plan yet — create one on the Care
+                                &amp; Support Plan tab before adding goals.
+                            </InfoCard>
+                        ) : null}
+                        <p className="mb-1.5 text-sm font-medium">Start from</p>
+                        <TilePicker
+                            value={template}
+                            onChange={applyTemplate}
+                            cols={3}
+                            options={TEMPLATES.map((t) => ({
+                                key: t.key,
+                                label: t.label,
+                                description: t.description,
+                                icon: t.icon,
+                            }))}
+                        />
+                        <div className="mt-4 grid gap-3.5 sm:grid-cols-2">
+                            <Field label="Goal" required span>
                                 <Input
-                                    value={s}
-                                    onChange={(e) =>
-                                        setNewSteps((arr) => arr.map((x, j) => (j === i ? e.target.value : x)))
-                                    }
-                                    placeholder="e.g. Choose a recipe together"
-                                />
-                                {newSteps.length > 1 ? (
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => setNewSteps((arr) => arr.filter((_, j) => j !== i))}>
-                                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
-                                ) : null}
-                            </div>
-                        ))}
-                        <Button type="button" variant="outline" size="sm" onClick={() => setNewSteps((arr) => [...arr, ''])}>
-                            <Plus className="mr-1.5 h-3.5 w-3.5" /> Add sub-goal
-                        </Button>
-                    </div>
-                    <div className="mt-5 grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Priority">
-                            <Segmented value={priority} onChange={setPriority} options={PRIORITY_OPTIONS} />
-                        </Field>
-                        <Field label="Target date">
-                            <Input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
-                        </Field>
-                    </div>
-                    <InfoCard icon={Flag} tone="info">
-                        You can leave sub-goals empty and add them later — the goal will simply start at 0%.
-                    </InfoCard>
-                </WizardStepPane>
-            ) : null}
-
-            {!managing && stepKey === '__review' ? (
-                <WizardStepPane key="__review">
-                    <StepHead icon={CheckCircle2} title="Review & save" blurb="Check the details — jump back to any step to edit." />
-                    <div className="mb-5 flex items-center gap-4 rounded-xl border border-border bg-muted/30 p-4">
-                        <Ring pct={0} size={64} />
-                        <div>
-                            <div className="text-sm font-semibold">{str(title) || 'Untitled goal'}</div>
-                            <p className="text-xs text-muted-foreground">{str(domain) || 'No domain'} · starts at 0%</p>
-                        </div>
-                    </div>
-                    <div className="space-y-3">
-                        <ReviewCard icon={Flag} title="The goal" onEdit={() => setStepIndex(0)}>
-                            <ReviewRow label="Goal" value={str(title) || undefined} />
-                            <ReviewRow label="Domain" value={str(domain) || undefined} />
-                            <ReviewRow label="Why it matters" value={opt(why)} />
-                        </ReviewCard>
-                        <ReviewCard icon={RouteIcon} title="First steps" onEdit={() => setStepIndex(1)}>
-                            <ReviewRow label="Sub-goals" value={newSteps.map(str).filter(Boolean).join(' · ') || undefined} />
-                            <ReviewRow label="Priority" value={priority} />
-                            <ReviewRow label="Target date" value={opt(targetDate)} />
-                        </ReviewCard>
-                    </div>
-                </WizardStepPane>
-            ) : null}
-
-            {/* ============================ MANAGE ============================ */}
-            {managing && loading ? (
-                <WizardStepPane key="loading">
-                    <div className="grid place-items-center py-16 text-muted-foreground">
-                        <Loader2 className="h-6 w-6 animate-spin" />
-                    </div>
-                </WizardStepPane>
-            ) : null}
-
-            {managing && !loading && stepKey === 'progress' ? (
-                <WizardStepPane key="progress">
-                    <StepHead icon={Target} title="Progress" blurb={hasSteps ? 'Auto-calculated from sub-goals — set the status and add a note.' : 'Set the progress and status for this goal.'} />
-                    <div className="mb-5 flex items-center gap-4 rounded-xl border border-border bg-muted/30 p-4">
-                        <Ring pct={livePct} size={72} />
-                        <div className="min-w-0">
-                            <div className="text-sm font-semibold">{detail?.goal.title}</div>
-                            <p className="text-xs text-muted-foreground">
-                                {hasSteps
-                                    ? `Auto-calculated from ${steps.length} sub-goal${steps.length === 1 ? '' : 's'} · ${doneCount} done`
-                                    : 'No sub-goals — set the percentage manually'}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        <Field label="Status">
-                            <Segmented value={status} onChange={setStatus} options={STATUS_OPTIONS} />
-                        </Field>
-                        {!hasSteps ? (
-                            <Field label={`Progress — ${manualPct}%`}>
-                                <input
-                                    type="range"
-                                    min={0}
-                                    max={100}
-                                    step={5}
-                                    value={manualPct}
-                                    onChange={(e) => setManualPct(Number(e.target.value))}
-                                    className="w-full accent-[var(--primary)]"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    placeholder="e.g. Prepare a simple meal independently"
                                 />
                             </Field>
-                        ) : (
-                            <InfoCard icon={RouteIcon} tone="info">
-                                Add or complete sub-goals to move this percentage. Switch to the Sub-goals step to manage them.
-                            </InfoCard>
-                        )}
-                        <Field label="Progress note (optional)" span>
-                            <Textarea value={progressNote} rows={2} onChange={(e) => setProgressNote(e.target.value)} placeholder="What changed? Added to the goal's progress log." />
-                        </Field>
-                    </div>
-                    {detail && detail.progress_log.length > 0 ? (
-                        <div className="mt-5">
-                            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Progress log</p>
-                            <div className="space-y-2">
-                                {detail.progress_log.slice(0, 5).map((p) => (
-                                    /* eslint-disable-next-line no-restricted-syntax -- compact log row inside the wizard pane */
-                                    <div key={p.id} className="rounded-lg border border-border bg-card p-3 text-sm">
-                                        <p className="leading-snug">{p.content}</p>
-                                        <p className="mt-1 text-[11px] text-muted-foreground">{p.author ?? 'Staff'}{p.created_at ? ` · ${new Date(p.created_at).toLocaleDateString('en-NZ')}` : ''}</p>
-                                    </div>
-                                ))}
+                            <Field label="Domain" required>
+                                <SelectInput
+                                    value={domain}
+                                    onChange={setDomain}
+                                    placeholder="Select a domain…"
+                                    options={DOMAINS.map((d) => ({
+                                        value: d,
+                                        label: d,
+                                    }))}
+                                />
+                            </Field>
+                            <Field label="Why it matters" span>
+                                <Textarea
+                                    value={why}
+                                    rows={2}
+                                    onChange={(e) => setWhy(e.target.value)}
+                                    placeholder="What makes this goal meaningful to the client?"
+                                />
+                            </Field>
+                        </div>
+                    </WizardStepPane>
+                ) : null}
+
+                {!managing && stepKey === 'plan' ? (
+                    <WizardStepPane key="plan">
+                        <StepHead
+                            icon={RouteIcon}
+                            title="How will we get there?"
+                            blurb="Add the first sub-goals. Progress is auto-calculated from these as they're completed."
+                        />
+                        <p className="mb-1.5 text-sm font-medium">Sub-goals</p>
+                        <div className="space-y-2">
+                            {newSteps.map((s, i) => (
+                                <div
+                                    key={i}
+                                    className="flex items-center gap-2"
+                                >
+                                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
+                                        {i + 1}
+                                    </span>
+                                    <Input
+                                        value={s}
+                                        onChange={(e) =>
+                                            setNewSteps((arr) =>
+                                                arr.map((x, j) =>
+                                                    j === i
+                                                        ? e.target.value
+                                                        : x,
+                                                ),
+                                            )
+                                        }
+                                        placeholder="e.g. Choose a recipe together"
+                                    />
+                                    {newSteps.length > 1 ? (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() =>
+                                                setNewSteps((arr) =>
+                                                    arr.filter(
+                                                        (_, j) => j !== i,
+                                                    ),
+                                                )
+                                            }
+                                        >
+                                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                        </Button>
+                                    ) : null}
+                                </div>
+                            ))}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    setNewSteps((arr) => [...arr, ''])
+                                }
+                            >
+                                <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
+                                sub-goal
+                            </Button>
+                        </div>
+                        <div className="mt-5 grid gap-3.5 sm:grid-cols-2">
+                            <Field label="Priority">
+                                <Segmented
+                                    value={priority}
+                                    onChange={setPriority}
+                                    options={PRIORITY_OPTIONS}
+                                />
+                            </Field>
+                            <Field label="Target date">
+                                <Input
+                                    type="date"
+                                    value={targetDate}
+                                    onChange={(e) =>
+                                        setTargetDate(e.target.value)
+                                    }
+                                />
+                            </Field>
+                        </div>
+                        <InfoCard icon={Flag} tone="info">
+                            You can leave sub-goals empty and add them later —
+                            the goal will simply start at 0%.
+                        </InfoCard>
+                    </WizardStepPane>
+                ) : null}
+
+                {!managing && stepKey === '__review' ? (
+                    <WizardStepPane key="__review">
+                        <StepHead
+                            icon={CheckCircle2}
+                            title="Review & save"
+                            blurb="Check the details — jump back to any step to edit."
+                        />
+                        <div className="mb-5 flex items-center gap-4 rounded-xl border border-border bg-muted/30 p-4">
+                            <Ring pct={0} size={64} />
+                            <div>
+                                <div className="text-sm font-semibold">
+                                    {str(title) || 'Untitled goal'}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    {str(domain) || 'No domain'} · starts at 0%
+                                </p>
                             </div>
                         </div>
-                    ) : null}
-                </WizardStepPane>
-            ) : null}
+                        <div className="space-y-3">
+                            <ReviewCard
+                                icon={Flag}
+                                title="The goal"
+                                onEdit={() => setStepIndex(0)}
+                            >
+                                <ReviewRow
+                                    label="Goal"
+                                    value={str(title) || undefined}
+                                />
+                                <ReviewRow
+                                    label="Domain"
+                                    value={str(domain) || undefined}
+                                />
+                                <ReviewRow
+                                    label="Why it matters"
+                                    value={opt(why)}
+                                />
+                            </ReviewCard>
+                            <ReviewCard
+                                icon={RouteIcon}
+                                title="First steps"
+                                onEdit={() => setStepIndex(1)}
+                            >
+                                <ReviewRow
+                                    label="Sub-goals"
+                                    value={
+                                        newSteps
+                                            .map(str)
+                                            .filter(Boolean)
+                                            .join(' · ') || undefined
+                                    }
+                                />
+                                <ReviewRow label="Priority" value={priority} />
+                                <ReviewRow
+                                    label="Target date"
+                                    value={opt(targetDate)}
+                                />
+                            </ReviewCard>
+                        </div>
+                    </WizardStepPane>
+                ) : null}
 
-            {managing && !loading && stepKey === 'steps' ? (
-                <WizardStepPane key="steps">
-                    <StepHead icon={RouteIcon} title="Sub-goals" blurb="Break the goal into steps. Completing them moves the goal's progress automatically." />
-                    <div className="space-y-2">
-                        {steps.length === 0 ? (
-                            <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">No sub-goals yet. Add the first below.</p>
-                        ) : (
-                            steps.map((s) => (
-                                <div key={s.id} className={cn('flex items-center gap-2.5 rounded-lg border p-3', s.is_complete ? 'border-status-success/40 bg-status-success-bg/30' : 'border-border')}>
-                                    {/* eslint-disable-next-line no-restricted-syntax -- custom checkbox toggle for a sub-goal */}
-                                    <button type="button" onClick={() => toggleStep(s)} aria-pressed={s.is_complete} className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-md border transition-colors', s.is_complete ? 'border-status-success bg-status-success text-white' : 'border-border hover:border-primary')}>
-                                        {s.is_complete ? <Check className="h-3.5 w-3.5" /> : null}
-                                    </button>
-                                    <span className={cn('min-w-0 flex-1 text-sm', s.is_complete && 'text-muted-foreground line-through')}>{s.title}</span>
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeStep(s)}>
-                                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
+                {/* ============================ MANAGE ============================ */}
+                {managing && loading ? (
+                    <WizardStepPane key="loading">
+                        <div className="grid place-items-center py-16 text-muted-foreground">
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                        </div>
+                    </WizardStepPane>
+                ) : null}
+
+                {managing && !loading && stepKey === 'progress' ? (
+                    <WizardStepPane key="progress">
+                        <StepHead
+                            icon={Target}
+                            title="Progress"
+                            blurb={
+                                hasSteps
+                                    ? 'Auto-calculated from sub-goals — set the status and add a note.'
+                                    : 'Set the progress and status for this goal.'
+                            }
+                        />
+                        <div className="mb-5 flex items-center gap-4 rounded-xl border border-border bg-muted/30 p-4">
+                            <Ring pct={livePct} size={72} />
+                            <div className="min-w-0">
+                                <div className="text-sm font-semibold">
+                                    {detail?.goal.title}
                                 </div>
-                            ))
-                        )}
-                    </div>
-                    <div className="mt-3 flex items-center gap-2">
-                        <Input value={newStepTitle} onChange={(e) => setNewStepTitle(e.target.value)} placeholder="Add a sub-goal…" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addStep(); } }} />
-                        <Button type="button" onClick={addStep} disabled={busy || !str(newStepTitle)}>
-                            <Plus className="mr-1.5 h-4 w-4" /> Add
-                        </Button>
-                    </div>
-                </WizardStepPane>
-            ) : null}
+                                <p className="text-xs text-muted-foreground">
+                                    {hasSteps
+                                        ? `Auto-calculated from ${steps.length} sub-goal${steps.length === 1 ? '' : 's'} · ${doneCount} done`
+                                        : 'No sub-goals — set the percentage manually'}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="space-y-4">
+                            <Field label="Status">
+                                <Segmented
+                                    value={status}
+                                    onChange={setStatus}
+                                    options={STATUS_OPTIONS}
+                                />
+                            </Field>
+                            {!hasSteps ? (
+                                <Field label={`Progress — ${manualPct}%`}>
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={100}
+                                        step={5}
+                                        value={manualPct}
+                                        onChange={(e) =>
+                                            setManualPct(Number(e.target.value))
+                                        }
+                                        className="w-full accent-[var(--primary)]"
+                                    />
+                                </Field>
+                            ) : (
+                                <InfoCard icon={RouteIcon} tone="info">
+                                    Add or complete sub-goals to move this
+                                    percentage. Switch to the Sub-goals step to
+                                    manage them.
+                                </InfoCard>
+                            )}
+                            <Field label="Progress note (optional)" span>
+                                <Textarea
+                                    value={progressNote}
+                                    rows={2}
+                                    onChange={(e) =>
+                                        setProgressNote(e.target.value)
+                                    }
+                                    placeholder="What changed? Added to the goal's progress log."
+                                />
+                            </Field>
+                        </div>
+                        {detail && detail.progress_log.length > 0 ? (
+                            <div className="mt-5">
+                                <p className="mb-2 text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
+                                    Progress log
+                                </p>
+                                <div className="space-y-2">
+                                    {detail.progress_log
+                                        .slice(0, 5)
+                                        .map((p) => (
+                                            /* eslint-disable-next-line no-restricted-syntax -- compact log row inside the wizard pane */
+                                            <div
+                                                key={p.id}
+                                                className="rounded-lg border border-border bg-card p-3 text-sm"
+                                            >
+                                                <p className="leading-snug">
+                                                    {p.content}
+                                                </p>
+                                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                                    {p.author ?? 'Staff'}
+                                                    {p.created_at
+                                                        ? ` · ${new Date(p.created_at).toLocaleDateString('en-NZ')}`
+                                                        : ''}
+                                                </p>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        ) : null}
+                    </WizardStepPane>
+                ) : null}
 
-            {managing && !loading && stepKey === 'hurdles' ? (
-                <WizardStepPane key="hurdles">
-                    <StepHead icon={ShieldAlert} title="Hurdles & issues" blurb="Record what's getting in the way so the team can respond." />
-                    <div className="space-y-2">
-                        {detail && detail.hurdles.length === 0 ? (
-                            <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">No hurdles logged. 🎉</p>
-                        ) : (
-                            detail?.hurdles.map((h) => (
-                                <div key={h.id} className={cn('flex items-start gap-2.5 rounded-lg border p-3', h.resolved ? 'border-border bg-muted/30' : 'border-status-warning/40 bg-status-warning-bg/40')}>
-                                    <ShieldAlert className={cn('mt-0.5 h-4 w-4 shrink-0', h.resolved ? 'text-muted-foreground' : 'text-status-warning')} />
-                                    <div className="min-w-0 flex-1">
-                                        <p className={cn('text-sm leading-snug', h.resolved && 'text-muted-foreground line-through')}>{h.content}</p>
-                                        <p className="mt-1 text-[11px] text-muted-foreground">{h.author ?? 'Staff'}{h.created_at ? ` · ${new Date(h.created_at).toLocaleDateString('en-NZ')}` : ''}</p>
+                {managing && !loading && stepKey === 'steps' ? (
+                    <WizardStepPane key="steps">
+                        <StepHead
+                            icon={RouteIcon}
+                            title="Sub-goals"
+                            blurb="Break the goal into steps. Completing them moves the goal's progress automatically."
+                        />
+                        <div className="space-y-2">
+                            {steps.length === 0 ? (
+                                <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                                    No sub-goals yet. Add the first below.
+                                </p>
+                            ) : (
+                                steps.map((s) => (
+                                    <div
+                                        key={s.id}
+                                        className={cn(
+                                            'flex items-center gap-2.5 rounded-lg border p-3',
+                                            s.is_complete
+                                                ? 'border-status-success/40 bg-status-success-bg/30'
+                                                : 'border-border',
+                                        )}
+                                    >
+                                        {/* eslint-disable-next-line no-restricted-syntax -- custom checkbox toggle for a sub-goal */}
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleStep(s)}
+                                            aria-pressed={s.is_complete}
+                                            className={cn(
+                                                'grid h-6 w-6 shrink-0 place-items-center rounded-md border transition-colors',
+                                                s.is_complete
+                                                    ? 'border-status-success bg-status-success text-white'
+                                                    : 'border-border hover:border-primary',
+                                            )}
+                                        >
+                                            {s.is_complete ? (
+                                                <Check className="h-3.5 w-3.5" />
+                                            ) : null}
+                                        </button>
+                                        <span
+                                            className={cn(
+                                                'min-w-0 flex-1 text-sm',
+                                                s.is_complete &&
+                                                    'text-muted-foreground line-through',
+                                            )}
+                                        >
+                                            {s.title}
+                                        </span>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => removeStep(s)}
+                                        >
+                                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                        </Button>
                                     </div>
-                                    {h.resolved ? (
-                                        <span className="shrink-0 text-[11px] font-medium text-status-success">Resolved</span>
-                                    ) : (
-                                        <Button type="button" variant="outline" size="sm" onClick={() => resolveHurdle(h)} disabled={busy}>Resolve</Button>
-                                    )}
-                                </div>
-                            ))
-                        )}
-                    </div>
-                    <div className="mt-3 flex items-center gap-2">
-                        <Input value={hurdleText} onChange={(e) => setHurdleText(e.target.value)} placeholder="Describe a hurdle or issue…" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addHurdle(); } }} />
-                        <Button type="button" onClick={addHurdle} disabled={busy || !str(hurdleText)}>
-                            <Plus className="mr-1.5 h-4 w-4" /> Log
-                        </Button>
-                    </div>
-                </WizardStepPane>
-            ) : null}
+                                ))
+                            )}
+                        </div>
+                        <div className="mt-3 flex items-center gap-2">
+                            <Input
+                                value={newStepTitle}
+                                onChange={(e) =>
+                                    setNewStepTitle(e.target.value)
+                                }
+                                placeholder="Add a sub-goal…"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addStep();
+                                    }
+                                }}
+                            />
+                            <Button
+                                type="button"
+                                onClick={addStep}
+                                disabled={busy || !str(newStepTitle)}
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" /> Add
+                            </Button>
+                        </div>
+                    </WizardStepPane>
+                ) : null}
 
-            {managing && !loading && stepKey === 'details' ? (
-                <WizardStepPane key="details">
-                    <StepHead icon={Settings2} title="Goal details" blurb="Edit the goal, or remove it from the path." />
-                    <div className="grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Goal" required span>
-                            <Input value={dTitle} onChange={(e) => setDTitle(e.target.value)} />
-                        </Field>
-                        <Field label="Domain" required>
-                            <SelectInput value={dDomain} onChange={setDDomain} placeholder="Select a domain…" options={DOMAINS.map((d) => ({ value: d, label: d }))} />
-                        </Field>
-                        <Field label="Priority">
-                            <Segmented value={dPriority} onChange={setDPriority} options={PRIORITY_OPTIONS} />
-                        </Field>
-                        <Field label="Target date">
-                            <Input type="date" value={dTarget} onChange={(e) => setDTarget(e.target.value)} />
-                        </Field>
-                        <Field label="Why it matters" span>
-                            <Textarea value={dWhy} rows={2} onChange={(e) => setDWhy(e.target.value)} />
-                        </Field>
-                    </div>
-                </WizardStepPane>
-            ) : null}
-        </WizardShell>
-        <ConfirmDialog
-            open={deleteOpen}
-            onClose={() => setDeleteOpen(false)}
-            onConfirm={deleteGoal}
-            title="Remove goal?"
-            description={`Remove “${goal?.title ?? 'this goal'}” from the path? This action cannot be undone.`}
-            confirmText="Remove goal"
-        />
+                {managing && !loading && stepKey === 'hurdles' ? (
+                    <WizardStepPane key="hurdles">
+                        <StepHead
+                            icon={ShieldAlert}
+                            title="Hurdles & issues"
+                            blurb="Record what's getting in the way so the team can respond."
+                        />
+                        <div className="space-y-2">
+                            {detail && detail.hurdles.length === 0 ? (
+                                <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                                    No hurdles logged. 🎉
+                                </p>
+                            ) : (
+                                detail?.hurdles.map((h) => (
+                                    <div
+                                        key={h.id}
+                                        className={cn(
+                                            'flex items-start gap-2.5 rounded-lg border p-3',
+                                            h.resolved
+                                                ? 'border-border bg-muted/30'
+                                                : 'border-status-warning/40 bg-status-warning-bg/40',
+                                        )}
+                                    >
+                                        <ShieldAlert
+                                            className={cn(
+                                                'mt-0.5 h-4 w-4 shrink-0',
+                                                h.resolved
+                                                    ? 'text-muted-foreground'
+                                                    : 'text-status-warning',
+                                            )}
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                            <p
+                                                className={cn(
+                                                    'text-sm leading-snug',
+                                                    h.resolved &&
+                                                        'text-muted-foreground line-through',
+                                                )}
+                                            >
+                                                {h.content}
+                                            </p>
+                                            <p className="mt-1 text-[11px] text-muted-foreground">
+                                                {h.author ?? 'Staff'}
+                                                {h.created_at
+                                                    ? ` · ${new Date(h.created_at).toLocaleDateString('en-NZ')}`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                        {h.resolved ? (
+                                            <span className="shrink-0 text-[11px] font-medium text-status-success">
+                                                Resolved
+                                            </span>
+                                        ) : (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => resolveHurdle(h)}
+                                                disabled={busy}
+                                            >
+                                                Resolve
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        <div className="mt-3 flex items-center gap-2">
+                            <Input
+                                value={hurdleText}
+                                onChange={(e) => setHurdleText(e.target.value)}
+                                placeholder="Describe a hurdle or issue…"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addHurdle();
+                                    }
+                                }}
+                            />
+                            <Button
+                                type="button"
+                                onClick={addHurdle}
+                                disabled={busy || !str(hurdleText)}
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" /> Log
+                            </Button>
+                        </div>
+                    </WizardStepPane>
+                ) : null}
+
+                {managing && !loading && stepKey === 'details' ? (
+                    <WizardStepPane key="details">
+                        <StepHead
+                            icon={Settings2}
+                            title="Goal details"
+                            blurb="Edit the goal, or remove it from the path."
+                        />
+                        <div className="grid gap-3.5 sm:grid-cols-2">
+                            <Field label="Goal" required span>
+                                <Input
+                                    value={dTitle}
+                                    onChange={(e) => setDTitle(e.target.value)}
+                                />
+                            </Field>
+                            <Field label="Domain" required>
+                                <SelectInput
+                                    value={dDomain}
+                                    onChange={setDDomain}
+                                    placeholder="Select a domain…"
+                                    options={DOMAINS.map((d) => ({
+                                        value: d,
+                                        label: d,
+                                    }))}
+                                />
+                            </Field>
+                            <Field label="Priority">
+                                <Segmented
+                                    value={dPriority}
+                                    onChange={setDPriority}
+                                    options={PRIORITY_OPTIONS}
+                                />
+                            </Field>
+                            <Field label="Target date">
+                                <Input
+                                    type="date"
+                                    value={dTarget}
+                                    onChange={(e) => setDTarget(e.target.value)}
+                                />
+                            </Field>
+                            <Field label="Why it matters" span>
+                                <Textarea
+                                    value={dWhy}
+                                    rows={2}
+                                    onChange={(e) => setDWhy(e.target.value)}
+                                />
+                            </Field>
+                        </div>
+                    </WizardStepPane>
+                ) : null}
+            </WizardShell>
+            <ConfirmDialog
+                open={deleteOpen}
+                onClose={() => setDeleteOpen(false)}
+                onConfirm={deleteGoal}
+                title="Remove goal?"
+                description={`Remove “${goal?.title ?? 'this goal'}” from the path? This action cannot be undone.`}
+                confirmText="Remove goal"
+            />
         </>
     );
 }
@@ -837,7 +1256,9 @@ function ClientChip({ label }: { label: string }) {
             </span>
             <div className="min-w-0">
                 <div className="truncate text-sm font-medium">{label}</div>
-                <div className="text-[11px] text-muted-foreground">Locked to the client you opened.</div>
+                <div className="text-[11px] text-muted-foreground">
+                    Locked to the client you opened.
+                </div>
             </div>
         </div>
     );

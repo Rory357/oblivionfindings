@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Site;
 use App\Models\SiteContact;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateSiteRequest extends FormRequest
 {
@@ -120,5 +122,42 @@ class UpdateSiteRequest extends FormRequest
             'landlord_contact' => ['nullable', 'string', 'max:255'],
             'weekly_food_budget' => ['nullable', 'numeric', 'min:0'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $site = $this->route('site');
+            $contacts = $this->input('contacts');
+            if (! $site instanceof Site || ! is_array($contacts)) {
+                return;
+            }
+
+            $primaryCount = 0;
+            foreach ($contacts as $index => $contact) {
+                if (! is_array($contact)) {
+                    continue;
+                }
+
+                if (filter_var($contact['is_primary'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                    $primaryCount++;
+                }
+
+                $contactId = $contact['id'] ?? null;
+                if (is_numeric($contactId) && ! SiteContact::query()
+                    ->where('site_id', $site->id)
+                    ->whereKey((int) $contactId)
+                    ->exists()) {
+                    $validator->errors()->add(
+                        "contacts.{$index}.id",
+                        'Choose a contact that belongs to this Site.',
+                    );
+                }
+            }
+
+            if ($primaryCount > 1) {
+                $validator->errors()->add('contacts', 'Only one Site contact can be primary.');
+            }
+        });
     }
 }

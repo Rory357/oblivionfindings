@@ -3,6 +3,7 @@ import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import ItMajorIncidentsIndex from './index';
 import ItMajorIncidentShow from './show';
+import ItMajorIncidentStatus from './status';
 
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: React.ReactNode }) => (
@@ -24,7 +25,10 @@ vi.mock('@inertiajs/react', () => ({
         </a>
     ),
     router: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
-    usePage: () => ({ props: { itNavigation: [] }, url: '/it/major-incidents' }),
+    usePage: () => ({
+        props: { itNavigation: [] },
+        url: '/it/major-incidents',
+    }),
     useForm: (initial: Record<string, unknown>) => ({
         data: initial,
         setData: vi.fn(),
@@ -160,5 +164,46 @@ describe('IT major incident command workspaces', () => {
                 name: /Open canonical ticket workspace/i,
             }),
         ).toHaveAttribute('href', '/it/tickets/60');
+    });
+
+    it('renders an audience-safe requester status journey without internal response fields', () => {
+        render(
+            <ItMajorIncidentStatus
+                status={{
+                    reference: 'IT-000060',
+                    title: 'All-site identity outage',
+                    severity: 'sev1',
+                    workflow_state: 'responding',
+                    impact_summary:
+                        'Authentication is unavailable across all sites.',
+                    restored_at: null,
+                    updates: [
+                        {
+                            id: 2,
+                            update_kind: 'stakeholder_update',
+                            audience: 'staff',
+                            summary:
+                                'Authentication remains unavailable. Use the emergency phone process.',
+                            service_status: 'major_outage',
+                            published_at: '2026-07-19T22:10:00Z',
+                        },
+                    ],
+                }}
+            />,
+        );
+
+        expect(
+            screen.getByRole('heading', { name: 'All-site identity outage' }),
+        ).toBeVisible();
+        expect(screen.getByText('Current impact')).toBeVisible();
+        expect(screen.getByText('Staff update')).toBeVisible();
+        expect(
+            screen.getByText(/Use the emergency phone process/i),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('link', { name: /Back to my requests/i }),
+        ).toHaveAttribute('href', '/it?tab=my-tickets');
+        expect(screen.queryByText(/privileged diagnostics/i)).toBeNull();
+        expect(screen.queryByText(/incident commander/i)).toBeNull();
     });
 });

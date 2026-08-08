@@ -12,7 +12,12 @@ import { cn } from '@/lib/utils';
 import { RotateCcw, Search } from 'lucide-react';
 import { ReactNode } from 'react';
 
-export type FilterFieldType = 'search' | 'select' | 'date' | 'date-range' | 'custom';
+export type FilterFieldType =
+    | 'search'
+    | 'select'
+    | 'date'
+    | 'date-range'
+    | 'custom';
 
 export interface FilterField {
     type: FilterFieldType;
@@ -67,7 +72,7 @@ export function FilterBar({
             aria-label="Search filters"
             className={cn(
                 'flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4',
-                className
+                className,
             )}
         >
             {fields.map((field) => {
@@ -77,19 +82,33 @@ export function FilterBar({
                 switch (field.type) {
                     case 'search':
                         return (
-                            <div key={field.key} className={cn('min-w-[200px] flex-1', widthClass)}>
+                            <div
+                                key={field.key}
+                                className={cn(
+                                    'min-w-[200px] flex-1',
+                                    widthClass,
+                                )}
+                            >
                                 {field.label && (
                                     <Label className="text-xs text-muted-foreground">
                                         {field.label}
                                     </Label>
                                 )}
                                 <div role="search" className="relative mt-1">
-                                    <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
-                                        placeholder={field.placeholder ?? 'Search...'}
-                                        aria-label={field.label || field.placeholder || 'Search'}
+                                        placeholder={
+                                            field.placeholder ?? 'Search...'
+                                        }
+                                        aria-label={
+                                            field.label ||
+                                            field.placeholder ||
+                                            'Search'
+                                        }
                                         value={value || ''}
-                                        onChange={(e) => onChange(field.key, e.target.value)}
+                                        onChange={(e) =>
+                                            onChange(field.key, e.target.value)
+                                        }
                                         className="pl-9"
                                         disabled={isPending}
                                     />
@@ -108,19 +127,27 @@ export function FilterBar({
                                 <Select
                                     value={value ?? ANY}
                                     onValueChange={(v) =>
-                                        onChange(field.key, v === ANY ? null : v)
+                                        onChange(
+                                            field.key,
+                                            v === ANY ? null : v,
+                                        )
                                     }
                                     disabled={isPending}
                                 >
                                     <SelectTrigger className="mt-1">
-                                        <SelectValue placeholder={field.placeholder} />
+                                        <SelectValue
+                                            placeholder={field.placeholder}
+                                        />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value={ANY}>
                                             {field.placeholder ?? 'Any'}
                                         </SelectItem>
                                         {field.options?.map((opt) => (
-                                            <SelectItem key={opt.value} value={opt.value}>
+                                            <SelectItem
+                                                key={opt.value}
+                                                value={opt.value}
+                                            >
                                                 {opt.label}
                                             </SelectItem>
                                         ))}
@@ -141,7 +168,10 @@ export function FilterBar({
                                     type="date"
                                     value={value || ''}
                                     onChange={(e) =>
-                                        onChange(field.key, e.target.value || null)
+                                        onChange(
+                                            field.key,
+                                            e.target.value || null,
+                                        )
                                     }
                                     className="mt-1"
                                     disabled={isPending}
@@ -151,7 +181,10 @@ export function FilterBar({
 
                     case 'date-range':
                         return (
-                            <div key={field.key} className="flex items-end gap-2">
+                            <div
+                                key={field.key}
+                                className="flex items-end gap-2"
+                            >
                                 <div className={cn(widthClass)}>
                                     {field.label && (
                                         <Label className="text-xs text-muted-foreground">
@@ -160,11 +193,13 @@ export function FilterBar({
                                     )}
                                     <Input
                                         type="date"
-                                        value={values[`${field.key}_from`] || ''}
+                                        value={
+                                            values[`${field.key}_from`] || ''
+                                        }
                                         onChange={(e) =>
                                             onChange(
                                                 `${field.key}_from`,
-                                                e.target.value || null
+                                                e.target.value || null,
                                             )
                                         }
                                         className="mt-1"
@@ -172,14 +207,16 @@ export function FilterBar({
                                     />
                                 </div>
                                 <div className={cn(widthClass)}>
-                                    <Label className="text-xs text-muted-foreground">To</Label>
+                                    <Label className="text-xs text-muted-foreground">
+                                        To
+                                    </Label>
                                     <Input
                                         type="date"
                                         value={values[`${field.key}_to`] || ''}
                                         onChange={(e) =>
                                             onChange(
                                                 `${field.key}_to`,
-                                                e.target.value || null
+                                                e.target.value || null,
                                             )
                                         }
                                         className="mt-1"

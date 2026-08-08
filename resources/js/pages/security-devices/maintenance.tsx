@@ -60,6 +60,7 @@ export type MaintenanceWorkspace = {
         type: string | null;
         site_id: number | null;
         device_id: number | null;
+        domain: string | null;
     };
     filter_options: {
         statuses: string[];
@@ -132,6 +133,21 @@ function Filters({ workspace }: { workspace: MaintenanceWorkspace }) {
             className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-2 xl:grid-cols-6"
             onSubmit={submit}
         >
+            {workspace.filters.domain ? (
+                <div className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 text-sm md:col-span-2 xl:col-span-6">
+                    <span className="font-medium">
+                        Device domain: {title(workspace.filters.domain)}
+                    </span>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => apply({ domain: null })}
+                    >
+                        Clear domain scope
+                    </Button>
+                </div>
+            ) : null}
             <label className="xl:col-span-2">
                 <span className="sr-only">Search maintenance work</span>
                 <div className="relative">

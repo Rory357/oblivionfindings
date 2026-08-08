@@ -2,6 +2,9 @@
  * Receive (emar.stock.receive) or adjust (emar.stock.adjust) a medication's
  * stock. Both endpoints key on client_medication_id. */
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     InfoCard,
@@ -9,21 +12,33 @@ import {
     SelectInput,
     StepHead,
 } from '@/components/wizard/primitives';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { router } from '@inertiajs/react';
 import { ClipboardCheck, Info, Package, PackagePlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import type { ClientOption } from './report-error-modal';
 import type { MedicationOption } from './cd-register-modal';
+import type { ClientOption } from './report-error-modal';
 
 const STEPS = [
-    { key: 'action', label: 'Action', blurb: 'Receive or adjust', icon: Package },
-    { key: 'details', label: 'Details', blurb: 'Quantity & batch', icon: PackagePlus },
-    { key: 'review', label: 'Review', blurb: 'Save change', icon: ClipboardCheck },
+    {
+        key: 'action',
+        label: 'Action',
+        blurb: 'Receive or adjust',
+        icon: Package,
+    },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Quantity & batch',
+        icon: PackagePlus,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Save change',
+        icon: ClipboardCheck,
+    },
 ];
 
 export function StockMovementModal({
@@ -42,7 +57,9 @@ export function StockMovementModal({
     const [step, setStep] = useState(0);
     const [saving, setSaving] = useState(false);
     const [action, setAction] = useState<'receive' | 'adjust'>('receive');
-    const [clientId, setClientId] = useState(initialClientId ? String(initialClientId) : '');
+    const [clientId, setClientId] = useState(
+        initialClientId ? String(initialClientId) : '',
+    );
     const [medId, setMedId] = useState('');
     const [quantity, setQuantity] = useState('');
     const [newQuantity, setNewQuantity] = useState('');
@@ -75,7 +92,9 @@ export function StockMovementModal({
         onClose();
     };
 
-    const clientMeds = medications.filter((m) => String(m.client_id) === clientId);
+    const clientMeds = medications.filter(
+        (m) => String(m.client_id) === clientId,
+    );
     const step1Ok = clientId && medId;
     const step2Ok =
         action === 'receive'
@@ -84,7 +103,8 @@ export function StockMovementModal({
 
     const submit = () => {
         setSaving(true);
-        const url = action === 'receive' ? '/emar/stock/receive' : '/emar/stock/adjust';
+        const url =
+            action === 'receive' ? '/emar/stock/receive' : '/emar/stock/adjust';
         const payload =
             action === 'receive'
                 ? {
@@ -101,7 +121,11 @@ export function StockMovementModal({
         router.post(url, payload, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success(action === 'receive' ? 'Stock received' : 'Stock count adjusted');
+                toast.success(
+                    action === 'receive'
+                        ? 'Stock received'
+                        : 'Stock count adjusted',
+                );
                 close();
             },
             onError: () => toast.error('Could not save the stock change'),
@@ -110,17 +134,24 @@ export function StockMovementModal({
     };
 
     const medName = clientMeds.find((m) => String(m.id) === medId)?.name ?? '—';
-    const clientName = clients.find((c) => String(c.id) === clientId)?.name ?? '—';
+    const clientName =
+        clients.find((c) => String(c.id) === clientId)?.name ?? '—';
 
     const footer = (
         <>
-            <Button variant="ghost" onClick={step === 0 ? close : () => setStep((s) => s - 1)} disabled={saving}>
+            <Button
+                variant="ghost"
+                onClick={step === 0 ? close : () => setStep((s) => s - 1)}
+                disabled={saving}
+            >
                 {step === 0 ? 'Cancel' : 'Back'}
             </Button>
             {step < 2 ? (
                 <Button
                     onClick={() => setStep((s) => s + 1)}
-                    disabled={(step === 0 && !step1Ok) || (step === 1 && !step2Ok)}
+                    disabled={
+                        (step === 0 && !step1Ok) || (step === 1 && !step2Ok)
+                    }
                 >
                     Continue
                 </Button>
@@ -149,7 +180,11 @@ export function StockMovementModal({
         >
             {step === 0 ? (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={Package} title="Stock action" blurb="What kind of change, and for which medication?" />
+                    <StepHead
+                        icon={Package}
+                        title="Stock action"
+                        blurb="What kind of change, and for which medication?"
+                    />
                     <Field label="Action" span>
                         <Segmented
                             value={action}
@@ -168,15 +203,29 @@ export function StockMovementModal({
                                 setMedId('');
                             }}
                             placeholder="Select client"
-                            options={clients.map((c) => ({ value: String(c.id), label: c.site ? `${c.name} · ${c.site}` : c.name }))}
+                            options={clients.map((c) => ({
+                                value: String(c.id),
+                                label: c.site
+                                    ? `${c.name} · ${c.site}`
+                                    : c.name,
+                            }))}
                         />
                     </Field>
                     <Field label="Medication" required>
                         <SelectInput
                             value={medId}
                             onChange={setMedId}
-                            placeholder={clientId ? (clientMeds.length ? 'Select medication' : 'No medications') : 'Select a client first'}
-                            options={clientMeds.map((m) => ({ value: String(m.id), label: m.name }))}
+                            placeholder={
+                                clientId
+                                    ? clientMeds.length
+                                        ? 'Select medication'
+                                        : 'No medications'
+                                    : 'Select a client first'
+                            }
+                            options={clientMeds.map((m) => ({
+                                value: String(m.id),
+                                label: m.name,
+                            }))}
                         />
                     </Field>
                 </div>
@@ -184,16 +233,36 @@ export function StockMovementModal({
                 <div className="grid gap-5 sm:grid-cols-2">
                     <StepHead
                         icon={PackagePlus}
-                        title={action === 'receive' ? 'Receipt details' : 'Adjustment details'}
-                        blurb={action === 'receive' ? 'How much arrived?' : 'Set the corrected count and why.'}
+                        title={
+                            action === 'receive'
+                                ? 'Receipt details'
+                                : 'Adjustment details'
+                        }
+                        blurb={
+                            action === 'receive'
+                                ? 'How much arrived?'
+                                : 'Set the corrected count and why.'
+                        }
                     />
                     {action === 'receive' ? (
                         <>
                             <Field label="Quantity received" required>
-                                <Input type="number" inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" />
+                                <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    value={quantity}
+                                    onChange={(e) =>
+                                        setQuantity(e.target.value)
+                                    }
+                                    placeholder="0"
+                                />
                             </Field>
                             <Field label="Batch number">
-                                <Input value={batch} onChange={(e) => setBatch(e.target.value)} placeholder="Optional" />
+                                <Input
+                                    value={batch}
+                                    onChange={(e) => setBatch(e.target.value)}
+                                    placeholder="Optional"
+                                />
                             </Field>
                             <Field label="Expiry date" span>
                                 {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in wizard primitives. */}
@@ -208,38 +277,79 @@ export function StockMovementModal({
                     ) : (
                         <>
                             <Field label="New on-hand count" required>
-                                <Input type="number" inputMode="numeric" value={newQuantity} onChange={(e) => setNewQuantity(e.target.value)} placeholder="0" />
+                                <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    value={newQuantity}
+                                    onChange={(e) =>
+                                        setNewQuantity(e.target.value)
+                                    }
+                                    placeholder="0"
+                                />
                             </Field>
                             <Field label="Reason for adjustment" required span>
-                                <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="e.g. recount after discrepancy, damaged stock disposed" />
+                                <Textarea
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                    rows={3}
+                                    placeholder="e.g. recount after discrepancy, damaged stock disposed"
+                                />
                             </Field>
                         </>
                     )}
                 </div>
             ) : (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={ClipboardCheck} title="Review" blurb="Confirm the stock change." />
+                    <StepHead
+                        icon={ClipboardCheck}
+                        title="Review"
+                        blurb="Confirm the stock change."
+                    />
                     <div className="col-span-full rounded-lg border border-border">
                         <div className="px-4">
-                            <SummaryRow label="Action" value={action === 'receive' ? 'Receive stock' : 'Adjust count'} />
+                            <SummaryRow
+                                label="Action"
+                                value={
+                                    action === 'receive'
+                                        ? 'Receive stock'
+                                        : 'Adjust count'
+                                }
+                            />
                             <SummaryRow label="Client" value={clientName} />
                             <SummaryRow label="Medication" value={medName} />
                             {action === 'receive' ? (
                                 <>
-                                    <SummaryRow label="Quantity" value={quantity || '—'} />
-                                    <SummaryRow label="Batch / expiry" value={[batch, expiry].filter(Boolean).join(' · ') || '—'} />
+                                    <SummaryRow
+                                        label="Quantity"
+                                        value={quantity || '—'}
+                                    />
+                                    <SummaryRow
+                                        label="Batch / expiry"
+                                        value={
+                                            [batch, expiry]
+                                                .filter(Boolean)
+                                                .join(' · ') || '—'
+                                        }
+                                    />
                                 </>
                             ) : (
                                 <>
-                                    <SummaryRow label="New count" value={newQuantity || '—'} />
-                                    <SummaryRow label="Reason" value={reason || '—'} />
+                                    <SummaryRow
+                                        label="New count"
+                                        value={newQuantity || '—'}
+                                    />
+                                    <SummaryRow
+                                        label="Reason"
+                                        value={reason || '—'}
+                                    />
                                 </>
                             )}
                         </div>
                     </div>
                     <InfoCard icon={Info}>
-                        Stock changes are audited. Receipts update batch &amp; expiry tracking; adjustments
-                        record the reason for the recount.
+                        Stock changes are audited. Receipts update batch &amp;
+                        expiry tracking; adjustments record the reason for the
+                        recount.
                     </InfoCard>
                 </div>
             )}

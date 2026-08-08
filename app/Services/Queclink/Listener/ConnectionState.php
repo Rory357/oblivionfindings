@@ -13,14 +13,29 @@ namespace App\Services\Queclink\Listener;
 class ConnectionState
 {
     public string $buffer = '';
+
     public ?string $imei = null;
+
     public ?int $queclinkDeviceId = null;
+
     public string $sessionId;
+
     public string $remoteAddress;
+
     public float $connectedAt;
+
+    /** Last complete, protocol-valid inbound frame; raw/partial bytes do not extend it. */
     public float $lastActivityAt;
+
     public int $framesIn = 0;
+
     public int $framesOut = 0;
+
+    public float $frameWindowStartedAt;
+
+    public int $framesInWindow = 0;
+
+    public int $invalidFramesInWindow = 0;
 
     public function __construct(string $remoteAddress)
     {
@@ -28,6 +43,7 @@ class ConnectionState
         $this->sessionId = bin2hex(random_bytes(8));
         $this->connectedAt = microtime(true);
         $this->lastActivityAt = $this->connectedAt;
+        $this->frameWindowStartedAt = $this->connectedAt;
     }
 
     public function bind(string $imei, int $queclinkDeviceId): void

@@ -1,10 +1,10 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 
@@ -71,7 +71,8 @@ export default function CustomFormEdit({ form }: Props) {
     return (
         <AppLayout>
             <Head title={`Edit ${form.name}`} />
-            <PageHero variant="compact"
+            <PageHero
+                variant="compact"
                 title={`Edit ${form.name}`}
                 description="Update the form structure and workflow type."
                 backHref={`/operations/forms/${form.id}`}

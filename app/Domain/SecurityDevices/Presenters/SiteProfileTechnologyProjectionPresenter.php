@@ -16,7 +16,8 @@ final class SiteProfileTechnologyProjectionPresenter
 
     public function canView(User $viewer, Site $site): bool
     {
-        return $viewer->canDo('securityDevices.devices.view')
+        return $viewer->canDo('securityDevices.viewAny')
+            && $viewer->canDo('securityDevices.devices.view')
             && $site->is_active
             && ! $site->archived
             && $site->archived_at === null
@@ -30,6 +31,9 @@ final class SiteProfileTechnologyProjectionPresenter
             return null;
         }
 
+        $canViewMonitoring = $viewer->canDo('securityDevices.events.view');
+        $canViewMaintenance = $viewer->canDo('securityDevices.maintenance.view')
+            || $viewer->canDo('securityDevices.maintenance.manage');
         $source = $this->estate->site($viewer, $site);
         $summary = $source['summary'];
         $devices = collect($source['devices'])
@@ -53,7 +57,7 @@ final class SiteProfileTechnologyProjectionPresenter
                 'href',
             ])->all())
             ->values();
-        $monitorIssues = collect($source['monitoring']['monitors'])
+        $monitorIssues = collect($canViewMonitoring ? $source['monitoring']['monitors'] : [])
             ->whereIn('state', ['failed', 'degraded', 'unknown', 'stale', 'pending'])
             ->take(8)
             ->map(fn (array $monitor): array => collect($monitor)->only([
@@ -105,18 +109,24 @@ final class SiteProfileTechnologyProjectionPresenter
             'devices' => $devices,
             'alerts' => collect($source['alerts'])->take(6)->values(),
             'it_work' => collect($source['itWork'])->take(6)->values(),
-            'maintenance' => collect($source['maintenance'])->take(6)->values(),
-            'collectors' => collect($source['collectors'])->take(6)->values(),
+            'maintenance' => collect($canViewMaintenance ? $source['maintenance'] : [])->take(6)->values(),
+            'collectors' => collect($canViewMonitoring ? $source['collectors'] : [])->take(6)->values(),
             'changes' => collect($source['changes'])->take(6)->values(),
             'links' => [
                 'full' => "/security-devices/sites/{$site->id}",
                 'devices' => "/security-devices/devices?site_id={$site->id}",
-                'monitoring' => "/security-devices/monitoring?site_id={$site->id}",
-                'maintenance' => "/security-devices/maintenance?site_id={$site->id}",
+                'monitoring' => $canViewMonitoring
+                    ? "/security-devices/monitoring?site_id={$site->id}"
+                    : null,
+                'maintenance' => $canViewMaintenance
+                    ? "/security-devices/maintenance?site_id={$site->id}"
+                    : null,
             ],
             'can' => [
                 'view_control_room' => (bool) $source['can']['view_control_room'],
                 'view_it_work' => (bool) $source['can']['view_it_work'],
+                'view_monitoring' => $canViewMonitoring,
+                'view_maintenance' => $canViewMaintenance,
                 'view_room_placement' => $viewer->canDo('siteHardware.view'),
             ],
         ];

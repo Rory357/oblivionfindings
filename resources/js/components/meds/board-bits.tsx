@@ -2,8 +2,8 @@
  * status pill, the CD badge, hue-tinted client avatar chips and the client
  * summary card used at the top of wizard steps. Extracted so the upcoming
  * eMAR page redesigns reuse one idiom. */
-import { Badge } from '@/components/ui/badge';
 import { avatarHueStyle } from '@/components/rostering/avatar-hue';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { MapPin } from 'lucide-react';
 

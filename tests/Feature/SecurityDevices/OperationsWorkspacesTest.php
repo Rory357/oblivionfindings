@@ -342,6 +342,53 @@ class OperationsWorkspacesTest extends TestCase
         });
     }
 
+    public function test_maintenance_handoffs_apply_overdue_open_and_domain_filters(): void
+    {
+        $site = Site::factory()->create();
+        $healthcare = Device::factory()->create([
+            'domain' => 'iot_healthcare',
+            'category' => 'medical_device',
+        ]);
+        $security = Device::factory()->create([
+            'domain' => 'security',
+            'category' => 'alarm',
+        ]);
+        $this->assignToSite($healthcare, $site);
+        $this->assignToSite($security, $site);
+        foreach ([
+            [$healthcare, 'Healthcare overdue calibration', 'scheduled', now()->subDay()],
+            [$healthcare, 'Healthcare completed calibration', 'completed', now()->subDays(2)],
+            [$security, 'Security overdue calibration', 'scheduled', now()->subDay()],
+        ] as [$device, $description, $status, $scheduledFor]) {
+            DeviceMaintenanceRecord::query()->create([
+                'device_id' => $device->id,
+                'type' => 'calibration',
+                'status' => $status,
+                'description' => $description,
+                'scheduled_for' => $scheduledFor,
+                'completed_at' => $status === 'completed' ? now()->subDay() : null,
+            ]);
+        }
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/maintenance?status=overdue&type=calibration&domain=iot_healthcare')
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $workspace = $page->toArray()['props']['workspace'];
+
+                $this->assertSame(['Healthcare overdue calibration'], collect($workspace['records'])->pluck('description')->all());
+                $this->assertSame('overdue', $workspace['filters']['status']);
+                $this->assertSame('iot_healthcare', $workspace['filters']['domain']);
+            });
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/maintenance?status=open&domain=iot_healthcare')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('workspace.records', 1)
+                ->where('workspace.records.0.description', 'Healthcare overdue calibration'));
+    }
+
     public function test_maintenance_mutations_enforce_device_visibility_and_accept_configuration_work(): void
     {
         [$viewer, $allowedSite, $hiddenSite] = $this->siteScopedViewer([

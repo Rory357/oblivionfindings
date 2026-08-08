@@ -1,12 +1,11 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import RespiteSubnav from '@/components/respite-subnav';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import RespiteSubnav from '@/components/respite-subnav';
+import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
-import { ShieldAlert } from 'lucide-react';
 
 type Props = {
     clientId: number;
@@ -30,9 +29,22 @@ const typeColors: Record<string, string> = {
     communication: 'bg-status-info-bg text-status-info',
 };
 
-export default function RiskPlanActivationsForClient({ clientId, activations, planTypes }: Props) {
+export default function RiskPlanActivationsForClient({
+    clientId,
+    activations,
+    planTypes,
+}: Props) {
     return (
-        <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Risk Plan Activations', href: '/respite/risk-plan-activations' }, { title: 'For Client', href: '#' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                {
+                    title: 'Risk Plan Activations',
+                    href: '/respite/risk-plan-activations',
+                },
+                { title: 'For Client', href: '#' },
+            ]}
+        >
             <Head title="Risk Plans for Client" />
 
             <PageLayout
@@ -54,17 +66,50 @@ export default function RiskPlanActivationsForClient({ clientId, activations, pl
                                 <CardTitle className="text-base">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
-                                            <div className="font-semibold">{a.plan_name}</div>
+                                            <div className="font-semibold">
+                                                {a.plan_name}
+                                            </div>
                                             <div className="mt-2 flex flex-wrap gap-2">
-                                                <Badge className={typeColors[a.plan_type] || ''}>{a.plan_type?.replace(/_/g, ' ')}</Badge>
-                                                <Badge className={statusColors[a.status] || ''}>{a.status?.replace(/_/g, ' ')}</Badge>
+                                                <Badge
+                                                    className={
+                                                        typeColors[
+                                                            a.plan_type
+                                                        ] || ''
+                                                    }
+                                                >
+                                                    {a.plan_type?.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </Badge>
+                                                <Badge
+                                                    className={
+                                                        statusColors[
+                                                            a.status
+                                                        ] || ''
+                                                    }
+                                                >
+                                                    {a.status?.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </Badge>
                                             </div>
                                             {a.stay && (
-                                                <div className="mt-2 text-xs text-muted-foreground">Stay #{a.stay.id}</div>
+                                                <div className="mt-2 text-xs text-muted-foreground">
+                                                    Stay #{a.stay.id}
+                                                </div>
                                             )}
-                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTimeLong(a.created_at)}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">
+                                                {formatDateTimeLong(
+                                                    a.created_at,
+                                                )}
+                                            </div>
                                         </div>
-                                        <Link href={`/respite/risk-plan-activations/${a.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                                        <Link
+                                            href={`/respite/risk-plan-activations/${a.id}`}
+                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                        >
                                             View
                                         </Link>
                                     </div>
@@ -73,7 +118,9 @@ export default function RiskPlanActivationsForClient({ clientId, activations, pl
                         </Card>
                     ))}
                     {!activations.data.length && (
-                        <div className="py-8 text-center text-sm text-muted-foreground">No risk plan activations found for this client.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                            No risk plan activations found for this client.
+                        </div>
                     )}
                 </div>
 
@@ -85,7 +132,17 @@ export default function RiskPlanActivationsForClient({ clientId, activations, pl
                                 variant="outline"
                                 size="sm"
                                 disabled={!l.url}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

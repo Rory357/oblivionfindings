@@ -25,14 +25,14 @@ Use this runbook when a Security & Devices credential reference may be compromis
    php artisan security-devices:verify-credential-containment <site-id> '<reference-key>' --require-active
    ```
 
-   Expected result: `Credential containment verified` and `Outstanding prior leases: 0`. The command never accepts or prints secret material.
+   Expected result: `Credential containment verified` and `Outstanding prior leases: 0`. The command fails unless every prior-version lease has a recognised terminal state, a recorded end time, and an erased lease identifier. It never accepts or prints secret material.
 7. Review **Settings & audit** for the immutable rotation, test, issued, contained, deferred-revocation, and expiry evidence. If any prior lease remains pending before its expiry, keep the incident open and verify the one-minute `monitoring-maintenance` worker and secret-manager availability.
 8. Confirm monitoring checks and approved Device commands recover using the new reference. Do not close the incident merely because the reference activated; verify the affected Site and Device paths.
 9. Close the incident/change with safe evidence: exact Site, reference UUID, versions, timestamps, lease counts, test result, and provider audit identifier. Never attach logs or screenshots containing credential material.
 
 ## Executable rehearsal
 
-The automated rehearsal uses a non-production secret-manager fixture and proves that an issued lease is encrypted at rest, rotation suspends new delivery, the old lease is revoked and erased, the replacement must be retested, and the verifier rejects incomplete containment:
+The automated rehearsal uses a non-production secret-manager fixture and proves that an issued lease is encrypted at rest, rotation suspends new delivery, the old lease is revoked and erased, the replacement must be retested, and the verifier rejects incomplete containment or a terminal-looking lifecycle row that still retains its lease identifier:
 
 ```powershell
 php artisan test tests/Feature/SecurityDevices/CredentialReferenceLeaseTest.php --filter="rehearses compromised credential containment"

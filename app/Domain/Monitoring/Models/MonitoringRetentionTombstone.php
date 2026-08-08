@@ -7,6 +7,7 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 final class MonitoringRetentionTombstone extends Model
 {
@@ -34,6 +35,44 @@ final class MonitoringRetentionTombstone extends Model
         'period_end' => 'immutable_datetime',
         'deleted_at' => 'immutable_datetime',
     ];
+
+    protected static function booted(): void
+    {
+        self::creating(function (self $tombstone): void {
+            $hasSeries = $tombstone->series_id !== null;
+            $hasSnapshot = $tombstone->snapshot_id !== null;
+            if ($hasSeries === $hasSnapshot
+                || ! Str::isUuid((string) $tombstone->tombstone_uuid)
+                || blank($tombstone->job_reference)
+                || $tombstone->period_start === null
+                || $tombstone->period_end === null
+                || $tombstone->period_start->greaterThan($tombstone->period_end)
+                || $tombstone->deleted_at === null) {
+                throw new \UnexpectedValueException(
+                    'Monitoring retention tombstone evidence is incomplete.',
+                );
+            }
+
+            if ($hasSnapshot
+                && ($tombstone->monitor_id !== null
+                    || $tombstone->data_class !== 'configuration'
+                    || $tombstone->retention_tier !== 'configuration')) {
+                throw new \UnexpectedValueException(
+                    'Snapshot retention tombstone lineage is invalid.',
+                );
+            }
+        });
+
+        self::updating(function (): void {
+            throw new \UnexpectedValueException('Monitoring retention tombstone evidence is immutable.');
+        });
+
+        self::deleting(function (): void {
+            throw new \UnexpectedValueException(
+                'Monitoring retention tombstone evidence cannot be deleted.',
+            );
+        });
+    }
 
     public function series(): BelongsTo
     {

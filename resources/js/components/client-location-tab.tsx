@@ -90,7 +90,7 @@ export type ClientLocationData = {
         fleet_dashboard_url?: string;
         history_url?: string;
         last_command_status?: CommandStatus;
-        detail_url?: string;
+        detail_url?: string | null;
     } | null;
     currentLocation: {
         lat: number;

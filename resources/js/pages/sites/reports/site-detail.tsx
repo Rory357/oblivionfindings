@@ -1,10 +1,17 @@
+import { PageHero, PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
-import { PageHero, PageLayout } from '@/components/page';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { AlertTriangle, Clock, Shield, Key, ClipboardList } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Clock, Key, Shield } from 'lucide-react';
 
 type Site = {
     id: number;
@@ -57,10 +64,12 @@ export default function SiteDetailReport({
     recentAuditEntries,
 }: Props) {
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Reports', href: '/sites/reports' },
-            { title: site.name, href: `/sites/reports/site/${site.id}` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Reports', href: '/sites/reports' },
+                { title: site.name, href: `/sites/reports/site/${site.id}` },
+            ]}
+        >
             <Head title={`Site Report - ${site.name}`} />
 
             <PageLayout
@@ -77,30 +86,46 @@ export default function SiteDetailReport({
                 {/* Hazard Stats */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4 text-status-warning" />
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <AlertTriangle className="h-4 w-4 text-status-warning" />
                             Hazards
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-4 sm:grid-cols-4">
-                            <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-status-warning">{hazardStats.open}</div>
-                                <div className="text-sm text-muted-foreground">Open</div>
-                            </div>
-                            <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-status-success">{hazardStats.closed}</div>
-                                <div className="text-sm text-muted-foreground">Closed</div>
-                            </div>
-                            <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-status-critical">{hazardStats.overdue}</div>
-                                <div className="text-sm text-muted-foreground">Overdue</div>
-                            </div>
-                            <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold">
-                                    {hazardStats.avg_time_to_close !== null ? `${hazardStats.avg_time_to_close}d` : 'N/A'}
+                            <div className="rounded-lg border p-3 text-center">
+                                <div className="text-2xl font-bold text-status-warning">
+                                    {hazardStats.open}
                                 </div>
-                                <div className="text-sm text-muted-foreground">Avg Time to Close</div>
+                                <div className="text-sm text-muted-foreground">
+                                    Open
+                                </div>
+                            </div>
+                            <div className="rounded-lg border p-3 text-center">
+                                <div className="text-2xl font-bold text-status-success">
+                                    {hazardStats.closed}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Closed
+                                </div>
+                            </div>
+                            <div className="rounded-lg border p-3 text-center">
+                                <div className="text-2xl font-bold text-status-critical">
+                                    {hazardStats.overdue}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Overdue
+                                </div>
+                            </div>
+                            <div className="rounded-lg border p-3 text-center">
+                                <div className="text-2xl font-bold">
+                                    {hazardStats.avg_time_to_close !== null
+                                        ? `${hazardStats.avg_time_to_close}d`
+                                        : 'N/A'}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Avg Time to Close
+                                </div>
                             </div>
                         </div>
                     </CardContent>
@@ -109,28 +134,44 @@ export default function SiteDetailReport({
                 {/* Checklist Stats */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <ClipboardList className="w-4 h-4 text-status-info" />
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <ClipboardList className="h-4 w-4 text-status-info" />
                             Checklists
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-4 sm:grid-cols-4">
-                            <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold">{checklistStats.total_runs}</div>
-                                <div className="text-sm text-muted-foreground">Total Runs</div>
+                            <div className="rounded-lg border p-3 text-center">
+                                <div className="text-2xl font-bold">
+                                    {checklistStats.total_runs}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Total Runs
+                                </div>
                             </div>
-                            <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-status-success">{checklistStats.completed_runs}</div>
-                                <div className="text-sm text-muted-foreground">Completed</div>
+                            <div className="rounded-lg border p-3 text-center">
+                                <div className="text-2xl font-bold text-status-success">
+                                    {checklistStats.completed_runs}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Completed
+                                </div>
                             </div>
-                            <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-status-critical">{checklistStats.overdue_runs}</div>
-                                <div className="text-sm text-muted-foreground">Overdue</div>
+                            <div className="rounded-lg border p-3 text-center">
+                                <div className="text-2xl font-bold text-status-critical">
+                                    {checklistStats.overdue_runs}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Overdue
+                                </div>
                             </div>
-                            <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-status-info">{checklistStats.completion_rate}%</div>
-                                <div className="text-sm text-muted-foreground">Completion Rate</div>
+                            <div className="rounded-lg border p-3 text-center">
+                                <div className="text-2xl font-bold text-status-info">
+                                    {checklistStats.completion_rate}%
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Completion Rate
+                                </div>
                             </div>
                         </div>
                     </CardContent>
@@ -140,24 +181,36 @@ export default function SiteDetailReport({
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Shield className="w-4 h-4 text-primary" />
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Shield className="h-4 w-4 text-primary" />
                                 Inspections
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="grid gap-4 sm:grid-cols-3">
-                                <div className="text-center p-3 rounded-lg border">
-                                    <div className="text-2xl font-bold">{inspectionStats.scheduled}</div>
-                                    <div className="text-sm text-muted-foreground">Scheduled</div>
+                                <div className="rounded-lg border p-3 text-center">
+                                    <div className="text-2xl font-bold">
+                                        {inspectionStats.scheduled}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Scheduled
+                                    </div>
                                 </div>
-                                <div className="text-center p-3 rounded-lg border">
-                                    <div className="text-2xl font-bold text-status-success">{inspectionStats.completed}</div>
-                                    <div className="text-sm text-muted-foreground">Completed</div>
+                                <div className="rounded-lg border p-3 text-center">
+                                    <div className="text-2xl font-bold text-status-success">
+                                        {inspectionStats.completed}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Completed
+                                    </div>
                                 </div>
-                                <div className="text-center p-3 rounded-lg border">
-                                    <div className="text-2xl font-bold text-status-critical">{inspectionStats.overdue}</div>
-                                    <div className="text-sm text-muted-foreground">Overdue</div>
+                                <div className="rounded-lg border p-3 text-center">
+                                    <div className="text-2xl font-bold text-status-critical">
+                                        {inspectionStats.overdue}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Overdue
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
@@ -165,20 +218,28 @@ export default function SiteDetailReport({
 
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Key className="w-4 h-4 text-status-warning" />
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Key className="h-4 w-4 text-status-warning" />
                                 Credentials
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="text-center p-3 rounded-lg border">
-                                    <div className="text-2xl font-bold">{credentialStats.total}</div>
-                                    <div className="text-sm text-muted-foreground">Total</div>
+                                <div className="rounded-lg border p-3 text-center">
+                                    <div className="text-2xl font-bold">
+                                        {credentialStats.total}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Total
+                                    </div>
                                 </div>
-                                <div className="text-center p-3 rounded-lg border">
-                                    <div className="text-2xl font-bold text-status-warning">{credentialStats.requiring_reauth}</div>
-                                    <div className="text-sm text-muted-foreground">Requiring Reauth</div>
+                                <div className="rounded-lg border p-3 text-center">
+                                    <div className="text-2xl font-bold text-status-warning">
+                                        {credentialStats.requiring_reauth}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Requiring Reauth
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
@@ -189,8 +250,8 @@ export default function SiteDetailReport({
                 {recentAuditEntries.length > 0 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Clock className="w-4 h-4 text-muted-foreground" />
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Clock className="h-4 w-4 text-muted-foreground" />
                                 Recent Audit Log
                             </CardTitle>
                         </CardHeader>
@@ -208,12 +269,16 @@ export default function SiteDetailReport({
                                         <TableRow key={entry.id}>
                                             <TableCell>
                                                 <Badge variant="outline">
-                                                    {entry.auditable_type?.split('\\').pop()}
+                                                    {entry.auditable_type
+                                                        ?.split('\\')
+                                                        .pop()}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>{entry.event}</TableCell>
                                             <TableCell className="text-muted-foreground">
-                                                {new Date(entry.created_at).toLocaleDateString()}
+                                                {new Date(
+                                                    entry.created_at,
+                                                ).toLocaleDateString()}
                                             </TableCell>
                                         </TableRow>
                                     ))}

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
-use App\Services\AuditLogger;
+use App\Services\Assets\AssetLifecycleService;
 use Illuminate\Http\Request;
 
 /**
@@ -16,17 +16,16 @@ use Illuminate\Http\Request;
  */
 class AssetController extends Controller
 {
+    public function __construct(
+        private readonly AssetLifecycleService $lifecycle,
+    ) {}
+
     public function destroy(Request $request, Asset $asset)
     {
-        $this->authorize('delete', $asset);
+        $user = $request->user() ?? abort(403);
+        $this->lifecycle->retire($user, $asset);
 
-        $asset->delete();
-
-        AuditLogger::log('assets.delete', $asset, [
-            'site_id' => $asset->site_id,
-            'client_id' => $asset->client_id,
-        ]);
-
-        return redirect()->route('fleet-assets.assets.index');
+        return redirect()->route('fleet-assets.assets.index')
+            ->with('success', 'Asset retired. Its lifecycle history has been retained.');
     }
 }

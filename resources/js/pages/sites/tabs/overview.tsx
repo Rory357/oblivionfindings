@@ -59,8 +59,9 @@ export function SiteProfileOverview({
     return (
         <div className="space-y-6">
             {hero.readiness.missing_critical > 0 ? (
-                <button
+                <Button
                     type="button"
+                    unstyled
                     onClick={() => onNavigate('readiness')}
                     className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg px-4 py-3 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
@@ -79,7 +80,7 @@ export function SiteProfileOverview({
                         </span>
                     </span>
                     <span className="text-sm font-medium">Review</span>
-                </button>
+                </Button>
             ) : null}
 
             <div className="grid gap-4 lg:grid-cols-4">

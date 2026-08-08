@@ -41,11 +41,46 @@ type PayablesTabDef = FinanceTabItem & {
 const apView = (c: CanTree) => !!c?.finance?.ap?.view;
 
 export const PAYABLES_TABS: PayablesTabDef[] = [
-    { id: 'bills', label: 'Bills', icon: Receipt, tone: 'primary', href: '/finance/bills', requires: apView },
-    { id: 'purchase-orders', label: 'Purchase orders', icon: ClipboardCheck, tone: 'info', href: '/finance/purchase-orders', requires: apView },
-    { id: 'vendors', label: 'Vendors', icon: Building2, tone: 'violet', href: '/finance/vendors', requires: apView },
-    { id: 'credit-notes', label: 'Credit notes', icon: FileText, tone: 'warning', href: '/finance/credit-notes', requires: apView },
-    { id: 'payment-runs', label: 'Payment runs', icon: ArrowLeftRight, tone: 'success', href: '/finance/payment-runs', requires: apView },
+    {
+        id: 'bills',
+        label: 'Bills',
+        icon: Receipt,
+        tone: 'primary',
+        href: '/finance/bills',
+        requires: apView,
+    },
+    {
+        id: 'purchase-orders',
+        label: 'Purchase orders',
+        icon: ClipboardCheck,
+        tone: 'info',
+        href: '/finance/purchase-orders',
+        requires: apView,
+    },
+    {
+        id: 'vendors',
+        label: 'Vendors',
+        icon: Building2,
+        tone: 'violet',
+        href: '/finance/vendors',
+        requires: apView,
+    },
+    {
+        id: 'credit-notes',
+        label: 'Credit notes',
+        icon: FileText,
+        tone: 'warning',
+        href: '/finance/credit-notes',
+        requires: apView,
+    },
+    {
+        id: 'payment-runs',
+        label: 'Payment runs',
+        icon: ArrowLeftRight,
+        tone: 'success',
+        href: '/finance/payment-runs',
+        requires: apView,
+    },
 ];
 
 /**
@@ -63,7 +98,9 @@ export function PayablesTabsFooter({ active }: { active: PayablesTabId }) {
         (page.props as { financeHubCounts?: FinanceHubCounts | null })
             .financeHubCounts?.['payables'] ?? {};
 
-    const visible = PAYABLES_TABS.filter((t) => t.id === active || t.requires(can));
+    const visible = PAYABLES_TABS.filter(
+        (t) => t.id === active || t.requires(can),
+    );
 
     const handleTab = (id: string) => {
         if (id === active) return;

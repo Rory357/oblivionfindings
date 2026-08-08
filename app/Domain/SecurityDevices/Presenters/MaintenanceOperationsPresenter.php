@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Presenters;
 
+use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
@@ -103,9 +104,10 @@ class MaintenanceOperationsPresenter
                 'type' => $this->stringFilter($filters['type'] ?? null),
                 'site_id' => $this->integerFilter($filters['site_id'] ?? null),
                 'device_id' => $this->integerFilter($filters['device_id'] ?? null),
+                'domain' => $this->domainFilter($filters['domain'] ?? null),
             ],
             'filter_options' => [
-                'statuses' => ['scheduled', 'in_progress', 'completed', 'cancelled'],
+                'statuses' => ['open', 'overdue', 'scheduled', 'in_progress', 'completed', 'cancelled'],
                 'types' => self::TYPES,
                 'sites' => $sitesByDevice->filter()->unique('id')->sortBy('name')->map(fn (Site $site): array => [
                     'value' => $site->id,
@@ -170,8 +172,9 @@ class MaintenanceOperationsPresenter
         $type = $this->stringFilter($filters['type'] ?? null);
         $siteId = $this->integerFilter($filters['site_id'] ?? null);
         $deviceId = $this->integerFilter($filters['device_id'] ?? null);
+        $domain = $this->domainFilter($filters['domain'] ?? null);
 
-        return $rows->filter(function (array $row) use ($search, $status, $type, $siteId, $deviceId, $activeTab): bool {
+        return $rows->filter(function (array $row) use ($search, $status, $type, $siteId, $deviceId, $domain, $activeTab): bool {
             $matchesTab = match ($activeTab) {
                 'due' => in_array($row['schedule_state'], ['overdue', 'due_soon'], true),
                 'planned' => in_array($row['schedule_state'], ['planned', 'planned_unscheduled'], true),
@@ -181,6 +184,12 @@ class MaintenanceOperationsPresenter
                 'firmware-configuration' => in_array($row['type'], ['firmware_update', 'configuration_change'], true),
                 default => true,
             };
+            $matchesStatus = match ($status) {
+                'open' => ! in_array($row['status'], ['completed', 'cancelled'], true),
+                'overdue' => $row['schedule_state'] === 'overdue',
+                null => true,
+                default => $row['status'] === $status,
+            };
 
             return $matchesTab
                 && ($search === '' || str_contains(mb_strtolower(implode(' ', [
@@ -189,11 +198,21 @@ class MaintenanceOperationsPresenter
                     $row['site']['name'] ?? '',
                     $row['vendor_reference'] ?? '',
                 ])), $search))
-                && (! $status || $row['status'] === $status)
+                && $matchesStatus
                 && (! $type || $row['type'] === $type)
                 && (! $siteId || ($row['site']['id'] ?? null) === $siteId)
-                && (! $deviceId || $row['device']['id'] === $deviceId);
+                && (! $deviceId || $row['device']['id'] === $deviceId)
+                && (! $domain || $row['device']['domain'] === $domain);
         })->values();
+    }
+
+    private function domainFilter(mixed $value): ?string
+    {
+        $domain = $this->stringFilter($value);
+
+        return $domain !== null && DeviceDomain::tryFrom($domain) !== null
+            ? $domain
+            : null;
     }
 
     /** @param Collection<int, Device> $devices @return array<string, Collection> */

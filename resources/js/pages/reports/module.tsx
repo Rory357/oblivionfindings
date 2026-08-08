@@ -45,11 +45,16 @@ function Pagination({ links }: { links?: PaginationLink[] }) {
                     disabled={!link.url}
                     onClick={() => {
                         if (link.url) {
-                            router.visit(link.url, { preserveScroll: true, preserveState: true });
+                            router.visit(link.url, {
+                                preserveScroll: true,
+                                preserveState: true,
+                            });
                         }
                     }}
                     dangerouslySetInnerHTML={{
-                        __html: link.label.replace('&laquo;', '<<').replace('&raquo;', '>>'),
+                        __html: link.label
+                            .replace('&laquo;', '<<')
+                            .replace('&raquo;', '>>'),
                     }}
                 />
             ))}
@@ -57,7 +62,12 @@ function Pagination({ links }: { links?: PaginationLink[] }) {
     );
 }
 
-export default function ModuleReport({ module, filters, statuses, rows }: Props) {
+export default function ModuleReport({
+    module,
+    filters,
+    statuses,
+    rows,
+}: Props) {
     const apply = (next: Partial<Props['filters']>) => {
         router.get(
             module.route,
@@ -89,8 +99,12 @@ export default function ModuleReport({ module, filters, statuses, rows }: Props)
             <div className="space-y-4 p-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">{module.label}</CardTitle>
-                        <div className="text-sm text-muted-foreground">{module.description}</div>
+                        <CardTitle className="text-base">
+                            {module.label}
+                        </CardTitle>
+                        <div className="text-sm text-muted-foreground">
+                            {module.description}
+                        </div>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-5">
                         <div className="md:col-span-2">
@@ -98,7 +112,9 @@ export default function ModuleReport({ module, filters, statuses, rows }: Props)
                             <Input
                                 value={filters.search ?? ''}
                                 placeholder="Search records"
-                                onChange={(e) => apply({ search: e.target.value || null })}
+                                onChange={(e) =>
+                                    apply({ search: e.target.value || null })
+                                }
                             />
                         </div>
                         <div>
@@ -106,7 +122,9 @@ export default function ModuleReport({ module, filters, statuses, rows }: Props)
                             <Input
                                 type="date"
                                 value={filters.date_from ?? ''}
-                                onChange={(e) => apply({ date_from: e.target.value || null })}
+                                onChange={(e) =>
+                                    apply({ date_from: e.target.value || null })
+                                }
                             />
                         </div>
                         <div>
@@ -114,7 +132,9 @@ export default function ModuleReport({ module, filters, statuses, rows }: Props)
                             <Input
                                 type="date"
                                 value={filters.date_to ?? ''}
-                                onChange={(e) => apply({ date_to: e.target.value || null })}
+                                onChange={(e) =>
+                                    apply({ date_to: e.target.value || null })
+                                }
                             />
                         </div>
                         <div>
@@ -122,7 +142,9 @@ export default function ModuleReport({ module, filters, statuses, rows }: Props)
                             <select
                                 className="w-full rounded-md border bg-background p-2 text-sm"
                                 value={filters.status ?? ''}
-                                onChange={(e) => apply({ status: e.target.value || null })}
+                                onChange={(e) =>
+                                    apply({ status: e.target.value || null })
+                                }
                                 disabled={statuses.length === 0}
                             >
                                 <option value="">All statuses</option>
@@ -140,7 +162,14 @@ export default function ModuleReport({ module, filters, statuses, rows }: Props)
                             </Button>
                             <Button
                                 variant="ghost"
-                                onClick={() => apply({ search: null, date_from: null, date_to: null, status: null })}
+                                onClick={() =>
+                                    apply({
+                                        search: null,
+                                        date_from: null,
+                                        date_to: null,
+                                        status: null,
+                                    })
+                                }
                             >
                                 Clear filters
                             </Button>
@@ -153,7 +182,10 @@ export default function ModuleReport({ module, filters, statuses, rows }: Props)
                         <thead className="bg-muted/40">
                             <tr>
                                 {columns.map(([column, label]) => (
-                                    <th key={column} className="p-3 text-left font-medium">
+                                    <th
+                                        key={column}
+                                        className="p-3 text-left font-medium"
+                                    >
                                         {label}
                                     </th>
                                 ))}
@@ -171,8 +203,12 @@ export default function ModuleReport({ module, filters, statuses, rows }: Props)
                             ))}
                             {rows.data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={columns.length || 1} className="p-6 text-center text-muted-foreground">
-                                        No records found for the selected filters.
+                                    <td
+                                        colSpan={columns.length || 1}
+                                        className="p-6 text-center text-muted-foreground"
+                                    >
+                                        No records found for the selected
+                                        filters.
                                     </td>
                                 </tr>
                             ) : null}
@@ -190,4 +226,3 @@ export default function ModuleReport({ module, filters, statuses, rows }: Props)
         </AppLayout>
     );
 }
-

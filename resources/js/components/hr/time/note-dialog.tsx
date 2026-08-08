@@ -50,8 +50,9 @@ export function NoteDialog({
                 <DialogHeader>
                     <DialogTitle>Add a note</DialogTitle>
                     <DialogDescription>
-                        A timestamped, team-visible note on {entry?.user_name}&apos;s entry
-                        for {entry?.entry_date}. Shows in the amendment history.
+                        A timestamped, team-visible note on {entry?.user_name}
+                        &apos;s entry for {entry?.entry_date}. Shows in the
+                        amendment history.
                     </DialogDescription>
                 </DialogHeader>
                 <Textarea
@@ -65,7 +66,10 @@ export function NoteDialog({
                     <Button variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={!form.data.note.trim() || form.processing}>
+                    <Button
+                        onClick={submit}
+                        disabled={!form.data.note.trim() || form.processing}
+                    >
                         {form.processing ? 'Saving…' : 'Add note'}
                     </Button>
                 </DialogFooter>

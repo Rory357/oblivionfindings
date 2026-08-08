@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +10,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
@@ -120,14 +120,18 @@ export default function PayslipDetail({ payslip, ytd }: Props) {
             <Head title={`Payslip - ${payslip.user?.name ?? 'Employee'}`} />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref="/hr/payroll/payslips"
                         title={payslip.user?.name ?? 'Employee'}
                         description={`${payslip.pay_period_start} - ${payslip.pay_period_end}`}
                         actions={
                             <>
-                                <Badge variant="outline" className={config.className}>
+                                <Badge
+                                    variant="outline"
+                                    className={config.className}
+                                >
                                     {config.label}
                                 </Badge>
                                 <Button variant="outline" size="sm" asChild>

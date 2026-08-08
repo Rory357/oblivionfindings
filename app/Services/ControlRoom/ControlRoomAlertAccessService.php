@@ -7,6 +7,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class ControlRoomAlertAccessService
@@ -65,6 +66,30 @@ final class ControlRoomAlertAccessService
     public function canView(ControlRoomAlert $alert, User $user): bool
     {
         return $this->findVisible($user, (int) $alert->id) !== null;
+    }
+
+    /**
+     * Resolve readable alert IDs in one canonical Site-scoped query so other
+     * modules can retain safe context without emitting inaccessible links.
+     *
+     * @param  iterable<ControlRoomAlert>  $alerts
+     * @return Collection<int, int>
+     */
+    public function readableIds(iterable $alerts, User $user): Collection
+    {
+        $ids = collect($alerts)
+            ->map(fn (ControlRoomAlert $alert): int => (int) $alert->id)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        $query = ControlRoomAlert::query()->whereKey($ids);
+        $this->applyReadableScope($query, $user);
+
+        return $query->pluck('id')->map(fn (mixed $id): int => (int) $id);
     }
 
     public function canManage(ControlRoomAlert $alert, User $user): bool

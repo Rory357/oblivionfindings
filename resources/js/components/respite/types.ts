@@ -5,7 +5,11 @@
 
 import type { ClientWizardForm } from '@/components/clients/add-client-dialog';
 import type { PlanPickerOption } from '@/components/health-safety/restraint-event-wizard';
-import type { IncidentOption, SiteOption, StaffOption } from '@/pages/health-safety/restraints/shared';
+import type {
+    IncidentOption,
+    SiteOption,
+    StaffOption,
+} from '@/pages/health-safety/restraints/shared';
 
 export type Urgency = 'planned' | 'urgent' | 'crisis';
 

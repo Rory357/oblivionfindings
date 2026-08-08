@@ -67,9 +67,12 @@ export function MyHrEsignDialog({
             {
                 preserveScroll: true,
                 onSuccess: (page) => {
-                    const flash = (page.props as { flash?: { error?: string } }).flash;
+                    const flash = (page.props as { flash?: { error?: string } })
+                        .flash;
                     if (flash?.error) {
-                        toast.error('Could not sign', { description: flash.error });
+                        toast.error('Could not sign', {
+                            description: flash.error,
+                        });
                         return;
                     }
                     toast.success('Signed ✍️', {
@@ -88,7 +91,10 @@ export function MyHrEsignDialog({
         <Dialog open={!!signature} onOpenChange={(next) => !next && close()}>
             <DialogContent
                 className="overflow-hidden p-0 [&>button]:hidden"
-                style={{ maxWidth: 'min(94vw, 560px)', width: 'min(94vw, 560px)' }}
+                style={{
+                    maxWidth: 'min(94vw, 560px)',
+                    width: 'min(94vw, 560px)',
+                }}
             >
                 <DialogTitle className="sr-only">
                     Sign {signature.document_title}
@@ -105,7 +111,9 @@ export function MyHrEsignDialog({
                         <div className="truncate text-[14.5px] font-bold">
                             {signature.document_title}
                         </div>
-                        <div className="text-[11.5px] text-muted-foreground">{meta}</div>
+                        <div className="text-[11.5px] text-muted-foreground">
+                            {meta}
+                        </div>
                     </div>
                     <button
                         type="button"
@@ -123,14 +131,15 @@ export function MyHrEsignDialog({
                             {signature.document_title}
                         </p>
                         <p className="mb-2">
-                            This document confirms your acknowledgement and agreement to the
-                            terms set out by Kauri Care. Please read carefully before
-                            signing. Your electronic signature has the same legal standing
-                            as a handwritten one.
+                            This document confirms your acknowledgement and
+                            agreement to the terms set out by Kauri Care. Please
+                            read carefully before signing. Your electronic
+                            signature has the same legal standing as a
+                            handwritten one.
                         </p>
                         <p className="mb-3">
-                            By signing you confirm you have read, understood and agree to
-                            comply with this document in full.
+                            By signing you confirm you have read, understood and
+                            agree to comply with this document in full.
                         </p>
                         <a
                             href={signature.download_url}
@@ -157,7 +166,9 @@ export function MyHrEsignDialog({
                             className="mt-2 flex h-[54px] items-center justify-center rounded-[10px] border border-dashed border-border text-[26px] italic"
                             style={{
                                 fontFamily: "'Brush Script MT', cursive",
-                                color: has ? 'var(--primary)' : 'var(--muted-foreground)',
+                                color: has
+                                    ? 'var(--primary)'
+                                    : 'var(--muted-foreground)',
                             }}
                         >
                             {has ? name : 'Your signature appears here'}

@@ -77,9 +77,15 @@ function relationshipCategory(member: FamilyMember): string {
     // categorised rows do not jump groups when the enum lookup misses.
     const r = (member.relationship ?? '').toLowerCase();
     if (
-        ['mother', 'father', 'parent', 'grandparent', 'sibling', 'sister', 'brother'].some(
-            (k) => r.includes(k),
-        )
+        [
+            'mother',
+            'father',
+            'parent',
+            'grandparent',
+            'sibling',
+            'sister',
+            'brother',
+        ].some((k) => r.includes(k))
     ) {
         return 'family';
     }
@@ -104,7 +110,9 @@ function MemberCard({
         <div className="rounded-lg border bg-card p-4">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <p className="font-medium">{person.name ?? 'Unnamed person'}</p>
+                    <p className="font-medium">
+                        {person.name ?? 'Unnamed person'}
+                    </p>
                     {person.relationship_label || person.relationship ? (
                         <p className="text-xs text-muted-foreground capitalize">
                             {person.relationship_label ?? person.relationship}
@@ -237,7 +245,7 @@ function GroupSection({
                         ))}
                     </div>
                 ) : (
-                    <p className="text-sm italic text-muted-foreground">
+                    <p className="text-sm text-muted-foreground italic">
                         {emptyLabel}
                     </p>
                 )}
@@ -305,8 +313,8 @@ export function FamilyTreeTab({
                             Important people for {clientName}
                         </h2>
                         <p className="text-sm text-muted-foreground">
-                            Relationships, contact details, and what each
-                            person is authorised to see.
+                            Relationships, contact details, and what each person
+                            is authorised to see.
                         </p>
                     </div>
                     <Badge variant="outline" className="text-base">

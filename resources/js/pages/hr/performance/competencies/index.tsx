@@ -131,7 +131,10 @@ export default function CompetencyIndex({
                         title="Competency framework"
                         description="Define and manage organisational competencies."
                         stats={[
-                            { label: 'Competencies', value: competencies.length },
+                            {
+                                label: 'Competencies',
+                                value: competencies.length,
+                            },
                             { label: 'Categories', value: categories.length },
                             { label: 'Staff profiles', value: staff.length },
                         ]}

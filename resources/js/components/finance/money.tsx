@@ -43,8 +43,7 @@ export function formatMoneyCompact(
     amount: string | number | null | undefined,
     currency = 'NZD',
 ): string {
-    const n =
-        typeof amount === 'number' ? amount : Number(amount ?? 0);
+    const n = typeof amount === 'number' ? amount : Number(amount ?? 0);
     const safe = Number.isFinite(n) ? n : 0;
     if (Math.abs(safe) < 1000) return formatMoney(safe, { currency });
     return new Intl.NumberFormat('en-NZ', {
@@ -87,7 +86,7 @@ export const AmountField = forwardRef<
 ) {
     return (
         <div className={cn('relative', className)}>
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
                 {currencySymbol}
             </span>
             <Input

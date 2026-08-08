@@ -1,12 +1,12 @@
+import { ConfirmDialog, formatMoney } from '@/components/finance';
+import { PageHero, PageLayout } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, FileText, Printer } from 'lucide-react';
-import { PageHero, PageLayout } from '@/components/page';
-import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { useState } from 'react';
 
 type TaxRate = {
@@ -119,7 +119,11 @@ type PageProps = {
 };
 
 const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(dateStr).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 
 const formatDateTime = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', {
@@ -181,11 +185,18 @@ function IrdFormBox({
     );
 }
 
-export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageProps) {
+export default function GstReturnShow({
+    gstReturn,
+    summary,
+    irdFormData,
+}: PageProps) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'GST Returns', href: '/finance/gst-returns' },
-        { title: `Period ending ${formatDate(gstReturn.period_end)}`, href: `/finance/gst-returns/${gstReturn.id}` },
+        {
+            title: `Period ending ${formatDate(gstReturn.period_end)}`,
+            href: `/finance/gst-returns/${gstReturn.id}`,
+        },
     ];
 
     const isDraft = gstReturn.status === 'draft';
@@ -193,11 +204,15 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
     const [filing, setFiling] = useState(false);
 
     function confirmFile() {
-        router.post(`/finance/gst-returns/${gstReturn.id}/file`, {}, {
-            onStart: () => setFiling(true),
-            onFinish: () => setFiling(false),
-            onSuccess: () => setFileOpen(false),
-        });
+        router.post(
+            `/finance/gst-returns/${gstReturn.id}/file`,
+            {},
+            {
+                onStart: () => setFiling(true),
+                onFinish: () => setFiling(false),
+                onSuccess: () => setFileOpen(false),
+            },
+        );
     }
 
     function handlePrint() {
@@ -210,7 +225,8 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/gst-returns"
                         title={
@@ -221,13 +237,18 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                         }
                         description={
                             <>
-                                {formatDate(gstReturn.period_start)} &ndash; {formatDate(gstReturn.period_end)}
+                                {formatDate(gstReturn.period_start)} &ndash;{' '}
+                                {formatDate(gstReturn.period_end)}
                                 {' | '}
-                                {frequencyLabels[gstReturn.filing_frequency]} |{' '}
-                                {basisLabels[gstReturn.basis]} Basis | IRD Period: {gstReturn.ird_period}
+                                {
+                                    frequencyLabels[gstReturn.filing_frequency]
+                                } | {basisLabels[gstReturn.basis]} Basis | IRD
+                                Period: {gstReturn.ird_period}
                                 {gstReturn.filed_at && gstReturn.filed_by && (
                                     <span className="mt-1 block text-sm">
-                                        Filed on {formatDateTime(gstReturn.filed_at)} by {gstReturn.filed_by.name}
+                                        Filed on{' '}
+                                        {formatDateTime(gstReturn.filed_at)} by{' '}
+                                        {gstReturn.filed_by.name}
                                     </span>
                                 )}
                             </>
@@ -264,32 +285,60 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                         <div className="space-y-6">
                             {/* Sales Section */}
                             <div>
-                                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                                <h3 className="mb-3 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
                                     Sales and Income
                                 </h3>
                                 <div className="space-y-2">
-                                    <IrdFormBox boxNumber="5" label={irdFormData.box_5_label} amount={irdFormData.box_5} />
-                                    <IrdFormBox boxNumber="6" label={irdFormData.box_6_label} amount={irdFormData.box_6} />
-                                    <IrdFormBox boxNumber="7" label={irdFormData.box_7_label} amount={irdFormData.box_7} />
-                                    <IrdFormBox boxNumber="8" label={irdFormData.box_8_label} amount={irdFormData.box_8} />
-                                    <IrdFormBox boxNumber="9" label={irdFormData.box_9_label} amount={irdFormData.box_9} />
+                                    <IrdFormBox
+                                        boxNumber="5"
+                                        label={irdFormData.box_5_label}
+                                        amount={irdFormData.box_5}
+                                    />
+                                    <IrdFormBox
+                                        boxNumber="6"
+                                        label={irdFormData.box_6_label}
+                                        amount={irdFormData.box_6}
+                                    />
+                                    <IrdFormBox
+                                        boxNumber="7"
+                                        label={irdFormData.box_7_label}
+                                        amount={irdFormData.box_7}
+                                    />
+                                    <IrdFormBox
+                                        boxNumber="8"
+                                        label={irdFormData.box_8_label}
+                                        amount={irdFormData.box_8}
+                                    />
+                                    <IrdFormBox
+                                        boxNumber="9"
+                                        label={irdFormData.box_9_label}
+                                        amount={irdFormData.box_9}
+                                    />
                                 </div>
                             </div>
 
                             {/* Purchases Section */}
                             <div>
-                                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                                <h3 className="mb-3 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
                                     Purchases and Expenses
                                 </h3>
                                 <div className="space-y-2">
-                                    <IrdFormBox boxNumber="11" label={irdFormData.box_11_label} amount={irdFormData.box_11} />
-                                    <IrdFormBox boxNumber="12" label={irdFormData.box_12_label} amount={irdFormData.box_12} />
+                                    <IrdFormBox
+                                        boxNumber="11"
+                                        label={irdFormData.box_11_label}
+                                        amount={irdFormData.box_11}
+                                    />
+                                    <IrdFormBox
+                                        boxNumber="12"
+                                        label={irdFormData.box_12_label}
+                                        amount={irdFormData.box_12}
+                                    />
                                 </div>
                             </div>
 
                             {/* Net GST */}
                             <div>
-                                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                                <h3 className="mb-3 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
                                     Net GST
                                 </h3>
                                 <IrdFormBox
@@ -313,34 +362,59 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b text-left text-muted-foreground">
-                                        <th className="pb-3 pr-4 font-medium">Tax Rate</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Rate</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Net Amount</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">GST Amount</th>
-                                        <th className="pb-3 font-medium text-right">Lines</th>
+                                        <th className="pr-4 pb-3 font-medium">
+                                            Tax Rate
+                                        </th>
+                                        <th className="pr-4 pb-3 text-right font-medium">
+                                            Rate
+                                        </th>
+                                        <th className="pr-4 pb-3 text-right font-medium">
+                                            Net Amount
+                                        </th>
+                                        <th className="pr-4 pb-3 text-right font-medium">
+                                            GST Amount
+                                        </th>
+                                        <th className="pb-3 text-right font-medium">
+                                            Lines
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {summary.breakdown_by_tax_rate.map((item) => (
-                                        <tr key={item.tax_rate_id} className="border-b last:border-0">
-                                            <td className="py-3 pr-4">
-                                                <span className="font-medium">{item.name}</span>
-                                                {item.code && (
-                                                    <span className="ml-2 text-muted-foreground">({item.code})</span>
-                                                )}
-                                            </td>
-                                            <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                {Number(item.rate)}%
-                                            </td>
-                                            <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                {formatMoney(item.net_amount)}
-                                            </td>
-                                            <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                {formatMoney(item.gst_amount)}
-                                            </td>
-                                            <td className="py-3 text-right">{item.line_count}</td>
-                                        </tr>
-                                    ))}
+                                    {summary.breakdown_by_tax_rate.map(
+                                        (item) => (
+                                            <tr
+                                                key={item.tax_rate_id}
+                                                className="border-b last:border-0"
+                                            >
+                                                <td className="py-3 pr-4">
+                                                    <span className="font-medium">
+                                                        {item.name}
+                                                    </span>
+                                                    {item.code && (
+                                                        <span className="ml-2 text-muted-foreground">
+                                                            ({item.code})
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 pr-4 text-right font-mono tabular-nums">
+                                                    {Number(item.rate)}%
+                                                </td>
+                                                <td className="py-3 pr-4 text-right font-mono tabular-nums">
+                                                    {formatMoney(
+                                                        item.net_amount,
+                                                    )}
+                                                </td>
+                                                <td className="py-3 pr-4 text-right font-mono tabular-nums">
+                                                    {formatMoney(
+                                                        item.gst_amount,
+                                                    )}
+                                                </td>
+                                                <td className="py-3 text-right">
+                                                    {item.line_count}
+                                                </td>
+                                            </tr>
+                                        ),
+                                    )}
                                 </tbody>
                             </table>
                         </CardContent>
@@ -350,7 +424,9 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                 {/* Detail Lines */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Detail Lines ({gstReturn.lines.length})</CardTitle>
+                        <CardTitle>
+                            Detail Lines ({gstReturn.lines.length})
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {gstReturn.lines.length === 0 ? (
@@ -362,44 +438,74 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b text-left text-muted-foreground">
-                                            <th className="pb-3 pr-4 font-medium">Date</th>
-                                            <th className="pb-3 pr-4 font-medium">Journal #</th>
-                                            <th className="pb-3 pr-4 font-medium">Account</th>
-                                            <th className="pb-3 pr-4 font-medium">Description</th>
-                                            <th className="pb-3 pr-4 font-medium text-right">Net Amount</th>
-                                            <th className="pb-3 pr-4 font-medium text-right">GST Amount</th>
-                                            <th className="pb-3 font-medium">Tax Rate</th>
+                                            <th className="pr-4 pb-3 font-medium">
+                                                Date
+                                            </th>
+                                            <th className="pr-4 pb-3 font-medium">
+                                                Journal #
+                                            </th>
+                                            <th className="pr-4 pb-3 font-medium">
+                                                Account
+                                            </th>
+                                            <th className="pr-4 pb-3 font-medium">
+                                                Description
+                                            </th>
+                                            <th className="pr-4 pb-3 text-right font-medium">
+                                                Net Amount
+                                            </th>
+                                            <th className="pr-4 pb-3 text-right font-medium">
+                                                GST Amount
+                                            </th>
+                                            <th className="pb-3 font-medium">
+                                                Tax Rate
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {gstReturn.lines.map((line) => (
-                                            <tr key={line.id} className="border-b last:border-0">
+                                            <tr
+                                                key={line.id}
+                                                className="border-b last:border-0"
+                                            >
                                                 <td className="py-2 pr-4 whitespace-nowrap">
-                                                    {line.journal_line?.journal?.journal_date
-                                                        ? formatDate(line.journal_line.journal.journal_date)
+                                                    {line.journal_line?.journal
+                                                        ?.journal_date
+                                                        ? formatDate(
+                                                              line.journal_line
+                                                                  .journal
+                                                                  .journal_date,
+                                                          )
                                                         : '-'}
                                                 </td>
                                                 <td className="py-2 pr-4 font-mono text-xs">
-                                                    {line.journal_line?.journal?.journal_number ?? '-'}
+                                                    {line.journal_line?.journal
+                                                        ?.journal_number ?? '-'}
                                                 </td>
                                                 <td className="py-2 pr-4 whitespace-nowrap">
                                                     {line.account && (
                                                         <span>
                                                             <span className="font-mono text-muted-foreground">
-                                                                {line.account.code}
+                                                                {
+                                                                    line.account
+                                                                        .code
+                                                                }
                                                             </span>{' '}
                                                             {line.account.name}
                                                         </span>
                                                     )}
                                                 </td>
-                                                <td className="py-2 pr-4 max-w-[200px] truncate">
+                                                <td className="max-w-[200px] truncate py-2 pr-4">
                                                     {line.description || '-'}
                                                 </td>
                                                 <td className="py-2 pr-4 text-right font-mono tabular-nums">
-                                                    {formatMoney(line.net_amount)}
+                                                    {formatMoney(
+                                                        line.net_amount,
+                                                    )}
                                                 </td>
                                                 <td className="py-2 pr-4 text-right font-mono tabular-nums">
-                                                    {formatMoney(line.gst_amount)}
+                                                    {formatMoney(
+                                                        line.gst_amount,
+                                                    )}
                                                 </td>
                                                 <td className="py-2 text-xs">
                                                     {line.tax_rate
@@ -423,8 +529,11 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                 description={
                     <>
                         This marks the GST return for IRD period{' '}
-                        <span className="font-medium text-foreground">{gstReturn.ird_period}</span>{' '}
-                        as filed and locks it. This action can&rsquo;t be undone.
+                        <span className="font-medium text-foreground">
+                            {gstReturn.ird_period}
+                        </span>{' '}
+                        as filed and locks it. This action can&rsquo;t be
+                        undone.
                     </>
                 }
                 confirmLabel="Mark as filed"

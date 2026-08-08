@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
 
+import { PageHero, type PageHeroBadge } from '@/components/page';
 import {
     WeekPicker,
     weekLabel as isoWeekLabel,
@@ -30,7 +31,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero, type PageHeroBadge } from '@/components/page';
 
 import type { JobBoardStats, JobBoardWeek } from './types';
 
@@ -104,8 +104,8 @@ export function JobBoardHero({
                     aria-hidden="true"
                     className="relative inline-flex h-2 w-2"
                 >
-                                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
+                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
                 </span>
                 Live board · refreshed just now · {openCount} open shifts
             </span>
@@ -129,7 +129,9 @@ export function JobBoardHero({
                 <span>
                     {stats.open} open position{stats.open === 1 ? '' : 's'} this
                     week,{' '}
-                    <strong>{stats.eligible_for_you} match your eligibility</strong>
+                    <strong>
+                        {stats.eligible_for_you} match your eligibility
+                    </strong>
                     , and {stats.expiring_soon} expire within the hour.
                 </span>
             }
@@ -167,7 +169,7 @@ export function JobBoardHero({
                         }
                         className={
                             alertsEnabled
-                                  ? 'border-status-success/60 bg-status-success/15 text-primary-foreground hover:bg-status-success/25'
+                                ? 'border-status-success/60 bg-status-success/15 text-primary-foreground hover:bg-status-success/25'
                                 : 'border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10'
                         }
                         onClick={onAlertMe}
@@ -189,7 +191,8 @@ export function JobBoardHero({
             footer={
                 <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex flex-wrap items-center gap-1.5">
-                        <Button unstyled
+                        <Button
+                            unstyled
                             type="button"
                             data-test="job-board-week-prev"
                             className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
@@ -197,7 +200,8 @@ export function JobBoardHero({
                         >
                             <ChevronLeft className="h-3.5 w-3.5" /> Prev week
                         </Button>
-                        <Button unstyled
+                        <Button
+                            unstyled
                             ref={pickerBtnRef}
                             type="button"
                             data-test="job-board-week-pick"
@@ -210,7 +214,8 @@ export function JobBoardHero({
                             {pickerLabel} · pick week
                             <ChevronDown className="h-3 w-3" />
                         </Button>
-                        <Button unstyled
+                        <Button
+                            unstyled
                             type="button"
                             data-test="job-board-week-next"
                             className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"

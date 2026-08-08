@@ -43,18 +43,31 @@ export function KitDialog({
     const [guidance, setGuidance] = useState('');
     const [criteria, setCriteria] = useState<Criterion[]>(
         kit && kit.criteria.length > 0
-            ? kit.criteria.map((c) => ({ label: c.label, weight: String(c.weight ?? '') }))
+            ? kit.criteria.map((c) => ({
+                  label: c.label,
+                  weight: String(c.weight ?? ''),
+              }))
             : [{ label: '', weight: '' }],
     );
     const form = useForm({});
 
-    const totalWeight = criteria.reduce((a, c) => a + (Number(c.weight) || 0), 0);
-    const canSubmit = name.trim() !== '' && criteria.some((c) => c.label.trim() !== '');
+    const totalWeight = criteria.reduce(
+        (a, c) => a + (Number(c.weight) || 0),
+        0,
+    );
+    const canSubmit =
+        name.trim() !== '' && criteria.some((c) => c.label.trim() !== '');
 
     const setCriterion = (i: number, patch: Partial<Criterion>) =>
-        setCriteria((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-    const addRow = () => setCriteria((rows) => [...rows, { label: '', weight: '' }]);
-    const removeRow = (i: number) => setCriteria((rows) => (rows.length > 1 ? rows.filter((_, idx) => idx !== i) : rows));
+        setCriteria((rows) =>
+            rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)),
+        );
+    const addRow = () =>
+        setCriteria((rows) => [...rows, { label: '', weight: '' }]);
+    const removeRow = (i: number) =>
+        setCriteria((rows) =>
+            rows.length > 1 ? rows.filter((_, idx) => idx !== i) : rows,
+        );
 
     const submit = () => {
         const payload = {
@@ -63,7 +76,10 @@ export function KitDialog({
             guidance: guidance.trim() || null,
             criteria: criteria
                 .filter((c) => c.label.trim() !== '')
-                .map((c) => ({ label: c.label.trim(), weight: Number(c.weight) || 0 })),
+                .map((c) => ({
+                    label: c.label.trim(),
+                    weight: Number(c.weight) || 0,
+                })),
         };
         const opts = {
             preserveScroll: true,
@@ -73,7 +89,9 @@ export function KitDialog({
                     toast.error('Could not save kit', { description: f.error });
                     return;
                 }
-                toast.success(editing ? 'Interview kit updated' : 'Interview kit created');
+                toast.success(
+                    editing ? 'Interview kit updated' : 'Interview kit created',
+                );
                 onClose();
             },
         };
@@ -86,16 +104,21 @@ export function KitDialog({
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>{editing ? 'Edit interview kit' : 'New interview kit'}</DialogTitle>
+                    <DialogTitle>
+                        {editing ? 'Edit interview kit' : 'New interview kit'}
+                    </DialogTitle>
                     <DialogDescription>
-                        Reusable weighted scorecard — interviewers score candidates against these criteria.
+                        Reusable weighted scorecard — interviewers score
+                        candidates against these criteria.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="mb-1.5 block text-sm font-semibold">Name</Label>
+                            <Label className="mb-1.5 block text-sm font-semibold">
+                                Name
+                            </Label>
                             <input
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
@@ -104,7 +127,12 @@ export function KitDialog({
                             />
                         </div>
                         <div>
-                            <Label className="mb-1.5 block text-sm font-semibold">Role <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                            <Label className="mb-1.5 block text-sm font-semibold">
+                                Role{' '}
+                                <span className="font-normal text-muted-foreground">
+                                    (optional)
+                                </span>
+                            </Label>
                             <input
                                 value={role}
                                 onChange={(e) => setRole(e.target.value)}
@@ -116,24 +144,44 @@ export function KitDialog({
 
                     <div>
                         <div className="mb-1.5 flex items-center justify-between">
-                            <Label className="text-sm font-semibold">Weighted criteria</Label>
-                            <span className={cn('text-[12px] font-bold tabular-nums', totalWeight === 100 ? 'text-status-success' : 'text-muted-foreground')}>
+                            <Label className="text-sm font-semibold">
+                                Weighted criteria
+                            </Label>
+                            <span
+                                className={cn(
+                                    'text-[12px] font-bold tabular-nums',
+                                    totalWeight === 100
+                                        ? 'text-status-success'
+                                        : 'text-muted-foreground',
+                                )}
+                            >
                                 total {totalWeight}%
                             </span>
                         </div>
                         <div className="flex flex-col gap-2">
                             {criteria.map((c, i) => (
-                                <div key={i} className="flex items-center gap-2">
+                                <div
+                                    key={i}
+                                    className="flex items-center gap-2"
+                                >
                                     <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
                                     <input
                                         value={c.label}
-                                        onChange={(e) => setCriterion(i, { label: e.target.value })}
+                                        onChange={(e) =>
+                                            setCriterion(i, {
+                                                label: e.target.value,
+                                            })
+                                        }
                                         placeholder="Criterion (e.g. Values & person-centred care)"
                                         className="h-9 flex-1 rounded-md border border-border bg-card px-3 text-[13px] outline-none focus:border-primary"
                                     />
                                     <input
                                         value={c.weight}
-                                        onChange={(e) => setCriterion(i, { weight: e.target.value })}
+                                        onChange={(e) =>
+                                            setCriterion(i, {
+                                                weight: e.target.value,
+                                            })
+                                        }
                                         placeholder="%"
                                         inputMode="numeric"
                                         className="h-9 w-16 rounded-md border border-border bg-card px-2 text-center text-[13px] outline-none focus:border-primary"
@@ -159,7 +207,12 @@ export function KitDialog({
                     </div>
 
                     <div>
-                        <Label className="mb-1.5 block text-sm font-semibold">Guidance <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <Label className="mb-1.5 block text-sm font-semibold">
+                            Guidance{' '}
+                            <span className="font-normal text-muted-foreground">
+                                (optional)
+                            </span>
+                        </Label>
                         <textarea
                             value={guidance}
                             onChange={(e) => setGuidance(e.target.value)}
@@ -171,7 +224,11 @@ export function KitDialog({
                 </div>
 
                 <DialogFooter>
-                    <button type="button" onClick={onClose} className="h-9 rounded-md border border-border bg-card px-4 text-[13px] font-semibold hover:bg-muted">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="h-9 rounded-md border border-border bg-card px-4 text-[13px] font-semibold hover:bg-muted"
+                    >
                         Cancel
                     </button>
                     <button

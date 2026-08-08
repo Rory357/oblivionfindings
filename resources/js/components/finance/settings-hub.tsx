@@ -25,8 +25,22 @@ type SettingsTabDef = FinanceTabItem & {
 };
 
 export const SETTINGS_TABS: SettingsTabDef[] = [
-    { id: 'integrations', label: 'Integrations', icon: Link2, tone: 'primary', href: '/finance/integrations', requires: (c) => !!c?.finance?.admin },
-    { id: 'funding-streams', label: 'Funding streams', icon: GitBranch, tone: 'success', href: '/finance/funding-streams', requires: (c) => !!c?.finance?.admin },
+    {
+        id: 'integrations',
+        label: 'Integrations',
+        icon: Link2,
+        tone: 'primary',
+        href: '/finance/integrations',
+        requires: (c) => !!c?.finance?.admin,
+    },
+    {
+        id: 'funding-streams',
+        label: 'Funding streams',
+        icon: GitBranch,
+        tone: 'success',
+        href: '/finance/funding-streams',
+        requires: (c) => !!c?.finance?.admin,
+    },
 ];
 
 /**
@@ -41,7 +55,9 @@ export function SettingsTabsFooter({ active }: { active: SettingsTabId }) {
     const page = usePage();
     const can = (page.props as { auth?: { can?: CanTree } })?.auth?.can;
 
-    const visible = SETTINGS_TABS.filter((t) => t.id === active || t.requires(can));
+    const visible = SETTINGS_TABS.filter(
+        (t) => t.id === active || t.requires(can),
+    );
 
     const handleTab = (id: string) => {
         if (id === active) return;

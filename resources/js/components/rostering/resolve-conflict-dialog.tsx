@@ -142,8 +142,7 @@ function ConflictShiftCard({
     onUnassign: (shift: ResolveConflictShift) => void;
     onReassign: (shift: ResolveConflictShift) => void;
 }) {
-    const locked =
-        shift.status === 'completed' || shift.status === 'cancelled';
+    const locked = shift.status === 'completed' || shift.status === 'cancelled';
     return (
         <article
             className={cn(

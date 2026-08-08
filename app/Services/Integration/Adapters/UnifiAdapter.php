@@ -36,6 +36,7 @@ use App\Services\Integration\UnifiOperationalBridgeService;
 use App\Support\SafeOperationalData;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -179,15 +180,20 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
             throw new WebhookRejected('payload', 422);
         }
 
-        $siteConfig = IntegrationSiteConfig::query()
+        $siteConfigs = IntegrationSiteConfig::query()
             ->forProvider($this->provider())
             ->active()
             ->where('mapped_external_site_id', $externalSiteId)
-            ->whereHas('site')
-            ->first();
-        if ($siteConfig === null) {
+            ->whereHas('site', fn ($site) => $site
+                ->where('is_active', true)
+                ->where(fn ($operational) => $operational->whereNull('archived')->orWhere('archived', false))
+                ->whereNull('archived_at'))
+            ->limit(2)
+            ->get();
+        if ($siteConfigs->count() !== 1) {
             throw new WebhookRejected('site_identity', 422);
         }
+        $siteConfig = $siteConfigs->sole();
         $siteId = (int) $siteConfig->site_id;
 
         $occurredAt = $this->webhookOccurredAt($payload['time'] ?? $payload['timestamp'] ?? null, $request->receivedAt);
@@ -276,7 +282,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 'api_key',
             );
 
-            $response = Http::withHeaders([
+            $response = $this->providerRequest([
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
             ])->get(self::BASE_URL.'/sites');
@@ -306,7 +312,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 'X-API-Key' => $apiKey,
             ];
 
-            $response = Http::withHeaders($headers)->get(self::BASE_URL.'/sites');
+            $response = $this->providerRequest($headers)->get(self::BASE_URL.'/sites');
 
             if (! $response->successful()) {
                 throw IntegrationDiscoveryException::forHttpStatus($response->status());
@@ -321,7 +327,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
             $hostsById = [];
 
             try {
-                $hostsResponse = Http::withHeaders($headers)->get(self::BASE_URL.'/hosts');
+                $hostsResponse = $this->providerRequest($headers)->get(self::BASE_URL.'/hosts');
                 if ($hostsResponse->successful()) {
                     $hosts = $hostsResponse->json('data', []);
                     $hostsById = $this->indexHosts($hosts);
@@ -339,7 +345,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
             }
 
             try {
-                $devicesResponse = Http::withHeaders($headers)->get(self::BASE_URL.'/devices');
+                $devicesResponse = $this->providerRequest($headers)->get(self::BASE_URL.'/devices');
                 if ($devicesResponse->successful()) {
                     $deviceGroups = $devicesResponse->json('data', []);
                     foreach ($deviceGroups as $group) {
@@ -519,7 +525,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 'api_key',
             );
 
-            $response = Http::withHeaders([
+            $response = $this->providerRequest([
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
             ])->get(self::BASE_URL.'/hosts');
@@ -580,15 +586,18 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
 
     public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): SyncResult
     {
+        $externalSiteId = is_scalar($siteConfig->mapped_external_site_id)
+            ? trim((string) $siteConfig->mapped_external_site_id)
+            : '';
+
         try {
             $apiKey = $this->secrets->application(
                 $providerConnection,
                 IntegrationSecretManager::PURPOSE_PRIMARY,
                 'api_key',
             );
-            $externalSiteId = $siteConfig->mapped_external_site_id;
 
-            $sitesResponse = Http::withHeaders([
+            $sitesResponse = $this->providerRequest([
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
             ])->get(self::BASE_URL.'/sites');
@@ -608,7 +617,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 );
             }
 
-            $devicesResponse = Http::withHeaders([
+            $devicesResponse = $this->providerRequest([
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
             ])->get(self::BASE_URL.'/devices');
@@ -649,6 +658,20 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                         }
 
                         $device['_resolved_host_id'] = $targetHostId;
+                        if (! $this->deviceSyncScopeStillUsable(
+                            (int) $providerConnection->id,
+                            (int) $siteConfig->id,
+                            (int) $siteConfig->site_id,
+                            $externalSiteId,
+                        )) {
+                            return new SyncResult(
+                                processed: $processed,
+                                created: $created,
+                                updated: $updated,
+                                errored: $errored,
+                                error: SafeOperationalData::failureSummary(),
+                            );
+                        }
                         $sync = $this->runtime->syncInventoryDevice($siteConfig, $device);
 
                         if ($sync['created']) {
@@ -682,6 +705,35 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
         }
     }
 
+    private function deviceSyncScopeStillUsable(
+        int $connectionId,
+        int $siteConfigId,
+        int $siteId,
+        string $externalSiteId,
+    ): bool {
+        if ($externalSiteId === '') {
+            return false;
+        }
+
+        return IntegrationProviderConnection::query()
+            ->whereKey($connectionId)
+            ->forProvider($this->provider())
+            ->connected()
+            ->exists()
+            && IntegrationSiteConfig::query()
+                ->whereKey($siteConfigId)
+                ->forProvider($this->provider())
+                ->active()
+                ->where('site_id', $siteId)
+                ->where('mapped_external_site_id', $externalSiteId)
+                ->whereRaw("TRIM(`mapped_external_site_id`) <> ''")
+                ->whereHas('site', fn ($site) => $site
+                    ->where('is_active', true)
+                    ->where(fn ($operational) => $operational->whereNull('archived')->orWhere('archived', false))
+                    ->whereNull('archived_at'))
+                ->exists();
+    }
+
     public function collectTopology(
         IntegrationSiteConfig $siteConfig,
         IntegrationProviderConnection $providerConnection,
@@ -706,7 +758,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
             ];
-            $sitesResponse = Http::withHeaders($headers)
+            $sitesResponse = $this->providerRequest($headers)
                 ->connectTimeout(5)
                 ->timeout(30)
                 ->get(self::BASE_URL.'/sites');
@@ -731,7 +783,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
             $siteBaseUrl = self::BASE_URL.'/connector/consoles/'.rawurlencode($consoleId)
                 .'/proxy/network/integration/v1/sites/'.rawurlencode($externalSiteId);
 
-            $devicesResponse = Http::withHeaders($headers)
+            $devicesResponse = $this->providerRequest($headers)
                 ->connectTimeout(5)
                 ->timeout(30)
                 ->get($siteBaseUrl.'/devices', [
@@ -774,7 +826,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 $deviceKey = $this->unifiTopologyNodeKey($deviceId);
                 $nodes[$deviceKey] = $this->unifiTopologyNode($deviceId, $device);
 
-                $detailResponse = Http::withHeaders($headers)
+                $detailResponse = $this->providerRequest($headers)
                     ->connectTimeout(5)
                     ->timeout(30)
                     ->get($siteBaseUrl.'/devices/'.rawurlencode($deviceId));
@@ -864,7 +916,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
             ];
-            $sitesResponse = Http::withHeaders($headers)
+            $sitesResponse = $this->providerRequest($headers)
                 ->connectTimeout(5)
                 ->timeout(30)
                 ->get(self::BASE_URL.'/sites');
@@ -887,7 +939,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
             $consoleId = $this->normalizeRequiredSiteIdentifier($hostId);
             $siteBaseUrl = self::BASE_URL.'/connector/consoles/'.rawurlencode($consoleId)
                 .'/proxy/network/integration/v1/sites/'.rawurlencode($externalSiteId);
-            $devicesResponse = Http::withHeaders($headers)
+            $devicesResponse = $this->providerRequest($headers)
                 ->connectTimeout(5)
                 ->timeout(30)
                 ->get($siteBaseUrl.'/devices', [
@@ -947,7 +999,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                     break;
                 }
 
-                $statisticsResponse = Http::withHeaders($headers)
+                $statisticsResponse = $this->providerRequest($headers)
                     ->connectTimeout(5)
                     ->timeout(30)
                     ->get($siteBaseUrl.'/devices/'.rawurlencode($providerEntityId).'/statistics/latest');
@@ -1000,7 +1052,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 if ($wanScopeException !== null) {
                     $exceptions[] = $wanScopeException;
                 } elseif ($wanDevice !== null && $wanMonitor !== null) {
-                    $wanResponse = Http::withHeaders($headers)
+                    $wanResponse = $this->providerRequest($headers)
                         ->connectTimeout(5)
                         ->timeout(30)
                         ->get(self::BASE_URL.'/isp-metrics/5m', [
@@ -1092,7 +1144,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
             ];
-            $sitesResponse = Http::withHeaders($headers)
+            $sitesResponse = $this->providerRequest($headers)
                 ->connectTimeout(5)
                 ->timeout(30)
                 ->get(self::BASE_URL.'/sites');
@@ -1127,7 +1179,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
 
             $siteBaseUrl = self::BASE_URL.'/connector/consoles/'.rawurlencode($consoleId)
                 .'/proxy/network/integration/v1/sites/'.rawurlencode($externalSiteId);
-            $wanResponse = Http::withHeaders($headers)
+            $wanResponse = $this->providerRequest($headers)
                 ->connectTimeout(5)
                 ->timeout(30)
                 ->get($siteBaseUrl.'/wans', ['offset' => 0, 'limit' => $limit]);
@@ -1137,7 +1189,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
             if (! $wanResponse->successful()) {
                 throw IntegrationDiscoveryException::forHttpStatus($wanResponse->status());
             }
-            $tunnelResponse = Http::withHeaders($headers)
+            $tunnelResponse = $this->providerRequest($headers)
                 ->connectTimeout(5)
                 ->timeout(30)
                 ->get($siteBaseUrl.'/vpn/site-to-site-tunnels', ['offset' => 0, 'limit' => $limit]);
@@ -1879,7 +1931,8 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 'page_size' => $limit,
                 'page_num' => $pageNumber,
             ], '', '&', PHP_QUERY_RFC3986);
-            $response = Http::withToken($apiKey)
+            $response = $this->providerRequest()
+                ->withToken($apiKey)
                 ->acceptJson()
                 ->connectTimeout(5)
                 ->timeout(15)
@@ -2451,6 +2504,14 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
         }
 
         return rtrim($candidate, '/');
+    }
+
+    /** @param array<string, string> $headers */
+    private function providerRequest(array $headers = []): PendingRequest
+    {
+        $request = Http::withoutRedirecting();
+
+        return $headers === [] ? $request : $request->withHeaders($headers);
     }
 
     private function accessRetryAfter(mixed $value): int

@@ -1,18 +1,36 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { type PageProps } from '@/types';
-import { type BreadcrumbItem } from '@/types';
-import AppLayout from '@/layouts/app-layout';
+import {
+    NewVendorDialog,
+    PayablesTabsFooter,
+    useRowContextMenu,
+    type AccountOption,
+    type RowCtxItem,
+} from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewVendorDialog, PayablesTabsFooter, useRowContextMenu, type AccountOption, type RowCtxItem } from '@/components/finance';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { Plus, Search, Building2, Download, Eye } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem, type PageProps } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { Building2, Download, Eye, Plus, Search } from 'lucide-react';
+import { useCallback, useState } from 'react';
 
 interface Vendor {
     id: number;
@@ -68,7 +86,12 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Vendors', href: '/finance/vendors' },
 ];
 
-export default function VendorsIndex({ vendors, filters, canManage, expenseAccounts }: Props) {
+export default function VendorsIndex({
+    vendors,
+    filters,
+    canManage,
+    expenseAccounts,
+}: Props) {
     const [search, setSearch] = useState(filters.search);
     const [newVendorOpen, setNewVendorOpen] = useState(false);
 
@@ -98,10 +121,16 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
 
     const clearFilters = useCallback(() => {
         setSearch('');
-        router.get('/finance/vendors', {}, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/finance/vendors',
+            {},
+            { preserveState: true, preserveScroll: true },
+        );
     }, []);
 
-    const hasFilters = Boolean(filters.search || filters.vendor_type || filters.is_active);
+    const hasFilters = Boolean(
+        filters.search || filters.vendor_type || filters.is_active,
+    );
 
     const activeCount = vendors.data.filter((v) => v.is_active).length;
 
@@ -109,7 +138,12 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
     const rowMenu = useRowContextMenu();
     const rowMenuItems = (vendor: Vendor): RowCtxItem[] => {
         const items: RowCtxItem[] = [
-            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/vendors/${vendor.id}`) },
+            {
+                kind: 'item',
+                label: 'Open',
+                icon: Eye,
+                onSelect: () => router.get(`/finance/vendors/${vendor.id}`),
+            },
         ];
         return items;
     };
@@ -120,7 +154,8 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Building2}
                         title="Vendors"
                         description="Manage your suppliers, contractors and service providers"
@@ -131,14 +166,19 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button size="sm" variant="outline" asChild>
-                                    <a href={`/finance/vendors/export?${new URLSearchParams(Object.entries({ search, vendor_type: filters.vendor_type, is_active: filters.is_active }).filter(([, v]) => v)).toString()}`}>
-                                        <Download className="w-4 h-4 mr-1.5" />
+                                    <a
+                                        href={`/finance/vendors/export?${new URLSearchParams(Object.entries({ search, vendor_type: filters.vendor_type, is_active: filters.is_active }).filter(([, v]) => v)).toString()}`}
+                                    >
+                                        <Download className="mr-1.5 h-4 w-4" />
                                         Export CSV
                                     </a>
                                 </Button>
                                 {canManage && (
-                                    <Button size="sm" onClick={() => setNewVendorOpen(true)}>
-                                        <Plus className="w-4 h-4 mr-1.5" />
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setNewVendorOpen(true)}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
                                         Add Vendor
                                     </Button>
                                 )}
@@ -151,14 +191,16 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                 {/* Filters */}
                 <Card>
                     <CardContent className="pt-6">
-                        <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex flex-col gap-4 sm:flex-row">
                             <div className="flex-1">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
                                         placeholder="Search by name or email..."
                                         value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
+                                        onChange={(e) =>
+                                            setSearch(e.target.value)
+                                        }
                                         onKeyDown={handleSearchKeyDown}
                                         className="pl-10"
                                     />
@@ -167,32 +209,59 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                             <Select
                                 value={filters.vendor_type || 'all'}
                                 onValueChange={(value) =>
-                                    applyFilters({ vendor_type: value === 'all' ? '' : value })
+                                    applyFilters({
+                                        vendor_type:
+                                            value === 'all' ? '' : value,
+                                    })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]" aria-label="Filter by type">
+                                <SelectTrigger
+                                    className="w-[180px]"
+                                    aria-label="Filter by type"
+                                >
                                     <SelectValue placeholder="All Types" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Types</SelectItem>
-                                    <SelectItem value="supplier">Supplier</SelectItem>
-                                    <SelectItem value="contractor">Contractor</SelectItem>
-                                    <SelectItem value="utility">Utility</SelectItem>
-                                    <SelectItem value="government">Government</SelectItem>
+                                    <SelectItem value="all">
+                                        All Types
+                                    </SelectItem>
+                                    <SelectItem value="supplier">
+                                        Supplier
+                                    </SelectItem>
+                                    <SelectItem value="contractor">
+                                        Contractor
+                                    </SelectItem>
+                                    <SelectItem value="utility">
+                                        Utility
+                                    </SelectItem>
+                                    <SelectItem value="government">
+                                        Government
+                                    </SelectItem>
                                     <SelectItem value="other">Other</SelectItem>
                                 </SelectContent>
                             </Select>
                             <Select
-                                value={filters.is_active === '' ? 'all' : filters.is_active}
+                                value={
+                                    filters.is_active === ''
+                                        ? 'all'
+                                        : filters.is_active
+                                }
                                 onValueChange={(value) =>
-                                    applyFilters({ is_active: value === 'all' ? '' : value })
+                                    applyFilters({
+                                        is_active: value === 'all' ? '' : value,
+                                    })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]" aria-label="Filter by active state">
+                                <SelectTrigger
+                                    className="w-[180px]"
+                                    aria-label="Filter by active state"
+                                >
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="all">
+                                        All Statuses
+                                    </SelectItem>
                                     <SelectItem value="1">Active</SelectItem>
                                     <SelectItem value="0">Inactive</SelectItem>
                                 </SelectContent>
@@ -223,7 +292,12 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                                     className="border-0"
                                     action={
                                         canManage ? (
-                                            <Button size="sm" onClick={() => setNewVendorOpen(true)}>
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    setNewVendorOpen(true)
+                                                }
+                                            >
                                                 New vendor
                                             </Button>
                                         ) : undefined
@@ -239,13 +313,20 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                                         <TableHead>Type</TableHead>
                                         <TableHead>Email</TableHead>
                                         <TableHead>Phone</TableHead>
-                                        <TableHead className="text-center">Bills</TableHead>
+                                        <TableHead className="text-center">
+                                            Bills
+                                        </TableHead>
                                         <TableHead>Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {vendors.data.map((vendor) => (
-                                        <TableRow key={vendor.id} onContextMenu={rowMenu.open(rowMenuItems(vendor))}>
+                                        <TableRow
+                                            key={vendor.id}
+                                            onContextMenu={rowMenu.open(
+                                                rowMenuItems(vendor),
+                                            )}
+                                        >
                                             <TableCell>
                                                 <Link
                                                     href={`/finance/vendors/${vendor.id}`}
@@ -260,9 +341,15 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                                             <TableCell>
                                                 <Badge
                                                     variant="secondary"
-                                                    className={vendorTypeColors[vendor.vendor_type] || ''}
+                                                    className={
+                                                        vendorTypeColors[
+                                                            vendor.vendor_type
+                                                        ] || ''
+                                                    }
                                                 >
-                                                    {vendorTypeLabels[vendor.vendor_type] || vendor.vendor_type}
+                                                    {vendorTypeLabels[
+                                                        vendor.vendor_type
+                                                    ] || vendor.vendor_type}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
@@ -276,14 +363,20 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                                             </TableCell>
                                             <TableCell>
                                                 <Badge
-                                                    variant={vendor.is_active ? 'default' : 'secondary'}
+                                                    variant={
+                                                        vendor.is_active
+                                                            ? 'default'
+                                                            : 'secondary'
+                                                    }
                                                     className={
                                                         vendor.is_active
                                                             ? 'bg-status-success-bg text-status-success'
                                                             : 'bg-muted text-muted-foreground'
                                                     }
                                                 >
-                                                    {vendor.is_active ? 'Active' : 'Inactive'}
+                                                    {vendor.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
                                                 </Badge>
                                             </TableCell>
                                         </TableRow>
@@ -298,19 +391,30 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                 {vendors.last_page > 1 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {(vendors.current_page - 1) * vendors.per_page + 1} to{' '}
-                            {Math.min(vendors.current_page * vendors.per_page, vendors.total)} of{' '}
-                            {vendors.total} vendors
+                            Showing{' '}
+                            {(vendors.current_page - 1) * vendors.per_page + 1}{' '}
+                            to{' '}
+                            {Math.min(
+                                vendors.current_page * vendors.per_page,
+                                vendors.total,
+                            )}{' '}
+                            of {vendors.total} vendors
                         </p>
                         <div className="flex gap-1">
                             {vendors.links.map((link, i) => (
                                 <Button
                                     key={i}
-                                    variant={link.active ? 'default' : 'outline'}
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
                                     size="sm"
                                     disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                    onClick={() =>
+                                        link.url && router.get(link.url)
+                                    }
+                                    dangerouslySetInnerHTML={{
+                                        __html: link.label,
+                                    }}
                                 />
                             ))}
                         </div>

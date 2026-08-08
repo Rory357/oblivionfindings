@@ -20,7 +20,7 @@ test('system users seeder creates hr employee profiles for all seeded staff reco
 
         $profile = $user->hrEmployeeProfile;
         expect($profile)->not()->toBeNull();
-        expect((int) $profile->tenant_id)->toBe(1);
+        expect((int) $profile->user_id)->toBe((int) $user->id);
         expect((string) $profile->work_email)->toBe((string) $user->email);
         expect((string) $profile->employee_number)->toBe((string) $staff->employee_id);
         expect((string) $profile->position_role)->toBe((string) $user->role);
@@ -46,7 +46,6 @@ test('system users seeder assigns a deterministic fallback when a generated empl
     $fallbackEmployeeNumber = 'EMP-U'.str_pad((string) $unprofiledStaff->id, 4, '0', STR_PAD_LEFT);
 
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $existingOwner->id,
         'employee_number' => $generatedEmployeeNumber,
     ]);

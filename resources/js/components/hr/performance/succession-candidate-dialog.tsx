@@ -37,8 +37,18 @@ export interface ExistingSuccessionCandidate {
 }
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'candidate', label: 'Candidate', blurb: 'Who & readiness', icon: UserPlus },
-    { key: 'assessment', label: 'Assessment', blurb: 'Strengths & needs', icon: ClipboardCheck },
+    {
+        key: 'candidate',
+        label: 'Candidate',
+        blurb: 'Who & readiness',
+        icon: UserPlus,
+    },
+    {
+        key: 'assessment',
+        label: 'Assessment',
+        blurb: 'Strengths & needs',
+        icon: ClipboardCheck,
+    },
 ];
 
 const READINESS_OPTIONS = [
@@ -90,7 +100,9 @@ export function SuccessionCandidateDialog({
             ? String(candidate.employee.id)
             : '',
         readiness: candidate?.readiness ?? '',
-        overall_rating: candidate?.overall_rating ? String(candidate.overall_rating) : '',
+        overall_rating: candidate?.overall_rating
+            ? String(candidate.overall_rating)
+            : '',
         strengths: candidate?.strengths ?? '',
         development_needs: candidate?.development_needs ?? '',
     });
@@ -108,7 +120,9 @@ export function SuccessionCandidateDialog({
                 value: String(e.id),
                 label: e.user?.name ?? `Profile #${e.id}`,
                 sub:
-                    [e.position_title, e.department].filter(Boolean).join(' · ') ||
+                    [e.position_title, e.department]
+                        .filter(Boolean)
+                        .join(' · ') ||
                     e.user?.email ||
                     undefined,
             })),
@@ -117,8 +131,8 @@ export function SuccessionCandidateDialog({
 
     const employeeName =
         candidate?.employee?.name ??
-        employees.find((e) => String(e.id) === form.data.employee_profile_id)?.user
-            ?.name ??
+        employees.find((e) => String(e.id) === form.data.employee_profile_id)
+            ?.user?.name ??
         '—';
 
     const canSubmit =
@@ -281,7 +295,11 @@ export function SuccessionCandidateDialog({
                         blurb="Strengths and development needs for this candidate."
                     />
                     <div className="space-y-4">
-                        <Field label="Strengths" hint="optional" error={form.errors.strengths}>
+                        <Field
+                            label="Strengths"
+                            hint="optional"
+                            error={form.errors.strengths}
+                        >
                             <Textarea
                                 rows={3}
                                 value={form.data.strengths}

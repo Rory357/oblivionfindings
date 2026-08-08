@@ -171,10 +171,15 @@ test('affected incidents and the permanent fix change receive reciprocal typed l
         ->assertJsonPath('linked_context.problems.0.href', "/it/problems/{$problem->id}");
 
     $incidentOne->update(['requester_user_id' => $this->requester->id]);
+    $problem->ticket()->update(['requester_user_id' => $this->requester->id]);
     $this->actingAs($this->requester)
         ->getJson("/it/tickets/{$incidentOne->id}")
         ->assertOk()
-        ->assertJsonCount(0, 'linked_context.problems');
+        ->assertJsonPath('linked_context.problems.0.reference', $problem->ticket->reference)
+        ->assertJsonPath('linked_context.problems.0.href', null)
+        ->assertJsonPath('linked_context.problems.0.workspace_access.state', 'restricted')
+        ->assertJsonPath('linked_context.problems.0.workspace_access.message', 'IT workspace access is required to open this record.')
+        ->assertJsonPath('linked_context.problems.0.ticket_href', "/it/tickets/{$problem->ticket_id}");
 });
 
 test('the problem workspace projects the shared ticket conversation tasks approvals and timeline', function () {

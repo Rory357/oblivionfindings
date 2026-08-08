@@ -207,6 +207,100 @@ class SiteTechnologyProjectionTest extends TestCase
         );
     }
 
+    public function test_site_profile_does_not_leak_monitoring_or_maintenance_without_source_permissions(): void
+    {
+        $site = Site::factory()->create(['name' => 'Restricted Technology House']);
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $viewer->roles()->attach(Role::query()->where('name', 'team_lead')->firstOrFail());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+
+        $permissions = Permission::query()
+            ->whereIn('key', [
+                'securityDevices.viewAny',
+                'securityDevices.devices.view',
+                'securityDevices.events.view',
+                'securityDevices.maintenance.view',
+                'securityDevices.maintenance.manage',
+            ])
+            ->get()
+            ->keyBy('key');
+        $this->assertCount(5, $permissions);
+        $viewer->permissionOverrides()->syncWithoutDetaching([
+            $permissions['securityDevices.viewAny']->id => ['allowed' => true],
+            $permissions['securityDevices.devices.view']->id => ['allowed' => true],
+            $permissions['securityDevices.events.view']->id => ['allowed' => false],
+            $permissions['securityDevices.maintenance.view']->id => ['allowed' => false],
+            $permissions['securityDevices.maintenance.manage']->id => ['allowed' => false],
+        ]);
+
+        $device = Device::factory()->create(['name' => 'Visible canonical Device']);
+        $this->assignToSite($device, $site);
+        Monitor::factory()->create([
+            'profile_id' => MonitoringProfile::factory()->create()->id,
+            'device_id' => $device->id,
+            'name' => 'RESTRICTED-MONITOR-SENTINEL',
+            'current_state' => MonitorState::Failed,
+        ]);
+        DeviceEvent::query()->create([
+            'device_id' => $device->id,
+            'event_type' => 'RESTRICTED-EVENT-SENTINEL',
+            'severity' => 'critical',
+            'occurred_at' => now(),
+        ]);
+        DeviceMaintenanceRecord::query()->create([
+            'device_id' => $device->id,
+            'type' => 'repair',
+            'status' => 'scheduled',
+            'description' => 'RESTRICTED-MAINTENANCE-SENTINEL',
+            'scheduled_for' => now()->subHour(),
+        ]);
+        MonitoringCollector::factory()->create([
+            'site_id' => $site->id,
+            'name' => 'RESTRICTED-COLLECTOR-SENTINEL',
+            'status' => 'offline',
+        ]);
+
+        $response = $this->partialTechnology($viewer, $site)
+            ->assertOk()
+            ->assertJsonPath('props.technology.can.view_monitoring', false)
+            ->assertJsonPath('props.technology.can.view_maintenance', false)
+            ->assertJsonPath('props.technology.summary.monitored_devices', null)
+            ->assertJsonPath('props.technology.summary.failed_monitors', null)
+            ->assertJsonPath('props.technology.summary.active_findings', null)
+            ->assertJsonPath('props.technology.summary.overdue_maintenance', null)
+            ->assertJsonPath('props.technology.summary.collector', null)
+            ->assertJsonPath('props.technology.links.monitoring', null)
+            ->assertJsonPath('props.technology.links.maintenance', null)
+            ->assertJsonCount(0, 'props.technology.monitoring.issues')
+            ->assertJsonCount(0, 'props.technology.maintenance')
+            ->assertJsonCount(0, 'props.technology.collectors');
+
+        $encoded = json_encode($response->json('props.technology'), JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString('RESTRICTED-MONITOR-SENTINEL', $encoded);
+        $this->assertStringNotContainsString('RESTRICTED-EVENT-SENTINEL', $encoded);
+        $this->assertStringNotContainsString('RESTRICTED-MAINTENANCE-SENTINEL', $encoded);
+        $this->assertStringNotContainsString('RESTRICTED-COLLECTOR-SENTINEL', $encoded);
+
+        $this->actingAs($viewer)->get('/security-devices/monitoring')->assertForbidden();
+        $this->actingAs($viewer)->get('/security-devices/maintenance')->assertForbidden();
+
+        $viewer->permissionOverrides()->updateExistingPivot(
+            $permissions['securityDevices.viewAny']->id,
+            ['allowed' => false],
+        );
+        $viewer->unsetRelation('permissionOverrides');
+        $this->partialTechnology($viewer->fresh(), $site)
+            ->assertOk()
+            ->assertJsonPath('props.technology', null);
+    }
+
     private function partialTechnology(User $viewer, Site $site)
     {
         $version = app(HandleInertiaRequests::class)->version(request());

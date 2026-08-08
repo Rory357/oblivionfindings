@@ -1,9 +1,24 @@
 import { PaneNav } from '@/components/control-room/alert-workspace-dialog';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
+import {
+    Field,
+    InfoCard,
+    SelectInput,
+    StepHead,
+} from '@/components/wizard/primitives';
 import { useForm } from '@inertiajs/react';
-import { ArrowUpCircle, CheckCircle2, ShieldAlert, UserPlus } from 'lucide-react';
+import {
+    ArrowUpCircle,
+    CheckCircle2,
+    ShieldAlert,
+    UserPlus,
+} from 'lucide-react';
 import { useState } from 'react';
 
 /**
@@ -21,7 +36,15 @@ export type BulkAlertSummary = {
 
 export type BulkAlertMode = 'acknowledge' | 'assign' | 'escalate';
 
-const MODE_META: Record<BulkAlertMode, { title: string; blurb: string; icon: typeof CheckCircle2; cta: (n: number) => string }> = {
+const MODE_META: Record<
+    BulkAlertMode,
+    {
+        title: string;
+        blurb: string;
+        icon: typeof CheckCircle2;
+        cta: (n: number) => string;
+    }
+> = {
     acknowledge: {
         title: 'Acknowledge selected alerts',
         blurb: 'Marks every selected open alert as seen and stops its acknowledge SLA clock. Alerts that are already past Open are skipped.',
@@ -66,7 +89,10 @@ export function BulkAlertActionDialog({
 }) {
     const [step, setStep] = useState(0);
     const meta = MODE_META[mode];
-    const form = useForm<{ assigned_to_user_id: string; reason: string }>({ assigned_to_user_id: '', reason: '' });
+    const form = useForm<{ assigned_to_user_id: string; reason: string }>({
+        assigned_to_user_id: '',
+        reason: '',
+    });
 
     const close = () => {
         setStep(0);
@@ -79,63 +105,161 @@ export function BulkAlertActionDialog({
         const ids = alerts.map((a) => a.id);
         if (mode === 'acknowledge') {
             form.transform(() => ({ alert_ids: ids }));
-            form.post('/control-room/alerts/bulk-acknowledge', { preserveScroll: true, onSuccess: () => { close(); onDone(); } });
+            form.post('/control-room/alerts/bulk-acknowledge', {
+                preserveScroll: true,
+                onSuccess: () => {
+                    close();
+                    onDone();
+                },
+            });
         } else if (mode === 'assign') {
-            form.transform((data) => ({ alert_ids: ids, assigned_to_user_id: Number(data.assigned_to_user_id) }));
-            form.post('/control-room/alerts/bulk-assign', { preserveScroll: true, onSuccess: () => { close(); onDone(); } });
+            form.transform((data) => ({
+                alert_ids: ids,
+                assigned_to_user_id: Number(data.assigned_to_user_id),
+            }));
+            form.post('/control-room/alerts/bulk-assign', {
+                preserveScroll: true,
+                onSuccess: () => {
+                    close();
+                    onDone();
+                },
+            });
         } else {
             form.transform((data) => ({ alert_ids: ids, reason: data.reason }));
-            form.post('/control-room/escalations/bulk-escalate', { preserveScroll: true, onSuccess: () => { close(); onDone(); } });
+            form.post('/control-room/escalations/bulk-escalate', {
+                preserveScroll: true,
+                onSuccess: () => {
+                    close();
+                    onDone();
+                },
+            });
         }
     };
 
-    const detailsValid = mode === 'acknowledge' ? true : mode === 'assign' ? Boolean(form.data.assigned_to_user_id) : Boolean(form.data.reason.trim());
+    const detailsValid =
+        mode === 'acknowledge'
+            ? true
+            : mode === 'assign'
+              ? Boolean(form.data.assigned_to_user_id)
+              : Boolean(form.data.reason.trim());
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && close()}>
             <DialogContent className="sm:max-w-lg">
                 <DialogTitle className="sr-only">{meta.title}</DialogTitle>
-                <DialogDescription className="sr-only">{meta.blurb}</DialogDescription>
+                <DialogDescription className="sr-only">
+                    {meta.blurb}
+                </DialogDescription>
                 <div className="flex flex-col gap-4">
-                    <StepHead icon={meta.icon} title={meta.title} blurb={meta.blurb} />
+                    <StepHead
+                        icon={meta.icon}
+                        title={meta.title}
+                        blurb={meta.blurb}
+                    />
 
                     {step === 0 ? (
                         <>
                             <div className="max-h-56 overflow-y-auto rounded-xl border border-border">
                                 {alerts.map((a) => (
-                                    <div key={a.id} className="flex items-center gap-2.5 border-b border-border/60 px-3 py-2 text-sm last:border-0">
-                                        <span className={`h-2 w-2 shrink-0 rounded-full ${SEV_DOT[a.severity] ?? 'bg-muted-foreground'}`} />
-                                        <span className="font-medium text-foreground">CR-{a.id}</span>
+                                    <div
+                                        key={a.id}
+                                        className="flex items-center gap-2.5 border-b border-border/60 px-3 py-2 text-sm last:border-0"
+                                    >
+                                        <span
+                                            className={`h-2 w-2 shrink-0 rounded-full ${SEV_DOT[a.severity] ?? 'bg-muted-foreground'}`}
+                                        />
+                                        <span className="font-medium text-foreground">
+                                            CR-{a.id}
+                                        </span>
                                         <span className="min-w-0 flex-1 truncate text-muted-foreground">
                                             {a.alert_type}
-                                            {a.client_name ? ` · ${a.client_name}` : ''}
+                                            {a.client_name
+                                                ? ` · ${a.client_name}`
+                                                : ''}
                                         </span>
-                                        {a.status ? <span className="shrink-0 text-xs text-muted-foreground capitalize">{a.status}</span> : null}
+                                        {a.status ? (
+                                            <span className="shrink-0 text-xs text-muted-foreground capitalize">
+                                                {a.status}
+                                            </span>
+                                        ) : null}
                                     </div>
                                 ))}
                             </div>
-                            <PaneNav onCancel={close} onNext={() => setStep(1)} nextDisabled={alerts.length === 0} step={0} stepCount={2} />
+                            <PaneNav
+                                onCancel={close}
+                                onNext={() => setStep(1)}
+                                nextDisabled={alerts.length === 0}
+                                step={0}
+                                stepCount={2}
+                            />
                         </>
                     ) : (
                         <>
                             {mode === 'acknowledge' ? (
                                 <InfoCard icon={ShieldAlert} tone="info">
-                                    {alerts.length} alert{alerts.length === 1 ? '' : 's'} will move to <span className="font-semibold">Acknowledged</span>. Anything already acknowledged, resolved or closed is skipped and reported back.
+                                    {alerts.length} alert
+                                    {alerts.length === 1 ? '' : 's'} will move
+                                    to{' '}
+                                    <span className="font-semibold">
+                                        Acknowledged
+                                    </span>
+                                    . Anything already acknowledged, resolved or
+                                    closed is skipped and reported back.
                                 </InfoCard>
                             ) : null}
                             {mode === 'assign' ? (
-                                <Field label="Assign to" required error={(form.errors as Record<string, string | undefined>).assigned_to_user_id}>
+                                <Field
+                                    label="Assign to"
+                                    required
+                                    error={
+                                        (
+                                            form.errors as Record<
+                                                string,
+                                                string | undefined
+                                            >
+                                        ).assigned_to_user_id
+                                    }
+                                >
                                     <SelectInput
                                         value={form.data.assigned_to_user_id}
-                                        onChange={(v) => form.setData('assigned_to_user_id', v)}
+                                        onChange={(v) =>
+                                            form.setData(
+                                                'assigned_to_user_id',
+                                                v,
+                                            )
+                                        }
                                         placeholder="Select a staff member"
-                                        options={(staff ?? []).map((s) => ({ value: String(s.id), label: s.name }))}
+                                        options={(staff ?? []).map((s) => ({
+                                            value: String(s.id),
+                                            label: s.name,
+                                        }))}
                                     />
                                 </Field>
                             ) : null}
                             {mode === 'escalate' ? (
-                                <Field label="Reason for escalating" required error={(form.errors as Record<string, string | undefined>).reason}>
-                                    <Textarea rows={3} value={form.data.reason} onChange={(e) => form.setData('reason', e.target.value)} placeholder="Why do these need to move up a queue?" />
+                                <Field
+                                    label="Reason for escalating"
+                                    required
+                                    error={
+                                        (
+                                            form.errors as Record<
+                                                string,
+                                                string | undefined
+                                            >
+                                        ).reason
+                                    }
+                                >
+                                    <Textarea
+                                        rows={3}
+                                        value={form.data.reason}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'reason',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Why do these need to move up a queue?"
+                                    />
                                 </Field>
                             ) : null}
                             <PaneNav

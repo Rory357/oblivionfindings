@@ -419,7 +419,9 @@ export function PeoplePane({
             x,
             y,
             tag: row.is_active ? 'Active' : 'Inactive',
-            meta: [row.user.name, row.position_title].filter(Boolean).join(' · '),
+            meta: [row.user.name, row.position_title]
+                .filter(Boolean)
+                .join(' · '),
             items,
         });
     };
@@ -437,7 +439,10 @@ export function PeoplePane({
             const dept = departments.find(
                 (d) => String(d.id) === filters.department,
             );
-            chips.push({ key: 'department', label: dept?.name ?? 'Department' });
+            chips.push({
+                key: 'department',
+                label: dept?.name ?? 'Department',
+            });
         }
         if (filters.employment_type)
             chips.push({
@@ -521,7 +526,9 @@ export function PeoplePane({
                             <SelectValue placeholder="All departments" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value={NONE}>All departments</SelectItem>
+                            <SelectItem value={NONE}>
+                                All departments
+                            </SelectItem>
                             {departments.map((d) => (
                                 <SelectItem key={d.id} value={String(d.id)}>
                                     {d.name}
@@ -537,7 +544,10 @@ export function PeoplePane({
                         apply({ employment_type: v === NONE ? null : v })
                     }
                 >
-                    <SelectTrigger className="w-40" aria-label="Employment type">
+                    <SelectTrigger
+                        className="w-40"
+                        aria-label="Employment type"
+                    >
                         <SelectValue placeholder="All types" />
                     </SelectTrigger>
                     <SelectContent>
@@ -553,7 +563,11 @@ export function PeoplePane({
                 <div className="ml-auto flex items-center gap-2">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="gap-1.5">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5"
+                            >
                                 <Columns3 className="h-4 w-4" />
                                 Columns
                             </Button>
@@ -577,9 +591,15 @@ export function PeoplePane({
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="gap-1.5">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5"
+                            >
                                 <Rows3 className="h-4 w-4" />
-                                {density === 'compact' ? 'Compact' : 'Comfortable'}
+                                {density === 'compact'
+                                    ? 'Compact'
+                                    : 'Comfortable'}
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
@@ -664,7 +684,9 @@ export function PeoplePane({
                             value: s.id,
                             label: s.name,
                         }))}
-                        onPick={(id) => bulkAction('assign_site', { site_id: id })}
+                        onPick={(id) =>
+                            bulkAction('assign_site', { site_id: id })
+                        }
                     />
                     <BulkAssign
                         icon={Building2}
@@ -878,7 +900,9 @@ export function PeoplePane({
                                                               <Link
                                                                   href={`/hr/people/${p.profile_id}`}
                                                                   className="font-medium text-foreground group-hover:text-primary"
-                                                                  onClick={(e) =>
+                                                                  onClick={(
+                                                                      e,
+                                                                  ) =>
                                                                       e.stopPropagation()
                                                                   }
                                                               >
@@ -899,14 +923,14 @@ export function PeoplePane({
                                                   <td
                                                       className={`hidden px-4 font-mono text-xs text-muted-foreground lg:table-cell ${rowPad}`}
                                                   >
-                                                      {p.employee_number ||
-                                                          '—'}
+                                                      {p.employee_number || '—'}
                                                   </td>
                                               ) : null}
                                               {cols.position ? (
-                                                  <td className={`px-4 ${rowPad}`}>
-                                                      {p.position_title ||
-                                                          '—'}
+                                                  <td
+                                                      className={`px-4 ${rowPad}`}
+                                                  >
+                                                      {p.position_title || '—'}
                                                   </td>
                                               ) : null}
                                               {cols.department ? (
@@ -1049,7 +1073,8 @@ export function PeoplePane({
             {/* Footer: count + pagination */}
             <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                 <span>
-                    {profiles.total} {profiles.total === 1 ? 'person' : 'people'}
+                    {profiles.total}{' '}
+                    {profiles.total === 1 ? 'person' : 'people'}
                 </span>
                 {profiles.last_page > 1 ? (
                     <LaravelPagination links={profiles.links} />
@@ -1090,7 +1115,11 @@ function SortableTh({
     className?: string;
 }) {
     const active = filters.sort === sortKey;
-    const Icon = !active ? ChevronsUpDown : filters.dir === 'desc' ? ArrowDown : ArrowUp;
+    const Icon = !active
+        ? ChevronsUpDown
+        : filters.dir === 'desc'
+          ? ArrowDown
+          : ArrowUp;
     return (
         <th
             className={`px-4 py-3 text-left ${hideBelow ? HIDE_CLASS[hideBelow] : ''} ${className}`}

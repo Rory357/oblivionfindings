@@ -5,6 +5,12 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { AmountField } from './money';
+import {
+    PostingPreview,
+    journalBalance,
+    type PostingLine,
+} from './posting-preview';
 import {
     Field,
     FieldErr,
@@ -12,11 +18,9 @@ import {
     SelectInput,
     StepHead,
     WizardShell,
-    type WizardStep,
     useWizard,
+    type WizardStep,
 } from './wizard';
-import { AmountField } from './money';
-import { PostingPreview, journalBalance, type PostingLine } from './posting-preview';
 
 type RefItem = { id: number; code: string; name: string };
 
@@ -43,9 +47,24 @@ const emptyLine = (): LineForm => ({
 });
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Details', blurb: 'Date, type & reference', icon: FileText },
-    { key: 'lines', label: 'Lines', blurb: 'Debit & credit lines', icon: BookOpen },
-    { key: 'review', label: 'Review & post', blurb: 'Confirm and post', icon: ListChecks },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Date, type & reference',
+        icon: FileText,
+    },
+    {
+        key: 'lines',
+        label: 'Lines',
+        blurb: 'Debit & credit lines',
+        icon: BookOpen,
+    },
+    {
+        key: 'review',
+        label: 'Review & post',
+        blurb: 'Confirm and post',
+        icon: ListChecks,
+    },
 ];
 
 /**
@@ -105,8 +124,8 @@ export function NewJournalDialog({
                 .map((l) => ({
                     accountCode: accountCode(l.account_id),
                     accountName:
-                        accounts.find((x) => String(x.id) === l.account_id)?.name ??
-                        'Unassigned',
+                        accounts.find((x) => String(x.id) === l.account_id)
+                            ?.name ?? 'Unassigned',
                     debit: l.debit,
                     credit: l.credit,
                     memo: l.description || undefined,
@@ -156,8 +175,14 @@ export function NewJournalDialog({
     }));
     // No empty-string option values — Radix Select forbids them (it reserves ''
     // for "cleared"). The placeholder ("None") conveys the unselected state.
-    const ccOptions = costCentres.map((c) => ({ value: String(c.id), label: `${c.code} - ${c.name}` }));
-    const fsOptions = fundingStreams.map((f) => ({ value: String(f.id), label: `${f.code} - ${f.name}` }));
+    const ccOptions = costCentres.map((c) => ({
+        value: String(c.id),
+        label: `${c.code} - ${c.name}`,
+    }));
+    const fsOptions = fundingStreams.map((f) => ({
+        value: String(f.id),
+        label: `${f.code} - ${f.name}`,
+    }));
 
     return (
         <WizardShell
@@ -171,7 +196,9 @@ export function NewJournalDialog({
             steps={STEPS}
             stepIndex={index}
             onStepClick={goTo}
-            pct={balance.balanced ? 100 : Math.min(90, previewLines.length * 30)}
+            pct={
+                balance.balanced ? 100 : Math.min(90, previewLines.length * 30)
+            }
             pctLabel="Balanced"
             footerStart={
                 <span
@@ -189,7 +216,12 @@ export function NewJournalDialog({
             footerEnd={
                 <>
                     {!isFirst && (
-                        <Button type="button" variant="outline" onClick={back} disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={back}
+                            disabled={processing}
+                        >
                             Back
                         </Button>
                     )}
@@ -222,14 +254,24 @@ export function NewJournalDialog({
         >
             {index === 0 && (
                 <div>
-                    <StepHead icon={FileText} title="Journal details" blurb="When, what kind, and a reference." />
+                    <StepHead
+                        icon={FileText}
+                        title="Journal details"
+                        blurb="When, what kind, and a reference."
+                    />
                     {postingError && <FieldErr>{postingError}</FieldErr>}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Date" required error={errors.journal_date}>
+                        <Field
+                            label="Date"
+                            required
+                            error={errors.journal_date}
+                        >
                             <Input
                                 type="date"
                                 value={data.journal_date}
-                                onChange={(e) => setData('journal_date', e.target.value)}
+                                onChange={(e) =>
+                                    setData('journal_date', e.target.value)
+                                }
                             />
                         </Field>
                         <Field label="Type" error={errors.type}>
@@ -238,23 +280,38 @@ export function NewJournalDialog({
                                 onChange={(v) => setData('type', v)}
                                 options={[
                                     { value: 'standard', label: 'Standard' },
-                                    { value: 'adjustment', label: 'Adjustment' },
+                                    {
+                                        value: 'adjustment',
+                                        label: 'Adjustment',
+                                    },
                                     { value: 'opening', label: 'Opening' },
                                 ]}
                             />
                         </Field>
-                        <Field label="Reference" hint="optional" error={errors.reference}>
+                        <Field
+                            label="Reference"
+                            hint="optional"
+                            error={errors.reference}
+                        >
                             <Input
                                 value={data.reference}
-                                onChange={(e) => setData('reference', e.target.value)}
+                                onChange={(e) =>
+                                    setData('reference', e.target.value)
+                                }
                                 placeholder="e.g. INV-1024"
                             />
                         </Field>
-                        <Field label="Description" span error={errors.description}>
+                        <Field
+                            label="Description"
+                            span
+                            error={errors.description}
+                        >
                             <Textarea
                                 rows={2}
                                 value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    setData('description', e.target.value)
+                                }
                                 placeholder="What is this journal for?"
                             />
                         </Field>
@@ -264,17 +321,36 @@ export function NewJournalDialog({
 
             {index === 1 && (
                 <div>
-                    <StepHead icon={BookOpen} title="Debit & credit lines" blurb="Each line debits or credits a GL account. Debits must equal credits to post." />
-                    {typeof errors.lines === 'string' && <FieldErr>{errors.lines}</FieldErr>}
+                    <StepHead
+                        icon={BookOpen}
+                        title="Debit & credit lines"
+                        blurb="Each line debits or credits a GL account. Debits must equal credits to post."
+                    />
+                    {typeof errors.lines === 'string' && (
+                        <FieldErr>{errors.lines}</FieldErr>
+                    )}
                     <div className="space-y-3">
                         {data.lines.map((line, i) => (
                             // eslint-disable-next-line no-restricted-syntax -- per-line field-group panel, not a content card
-                            <div key={i} className="rounded-xl border border-border bg-card/60 p-3">
+                            <div
+                                key={i}
+                                className="rounded-xl border border-border bg-card/60 p-3"
+                            >
                                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                    <Field label="Account" required error={errors[`lines.${i}.account_id` as keyof typeof errors] as string | undefined}>
+                                    <Field
+                                        label="Account"
+                                        required
+                                        error={
+                                            errors[
+                                                `lines.${i}.account_id` as keyof typeof errors
+                                            ] as string | undefined
+                                        }
+                                    >
                                         <SelectInput
                                             value={line.account_id}
-                                            onChange={(v) => updateLine(i, 'account_id', v)}
+                                            onChange={(v) =>
+                                                updateLine(i, 'account_id', v)
+                                            }
                                             placeholder="Select account"
                                             options={accountOptions}
                                         />
@@ -282,7 +358,13 @@ export function NewJournalDialog({
                                     <Field label="Line description">
                                         <Input
                                             value={line.description}
-                                            onChange={(e) => updateLine(i, 'description', e.target.value)}
+                                            onChange={(e) =>
+                                                updateLine(
+                                                    i,
+                                                    'description',
+                                                    e.target.value,
+                                                )
+                                            }
                                             placeholder="Optional"
                                         />
                                     </Field>
@@ -291,7 +373,8 @@ export function NewJournalDialog({
                                             value={line.debit}
                                             onValueChange={(v) => {
                                                 updateLine(i, 'debit', v);
-                                                if (v) updateLine(i, 'credit', '');
+                                                if (v)
+                                                    updateLine(i, 'credit', '');
                                             }}
                                             aria-label={`Line ${i + 1} debit`}
                                         />
@@ -301,7 +384,8 @@ export function NewJournalDialog({
                                             value={line.credit}
                                             onValueChange={(v) => {
                                                 updateLine(i, 'credit', v);
-                                                if (v) updateLine(i, 'debit', '');
+                                                if (v)
+                                                    updateLine(i, 'debit', '');
                                             }}
                                             aria-label={`Line ${i + 1} credit`}
                                         />
@@ -309,7 +393,13 @@ export function NewJournalDialog({
                                     <Field label="Cost centre">
                                         <SelectInput
                                             value={line.cost_centre_id}
-                                            onChange={(v) => updateLine(i, 'cost_centre_id', v)}
+                                            onChange={(v) =>
+                                                updateLine(
+                                                    i,
+                                                    'cost_centre_id',
+                                                    v,
+                                                )
+                                            }
                                             placeholder="None"
                                             options={ccOptions}
                                         />
@@ -317,7 +407,13 @@ export function NewJournalDialog({
                                     <Field label="Funding stream">
                                         <SelectInput
                                             value={line.funding_stream_id}
-                                            onChange={(v) => updateLine(i, 'funding_stream_id', v)}
+                                            onChange={(v) =>
+                                                updateLine(
+                                                    i,
+                                                    'funding_stream_id',
+                                                    v,
+                                                )
+                                            }
                                             placeholder="None"
                                             options={fsOptions}
                                         />
@@ -332,54 +428,87 @@ export function NewJournalDialog({
                                         disabled={data.lines.length <= 2}
                                         className="text-muted-foreground hover:text-status-critical"
                                     >
-                                        <Trash2 className="mr-1 h-4 w-4" /> Remove line
+                                        <Trash2 className="mr-1 h-4 w-4" />{' '}
+                                        Remove line
                                     </Button>
                                 </div>
                             </div>
                         ))}
                     </div>
-                    <Button type="button" variant="outline" size="sm" onClick={addLine} className="mt-3">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addLine}
+                        className="mt-3"
+                    >
                         <Plus className="mr-1 h-4 w-4" /> Add line
                     </Button>
                     <div className="mt-4">
-                        <PostingPreview lines={previewLines} title="Live balance" />
+                        <PostingPreview
+                            lines={previewLines}
+                            title="Live balance"
+                        />
                     </div>
                 </div>
             )}
 
             {index === 2 && (
                 <div>
-                    <StepHead icon={ListChecks} title="Review & post" blurb="Confirm the entry. Save as a draft, or post it straight to the ledger." />
+                    <StepHead
+                        icon={ListChecks}
+                        title="Review & post"
+                        blurb="Confirm the entry. Save as a draft, or post it straight to the ledger."
+                    />
                     <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
                         <div>
                             <div className="text-muted-foreground">Date</div>
-                            <div className="font-medium">{data.journal_date}</div>
+                            <div className="font-medium">
+                                {data.journal_date}
+                            </div>
                         </div>
                         <div>
                             <div className="text-muted-foreground">Type</div>
-                            <div className="font-medium capitalize">{data.type}</div>
+                            <div className="font-medium capitalize">
+                                {data.type}
+                            </div>
                         </div>
                         {data.reference && (
                             <div>
-                                <div className="text-muted-foreground">Reference</div>
-                                <div className="font-medium">{data.reference}</div>
+                                <div className="text-muted-foreground">
+                                    Reference
+                                </div>
+                                <div className="font-medium">
+                                    {data.reference}
+                                </div>
                             </div>
                         )}
                         {data.description && (
                             <div className="col-span-2">
-                                <div className="text-muted-foreground">Description</div>
-                                <div className="font-medium">{data.description}</div>
+                                <div className="text-muted-foreground">
+                                    Description
+                                </div>
+                                <div className="font-medium">
+                                    {data.description}
+                                </div>
                             </div>
                         )}
                     </div>
-                    <PostingPreview lines={previewLines} title="Journal preview" />
+                    <PostingPreview
+                        lines={previewLines}
+                        title="Journal preview"
+                    />
                     {!balance.balanced && (
                         <p className="mt-3 text-[13px] text-status-warning">
-                            This journal isn't balanced yet — you can still save it as a draft, but it can't be posted until debits equal credits.
+                            This journal isn't balanced yet — you can still save
+                            it as a draft, but it can't be posted until debits
+                            equal credits.
                         </p>
                     )}
                     {postImmediately && processing && (
-                        <p className="mt-3 text-[13px] text-muted-foreground">Posting…</p>
+                        <p className="mt-3 text-[13px] text-muted-foreground">
+                            Posting…
+                        </p>
                     )}
                 </div>
             )}

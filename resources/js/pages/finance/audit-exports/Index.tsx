@@ -1,15 +1,28 @@
-import { Head, router } from '@inertiajs/react';
-import { type BreadcrumbItem } from '@/types';
-import AppLayout from '@/layouts/app-layout';
+import {
+    AuditExportDialog,
+    ConfirmDialog,
+    TaxTabsFooter,
+    useRowContextMenu,
+    type RowCtxItem,
+} from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
-import { AuditExportDialog, ConfirmDialog, TaxTabsFooter, useRowContextMenu, type RowCtxItem } from '@/components/finance';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyList } from '@/components/ui/empty-state';
-import { Plus, Download, Trash2, FileText, History } from 'lucide-react';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { Download, FileText, History, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface AuditExport {
@@ -49,10 +62,22 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+    new Date(date).toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
 
 const formatDateTime = (date: string | null) =>
-    date ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+    date
+        ? new Date(date).toLocaleString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+          })
+        : '-';
 
 const formatFileSize = (bytes: number | null) => {
     if (!bytes) return '-';
@@ -77,7 +102,10 @@ const getSections = (exp: AuditExport): string[] => {
     return sections;
 };
 
-export default function AuditExportsIndex({ exports: exportData, canManage = false }: PageProps) {
+export default function AuditExportsIndex({
+    exports: exportData,
+    canManage = false,
+}: PageProps) {
     const [createOpen, setCreateOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<AuditExport | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -101,18 +129,33 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                 label: 'Download',
                 icon: Download,
                 tone: 'success',
-                onSelect: () => window.location.assign(`/finance/audit-exports/${exp.id}/download`),
+                onSelect: () =>
+                    window.location.assign(
+                        `/finance/audit-exports/${exp.id}/download`,
+                    ),
             });
         }
         if (canManage) {
-            items.push({ kind: 'item', label: 'Delete', icon: Trash2, tone: 'critical', onSelect: () => setDeleteTarget(exp) });
+            items.push({
+                kind: 'item',
+                label: 'Delete',
+                icon: Trash2,
+                tone: 'critical',
+                onSelect: () => setDeleteTarget(exp),
+            });
         }
         return items;
     };
 
-    const completedCount = exportData.data.filter((e) => e.status === 'completed').length;
-    const generatingCount = exportData.data.filter((e) => e.status === 'generating').length;
-    const failedCount = exportData.data.filter((e) => e.status === 'failed').length;
+    const completedCount = exportData.data.filter(
+        (e) => e.status === 'completed',
+    ).length;
+    const generatingCount = exportData.data.filter(
+        (e) => e.status === 'generating',
+    ).length;
+    const failedCount = exportData.data.filter(
+        (e) => e.status === 'failed',
+    ).length;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -120,7 +163,8 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={History}
                         title="Audit Exports"
                         description="Generate audit trail reports for external auditors"
@@ -132,8 +176,11 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                         ]}
                         actions={
                             canManage && (
-                                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
+                                <Button
+                                    size="sm"
+                                    onClick={() => setCreateOpen(true)}
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
                                     New Export
                                 </Button>
                             )
@@ -160,7 +207,9 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                                     <TableHead>Status</TableHead>
                                     <TableHead>Size</TableHead>
                                     <TableHead>Created</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="text-right">
+                                        Actions
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -175,7 +224,14 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                                                 className="border-0"
                                                 action={
                                                     canManage ? (
-                                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                setCreateOpen(
+                                                                    true,
+                                                                )
+                                                            }
+                                                        >
                                                             New audit export
                                                         </Button>
                                                     ) : undefined
@@ -186,38 +242,79 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                                 ) : (
                                     exportData.data.map((exp) => {
                                         return (
-                                            <TableRow key={exp.id} onContextMenu={rowMenu.open(rowMenuItems(exp))}>
-                                                <TableCell className="font-medium">{exp.export_name}</TableCell>
+                                            <TableRow
+                                                key={exp.id}
+                                                onContextMenu={rowMenu.open(
+                                                    rowMenuItems(exp),
+                                                )}
+                                            >
+                                                <TableCell className="font-medium">
+                                                    {exp.export_name}
+                                                </TableCell>
                                                 <TableCell>
                                                     <span className="text-sm">
-                                                        {formatDate(exp.period_from)} - {formatDate(exp.period_to)}
+                                                        {formatDate(
+                                                            exp.period_from,
+                                                        )}{' '}
+                                                        -{' '}
+                                                        {formatDate(
+                                                            exp.period_to,
+                                                        )}
                                                     </span>
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-wrap gap-1">
-                                                        {getSections(exp).map((s) => (
-                                                            <Badge key={s} variant="outline" className="text-xs">
-                                                                {s}
-                                                            </Badge>
-                                                        ))}
+                                                        {getSections(exp).map(
+                                                            (s) => (
+                                                                <Badge
+                                                                    key={s}
+                                                                    variant="outline"
+                                                                    className="text-xs"
+                                                                >
+                                                                    {s}
+                                                                </Badge>
+                                                            ),
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <StatusBadge status={exp.status} />
+                                                    <StatusBadge
+                                                        status={exp.status}
+                                                    />
                                                 </TableCell>
-                                                <TableCell className="text-sm">{formatFileSize(exp.file_size_bytes)}</TableCell>
+                                                <TableCell className="text-sm">
+                                                    {formatFileSize(
+                                                        exp.file_size_bytes,
+                                                    )}
+                                                </TableCell>
                                                 <TableCell>
-                                                    <div className="text-sm">{formatDateTime(exp.created_at)}</div>
+                                                    <div className="text-sm">
+                                                        {formatDateTime(
+                                                            exp.created_at,
+                                                        )}
+                                                    </div>
                                                     {exp.created_by && (
-                                                        <div className="text-xs text-muted-foreground">{exp.created_by.name}</div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {
+                                                                exp.created_by
+                                                                    .name
+                                                            }
+                                                        </div>
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex items-center justify-end gap-1">
-                                                        {exp.status === 'completed' && (
-                                                            <Button variant="outline" size="sm" asChild>
-                                                                <a href={`/finance/audit-exports/${exp.id}/download`}>
-                                                                    <Download className="w-4 h-4 mr-1" />
+                                                        {exp.status ===
+                                                            'completed' && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                asChild
+                                                            >
+                                                                <a
+                                                                    href={`/finance/audit-exports/${exp.id}/download`}
+                                                                >
+                                                                    <Download className="mr-1 h-4 w-4" />
                                                                     Download
                                                                 </a>
                                                             </Button>
@@ -227,9 +324,13 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 aria-label={`Delete ${exp.export_name}`}
-                                                                onClick={() => setDeleteTarget(exp)}
+                                                                onClick={() =>
+                                                                    setDeleteTarget(
+                                                                        exp,
+                                                                    )
+                                                                }
                                                             >
-                                                                <Trash2 className="w-4 h-4 text-destructive" />
+                                                                <Trash2 className="h-4 w-4 text-destructive" />
                                                             </Button>
                                                         )}
                                                     </div>
@@ -247,11 +348,22 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                                 {exportData.links.map((link, i) => (
                                     <Button
                                         key={i}
-                                        variant={link.active ? 'default' : 'outline'}
+                                        variant={
+                                            link.active ? 'default' : 'outline'
+                                        }
                                         size="sm"
                                         disabled={!link.url}
-                                        onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                        dangerouslySetInnerHTML={{ __html: link.label }}
+                                        onClick={() =>
+                                            link.url &&
+                                            router.get(
+                                                link.url,
+                                                {},
+                                                { preserveState: true },
+                                            )
+                                        }
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label,
+                                        }}
                                     />
                                 ))}
                             </div>
@@ -263,7 +375,10 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
             </PageLayout>
 
             {canManage && (
-                <AuditExportDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+                <AuditExportDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                />
             )}
 
             <ConfirmDialog

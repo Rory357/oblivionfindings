@@ -61,7 +61,7 @@ class ServiceAgreementController extends Controller
 
         $agreements = (clone $baseQuery)
             ->with(['client:id,first_name,last_name', 'creator:id,name'])
-            ->withCount(['lineItems', 'fundingClaims'])
+            ->withCount('lineItems')
             ->when(! empty($data['q']), function ($q) use ($data) {
                 $search = $data['q'];
                 $q->where(function ($sub) use ($search) {
@@ -218,19 +218,23 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.viewAny'), 403);
 
-        $agreement = $this->accessibleAgreements($auth)
+        $canViewFundingClaims = $auth->canDo('funding.viewAny');
+
+        $agreementQuery = $this->accessibleAgreements($auth)
             ->with([
                 'client:id,first_name,last_name',
                 'creator:id,name',
                 'lineItems',
                 'rates',
-                'fundingClaims' => fn ($q) => $q->orderByDesc('created_at'),
-                'fundingClaims.submitter:id,name',
                 'statusChanges' => fn ($q) => $q->orderByDesc('created_at'),
                 'statusChanges.user:id,name',
-            ])
-            ->withCount('fundingClaims')
-            ->findOrFail($agreement);
+            ]);
+
+        if ($canViewFundingClaims) {
+            $agreementQuery->withCount('fundingClaims');
+        }
+
+        $agreement = $agreementQuery->findOrFail($agreement);
 
         $agreement->append([
             'budget_utilisation_percent',
@@ -253,15 +257,6 @@ class ServiceAgreementController extends Controller
         $agreement->hours_remaining = $hoursRemaining;
         $agreement->hours_utilisation_percent = $hoursUtilisationPercent;
 
-        // Funding claims summary by status
-        $claimsByStatus = $agreement->fundingClaims->groupBy('status');
-        $fundingClaimsSummary = [
-            'draft' => ($claimsByStatus->get('draft') ?? collect())->count(),
-            'submitted' => ($claimsByStatus->get('submitted') ?? collect())->count(),
-            'approved' => ($claimsByStatus->get('approved') ?? collect())->count(),
-            'total_claimed' => round((float) $agreement->fundingClaims->sum('amount'), 2),
-        ];
-
         return inertia('operations/service-agreements/Show', [
             'agreement' => $agreement,
             'budget_summary' => [
@@ -273,7 +268,11 @@ class ServiceAgreementController extends Controller
                     ? round(($effectiveUsed / (float) $agreement->total_budget) * 100, 1)
                     : 0,
             ],
-            'funding_claims_summary' => $fundingClaimsSummary,
+            'related_record_permissions' => [
+                'view_funding_claims' => $canViewFundingClaims,
+                'create_funding_claims' => $auth->canDo('funding.claims.create'),
+                'view_invoices' => $auth->canDo('finance.ar.view'),
+            ],
         ]);
     }
 

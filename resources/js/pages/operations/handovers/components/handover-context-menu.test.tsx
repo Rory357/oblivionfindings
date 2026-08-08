@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 // buildItems wires router.visit into the cross-entity jump items; mock Inertia so
 // importing the module works (we assert the items exist, we don't invoke jumps).
 const visit = vi.fn();
-vi.mock('@inertiajs/react', () => ({ router: { visit: (...a: unknown[]) => visit(...a) } }));
+vi.mock('@inertiajs/react', () => ({
+    router: { visit: (...a: unknown[]) => visit(...a) },
+}));
 
 import { buildItems, type HandoverCtxHandlers } from './handover-context-menu';
 import type { Handover } from './shared';
@@ -41,7 +43,12 @@ function makeHandover(over: Partial<Handover> = {}): Handover {
         can_submit: true,
         can_acknowledge: false,
         can_edit: true,
-        lock: { locked: false, reason: 'within_window', days_left: 7, age_days: 0 },
+        lock: {
+            locked: false,
+            reason: 'within_window',
+            days_left: 7,
+            age_days: 0,
+        },
         ...over,
     };
 }
@@ -70,7 +77,12 @@ describe('buildItems (handover context menu)', () => {
     it('offers Submit + Edit for an editable own draft, but not Acknowledge', () => {
         const ls = labels(
             buildItems(
-                makeHandover({ status: 'draft', can_submit: true, can_edit: true, can_acknowledge: false }),
+                makeHandover({
+                    status: 'draft',
+                    can_submit: true,
+                    can_edit: true,
+                    can_acknowledge: false,
+                }),
                 allHandlers(),
             ),
         );
@@ -81,31 +93,56 @@ describe('buildItems (handover context menu)', () => {
 
     it('offers Acknowledge only when submitted and can_acknowledge', () => {
         const can = labels(
-            buildItems(makeHandover({ status: 'submitted', can_acknowledge: true, can_submit: false }), allHandlers()),
+            buildItems(
+                makeHandover({
+                    status: 'submitted',
+                    can_acknowledge: true,
+                    can_submit: false,
+                }),
+                allHandlers(),
+            ),
         );
         expect(can).toContain('Acknowledge');
 
         const cannot = labels(
-            buildItems(makeHandover({ status: 'submitted', can_acknowledge: false }), allHandlers()),
+            buildItems(
+                makeHandover({ status: 'submitted', can_acknowledge: false }),
+                allHandlers(),
+            ),
         );
         expect(cannot).not.toContain('Acknowledge');
     });
 
     it('hides Edit when can_edit is false', () => {
-        const ls = labels(buildItems(makeHandover({ can_edit: false }), allHandlers()));
+        const ls = labels(
+            buildItems(makeHandover({ can_edit: false }), allHandlers()),
+        );
         expect(ls).not.toContain('Edit handover');
     });
 
     it('hides Edit when another worker holds the presence lock', () => {
         const ls = labels(
-            buildItems(makeHandover({ can_edit: true, edit_lock: { held_by_name: 'Pat Rua', held_at: null } }), allHandlers()),
+            buildItems(
+                makeHandover({
+                    can_edit: true,
+                    edit_lock: { held_by_name: 'Pat Rua', held_at: null },
+                }),
+                allHandlers(),
+            ),
         );
         expect(ls).not.toContain('Edit handover');
     });
 
     it('omits action items whose handler is not supplied', () => {
         const ls = labels(
-            buildItems(makeHandover({ status: 'draft', can_submit: true, can_edit: true }), { onOpen: vi.fn() }),
+            buildItems(
+                makeHandover({
+                    status: 'draft',
+                    can_submit: true,
+                    can_edit: true,
+                }),
+                { onOpen: vi.fn() },
+            ),
         );
         expect(ls).toContain('View handover');
         expect(ls).not.toContain('Submit to incoming');
@@ -125,7 +162,12 @@ describe('buildItems (handover context menu)', () => {
     it('drops the client/shift/staff jumps when those entities are absent', () => {
         const ls = labels(
             buildItems(
-                makeHandover({ client: null, outgoing_shift: null, outgoing_staff: null, incoming_staff: null }),
+                makeHandover({
+                    client: null,
+                    outgoing_shift: null,
+                    outgoing_staff: null,
+                    incoming_staff: null,
+                }),
                 allHandlers(),
             ),
         );

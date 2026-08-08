@@ -1,6 +1,13 @@
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -28,12 +35,18 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Loader2, Plus, RefreshCw, Shield, ShieldCheck, Trash2 } from 'lucide-react';
+import {
+    Loader2,
+    Plus,
+    RefreshCw,
+    Shield,
+    ShieldCheck,
+    Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -65,7 +78,11 @@ type Props = {
     stats: { total: number; microsoft: number; google: number };
 };
 
-export default function SsoGroups({ mappings = [], roles = [], stats = { total: 0, microsoft: 0, google: 0 } }: Props) {
+export default function SsoGroups({
+    mappings = [],
+    roles = [],
+    stats = { total: 0, microsoft: 0, google: 0 },
+}: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [fetching, setFetching] = useState(false);
 
@@ -95,9 +112,13 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
 
     function handleFetchGroups() {
         setFetching(true);
-        router.post('/settings/sso-groups/fetch', {}, {
-            onFinish: () => setFetching(false),
-        });
+        router.post(
+            '/settings/sso-groups/fetch',
+            {},
+            {
+                onFinish: () => setFetching(false),
+            },
+        );
     }
 
     function handleUpdateMapping(id: number, field: string, value: any) {
@@ -121,20 +142,32 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                 <div className="grid grid-cols-3 gap-4">
                     <Card>
                         <CardContent className="pt-4">
-                            <div className="text-2xl font-bold">{stats.total}</div>
-                            <div className="text-muted-foreground text-xs">Total Mappings</div>
+                            <div className="text-2xl font-bold">
+                                {stats.total}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Total Mappings
+                            </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-4">
-                            <div className="text-2xl font-bold">{stats.microsoft}</div>
-                            <div className="text-muted-foreground text-xs">Microsoft</div>
+                            <div className="text-2xl font-bold">
+                                {stats.microsoft}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Microsoft
+                            </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-4">
-                            <div className="text-2xl font-bold">{stats.google}</div>
-                            <div className="text-muted-foreground text-xs">Google</div>
+                            <div className="text-2xl font-bold">
+                                {stats.google}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Google
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -149,7 +182,8 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                                     SSO Group Mapping
                                 </CardTitle>
                                 <CardDescription>
-                                    Map security groups from Microsoft Entra ID or Google Workspace to application roles
+                                    Map security groups from Microsoft Entra ID
+                                    or Google Workspace to application roles
                                 </CardDescription>
                             </div>
                             <div className="flex gap-2">
@@ -166,49 +200,86 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                                     )}
                                     Fetch Groups
                                 </Button>
-                                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                                <Dialog
+                                    open={dialogOpen}
+                                    onOpenChange={setDialogOpen}
+                                >
                                     <DialogTrigger asChild>
-                                        <Button size="sm" className="bg-primary hover:bg-primary">
+                                        <Button
+                                            size="sm"
+                                            className="bg-primary hover:bg-primary"
+                                        >
                                             <Plus className="mr-1 h-4 w-4" />
                                             Add Mapping
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent>
                                         <DialogHeader>
-                                            <DialogTitle>Add Group Mapping</DialogTitle>
+                                            <DialogTitle>
+                                                Add Group Mapping
+                                            </DialogTitle>
                                             <DialogDescription>
-                                                Map an external security group to an application role.
+                                                Map an external security group
+                                                to an application role.
                                             </DialogDescription>
                                         </DialogHeader>
-                                        <form onSubmit={handleStore} className="space-y-4">
+                                        <form
+                                            onSubmit={handleStore}
+                                            className="space-y-4"
+                                        >
                                             <div className="space-y-2">
                                                 <Label>Provider</Label>
                                                 <Select
                                                     value={form.data.provider}
-                                                    onValueChange={(v) => form.setData('provider', v)}
+                                                    onValueChange={(v) =>
+                                                        form.setData(
+                                                            'provider',
+                                                            v,
+                                                        )
+                                                    }
                                                 >
                                                     <SelectTrigger>
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="microsoft">Microsoft</SelectItem>
-                                                        <SelectItem value="google">Google</SelectItem>
+                                                        <SelectItem value="microsoft">
+                                                            Microsoft
+                                                        </SelectItem>
+                                                        <SelectItem value="google">
+                                                            Google
+                                                        </SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
                                             <div className="space-y-2">
                                                 <Label>External Group ID</Label>
                                                 <Input
-                                                    value={form.data.external_group_id}
-                                                    onChange={(e) => form.setData('external_group_id', e.target.value)}
+                                                    value={
+                                                        form.data
+                                                            .external_group_id
+                                                    }
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'external_group_id',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                     placeholder="e.g. 00000000-0000-0000-0000-000000000000"
                                                 />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label>Group Name</Label>
                                                 <Input
-                                                    value={form.data.external_group_name}
-                                                    onChange={(e) => form.setData('external_group_name', e.target.value)}
+                                                    value={
+                                                        form.data
+                                                            .external_group_name
+                                                    }
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'external_group_name',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                     placeholder="e.g. Support Workers"
                                                 />
                                             </div>
@@ -216,15 +287,24 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                                                 <Label>Mapped Role</Label>
                                                 <Select
                                                     value={form.data.role_id.toString()}
-                                                    onValueChange={(v) => form.setData('role_id', v)}
+                                                    onValueChange={(v) =>
+                                                        form.setData(
+                                                            'role_id',
+                                                            v,
+                                                        )
+                                                    }
                                                 >
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="Select a role" />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {roles.map((r) => (
-                                                            <SelectItem key={r.id} value={r.id.toString()}>
-                                                                {r.label || r.name}
+                                                            <SelectItem
+                                                                key={r.id}
+                                                                value={r.id.toString()}
+                                                            >
+                                                                {r.label ||
+                                                                    r.name}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>
@@ -233,19 +313,37 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                                             <div className="flex items-center justify-between">
                                                 <Label>Auto-Assign</Label>
                                                 <Switch
-                                                    checked={form.data.auto_assign}
-                                                    onCheckedChange={(v) => form.setData('auto_assign', v)}
+                                                    checked={
+                                                        form.data.auto_assign
+                                                    }
+                                                    onCheckedChange={(v) =>
+                                                        form.setData(
+                                                            'auto_assign',
+                                                            v,
+                                                        )
+                                                    }
                                                 />
                                             </div>
                                             <div className="flex items-center justify-between">
                                                 <Label>Auto-Remove</Label>
                                                 <Switch
-                                                    checked={form.data.auto_remove}
-                                                    onCheckedChange={(v) => form.setData('auto_remove', v)}
+                                                    checked={
+                                                        form.data.auto_remove
+                                                    }
+                                                    onCheckedChange={(v) =>
+                                                        form.setData(
+                                                            'auto_remove',
+                                                            v,
+                                                        )
+                                                    }
                                                 />
                                             </div>
                                             <DialogFooter>
-                                                <Button type="submit" disabled={form.processing} className="bg-primary hover:bg-primary">
+                                                <Button
+                                                    type="submit"
+                                                    disabled={form.processing}
+                                                    className="bg-primary hover:bg-primary"
+                                                >
                                                     Create Mapping
                                                 </Button>
                                             </DialogFooter>
@@ -258,10 +356,13 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                     <CardContent>
                         {mappings.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <Shield className="text-muted-foreground mb-3 h-10 w-10" />
-                                <h3 className="text-sm font-medium">No group mappings</h3>
-                                <p className="text-muted-foreground mt-1 text-sm">
-                                    Add a mapping to automatically sync roles from your identity provider.
+                                <Shield className="mb-3 h-10 w-10 text-muted-foreground" />
+                                <h3 className="text-sm font-medium">
+                                    No group mappings
+                                </h3>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Add a mapping to automatically sync roles
+                                    from your identity provider.
                                 </p>
                             </div>
                         ) : (
@@ -270,11 +371,15 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                                     <TableRow>
                                         <TableHead>Provider</TableHead>
                                         <TableHead>Group Name</TableHead>
-                                        <TableHead className="hidden md:table-cell">External ID</TableHead>
+                                        <TableHead className="hidden md:table-cell">
+                                            External ID
+                                        </TableHead>
                                         <TableHead>Mapped Role</TableHead>
                                         <TableHead>Auto-Assign</TableHead>
                                         <TableHead>Auto-Remove</TableHead>
-                                        <TableHead className="hidden lg:table-cell">Last Synced</TableHead>
+                                        <TableHead className="hidden lg:table-cell">
+                                            Last Synced
+                                        </TableHead>
                                         <TableHead className="w-10" />
                                     </TableRow>
                                 </TableHeader>
@@ -282,26 +387,47 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                                     {mappings.map((m) => (
                                         <TableRow key={m.id}>
                                             <TableCell>
-                                                <Badge variant={m.provider === 'microsoft' ? 'default' : 'secondary'}>
-                                                    {m.provider === 'microsoft' ? 'Microsoft' : 'Google'}
+                                                <Badge
+                                                    variant={
+                                                        m.provider ===
+                                                        'microsoft'
+                                                            ? 'default'
+                                                            : 'secondary'
+                                                    }
+                                                >
+                                                    {m.provider === 'microsoft'
+                                                        ? 'Microsoft'
+                                                        : 'Google'}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="font-medium">{m.external_group_name}</TableCell>
-                                            <TableCell className="text-muted-foreground hidden max-w-[200px] truncate font-mono text-xs md:table-cell">
+                                            <TableCell className="font-medium">
+                                                {m.external_group_name}
+                                            </TableCell>
+                                            <TableCell className="hidden max-w-[200px] truncate font-mono text-xs text-muted-foreground md:table-cell">
                                                 {m.external_group_id}
                                             </TableCell>
                                             <TableCell>
                                                 <Select
                                                     value={m.role_id.toString()}
-                                                    onValueChange={(v) => handleUpdateMapping(m.id, 'role_id', parseInt(v))}
+                                                    onValueChange={(v) =>
+                                                        handleUpdateMapping(
+                                                            m.id,
+                                                            'role_id',
+                                                            parseInt(v),
+                                                        )
+                                                    }
                                                 >
                                                     <SelectTrigger className="h-8 w-[140px]">
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {roles.map((r) => (
-                                                            <SelectItem key={r.id} value={r.id.toString()}>
-                                                                {r.label || r.name}
+                                                            <SelectItem
+                                                                key={r.id}
+                                                                value={r.id.toString()}
+                                                            >
+                                                                {r.label ||
+                                                                    r.name}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>
@@ -310,18 +436,32 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                                             <TableCell>
                                                 <Switch
                                                     checked={m.auto_assign}
-                                                    onCheckedChange={(v) => handleUpdateMapping(m.id, 'auto_assign', v)}
+                                                    onCheckedChange={(v) =>
+                                                        handleUpdateMapping(
+                                                            m.id,
+                                                            'auto_assign',
+                                                            v,
+                                                        )
+                                                    }
                                                 />
                                             </TableCell>
                                             <TableCell>
                                                 <Switch
                                                     checked={m.auto_remove}
-                                                    onCheckedChange={(v) => handleUpdateMapping(m.id, 'auto_remove', v)}
+                                                    onCheckedChange={(v) =>
+                                                        handleUpdateMapping(
+                                                            m.id,
+                                                            'auto_remove',
+                                                            v,
+                                                        )
+                                                    }
                                                 />
                                             </TableCell>
-                                            <TableCell className="text-muted-foreground hidden text-xs lg:table-cell">
+                                            <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
                                                 {m.last_synced_at
-                                                    ? new Date(m.last_synced_at).toLocaleDateString()
+                                                    ? new Date(
+                                                          m.last_synced_at,
+                                                      ).toLocaleDateString()
                                                     : 'Never'}
                                             </TableCell>
                                             <TableCell>
@@ -329,7 +469,9 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-8 w-8 text-status-critical hover:text-status-critical"
-                                                    onClick={() => handleDelete(m.id)}
+                                                    onClick={() =>
+                                                        handleDelete(m.id)
+                                                    }
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>

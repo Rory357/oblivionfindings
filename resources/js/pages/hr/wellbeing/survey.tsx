@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import {
     AlertDialog,
@@ -42,7 +43,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ChevronDown, ChevronRight, Lock, Send, User } from 'lucide-react';
@@ -199,7 +199,9 @@ export default function WellbeingSurveyShow({
         >
             <Head title={`Survey · ${survey.title}`} />
             <PageShell>
-                <PageHero category="hr" variant="compact"
+                <PageHero
+                    category="hr"
+                    variant="compact"
                     title={survey.title}
                     description={survey.description ?? 'Engagement survey'}
                     actions={

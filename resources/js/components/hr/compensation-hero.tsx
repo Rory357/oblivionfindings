@@ -7,7 +7,6 @@
  * in a className — so the raw-colour lint stays green. */
 import { cn } from '@/lib/utils';
 import { usePage } from '@inertiajs/react';
-import type { ComponentType, CSSProperties, ReactNode } from 'react';
 import {
     AlertTriangle,
     Banknote,
@@ -18,6 +17,7 @@ import {
     Plus,
     Receipt,
 } from 'lucide-react';
+import type { ComponentType, CSSProperties, ReactNode } from 'react';
 
 export type CompensationHeroStats = {
     people_out_of_band: number;
@@ -68,7 +68,10 @@ function HealthRing({ pct, color }: { pct: number; color: string }) {
     const r = (size - 10) / 2;
     const c = 2 * Math.PI * r;
     return (
-        <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <div
+            className="relative shrink-0"
+            style={{ width: size, height: size }}
+        >
             <svg width={size} height={size} className="-rotate-90">
                 <circle
                     cx={size / 2}
@@ -88,7 +91,9 @@ function HealthRing({ pct, color }: { pct: number; color: string }) {
                     strokeWidth="8"
                     strokeLinecap="round"
                     strokeDasharray={c}
-                    strokeDashoffset={c * (1 - Math.min(100, Math.max(0, pct)) / 100)}
+                    strokeDashoffset={
+                        c * (1 - Math.min(100, Math.max(0, pct)) / 100)
+                    }
                     className="transition-[stroke-dashoffset] duration-700"
                 />
             </svg>
@@ -110,7 +115,7 @@ function HeroStat({
 }) {
     return (
         <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-primary-foreground/60">
+            <div className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
                 {label}
             </div>
             <div
@@ -135,7 +140,10 @@ function AlertChip({
     return (
         <div className="flex items-center gap-2 rounded-lg border border-primary-foreground/15 bg-primary-foreground/10 px-3 py-2 text-[13px] font-medium backdrop-blur-sm">
             <Icon
-                className={cn('h-3.5 w-3.5 shrink-0', !amber && 'text-primary-foreground/70')}
+                className={cn(
+                    'h-3.5 w-3.5 shrink-0',
+                    !amber && 'text-primary-foreground/70',
+                )}
                 style={amber ? goldStyle : undefined}
             />
             {children}
@@ -160,21 +168,50 @@ export function CompensationHero({
 }) {
     const can = (
         usePage().props as {
-            auth?: { can?: { hr?: { compensation?: { manage?: boolean }; expenses?: { view?: boolean } } } };
+            auth?: {
+                can?: {
+                    hr?: {
+                        compensation?: { manage?: boolean };
+                        expenses?: { view?: boolean };
+                    };
+                };
+            };
         }
     ).auth?.can?.hr;
     const defaultActions: CompensationQuickAction[] = [
         ...(can?.compensation?.manage
             ? [
-                  { label: 'New band', icon: Plus, href: '/hr/compensation/bands' },
-                  { label: 'Start pay review', icon: ClipboardCheck, href: '/hr/compensation/reviews' },
-                  { label: 'Record bonus', icon: Banknote, href: '/hr/compensation/bonuses' },
+                  {
+                      label: 'New band',
+                      icon: Plus,
+                      href: '/hr/compensation/bands',
+                  },
+                  {
+                      label: 'Start pay review',
+                      icon: ClipboardCheck,
+                      href: '/hr/compensation/reviews',
+                  },
+                  {
+                      label: 'Record bonus',
+                      icon: Banknote,
+                      href: '/hr/compensation/bonuses',
+                  },
               ]
             : []),
         ...(can?.expenses?.view
-            ? [{ label: 'New claim', icon: Receipt, href: '/hr/compensation/expenses/create' }]
+            ? [
+                  {
+                      label: 'New claim',
+                      icon: Receipt,
+                      href: '/hr/compensation/expenses/create',
+                  },
+              ]
             : []),
-        { label: 'Export', icon: Download, href: '/hr/compensation/bands/export' },
+        {
+            label: 'Export',
+            icon: Download,
+            href: '/hr/compensation/bands/export',
+        },
     ];
     const actions = quickActions ?? defaultActions;
     const health = healthBand(stats.band_health);
@@ -186,8 +223,8 @@ export function CompensationHero({
             className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 text-primary-foreground"
         >
             <div className="pointer-events-none absolute inset-0">
-                <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                <div className="absolute right-1/4 top-1/3 h-40 w-40 rounded-full bg-primary-foreground/5" />
+                <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                <div className="absolute top-1/3 right-1/4 h-40 w-40 rounded-full bg-primary-foreground/5" />
             </div>
 
             <div className="relative flex flex-col gap-6 p-6 md:p-8 lg:flex-row lg:items-start lg:justify-between">
@@ -213,7 +250,10 @@ export function CompensationHero({
                             value={stats.people_out_of_band}
                             amber={stats.people_out_of_band > 0}
                         />
-                        <HeroStat label="Reviews in flight" value={stats.reviews_in_flight} />
+                        <HeroStat
+                            label="Reviews in flight"
+                            value={stats.reviews_in_flight}
+                        />
                         <HeroStat
                             label="Awaiting my approval"
                             value={stats.awaiting_approval}
@@ -237,11 +277,20 @@ export function CompensationHero({
                             const klass =
                                 'inline-flex items-center gap-1.5 rounded-lg bg-primary-foreground/10 px-3 py-2 text-[13px] font-semibold backdrop-blur-sm transition-colors hover:bg-primary-foreground/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground';
                             return a.href ? (
-                                <a key={a.label} href={a.href} className={klass}>
+                                <a
+                                    key={a.label}
+                                    href={a.href}
+                                    className={klass}
+                                >
                                     {inner}
                                 </a>
                             ) : (
-                                <button key={a.label} type="button" onClick={a.onClick} className={klass}>
+                                <button
+                                    key={a.label}
+                                    type="button"
+                                    onClick={a.onClick}
+                                    className={klass}
+                                >
                                     {inner}
                                 </button>
                             );
@@ -252,13 +301,20 @@ export function CompensationHero({
                 {/* Right: band-health ring + alert chips */}
                 <div className="flex shrink-0 flex-col gap-3 lg:w-72">
                     <div className="flex items-center gap-4">
-                        <HealthRing pct={stats.band_health} color={health.color} />
+                        <HealthRing
+                            pct={stats.band_health}
+                            color={health.color}
+                        />
                         <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-primary-foreground/60">
-                                Band health · <span style={{ color: health.color }}>{health.label}</span>
+                            <div className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
+                                Band health ·{' '}
+                                <span style={{ color: health.color }}>
+                                    {health.label}
+                                </span>
                             </div>
-                            <div className="mt-1 text-sm font-semibold leading-snug">
-                                {stats.people_in_band} of {stats.people_placed} people
+                            <div className="mt-1 text-sm leading-snug font-semibold">
+                                {stats.people_in_band} of {stats.people_placed}{' '}
+                                people
                                 <br />
                                 sit within band
                             </div>
@@ -267,7 +323,10 @@ export function CompensationHero({
                     <AlertChip icon={Clock} amber={stats.awaiting_approval > 0}>
                         {stats.awaiting_approval} awaiting your approval
                     </AlertChip>
-                    <AlertChip icon={AlertTriangle} amber={stats.people_out_of_band > 0}>
+                    <AlertChip
+                        icon={AlertTriangle}
+                        amber={stats.people_out_of_band > 0}
+                    >
                         {stats.people_out_of_band} over / under band
                     </AlertChip>
                     <AlertChip icon={Clock} amber={stats.claims_overdue > 0}>

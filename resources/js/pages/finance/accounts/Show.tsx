@@ -1,7 +1,7 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
+import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,8 +13,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero, PageLayout } from '@/components/page';
-import { formatMoney } from '@/components/finance/money';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
@@ -67,10 +67,13 @@ const typeLabels: Record<string, string> = {
 
 const typeColors: Record<string, string> = {
     asset: 'bg-status-info-bg text-status-info border-status-info/30',
-    liability: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    liability:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
     equity: 'bg-primary/10 text-primary border-primary/30',
-    revenue: 'bg-status-success-bg text-status-success border-status-success/30',
-    expense: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    revenue:
+        'bg-status-success-bg text-status-success border-status-success/30',
+    expense:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 export default function AccountShow({ account, ledger, filters }: PageProps) {
@@ -80,15 +83,22 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
     const breadcrumbs = [
         { title: 'Finance', href: '/finance' },
         { title: 'Chart of Accounts', href: '/finance/accounts' },
-        { title: `${account.code} - ${account.name}`, href: `/finance/accounts/${account.id}` },
+        {
+            title: `${account.code} - ${account.name}`,
+            href: `/finance/accounts/${account.id}`,
+        },
     ];
 
     function handleFilter(e: FormEvent) {
         e.preventDefault();
-        router.get(`/finance/accounts/${account.id}`, {
-            start_date: startDate,
-            end_date: endDate,
-        }, { preserveState: true });
+        router.get(
+            `/finance/accounts/${account.id}`,
+            {
+                start_date: startDate,
+                end_date: endDate,
+            },
+            { preserveState: true },
+        );
     }
 
     return (
@@ -97,14 +107,18 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/accounts"
                         title={`${account.code} - ${account.name}`}
                         description={account.description ?? undefined}
                         actions={
                             <div className="flex items-center gap-3">
-                                <Badge variant="outline" className={typeColors[account.type]}>
+                                <Badge
+                                    variant="outline"
+                                    className={typeColors[account.type]}
+                                >
                                     {typeLabels[account.type]}
                                 </Badge>
                                 {account.is_system && (
@@ -114,8 +128,10 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
                                     <Badge variant="secondary">Inactive</Badge>
                                 )}
                                 <div className="text-right">
-                                    <p className="text-xs text-muted-foreground">Current Balance</p>
-                                    <p className="text-xl font-bold font-mono tabular-nums">
+                                    <p className="text-xs text-muted-foreground">
+                                        Current Balance
+                                    </p>
+                                    <p className="font-mono text-xl font-bold tabular-nums">
                                         {formatMoney(account.balance)}
                                     </p>
                                 </div>
@@ -127,14 +143,19 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
                 {/* Date Filter */}
                 <Card>
                     <CardContent className="pt-6">
-                        <form onSubmit={handleFilter} className="flex items-end gap-4">
+                        <form
+                            onSubmit={handleFilter}
+                            className="flex items-end gap-4"
+                        >
                             <div className="space-y-1.5">
                                 <Label htmlFor="start_date">From</Label>
                                 <Input
                                     id="start_date"
                                     type="date"
                                     value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
+                                    onChange={(e) =>
+                                        setStartDate(e.target.value)
+                                    }
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -166,15 +187,23 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
                                     <TableHead>Date</TableHead>
                                     <TableHead>Journal #</TableHead>
                                     <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">Debit</TableHead>
-                                    <TableHead className="text-right">Credit</TableHead>
-                                    <TableHead className="text-right">Balance</TableHead>
+                                    <TableHead className="text-right">
+                                        Debit
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Credit
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Balance
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {/* Opening Balance Row */}
                                 <TableRow className="bg-muted/30 font-medium">
-                                    <TableCell colSpan={5}>Opening Balance</TableCell>
+                                    <TableCell colSpan={5}>
+                                        Opening Balance
+                                    </TableCell>
                                     <TableCell className="text-right font-mono tabular-nums">
                                         {formatMoney(ledger.opening_balance)}
                                     </TableCell>
@@ -182,33 +211,45 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
 
                                 {ledger.lines.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                                            No journal entries found for this period.
+                                        <TableCell
+                                            colSpan={6}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            No journal entries found for this
+                                            period.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     ledger.lines.map((line) => (
                                         <TableRow key={line.id}>
-                                            <TableCell className="text-sm">{line.date}</TableCell>
+                                            <TableCell className="text-sm">
+                                                {line.date}
+                                            </TableCell>
                                             <TableCell>
                                                 <Link
                                                     href={`/finance/journals/${line.journal_id}`}
-                                                    className="text-sm font-mono text-primary hover:underline"
+                                                    className="font-mono text-sm text-primary hover:underline"
                                                 >
                                                     {line.journal_number}
                                                 </Link>
                                             </TableCell>
-                                            <TableCell className="text-sm max-w-xs truncate">
+                                            <TableCell className="max-w-xs truncate text-sm">
                                                 {line.description}
                                             </TableCell>
-                                            <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                {line.debit > 0 ? formatMoney(line.debit) : ''}
+                                            <TableCell className="text-right font-mono text-sm tabular-nums">
+                                                {line.debit > 0
+                                                    ? formatMoney(line.debit)
+                                                    : ''}
                                             </TableCell>
-                                            <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                {line.credit > 0 ? formatMoney(line.credit) : ''}
+                                            <TableCell className="text-right font-mono text-sm tabular-nums">
+                                                {line.credit > 0
+                                                    ? formatMoney(line.credit)
+                                                    : ''}
                                             </TableCell>
-                                            <TableCell className="text-right font-mono tabular-nums text-sm font-medium">
-                                                {formatMoney(line.running_balance)}
+                                            <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
+                                                {formatMoney(
+                                                    line.running_balance,
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -216,7 +257,9 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
 
                                 {/* Closing Balance Row */}
                                 <TableRow className="bg-muted/30 font-semibold">
-                                    <TableCell colSpan={5}>Closing Balance</TableCell>
+                                    <TableCell colSpan={5}>
+                                        Closing Balance
+                                    </TableCell>
                                     <TableCell className="text-right font-mono tabular-nums">
                                         {formatMoney(ledger.closing_balance)}
                                     </TableCell>

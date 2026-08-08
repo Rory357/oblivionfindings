@@ -13,7 +13,14 @@ vi.mock('@/components/leaflet-map', () => ({
 }));
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
-    Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
+    Link: ({
+        href,
+        children,
+        ...props
+    }: {
+        href: string;
+        children: React.ReactNode;
+    }) => (
         <a href={href} {...props}>
             {children}
         </a>

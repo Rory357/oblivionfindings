@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/datetime';
+import { formatReadableOperationalValue } from '@/lib/readable-operational-state';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
@@ -152,9 +153,7 @@ function SafeSummary({ value }: { value: unknown }) {
                 <div key={key} className="flex gap-1">
                     <dt className="font-semibold">{humanise(key)}:</dt>
                     <dd className="text-muted-foreground">
-                        {typeof entry === 'object'
-                            ? JSON.stringify(entry)
-                            : String(entry)}
+                        {formatReadableOperationalValue(entry)}
                     </dd>
                 </div>
             ))}

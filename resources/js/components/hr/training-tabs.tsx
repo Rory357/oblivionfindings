@@ -22,18 +22,28 @@ type HrCan = {
  * (Assignments isn't a built page, so the hub honestly carries 2 tabs.)
  */
 export function TrainingTabs({ active }: { active: TrainingTab }) {
-    const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth?.can
-        ?.hr;
+    const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth
+        ?.can?.hr;
 
     const canView = !!hr?.training?.view;
 
     const all: Array<{ item: HrTabItem; show: boolean }> = [
         {
-            item: { id: 'dashboard', label: 'Dashboard', icon: GraduationCap, tone: 'primary' },
+            item: {
+                id: 'dashboard',
+                label: 'Dashboard',
+                icon: GraduationCap,
+                tone: 'primary',
+            },
             show: canView,
         },
         {
-            item: { id: 'catalog', label: 'Catalog', icon: BookOpen, tone: 'info' },
+            item: {
+                id: 'catalog',
+                label: 'Catalog',
+                icon: BookOpen,
+                tone: 'info',
+            },
             show: canView,
         },
     ];

@@ -3,12 +3,15 @@
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\FleetTelemetryEvent;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkRawFrame;
+use App\Models\User;
 use App\Services\Queclink\ConfigurationSnapshotService;
+use App\Services\Queclink\Exceptions\IntakeRejected;
 use App\Services\Queclink\Listener\ConnectionState;
 use App\Services\Queclink\Listener\FrameRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,16 +121,81 @@ it('does not ingest a paired provider projection without its canonical Device bi
         ->and(QueclinkRawFrame::inbound()->count())->toBe(1);
 });
 
-it('stores binary probe frames as hex text instead of throwing while logging them', function () {
-    $responses = $this->router->handleInbound("\x16\x03\x01\x02\x97\xFF$", $this->state);
+it('rejects malformed binary probe frames before persistence', function () {
+    expect(fn () => $this->router->handleInbound("\x16\x03\x01\x02\x97\xFF$", $this->state))
+        ->toThrow(IntakeRejected::class);
 
-    expect($responses)->toBe([]);
+    expect(QueclinkRawFrame::count())->toBe(0)
+        ->and(QueclinkDevice::count())->toBe(0);
+});
 
-    $rawFrame = QueclinkRawFrame::first();
-    expect($rawFrame)->not->toBeNull()
-        ->and($rawFrame->parse_ok)->toBeFalse()
-        ->and($rawFrame->parse_error)->toContain('HEX frame detected')
-        ->and($rawFrame->raw_frame)->toBe('0x1603010297FF24');
+it('rejects server-originated frame types before any intake persistence', function () {
+    expect(fn () => $this->router->handleInbound(
+        'AT+GTRTO,Secret42,1,0001$',
+        $this->state,
+    ))->toThrow(IntakeRejected::class);
+
+    expect(fn () => $this->router->handleInbound(
+        '+SACK:GTHBD,8020090100,09CF$',
+        $this->state,
+    ))->toThrow(IntakeRejected::class);
+
+    expect(QueclinkRawFrame::count())->toBe(0)
+        ->and(QueclinkDevice::count())->toBe(0);
+});
+
+it('rejects overlong persisted protocol fields before resolving a provider device', function () {
+    expect(fn () => $this->router->handleInbound(
+        '+RESP:GTTOOLONG12,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    ))->toThrow(IntakeRejected::class);
+
+    expect(QueclinkRawFrame::count())->toBe(0)
+        ->and(QueclinkDevice::count())->toBe(0);
+});
+
+it('does not let an empty delimiter extend the accepted-frame idle deadline', function () {
+    $this->state->lastActivityAt = 100.0;
+
+    expect(fn () => $this->router->handleInbound('$', $this->state))
+        ->toThrow(IntakeRejected::class)
+        ->and($this->state->lastActivityAt)->toBe(100.0)
+        ->and(QueclinkRawFrame::count())->toBe(0);
+});
+
+it('captures immutable canonical assignment and binding lineage on every stored frame', function () {
+    $staff = User::factory()->create();
+    $canonicalDevice = Device::factory()->tracking()->create();
+    $assignment = DeviceAssignment::query()->create([
+        'device_id' => $canonicalDevice->id,
+        'assignable_type' => DeviceAssignment::TARGET_STAFF,
+        'assignable_id' => $staff->id,
+        'assignment_type' => 'permanent',
+        'assigned_at' => now()->subMinute(),
+        'retention_days' => 30,
+    ]);
+    $bindingUuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    QueclinkDevice::query()->create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+        'device_id' => $canonicalDevice->id,
+        'binding_uuid' => $bindingUuid,
+    ]);
+
+    $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    QueclinkRawFrame::query()->get()->each(function (QueclinkRawFrame $frame) use (
+        $canonicalDevice,
+        $assignment,
+        $bindingUuid,
+    ): void {
+        expect($frame->canonical_device_id)->toBe($canonicalDevice->id)
+            ->and($frame->device_assignment_id)->toBe($assignment->id)
+            ->and($frame->binding_uuid)->toBe($bindingUuid);
+    });
 });
 
 it('protects inbound configuration bytes while retaining an internal configuration projection', function () {

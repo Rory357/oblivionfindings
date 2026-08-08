@@ -96,7 +96,8 @@ export function FixClockOutWizard({
             const suggested = new Date(
                 new Date(candidate.clock_in_at).getTime() + 8 * 3600000,
             );
-            const capped = suggested.getTime() > Date.now() ? new Date() : suggested;
+            const capped =
+                suggested.getTime() > Date.now() ? new Date() : suggested;
             setOutDate(toYMD(capped));
             setOutTime(toHHMM(capped));
         }
@@ -260,9 +261,9 @@ export function FixClockOutWizard({
                             <>
                                 The session now reads{' '}
                                 {session ? formatTime(session.clock_in_at) : ''}{' '}
-                                → {formatTime(done.outAt)} ({done.workedH}h). The
-                                linked timesheet was updated and your reason was
-                                recorded in the audit log.
+                                → {formatTime(done.outAt)} ({done.workedH}h).
+                                The linked timesheet was updated and your reason
+                                was recorded in the audit log.
                             </>
                         }
                         actions={
@@ -358,9 +359,10 @@ export function FixClockOutWizard({
                             </Badge>
                         </div>
                         <InfoCard icon={AlertTriangle} tone="warn">
-                            The linked draft timesheet is recalculated from these
-                            times. If the timesheet was already submitted, it
-                            returns to <strong>draft</strong> for re-approval.
+                            The linked draft timesheet is recalculated from
+                            these times. If the timesheet was already submitted,
+                            it returns to <strong>draft</strong> for
+                            re-approval.
                         </InfoCard>
                     </div>
                 </WizardStepPane>
@@ -391,7 +393,10 @@ export function FixClockOutWizard({
                             title="Corrected session"
                             onEdit={() => setStepIndex(1)}
                         >
-                            <ReviewRow label="Staff" value={session?.user_name} />
+                            <ReviewRow
+                                label="Staff"
+                                value={session?.user_name}
+                            />
                             <ReviewRow
                                 label="Clock in"
                                 value={

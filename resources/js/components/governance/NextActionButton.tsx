@@ -1,8 +1,12 @@
 import { Button } from '@/components/ui/button';
+import {
+    resolveActionVerb,
+    type WorkflowArea,
+    type WorkflowStatus,
+} from '@/lib/governance-action-verbs';
+import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
-import { resolveActionVerb, type WorkflowArea, type WorkflowStatus } from '@/lib/governance-action-verbs';
-import { cn } from '@/lib/utils';
 
 interface NextActionButtonProps {
     area: WorkflowArea;
@@ -35,7 +39,8 @@ export function NextActionButton({
     ...rest
 }: NextActionButtonProps) {
     const label = resolveActionVerb(area, status, actionLabel);
-    const resolvedVariant = variant ?? (status === 'overdue' ? 'default' : 'outline');
+    const resolvedVariant =
+        variant ?? (status === 'overdue' ? 'default' : 'outline');
 
     return (
         <Button

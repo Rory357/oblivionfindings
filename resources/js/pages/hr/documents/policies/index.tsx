@@ -143,7 +143,8 @@ export default function PoliciesIndex({
         if (typeof window === 'undefined' || !can.manage) return null;
         const params = new URLSearchParams(window.location.search);
         if (params.has('new')) return { mode: 'create' };
-        if (params.has('edit') && editPolicy) return { mode: 'edit', policy: editPolicy };
+        if (params.has('edit') && editPolicy)
+            return { mode: 'edit', policy: editPolicy };
         return null;
     });
     const [deleting, setDeleting] = useState<Policy | null>(null);
@@ -180,24 +181,36 @@ export default function PoliciesIndex({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={BookOpen}
                         title="Policy Library"
                         description="Organisation policies, procedures, and staff attestations."
                         stats={[
                             { label: 'Policies', value: stats.total },
-                            { label: 'Active', value: stats.active, tone: 'success' },
+                            {
+                                label: 'Active',
+                                value: stats.active,
+                                tone: 'success',
+                            },
                             {
                                 label: 'Need attestation',
                                 value: stats.need_attestation,
                                 tone: 'warning',
                             },
-                            { label: 'Attestations recorded', value: stats.attestations },
+                            {
+                                label: 'Attestations recorded',
+                                value: stats.attestations,
+                            },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 <Link href="/hr/documents/policies/attestations">
-                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
                                         <ShieldCheck className="mr-1.5 h-4 w-4" />
                                         Attestations
                                     </Button>
@@ -205,7 +218,9 @@ export default function PoliciesIndex({
                                 {can.manage && (
                                     <Button
                                         size="sm"
-                                        onClick={() => setWizard({ mode: 'create' })}
+                                        onClick={() =>
+                                            setWizard({ mode: 'create' })
+                                        }
                                     >
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         New policy
@@ -397,7 +412,9 @@ export default function PoliciesIndex({
                                                 </Link>
                                                 {can.manage && (
                                                     <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
+                                                        <DropdownMenuTrigger
+                                                            asChild
+                                                        >
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
@@ -423,7 +440,9 @@ export default function PoliciesIndex({
                                                             <DropdownMenuItem
                                                                 className="text-status-critical focus:text-status-critical"
                                                                 onSelect={() =>
-                                                                    setDeleting(policy)
+                                                                    setDeleting(
+                                                                        policy,
+                                                                    )
                                                                 }
                                                             >
                                                                 <Archive className="mr-2 h-4 w-4" />
@@ -474,9 +493,10 @@ export default function PoliciesIndex({
                     <DialogHeader>
                         <DialogTitle>Archive policy</DialogTitle>
                         <DialogDescription>
-                            Archive “{deleting?.title}”? It will leave the active
-                            library while every published version, attestation and
-                            stored PDF remains available for audit history.
+                            Archive “{deleting?.title}”? It will leave the
+                            active library while every published version,
+                            attestation and stored PDF remains available for
+                            audit history.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -487,10 +507,7 @@ export default function PoliciesIndex({
                         >
                             Cancel
                         </Button>
-                        <Button
-                            onClick={confirmDelete}
-                            disabled={deleteBusy}
-                        >
+                        <Button onClick={confirmDelete} disabled={deleteBusy}>
                             <Archive className="mr-1.5 h-4 w-4" />
                             {deleteBusy ? 'Archiving…' : 'Archive policy'}
                         </Button>

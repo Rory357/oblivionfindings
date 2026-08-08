@@ -1,7 +1,3 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { type BreadcrumbItem, PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import {
     CreditNoteDialog,
     formatMoney,
@@ -12,15 +8,32 @@ import {
     type CreditNoteVendorOption,
     type RowCtxItem,
 } from '@/components/finance';
-import { Button } from '@/components/ui/button';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { FileText, Plus, FileMinus, Download, Search, Eye } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { PageProps, type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { Download, Eye, FileMinus, FileText, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 
 interface CreditNote {
@@ -58,11 +71,23 @@ interface Props extends PageProps {
 }
 
 const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+    new Date(date).toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
 
 const typeConfig: Record<string, { label: string; className: string }> = {
-    payable: { label: 'AP', className: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70' },
-    receivable: { label: 'AR', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
+    payable: {
+        label: 'AP',
+        className:
+            'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70',
+    },
+    receivable: {
+        label: 'AR',
+        className:
+            'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -70,7 +95,15 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Credit Notes', href: '/finance/credit-notes' },
 ];
 
-export default function CreditNotesIndex({ auth, creditNotes, filters, canManage = false, vendors = [], clients = [], accounts = [] }: Props) {
+export default function CreditNotesIndex({
+    auth,
+    creditNotes,
+    filters,
+    canManage = false,
+    vendors = [],
+    clients = [],
+    accounts = [],
+}: Props) {
     const [type, setType] = useState(filters.type ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [search, setSearch] = useState(filters.search ?? '');
@@ -86,7 +119,10 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
         if (dateFrom) params.date_from = dateFrom;
         if (dateTo) params.date_to = dateTo;
 
-        router.get('/finance/credit-notes', params, { preserveState: true, preserveScroll: true });
+        router.get('/finance/credit-notes', params, {
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
 
     const clearFilters = () => {
@@ -99,17 +135,31 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
     };
 
     const hasFilters = Boolean(
-        search || (type && type !== 'all') || (status && status !== 'all') || dateFrom || dateTo,
+        search ||
+        (type && type !== 'all') ||
+        (status && status !== 'all') ||
+        dateFrom ||
+        dateTo,
     );
 
-    const payableCount = creditNotes.data.filter((cn) => cn.type === 'payable').length;
-    const receivableCount = creditNotes.data.filter((cn) => cn.type === 'receivable').length;
+    const payableCount = creditNotes.data.filter(
+        (cn) => cn.type === 'payable',
+    ).length;
+    const receivableCount = creditNotes.data.filter(
+        (cn) => cn.type === 'receivable',
+    ).length;
 
     // Right-click row menu — mirrors the row's only inline action: opening the
     // credit note (row onClick + the CN-number link both go to the show route).
     const rowMenu = useRowContextMenu();
     const rowMenuItems = (creditNote: CreditNote): RowCtxItem[] => [
-        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/credit-notes/${creditNote.id}`) },
+        {
+            kind: 'item',
+            label: 'Open',
+            icon: Eye,
+            onSelect: () =>
+                router.get(`/finance/credit-notes/${creditNote.id}`),
+        },
     ];
 
     return (
@@ -118,26 +168,35 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={FileMinus}
                         title="Credit Notes"
                         description="Manage credit notes for accounts payable and receivable"
                         stats={[
-                            { label: 'Total (this page)', value: creditNotes.data.length },
+                            {
+                                label: 'Total (this page)',
+                                value: creditNotes.data.length,
+                            },
                             { label: 'AP', value: payableCount },
                             { label: 'AR', value: receivableCount },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button size="sm" variant="outline" asChild>
-                                    <a href={`/finance/credit-notes/export?${new URLSearchParams(Object.entries({ type: type !== 'all' ? type : '', status: status !== 'all' ? status : '', search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}>
-                                        <Download className="w-4 h-4 mr-1.5" />
+                                    <a
+                                        href={`/finance/credit-notes/export?${new URLSearchParams(Object.entries({ type: type !== 'all' ? type : '', status: status !== 'all' ? status : '', search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}
+                                    >
+                                        <Download className="mr-1.5 h-4 w-4" />
                                         Export CSV
                                     </a>
                                 </Button>
                                 {canManage && (
-                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
-                                        <Plus className="w-4 h-4 mr-1.5" />
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
                                         New Credit Note
                                     </Button>
                                 )}
@@ -152,12 +211,14 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                     <CardContent className="pt-6">
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-6">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                 <Input
                                     placeholder="Search CN #, party..."
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    onKeyDown={(e) =>
+                                        e.key === 'Enter' && applyFilters()
+                                    }
                                     className="pl-9"
                                 />
                             </div>
@@ -166,9 +227,15 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                                     <SelectValue placeholder="All Types" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Types</SelectItem>
-                                    <SelectItem value="payable">Accounts Payable</SelectItem>
-                                    <SelectItem value="receivable">Accounts Receivable</SelectItem>
+                                    <SelectItem value="all">
+                                        All Types
+                                    </SelectItem>
+                                    <SelectItem value="payable">
+                                        Accounts Payable
+                                    </SelectItem>
+                                    <SelectItem value="receivable">
+                                        Accounts Receivable
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                             <Select value={status} onValueChange={setStatus}>
@@ -176,11 +243,19 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="all">
+                                        All Statuses
+                                    </SelectItem>
                                     <SelectItem value="draft">Draft</SelectItem>
-                                    <SelectItem value="approved">Approved</SelectItem>
-                                    <SelectItem value="applied">Applied</SelectItem>
-                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                    <SelectItem value="approved">
+                                        Approved
+                                    </SelectItem>
+                                    <SelectItem value="applied">
+                                        Applied
+                                    </SelectItem>
+                                    <SelectItem value="cancelled">
+                                        Cancelled
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                             <Input
@@ -196,8 +271,20 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                                 placeholder="To"
                             />
                             <div className="flex gap-2">
-                                <Button onClick={applyFilters} variant="secondary" className="shrink-0">Filter</Button>
-                                <Button onClick={clearFilters} variant="ghost" className="shrink-0">Clear</Button>
+                                <Button
+                                    onClick={applyFilters}
+                                    variant="secondary"
+                                    className="shrink-0"
+                                >
+                                    Filter
+                                </Button>
+                                <Button
+                                    onClick={clearFilters}
+                                    variant="ghost"
+                                    className="shrink-0"
+                                >
+                                    Clear
+                                </Button>
                             </div>
                         </div>
                     </CardContent>
@@ -221,7 +308,10 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                                 className="border-0"
                                 action={
                                     canManage ? (
-                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setCreateOpen(true)}
+                                        >
                                             New credit note
                                         </Button>
                                     ) : undefined
@@ -237,7 +327,9 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                                         <TableHead>Type</TableHead>
                                         <TableHead>Vendor / Client</TableHead>
                                         <TableHead>Date</TableHead>
-                                        <TableHead className="text-right">Total</TableHead>
+                                        <TableHead className="text-right">
+                                            Total
+                                        </TableHead>
                                         <TableHead>Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -246,24 +338,56 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                                         <TableRow
                                             key={creditNote.id}
                                             className="cursor-pointer hover:bg-muted/50"
-                                            onClick={() => router.get(`/finance/credit-notes/${creditNote.id}`)}
-                                            onContextMenu={rowMenu.open(rowMenuItems(creditNote))}
+                                            onClick={() =>
+                                                router.get(
+                                                    `/finance/credit-notes/${creditNote.id}`,
+                                                )
+                                            }
+                                            onContextMenu={rowMenu.open(
+                                                rowMenuItems(creditNote),
+                                            )}
                                         >
                                             <TableCell className="font-medium">
-                                                <Link href={`/finance/credit-notes/${creditNote.id}`} className="text-primary hover:underline">
-                                                    {creditNote.credit_note_number}
+                                                <Link
+                                                    href={`/finance/credit-notes/${creditNote.id}`}
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    {
+                                                        creditNote.credit_note_number
+                                                    }
                                                 </Link>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge className={typeConfig[creditNote.type]?.className ?? 'bg-muted text-foreground'}>
-                                                    {typeConfig[creditNote.type]?.label ?? creditNote.type}
+                                                <Badge
+                                                    className={
+                                                        typeConfig[
+                                                            creditNote.type
+                                                        ]?.className ??
+                                                        'bg-muted text-foreground'
+                                                    }
+                                                >
+                                                    {typeConfig[creditNote.type]
+                                                        ?.label ??
+                                                        creditNote.type}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell>{creditNote.vendor?.name ?? '-'}</TableCell>
-                                            <TableCell>{formatDate(creditNote.credit_date)}</TableCell>
-                                            <TableCell className="text-right font-medium">{formatMoney(creditNote.total_amount)}</TableCell>
                                             <TableCell>
-                                                <StatusBadge status={creditNote.status} />
+                                                {creditNote.vendor?.name ?? '-'}
+                                            </TableCell>
+                                            <TableCell>
+                                                {formatDate(
+                                                    creditNote.credit_date,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right font-medium">
+                                                {formatMoney(
+                                                    creditNote.total_amount,
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <StatusBadge
+                                                    status={creditNote.status}
+                                                />
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -272,15 +396,28 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
 
                             {/* Pagination */}
                             {creditNotes.last_page > 1 && (
-                                <div className="flex items-center justify-center gap-1 p-4 border-t">
+                                <div className="flex items-center justify-center gap-1 border-t p-4">
                                     {creditNotes.links.map((link, i) => (
                                         <Button
                                             key={i}
-                                            variant={link.active ? 'default' : 'ghost'}
+                                            variant={
+                                                link.active
+                                                    ? 'default'
+                                                    : 'ghost'
+                                            }
                                             size="sm"
                                             disabled={!link.url}
-                                            onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                            onClick={() =>
+                                                link.url &&
+                                                router.get(
+                                                    link.url,
+                                                    {},
+                                                    { preserveState: true },
+                                                )
+                                            }
+                                            dangerouslySetInnerHTML={{
+                                                __html: link.label,
+                                            }}
                                         />
                                     ))}
                                 </div>

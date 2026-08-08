@@ -20,10 +20,7 @@ export default function WizardStepper({ steps, current }: Props) {
                 const isComplete = index < current;
                 const isCurrent = index === current;
                 return (
-                    <li
-                        key={step.key}
-                        className="min-w-0"
-                    >
+                    <li key={step.key} className="min-w-0">
                         <div
                             className={`flex h-full min-w-0 items-center gap-2 rounded-md border px-2 py-2 ${
                                 isCurrent
@@ -50,7 +47,7 @@ export default function WizardStepper({ steps, current }: Props) {
                                 )}
                             </span>
                             <span
-                                className={`min-w-0 break-words text-xs font-medium leading-tight ${
+                                className={`min-w-0 text-xs leading-tight font-medium break-words ${
                                     isCurrent
                                         ? 'text-foreground'
                                         : 'text-muted-foreground'

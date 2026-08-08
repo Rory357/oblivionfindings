@@ -7,7 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatDateTime } from '@/lib/datetime';
 import { Link, router, useForm } from '@inertiajs/react';
-import { CalendarClock, History, KeyRound, ShieldCheck } from 'lucide-react';
+import {
+    AlertTriangle,
+    CalendarClock,
+    CheckCircle2,
+    Clock3,
+    History,
+    KeyRound,
+    ShieldCheck,
+    XCircle,
+} from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 
 export type AccessControlWorkspaceData = {
@@ -26,6 +35,10 @@ export type AccessControlWorkspaceData = {
         label: string;
         siteIds: number[];
     }>;
+    providerActions: {
+        issue: { available: boolean; reason: string };
+        revoke: { available: boolean; reason: string };
+    };
     schedules: Array<{
         id: number;
         siteId: number;
@@ -46,8 +59,12 @@ export type AccessControlWorkspaceData = {
         };
         providerReconciliation: {
             status: string;
+            label: string;
+            tone: 'positive' | 'warning' | 'danger';
             requiredAt: string | null;
             message: string;
+            failureReason: string | null;
+            providerConfirmed: boolean;
         };
         deactivatedAt: string | null;
         deactivationReason: string | null;
@@ -70,6 +87,16 @@ export type AccessControlWorkspaceData = {
         holderLabel: string;
         referenceKey: string;
         status: string;
+        providerLifecycle: {
+            state: 'active' | 'revoked' | 'pending' | 'failed';
+            label: string;
+            tone: 'positive' | 'neutral' | 'warning' | 'danger';
+            message: string;
+            requestedAt: string | null;
+            confirmedAt: string | null;
+            failureReason: string | null;
+            accessStillConfirmed: boolean;
+        };
         scheduleName: string;
         devices: Array<{ id: number; name: string; href: string }>;
         validFrom: string | null;
@@ -78,7 +105,7 @@ export type AccessControlWorkspaceData = {
         revocationReason: string | null;
     }>;
     history: Array<{
-        id: number;
+        id: string;
         action: string;
         actor: string;
         occurredAt: string | null;
@@ -572,6 +599,23 @@ function CredentialForm({ data }: { data: AccessControlWorkspaceData }) {
         (item) => item.siteId === siteId,
     );
 
+    if (!data.providerActions.issue.available) {
+        return (
+            <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-sm text-status-warning">
+                <p className="flex items-center gap-2 font-medium">
+                    <AlertTriangle className="h-4 w-4" /> Provider issue action
+                    unavailable
+                </p>
+                <p className="mt-2">{data.providerActions.issue.reason}</p>
+                <p className="mt-2 text-xs">
+                    Provider-synchronised credentials may still appear below,
+                    but Oblivion Findings will not create a local row that
+                    implies access was granted.
+                </p>
+            </div>
+        );
+    }
+
     const submit = (event: FormEvent) => {
         event.preventDefault();
         form.post('/security-devices/access-control/credentials', {
@@ -786,9 +830,67 @@ function CredentialForm({ data }: { data: AccessControlWorkspaceData }) {
                     form.data.device_ids.length === 0
                 }
             >
-                Issue credential
+                Request provider issue
             </Button>
+            <ErrorText
+                value={(form.errors as Record<string, string>).provider_action}
+            />
         </form>
+    );
+}
+
+function CredentialLifecycleBadge({
+    lifecycle,
+}: {
+    lifecycle: AccessControlWorkspaceData['credentials'][number]['providerLifecycle'];
+}) {
+    const Icon =
+        lifecycle.state === 'active'
+            ? CheckCircle2
+            : lifecycle.state === 'failed'
+              ? XCircle
+              : lifecycle.state === 'pending'
+                ? Clock3
+                : ShieldCheck;
+    const classes =
+        lifecycle.tone === 'positive'
+            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+            : lifecycle.tone === 'danger'
+              ? 'border-destructive/30 bg-destructive/10 text-destructive'
+              : lifecycle.tone === 'warning'
+                ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
+                : 'border-border bg-muted text-muted-foreground';
+
+    return (
+        <Badge variant="outline" className={classes}>
+            <Icon className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+            {lifecycle.label}
+        </Badge>
+    );
+}
+
+function ScheduleReconciliationBadge({
+    reconciliation,
+}: {
+    reconciliation: AccessControlWorkspaceData['schedules'][number]['providerReconciliation'];
+}) {
+    const Icon = reconciliation.providerConfirmed
+        ? CheckCircle2
+        : reconciliation.tone === 'danger'
+          ? XCircle
+          : Clock3;
+    const classes =
+        reconciliation.tone === 'positive'
+            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+            : reconciliation.tone === 'danger'
+              ? 'border-destructive/30 bg-destructive/10 text-destructive'
+              : 'border-status-warning/30 bg-status-warning-bg text-status-warning';
+
+    return (
+        <Badge variant="outline" className={classes}>
+            <Icon className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+            {reconciliation.label}
+        </Badge>
     );
 }
 
@@ -803,8 +905,8 @@ function Credentials({ data }: { data: AccessControlWorkspaceData }) {
         <Card>
             <CardHeader>
                 <h3 className="flex items-center gap-2 font-semibold">
-                    <KeyRound className="h-4 w-4 text-primary" /> Issued
-                    credentials
+                    <KeyRound className="h-4 w-4 text-primary" /> Credential
+                    lifecycle
                 </h3>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -830,17 +932,13 @@ function Credentials({ data }: { data: AccessControlWorkspaceData }) {
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <Badge
-                                        variant={
-                                            credential.status === 'active'
-                                                ? 'default'
-                                                : 'secondary'
-                                        }
-                                    >
-                                        {credential.status}
-                                    </Badge>
+                                    <CredentialLifecycleBadge
+                                        lifecycle={credential.providerLifecycle}
+                                    />
                                     {data.canManage &&
-                                    credential.status === 'active' ? (
+                                    credential.providerLifecycle.state ===
+                                        'active' &&
+                                    data.providerActions.revoke.available ? (
                                         <div className="flex flex-col items-end gap-2">
                                             <Label
                                                 htmlFor={`revoke-reason-${credential.id}`}
@@ -884,12 +982,52 @@ function Credentials({ data }: { data: AccessControlWorkspaceData }) {
                                                     setRevoke(credential)
                                                 }
                                             >
-                                                Revoke
+                                                Request revocation
                                             </Button>
                                         </div>
                                     ) : null}
                                 </div>
                             </div>
+                            <div
+                                className="mt-3 rounded-lg border bg-muted/30 p-3 text-sm"
+                                role="status"
+                            >
+                                <p>{credential.providerLifecycle.message}</p>
+                                {credential.providerLifecycle.requestedAt ? (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Provider action requested{' '}
+                                        {formatDateTime(
+                                            credential.providerLifecycle
+                                                .requestedAt,
+                                        )}
+                                    </p>
+                                ) : null}
+                                {credential.providerLifecycle.confirmedAt ? (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Provider evidence confirmed{' '}
+                                        {formatDateTime(
+                                            credential.providerLifecycle
+                                                .confirmedAt,
+                                        )}
+                                    </p>
+                                ) : null}
+                                {credential.providerLifecycle.failureReason ? (
+                                    <p className="mt-1 text-xs text-destructive">
+                                        {
+                                            credential.providerLifecycle
+                                                .failureReason
+                                        }
+                                    </p>
+                                ) : null}
+                            </div>
+                            {data.canManage &&
+                            credential.providerLifecycle.state === 'active' &&
+                            !data.providerActions.revoke.available ? (
+                                <p className="mt-3 flex items-start gap-2 text-xs text-status-warning">
+                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                    {data.providerActions.revoke.reason}
+                                </p>
+                            ) : null}
                             <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                                 <div>
                                     <dt className="text-xs text-muted-foreground">
@@ -907,19 +1045,34 @@ function Credentials({ data }: { data: AccessControlWorkspaceData }) {
                                 </div>
                             </dl>
                             <div className="mt-3 flex flex-wrap gap-2">
-                                {credential.devices.map((device) => (
-                                    <Link
-                                        key={device.id}
-                                        href={device.href}
-                                        className="frontline-focus rounded-md border px-2 py-1 text-xs hover:text-primary"
-                                    >
-                                        {device.name}
-                                    </Link>
-                                ))}
+                                {credential.devices.length ? (
+                                    credential.devices.map((device) => (
+                                        <Link
+                                            key={device.id}
+                                            href={device.href}
+                                            className="frontline-focus min-h-11 rounded-md border px-3 py-2 text-xs hover:text-primary"
+                                        >
+                                            <ShieldCheck
+                                                className="mr-1 inline h-3.5 w-3.5"
+                                                aria-hidden="true"
+                                            />
+                                            {device.name}
+                                        </Link>
+                                    ))
+                                ) : (
+                                    <p className="flex items-center gap-2 text-xs text-status-warning">
+                                        <AlertTriangle
+                                            className="h-3.5 w-3.5 shrink-0"
+                                            aria-hidden="true"
+                                        />
+                                        No current provider-confirmed Site-bound
+                                        reader is attached.
+                                    </p>
+                                )}
                             </div>
                             {credential.revokedAt ? (
                                 <p className="mt-3 text-xs text-muted-foreground">
-                                    Revoked{' '}
+                                    Provider-confirmed revocation{' '}
                                     {formatDateTime(credential.revokedAt)}
                                     {credential.revocationReason
                                         ? ` • ${credential.revocationReason}`
@@ -950,9 +1103,9 @@ function Credentials({ data }: { data: AccessControlWorkspaceData }) {
                         }));
                     }
                 }}
-                title="Revoke physical access credential?"
-                description="This records an auditable revocation and prevents the credential from remaining active. Provider-side execution may still require the configured integration."
-                confirmText="Revoke credential"
+                title="Request provider credential revocation?"
+                description="This creates a governed provider request. The credential remains active until fresh provider evidence confirms revocation."
+                confirmText="Request revocation"
             />
         </Card>
     );
@@ -982,8 +1135,14 @@ export function AccessControlWorkspace({
         <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-3">
                 {[
-                    [data.summary.activeCredentials, 'Active credentials'],
-                    [data.summary.activeSchedules, 'Active schedules'],
+                    [
+                        data.summary.activeCredentials,
+                        'Provider-confirmed active credentials',
+                    ],
+                    [
+                        data.summary.activeSchedules,
+                        'Provider-confirmed schedules',
+                    ],
                     [data.summary.coveredDoors, 'Covered doors/readers'],
                 ].map(([value, label]) => (
                     <Card key={label}>
@@ -1013,7 +1172,7 @@ export function AccessControlWorkspace({
                         <CardHeader>
                             <h3 className="flex items-center gap-2 font-semibold">
                                 <ShieldCheck className="h-4 w-4 text-primary" />{' '}
-                                Issue credential
+                                Provider credential actions
                             </h3>
                         </CardHeader>
                         <CardContent>
@@ -1080,13 +1239,15 @@ export function AccessControlWorkspace({
                                     </p>
                                     <div className="mt-3 rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <Badge variant="secondary">
-                                                Provider reconciliation required
-                                            </Badge>
+                                            <ScheduleReconciliationBadge
+                                                reconciliation={
+                                                    schedule.providerReconciliation
+                                                }
+                                            />
                                             {schedule.providerReconciliation
                                                 .requiredAt ? (
                                                 <span>
-                                                    Since{' '}
+                                                    State tracked since{' '}
                                                     {formatDateTime(
                                                         schedule
                                                             .providerReconciliation
@@ -1101,6 +1262,20 @@ export function AccessControlWorkspace({
                                                     .message
                                             }
                                         </p>
+                                        {schedule.providerReconciliation
+                                            .failureReason ? (
+                                            <p className="mt-2 flex items-start gap-2 text-destructive">
+                                                <XCircle
+                                                    className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                                                    aria-hidden="true"
+                                                />
+                                                {
+                                                    schedule
+                                                        .providerReconciliation
+                                                        .failureReason
+                                                }
+                                            </p>
+                                        ) : null}
                                     </div>
                                     {!schedule.isActive &&
                                     schedule.deactivationReason ? (
@@ -1148,7 +1323,8 @@ export function AccessControlWorkspace({
                                                                 {
                                                                     revision.activeCredentialsAffected
                                                                 }{' '}
-                                                                active
+                                                                provider-confirmed
+                                                                access
                                                                 credential
                                                                 {revision.activeCredentialsAffected ===
                                                                 1

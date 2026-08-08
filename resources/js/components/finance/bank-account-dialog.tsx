@@ -14,10 +14,10 @@ import {
     ReviewRow,
     SelectInput,
     StepHead,
+    useWizard,
     WizardShell,
     WizardSuccessPane,
     type WizardStep,
-    useWizard,
 } from './wizard';
 
 /** An existing bank account to prefill the wizard with (edit mode). */
@@ -40,8 +40,18 @@ const ACCOUNT_TYPES = [
 ];
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'account', label: 'Account', blurb: 'Bank & account number', icon: Landmark },
-    { key: 'review', label: 'Ledger & review', blurb: 'GL link & confirm', icon: ListChecks },
+    {
+        key: 'account',
+        label: 'Account',
+        blurb: 'Bank & account number',
+        icon: Landmark,
+    },
+    {
+        key: 'review',
+        label: 'Ledger & review',
+        blurb: 'GL link & confirm',
+        icon: ListChecks,
+    },
 ];
 
 /**
@@ -78,39 +88,54 @@ export function BankAccountDialog({
         opening_balance: string;
         is_primary: boolean;
         is_active: boolean;
-    }>(bankAccount ? {
-        name: bankAccount.name ?? '',
-        bank_name: bankAccount.bank_name ?? '',
-        account_number: bankAccount.account_number ?? '',
-        account_type: bankAccount.account_type ?? 'cheque',
-        gl_account_id: bankAccount.gl_account_id != null ? String(bankAccount.gl_account_id) : '',
-        opening_balance: '0.00', // display-only in edit mode; never submitted
-        is_primary: bankAccount.is_primary,
-        is_active: bankAccount.is_active,
-    } : {
-        name: '',
-        bank_name: '',
-        account_number: '',
-        account_type: 'cheque',
-        gl_account_id: '',
-        opening_balance: '0.00',
-        is_primary: false,
-        is_active: true,
-    });
+    }>(
+        bankAccount
+            ? {
+                  name: bankAccount.name ?? '',
+                  bank_name: bankAccount.bank_name ?? '',
+                  account_number: bankAccount.account_number ?? '',
+                  account_type: bankAccount.account_type ?? 'cheque',
+                  gl_account_id:
+                      bankAccount.gl_account_id != null
+                          ? String(bankAccount.gl_account_id)
+                          : '',
+                  opening_balance: '0.00', // display-only in edit mode; never submitted
+                  is_primary: bankAccount.is_primary,
+                  is_active: bankAccount.is_active,
+              }
+            : {
+                  name: '',
+                  bank_name: '',
+                  account_number: '',
+                  account_type: 'cheque',
+                  gl_account_id: '',
+                  opening_balance: '0.00',
+                  is_primary: false,
+                  is_active: true,
+              },
+    );
     const { data, setData, processing, errors } = form;
 
-    const glOptions = glAccounts.map((a) => ({ value: String(a.id), label: `${a.code} · ${a.name}` }));
-    const glLabel = glOptions.find((a) => a.value === data.gl_account_id)?.label ?? '—';
-    const typeLabel = ACCOUNT_TYPES.find((t) => t.value === data.account_type)?.label ?? data.account_type;
+    const glOptions = glAccounts.map((a) => ({
+        value: String(a.id),
+        label: `${a.code} · ${a.name}`,
+    }));
+    const glLabel =
+        glOptions.find((a) => a.value === data.gl_account_id)?.label ?? '—';
+    const typeLabel =
+        ACCOUNT_TYPES.find((t) => t.value === data.account_type)?.label ??
+        data.account_type;
 
     const accountValid =
-        !!data.name.trim()
-        && !!data.bank_name.trim()
-        && !!data.account_number.trim()
-        && !!data.account_type;
+        !!data.name.trim() &&
+        !!data.bank_name.trim() &&
+        !!data.account_number.trim() &&
+        !!data.account_type;
     const ledgerValid =
-        !!data.gl_account_id
-        && (isEdit || (data.opening_balance !== '' && !Number.isNaN(Number(data.opening_balance))));
+        !!data.gl_account_id &&
+        (isEdit ||
+            (data.opening_balance !== '' &&
+                !Number.isNaN(Number(data.opening_balance))));
 
     const close = () => {
         setSucceeded(false);
@@ -162,7 +187,11 @@ export function BankAccountDialog({
             open={open}
             onClose={close}
             title={isEdit ? 'Edit bank account' : 'Add bank account'}
-            description={isEdit ? 'Update this bank account' : 'Register a bank account for reconciliation'}
+            description={
+                isEdit
+                    ? 'Update this bank account'
+                    : 'Register a bank account for reconciliation'
+            }
             railIcon={Banknote}
             railTitle={isEdit ? 'Edit Account' : 'New Account'}
             railSub="Banking & cash"
@@ -171,38 +200,64 @@ export function BankAccountDialog({
             onStepClick={goTo}
             pct={accountValid && ledgerValid ? 100 : accountValid ? 70 : 30}
             pctLabel="Account"
-            success={succeeded ? (
-                <WizardSuccessPane
-                    title={isEdit ? 'Bank account updated' : `${data.name || 'Bank account'} added`}
-                    blurb={isEdit
-                        ? 'The bank account details have been saved.'
-                        : 'The account is registered and ready for transactions, feeds and reconciliation.'}
-                    actions={
-                        <>
-                            {!isEdit && (
-                                <Button variant="outline" onClick={startAnother}>
-                                    <Plus className="h-4 w-4" /> Add another
-                                </Button>
-                            )}
-                            <Button onClick={close}>Done</Button>
-                        </>
-                    }
-                />
-            ) : undefined}
+            success={
+                succeeded ? (
+                    <WizardSuccessPane
+                        title={
+                            isEdit
+                                ? 'Bank account updated'
+                                : `${data.name || 'Bank account'} added`
+                        }
+                        blurb={
+                            isEdit
+                                ? 'The bank account details have been saved.'
+                                : 'The account is registered and ready for transactions, feeds and reconciliation.'
+                        }
+                        actions={
+                            <>
+                                {!isEdit && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={startAnother}
+                                    >
+                                        <Plus className="h-4 w-4" /> Add another
+                                    </Button>
+                                )}
+                                <Button onClick={close}>Done</Button>
+                            </>
+                        }
+                    />
+                ) : undefined
+            }
             footerEnd={
                 <>
                     {!isFirst && (
-                        <Button type="button" variant="outline" onClick={back} disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={back}
+                            disabled={processing}
+                        >
                             Back
                         </Button>
                     )}
                     {!isLast && (
-                        <Button type="button" onClick={next} disabled={!accountValid}>
+                        <Button
+                            type="button"
+                            onClick={next}
+                            disabled={!accountValid}
+                        >
                             Continue
                         </Button>
                     )}
                     {isLast && (
-                        <Button type="button" onClick={submit} disabled={processing || !accountValid || !ledgerValid}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={
+                                processing || !accountValid || !ledgerValid
+                            }
+                        >
                             {isEdit ? 'Save changes' : 'Create bank account'}
                         </Button>
                     )}
@@ -211,30 +266,57 @@ export function BankAccountDialog({
         >
             {index === 0 && (
                 <div>
-                    <StepHead icon={Landmark} title="Account details" blurb="The bank account as it appears on statements." />
+                    <StepHead
+                        icon={Landmark}
+                        title="Account details"
+                        blurb="The bank account as it appears on statements."
+                    />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Account name" span required error={errors.name}>
+                        <Field
+                            label="Account name"
+                            span
+                            required
+                            error={errors.name}
+                        >
                             <Input
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                                 placeholder="e.g. ANZ Business Cheque"
                             />
                         </Field>
-                        <Field label="Bank name" required error={errors.bank_name}>
+                        <Field
+                            label="Bank name"
+                            required
+                            error={errors.bank_name}
+                        >
                             <Input
                                 value={data.bank_name}
-                                onChange={(e) => setData('bank_name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('bank_name', e.target.value)
+                                }
                                 placeholder="e.g. ANZ, Westpac, BNZ, ASB"
                             />
                         </Field>
-                        <Field label="Account number" required error={errors.account_number}>
+                        <Field
+                            label="Account number"
+                            required
+                            error={errors.account_number}
+                        >
                             <Input
                                 value={data.account_number}
-                                onChange={(e) => setData('account_number', e.target.value)}
+                                onChange={(e) =>
+                                    setData('account_number', e.target.value)
+                                }
                                 placeholder="XX-XXXX-XXXXXXX-XXX"
                             />
                         </Field>
-                        <Field label="Account type" required error={errors.account_type}>
+                        <Field
+                            label="Account type"
+                            required
+                            error={errors.account_type}
+                        >
                             <SelectInput
                                 value={data.account_type}
                                 onChange={(v) => setData('account_type', v)}
@@ -251,10 +333,19 @@ export function BankAccountDialog({
                     <StepHead
                         icon={ListChecks}
                         title="Ledger & review"
-                        blurb={isEdit ? 'Which GL account it maps to, then confirm.' : 'Where it posts in the ledger and its starting balance.'}
+                        blurb={
+                            isEdit
+                                ? 'Which GL account it maps to, then confirm.'
+                                : 'Where it posts in the ledger and its starting balance.'
+                        }
                     />
                     <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="GL account" span={isEdit} required error={errors.gl_account_id}>
+                        <Field
+                            label="GL account"
+                            span={isEdit}
+                            required
+                            error={errors.gl_account_id}
+                        >
                             <SelectInput
                                 value={data.gl_account_id}
                                 onChange={(v) => setData('gl_account_id', v)}
@@ -263,34 +354,51 @@ export function BankAccountDialog({
                             />
                         </Field>
                         {!isEdit && (
-                            <Field label="Opening balance (NZD)" required error={errors.opening_balance}>
+                            <Field
+                                label="Opening balance (NZD)"
+                                required
+                                error={errors.opening_balance}
+                            >
                                 <Input
                                     type="number"
                                     step="0.01"
                                     value={data.opening_balance}
-                                    onChange={(e) => setData('opening_balance', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'opening_balance',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </Field>
                         )}
                         <div className="flex items-center justify-between gap-3 sm:col-span-2">
                             <div>
                                 <Label>Primary account</Label>
-                                <p className="text-sm text-muted-foreground">Set as the primary bank account</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Set as the primary bank account
+                                </p>
                             </div>
                             <Switch
                                 checked={data.is_primary}
-                                onCheckedChange={(checked) => setData('is_primary', checked)}
+                                onCheckedChange={(checked) =>
+                                    setData('is_primary', checked)
+                                }
                                 aria-label="Primary account"
                             />
                         </div>
                         <div className="flex items-center justify-between gap-3 sm:col-span-2">
                             <div>
                                 <Label>Active</Label>
-                                <p className="text-sm text-muted-foreground">Inactive accounts are hidden from lists</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Inactive accounts are hidden from lists
+                                </p>
                             </div>
                             <Switch
                                 checked={data.is_active}
-                                onCheckedChange={(checked) => setData('is_active', checked)}
+                                onCheckedChange={(checked) =>
+                                    setData('is_active', checked)
+                                }
                                 aria-label="Active"
                             />
                         </div>
@@ -298,14 +406,32 @@ export function BankAccountDialog({
                     <ReviewCard icon={Banknote} title="Bank account">
                         <ReviewRow label="Name" value={data.name || '—'} />
                         <ReviewRow label="Bank" value={data.bank_name || '—'} />
-                        <ReviewRow label="Account number" value={data.account_number || '—'} />
+                        <ReviewRow
+                            label="Account number"
+                            value={data.account_number || '—'}
+                        />
                         <ReviewRow label="Type" value={typeLabel} />
                         <ReviewRow label="GL account" value={glLabel} />
-                        {!isEdit && <ReviewRow label="Opening balance" value={formatMoney(data.opening_balance)} />}
-                        <ReviewRow label="Primary" value={data.is_primary ? 'Yes' : 'No'} />
-                        <ReviewRow label="Status" value={data.is_active ? 'Active' : 'Inactive'} />
+                        {!isEdit && (
+                            <ReviewRow
+                                label="Opening balance"
+                                value={formatMoney(data.opening_balance)}
+                            />
+                        )}
+                        <ReviewRow
+                            label="Primary"
+                            value={data.is_primary ? 'Yes' : 'No'}
+                        />
+                        <ReviewRow
+                            label="Status"
+                            value={data.is_active ? 'Active' : 'Inactive'}
+                        />
                     </ReviewCard>
-                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">{isEdit ? 'Saving…' : 'Creating…'}</p>}
+                    {processing && (
+                        <p className="mt-3 text-[13px] text-muted-foreground">
+                            {isEdit ? 'Saving…' : 'Creating…'}
+                        </p>
+                    )}
                 </div>
             )}
         </WizardShell>

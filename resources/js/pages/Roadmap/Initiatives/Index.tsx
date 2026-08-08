@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Compass } from 'lucide-react';
@@ -101,15 +101,22 @@ export default function InitiativeIndex({ items, filters }: Props) {
                     { label: 'Total', value: items.data?.length ?? 0 },
                     {
                         label: 'In progress',
-                        value: items.data?.filter((i) => i.status === 'in_progress').length ?? 0,
+                        value:
+                            items.data?.filter(
+                                (i) => i.status === 'in_progress',
+                            ).length ?? 0,
                     },
                     {
                         label: 'Approved',
-                        value: items.data?.filter((i) => i.status === 'approved').length ?? 0,
+                        value:
+                            items.data?.filter((i) => i.status === 'approved')
+                                .length ?? 0,
                     },
                     {
                         label: 'Blocked',
-                        value: items.data?.filter((i) => i.status === 'blocked').length ?? 0,
+                        value:
+                            items.data?.filter((i) => i.status === 'blocked')
+                                .length ?? 0,
                     },
                 ]}
             />
@@ -124,7 +131,9 @@ export default function InitiativeIndex({ items, filters }: Props) {
                         >
                             {statusOptions.map((option) => (
                                 <option key={option || 'all'} value={option}>
-                                    {option ? statusLabel(option) : 'All statuses'}
+                                    {option
+                                        ? statusLabel(option)
+                                        : 'All statuses'}
                                 </option>
                             ))}
                         </select>
@@ -136,7 +145,9 @@ export default function InitiativeIndex({ items, filters }: Props) {
                         >
                             {streamOptions.map((option) => (
                                 <option key={option || 'all'} value={option}>
-                                    {option ? statusLabel(option) : 'All streams'}
+                                    {option
+                                        ? statusLabel(option)
+                                        : 'All streams'}
                                 </option>
                             ))}
                         </select>
@@ -144,7 +155,9 @@ export default function InitiativeIndex({ items, filters }: Props) {
                             inputMode="numeric"
                             placeholder="Fiscal year"
                             value={fiscalYear}
-                            onChange={(event) => setFiscalYear(event.target.value)}
+                            onChange={(event) =>
+                                setFiscalYear(event.target.value)
+                            }
                         />
                         <select
                             className="h-10 rounded-md border bg-background px-3 text-sm"
@@ -182,29 +195,52 @@ export default function InitiativeIndex({ items, filters }: Props) {
                                 <TableBody>
                                     {items.data.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-muted-foreground">
-                                                No initiatives match these filters.
+                                            <TableCell
+                                                colSpan={6}
+                                                className="text-muted-foreground"
+                                            >
+                                                No initiatives match these
+                                                filters.
                                             </TableCell>
                                         </TableRow>
                                     )}
                                     {items.data.map((initiative) => (
                                         <TableRow key={initiative.id}>
                                             <TableCell className="max-w-[360px]">
-                                                <div className="font-medium">{initiative.title}</div>
+                                                <div className="font-medium">
+                                                    {initiative.title}
+                                                </div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    {initiative.code ?? `INIT-${initiative.id}`}
+                                                    {initiative.code ??
+                                                        `INIT-${initiative.id}`}
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{statusLabel(initiative.stream)}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline">{statusLabel(initiative.status)}</Badge>
+                                                {statusLabel(initiative.stream)}
                                             </TableCell>
-                                            <TableCell>{initiative.priority_score ?? '-'}</TableCell>
-                                            <TableCell>{initiative.owner?.name ?? '-'}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">
+                                                    {statusLabel(
+                                                        initiative.status,
+                                                    )}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                {initiative.priority_score ??
+                                                    '-'}
+                                            </TableCell>
+                                            <TableCell>
+                                                {initiative.owner?.name ?? '-'}
+                                            </TableCell>
                                             <TableCell className="max-w-[320px]">
-                                                <div>{initiative.next_decision ?? '-'}</div>
+                                                <div>
+                                                    {initiative.next_decision ??
+                                                        '-'}
+                                                </div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    {formatDate(initiative.decision_due_at)}
+                                                    {formatDate(
+                                                        initiative.decision_due_at,
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -217,9 +253,13 @@ export default function InitiativeIndex({ items, filters }: Props) {
 
                 <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="text-sm text-muted-foreground">
-                        Showing {items.data.length} of {items.total} initiatives.
+                        Showing {items.data.length} of {items.total}{' '}
+                        initiatives.
                     </div>
-                    <LaravelPagination links={items.links} lastPage={items.last_page} />
+                    <LaravelPagination
+                        links={items.links}
+                        lastPage={items.last_page}
+                    />
                 </div>
 
                 <div className="mt-4">

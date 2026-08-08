@@ -136,17 +136,47 @@ identity_validation="$({
         } catch (Throwable) {
             exit(20);
         }
-        foreach (["collector_id", "central_url", "tls_public_key_pin", "central_signing_public_key", "request_signing_secret_key", "state_directory", "client_certificate_file", "client_private_key_file"] as $key) {
+        foreach (["collector_id", "central_url", "tls_public_key_pin", "central_signing_public_key", "request_signing_secret_key", "state_directory", "client_certificate_file", "client_private_key_file", "client_certificate_fingerprint"] as $key) {
             if (! is_string($identity[$key] ?? null) || trim($identity[$key]) === "") { exit(21); }
         }
-        if (! is_int($identity["site_id"] ?? null) || $identity["site_id"] < 1 || $identity["state_directory"] !== $expectedState) { exit(22); }
+        if (! is_int($identity["site_id"] ?? null)
+            || $identity["site_id"] < 1
+            || $identity["state_directory"] !== $expectedState
+            || preg_match("/\\A[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\z/i", $identity["collector_id"]) !== 1
+            || preg_match("/\\A[a-f0-9]{64}\\z/", $identity["client_certificate_fingerprint"]) !== 1) { exit(22); }
         $statePrefix = rtrim($expectedState, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
+        $resolved = [];
         foreach (["client_certificate_file", "client_private_key_file"] as $key) {
             $path = $identity[$key];
             $real = realpath($path);
             if ($real === false || ! is_file($real) || ! str_starts_with($real, $statePrefix)) { exit(23); }
-            echo $real, PHP_EOL;
+            $resolved[$key] = $real;
         }
+        $certificateSize = filesize($resolved["client_certificate_file"]);
+        $certificatePem = is_int($certificateSize) && $certificateSize > 0 && $certificateSize <= 262144
+            ? file_get_contents($resolved["client_certificate_file"])
+            : false;
+        $privateKeySize = filesize($resolved["client_private_key_file"]);
+        $privateKeyPem = is_int($privateKeySize) && $privateKeySize > 0 && $privateKeySize <= 262144
+            ? file_get_contents($resolved["client_private_key_file"])
+            : false;
+        $certificate = is_string($certificatePem) ? openssl_x509_read($certificatePem) : false;
+        $privateKey = is_string($privateKeyPem) ? openssl_pkey_get_private($privateKeyPem) : false;
+        $parsed = $certificate === false ? false : openssl_x509_parse($certificate, false);
+        $fingerprint = $certificate === false ? false : openssl_x509_fingerprint($certificate, "sha256");
+        $now = time();
+        if (! is_array($parsed)
+            || $privateKey === false
+            || ! openssl_x509_check_private_key($certificate, $privateKey)
+            || ! is_string($fingerprint)
+            || ! hash_equals($identity["client_certificate_fingerprint"], strtolower($fingerprint))
+            || ($parsed["subject"]["CN"] ?? null) !== "oblivion-collector-".$identity["collector_id"]
+            || ! is_int($parsed["validFrom_time_t"] ?? null)
+            || ! is_int($parsed["validTo_time_t"] ?? null)
+            || $now < $parsed["validFrom_time_t"]
+            || $now >= $parsed["validTo_time_t"]) { exit(24); }
+        echo $resolved["client_certificate_file"], PHP_EOL;
+        echo $resolved["client_private_key_file"], PHP_EOL;
     '
 })" || fail 'the collector identity is invalid, incomplete, or references material outside its private state directory.'
 mapfile -t identity_files <<< "$identity_validation"

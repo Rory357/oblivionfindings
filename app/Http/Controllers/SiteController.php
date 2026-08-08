@@ -10,7 +10,6 @@ use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistTemplate;
-use App\Models\SiteContact;
 use App\Models\SiteCoverageRequirement;
 use App\Models\SiteDocument;
 use App\Models\SiteDocumentFolder;
@@ -21,6 +20,8 @@ use App\Models\SiteStaffRequirement;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\NotificationService;
+use App\Services\Sites\SiteContactService;
+use App\Services\Sites\SitePhysicalRoomService;
 use App\Services\Sites\SiteReadinessService;
 use App\Services\UserSiteAccessService;
 use App\Support\NzRegions;
@@ -34,6 +35,11 @@ use Illuminate\Validation\ValidationException;
 class SiteController extends Controller
 {
     private const SITE_BYPASS_PERMISSIONS = ['sites.viewAll'];
+
+    public function __construct(
+        private readonly SiteContactService $siteContacts,
+        private readonly SitePhysicalRoomService $physicalRooms,
+    ) {}
 
     public function index(Request $request)
     {
@@ -86,7 +92,7 @@ class SiteController extends Controller
             ->when(! $archivedView, fn ($q) => $q->where('archived', false))
             // Status (active/inactive) does not apply inside the Archived view.
             ->when(! $archivedView && in_array($status, ['active', 'inactive']), fn ($q) => $q->where('is_active', $status === 'active'))
-            ->when($type && in_array($type, ['head_office', 'house', 'facility']), fn ($q) => $q->where('type', $type))
+            ->when($type && in_array($type, ['head_office', 'house', 'facility', 'residential']), fn ($q) => $q->where('type', $type))
             ->when($region, fn ($q) => $q->where(function ($query) use ($region) {
                 $query->where('region', $region)
                     ->orWhere(function ($derivedQuery) use ($region) {
@@ -475,8 +481,8 @@ class SiteController extends Controller
         $site = DB::transaction(function () use ($validated, $contacts, $rooms, $resources, $zones, $assets, $checklists, $coverage, $credentials, $geofence, $request, $user) {
             $site = Site::create($validated);
 
-            $this->syncContacts($site, $contacts);
-            $this->syncRooms($site, $rooms);
+            $this->siteContacts->sync($site, $contacts);
+            $this->syncRooms($site, $rooms, $user);
             $this->syncResources($site, $resources);
             $this->syncZones($site, $zones);
             $this->assignAssets($site, $assets, $user?->id);
@@ -706,11 +712,11 @@ class SiteController extends Controller
         return $folder;
     }
 
-    public function edit(Site $site)
+    public function edit(Request $request, Site $site)
     {
         $this->authorize('update', $site);
 
-        $users = User::select(['id', 'name'])->orderBy('name')->get();
+        $users = $this->staffPicker($request->user());
 
         $site->load('contacts');
 
@@ -829,14 +835,26 @@ class SiteController extends Controller
             $validated['weekly_food_budget'],
         );
 
-        $site->update($validated);
+        DB::transaction(function () use (
+            $assets,
+            $checklists,
+            $contacts,
+            $request,
+            $resources,
+            $rooms,
+            $site,
+            $validated,
+            $zones,
+        ): void {
+            $site->update($validated);
 
-        $this->syncContacts($site, $contacts);
-        $this->syncRooms($site, $rooms);
-        $this->syncResources($site, $resources);
-        $this->syncZones($site, $zones);
-        $this->assignAssets($site, $assets, $request->user()?->id);
-        $this->syncChecklists($site, $checklists);
+            $this->siteContacts->sync($site, $contacts);
+            $this->syncRooms($site, $rooms, $request->user());
+            $this->syncResources($site, $resources);
+            $this->syncZones($site, $zones);
+            $this->assignAssets($site, $assets, $request->user()?->id);
+            $this->syncChecklists($site, $checklists);
+        });
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'site', $site, null, [
             'title' => "Site updated: {$site->name}",
@@ -993,27 +1011,7 @@ class SiteController extends Controller
 
     private function storeOnboardingContacts(Site $site, array $contacts): void
     {
-        foreach ($contacts as $contact) {
-            $name = trim((string) ($contact['name'] ?? ''));
-            if ($name === '') {
-                continue;
-            }
-
-            SiteContact::updateOrCreate(
-                [
-                    'site_id' => $site->id,
-                    'type' => $contact['type'] ?? 'other',
-                    'name' => $name,
-                ],
-                [
-                    'role' => $contact['role'] ?? null,
-                    'phone' => $contact['phone'] ?? null,
-                    'email' => $contact['email'] ?? null,
-                    'is_primary' => (bool) ($contact['is_primary'] ?? false),
-                    'notes' => $contact['notes'] ?? null,
-                ],
-            );
-        }
+        $this->siteContacts->upsertBatch($site, $contacts);
     }
 
     private function storeOnboardingAssets(Site $site, array $assets, ?int $userId): void
@@ -1041,97 +1039,13 @@ class SiteController extends Controller
         }
     }
 
-    private function syncContacts(Site $site, array $contacts): void
+    private function syncRooms(Site $site, array $rooms, User $actor): void
     {
-        $keepIds = [];
-
-        foreach ($contacts as $contact) {
-            $name = trim((string) ($contact['name'] ?? ''));
-            if ($name === '') {
-                continue;
-            }
-
-            $payload = [
-                'site_id' => $site->id,
-                'type' => $contact['type'] ?? 'general',
-                'name' => $name,
-                'role' => $contact['role'] ?? null,
-                'phone' => $contact['phone'] ?? null,
-                'email' => $contact['email'] ?? null,
-                'is_primary' => (bool) ($contact['is_primary'] ?? false),
-                'notes' => $contact['notes'] ?? null,
-            ];
-
-            if (! empty($contact['id'])) {
-                $existing = SiteContact::where('id', $contact['id'])
-                    ->where('site_id', $site->id)
-                    ->first();
-                if ($existing) {
-                    $existing->update($payload);
-                    $keepIds[] = $existing->id;
-
-                    continue;
-                }
-            }
-
-            $created = SiteContact::create($payload);
-            $keepIds[] = $created->id;
-        }
-
-        SiteContact::where('site_id', $site->id)
-            ->whereNotIn('id', $keepIds)
-            ->delete();
-    }
-
-    private function syncRooms(Site $site, array $rooms): void
-    {
-        if ($site->type !== 'house') {
+        if (! in_array($site->type, ['house', 'residential'], true)) {
             return;
         }
 
-        $keepIds = [];
-        foreach ($rooms as $room) {
-            $name = trim((string) ($room['name'] ?? ''));
-            if ($name === '') {
-                continue;
-            }
-
-            $payload = [
-                'notes' => $room['notes'] ?? null,
-                'is_active' => true,
-            ];
-            // Room type = assignable bedroom vs communal/shared space. The
-            // full-page wizard omits this, so default to a bedroom (assignable).
-            if (array_key_exists('is_assignable', $room)) {
-                $payload['is_assignable'] = (bool) $room['is_assignable'];
-            }
-
-            if (! empty($room['id'])) {
-                $existing = SiteHouseRoom::where('id', $room['id'])
-                    ->where('site_id', $site->id)
-                    ->first();
-                if ($existing) {
-                    $existing->update($payload + ['name' => $name]);
-                    $keepIds[] = $existing->id;
-
-                    continue;
-                }
-            }
-
-            // Dedupe by (site_id, name) — prevents unique-constraint crashes
-            // when the user submits the same room name twice in one form.
-            $row = SiteHouseRoom::updateOrCreate(
-                ['site_id' => $site->id, 'name' => $name],
-                $payload,
-            );
-            if (! in_array($row->id, $keepIds, true)) {
-                $keepIds[] = $row->id;
-            }
-        }
-
-        SiteHouseRoom::where('site_id', $site->id)
-            ->whereNotIn('id', $keepIds)
-            ->delete();
+        $this->physicalRooms->syncResidentialRooms($site, $rooms, $actor);
     }
 
     private function syncResources(Site $site, array $resources): void
@@ -1454,6 +1368,7 @@ class SiteController extends Controller
         $map = [
             'head_office' => 'sites.type.head_office.view',
             'house' => 'sites.type.house.view',
+            'residential' => 'sites.type.house.view',
             'facility' => 'sites.type.facility.view',
         ];
 

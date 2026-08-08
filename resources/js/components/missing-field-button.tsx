@@ -14,7 +14,7 @@ export function MissingFieldButton({
 }: Props) {
     if (!onClick || disabled) {
         return (
-            <span className="font-normal italic text-muted-foreground">
+            <span className="font-normal text-muted-foreground italic">
                 Not specified
             </span>
         );

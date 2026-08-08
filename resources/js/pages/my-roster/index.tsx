@@ -14,9 +14,9 @@ import type { RosterShift } from '@/components/roster/types';
 import UpcomingList from '@/components/roster/upcoming-list';
 import WeekGridOverview from '@/components/roster/week-grid-overview';
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import StaffPageShell from '@/layouts/staff-page-shell';
 import { formatDate } from '@/lib/datetime';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 interface Props {
     today: string;
@@ -98,7 +98,10 @@ export default function MyRoster({
                             {window.recent_days} days back
                         </p>
                     </div>
-                    <GuardrailCard unstyled className="inline-flex rounded-lg border bg-card p-1">
+                    <GuardrailCard
+                        unstyled
+                        className="inline-flex rounded-lg border bg-card p-1"
+                    >
                         <Button
                             type="button"
                             variant="ghost"
@@ -124,7 +127,10 @@ export default function MyRoster({
                 </div>
 
                 {nextShift ? (
-                    <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
+                    <GuardrailCard
+                        unstyled
+                        className="rounded-lg border bg-card p-4"
+                    >
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                                 <CalendarDays className="h-5 w-5" />

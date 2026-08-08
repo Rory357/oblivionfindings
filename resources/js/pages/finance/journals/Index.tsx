@@ -1,13 +1,23 @@
-import { Head, router } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { LedgerTabsFooter, NewJournalDialog, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
+import {
+    LedgerTabsFooter,
+    NewJournalDialog,
+    formatMoney,
+    useRowContextMenu,
+    type RowCtxItem,
+} from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -16,8 +26,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { Plus, Search, BookOpen, Download, Eye } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { PageProps } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { BookOpen, Download, Eye, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 
 interface JournalLine {
@@ -122,13 +134,20 @@ export default function JournalsIndex({
 
     const hasFilters = Boolean(search || status || type || dateFrom || dateTo);
 
-    const postedCount = journals.data.filter((j) => j.status === 'posted').length;
+    const postedCount = journals.data.filter(
+        (j) => j.status === 'posted',
+    ).length;
     const draftCount = journals.data.filter((j) => j.status === 'draft').length;
 
     // Right-click row menu — mirrors the row's existing navigation (Open).
     const rowMenu = useRowContextMenu();
     const rowMenuItems = (journal: Journal): RowCtxItem[] => [
-        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/journals/${journal.id}`) },
+        {
+            kind: 'item',
+            label: 'Open',
+            icon: Eye,
+            onSelect: () => router.visit(`/finance/journals/${journal.id}`),
+        },
     ];
 
     return (
@@ -143,7 +162,8 @@ export default function JournalsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         footer={<LedgerTabsFooter active="journals" />}
                         icon={BookOpen}
                         title="Journals"
@@ -156,14 +176,19 @@ export default function JournalsIndex({
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button size="sm" variant="outline" asChild>
-                                    <a href={`/finance/journals/export?${new URLSearchParams(Object.entries({ status, type, date_from: dateFrom, date_to: dateTo, search }).filter(([, v]) => v)).toString()}`}>
-                                        <Download className="w-4 h-4 mr-1.5" />
+                                    <a
+                                        href={`/finance/journals/export?${new URLSearchParams(Object.entries({ status, type, date_from: dateFrom, date_to: dateTo, search }).filter(([, v]) => v)).toString()}`}
+                                    >
+                                        <Download className="mr-1.5 h-4 w-4" />
                                         Export CSV
                                     </a>
                                 </Button>
                                 {canManage && (
-                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
-                                        <Plus className="w-4 h-4 mr-1.5" />
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
                                         New Journal
                                     </Button>
                                 )}
@@ -175,14 +200,16 @@ export default function JournalsIndex({
                 {/* Filters */}
                 <Card className="mb-6">
                     <CardContent className="pt-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                 <Input
                                     placeholder="Search number or description..."
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    onKeyDown={(e) =>
+                                        e.key === 'Enter' && applyFilters()
+                                    }
                                     className="pl-9"
                                 />
                             </div>
@@ -193,8 +220,12 @@ export default function JournalsIndex({
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="draft">Draft</SelectItem>
-                                    <SelectItem value="posted">Posted</SelectItem>
-                                    <SelectItem value="reversed">Reversed</SelectItem>
+                                    <SelectItem value="posted">
+                                        Posted
+                                    </SelectItem>
+                                    <SelectItem value="reversed">
+                                        Reversed
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
 
@@ -203,9 +234,15 @@ export default function JournalsIndex({
                                     <SelectValue placeholder="All types" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="standard">Standard</SelectItem>
-                                    <SelectItem value="adjustment">Adjustment</SelectItem>
-                                    <SelectItem value="opening">Opening</SelectItem>
+                                    <SelectItem value="standard">
+                                        Standard
+                                    </SelectItem>
+                                    <SelectItem value="adjustment">
+                                        Adjustment
+                                    </SelectItem>
+                                    <SelectItem value="opening">
+                                        Opening
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
 
@@ -224,11 +261,15 @@ export default function JournalsIndex({
                             />
                         </div>
 
-                        <div className="flex gap-2 mt-4">
+                        <div className="mt-4 flex gap-2">
                             <Button size="sm" onClick={applyFilters}>
                                 Apply Filters
                             </Button>
-                            <Button size="sm" variant="outline" onClick={clearFilters}>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={clearFilters}
+                            >
                                 Clear
                             </Button>
                         </div>
@@ -245,7 +286,9 @@ export default function JournalsIndex({
                                     <TableHead>Date</TableHead>
                                     <TableHead>Type</TableHead>
                                     <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">Total Amount</TableHead>
+                                    <TableHead className="text-right">
+                                        Total Amount
+                                    </TableHead>
                                     <TableHead>Status</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -268,7 +311,14 @@ export default function JournalsIndex({
                                                     className="border-0"
                                                     action={
                                                         canManage ? (
-                                                            <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    setCreateOpen(
+                                                                        true,
+                                                                    )
+                                                                }
+                                                            >
                                                                 New journal
                                                             </Button>
                                                         ) : undefined
@@ -282,21 +332,51 @@ export default function JournalsIndex({
                                     <TableRow
                                         key={journal.id}
                                         className="cursor-pointer hover:bg-muted"
-                                        onClick={() => router.visit(`/finance/journals/${journal.id}`)}
-                                        onContextMenu={rowMenu.open(rowMenuItems(journal))}
+                                        onClick={() =>
+                                            router.visit(
+                                                `/finance/journals/${journal.id}`,
+                                            )
+                                        }
+                                        onContextMenu={rowMenu.open(
+                                            rowMenuItems(journal),
+                                        )}
                                     >
-                                        <TableCell className="font-medium">{journal.journal_number}</TableCell>
-                                        <TableCell>{new Date(journal.journal_date).toLocaleDateString('en-NZ')}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {journal.journal_number}
+                                        </TableCell>
                                         <TableCell>
-                                            <Badge className={typeBadge(journal.type)}>
-                                                {journal.type.charAt(0).toUpperCase() + journal.type.slice(1)}
+                                            {new Date(
+                                                journal.journal_date,
+                                            ).toLocaleDateString('en-NZ')}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge
+                                                className={typeBadge(
+                                                    journal.type,
+                                                )}
+                                            >
+                                                {journal.type
+                                                    .charAt(0)
+                                                    .toUpperCase() +
+                                                    journal.type.slice(1)}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="max-w-xs truncate">{journal.description ?? '-'}</TableCell>
-                                        <TableCell className="text-right font-mono">{formatMoney(journal.total_amount)}</TableCell>
+                                        <TableCell className="max-w-xs truncate">
+                                            {journal.description ?? '-'}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {formatMoney(journal.total_amount)}
+                                        </TableCell>
                                         <TableCell>
-                                            <Badge className={statusBadge(journal.status)}>
-                                                {journal.status.charAt(0).toUpperCase() + journal.status.slice(1)}
+                                            <Badge
+                                                className={statusBadge(
+                                                    journal.status,
+                                                )}
+                                            >
+                                                {journal.status
+                                                    .charAt(0)
+                                                    .toUpperCase() +
+                                                    journal.status.slice(1)}
                                             </Badge>
                                         </TableCell>
                                     </TableRow>
@@ -308,21 +388,33 @@ export default function JournalsIndex({
 
                 {/* Pagination */}
                 {journals.last_page > 1 && (
-                    <div className="flex items-center justify-between mt-4">
+                    <div className="mt-4 flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {(journals.current_page - 1) * journals.per_page + 1} to{' '}
-                            {Math.min(journals.current_page * journals.per_page, journals.total)} of{' '}
-                            {journals.total} journals
+                            Showing{' '}
+                            {(journals.current_page - 1) * journals.per_page +
+                                1}{' '}
+                            to{' '}
+                            {Math.min(
+                                journals.current_page * journals.per_page,
+                                journals.total,
+                            )}{' '}
+                            of {journals.total} journals
                         </p>
                         <div className="flex gap-1">
                             {journals.links.map((link, i) => (
                                 <Button
                                     key={i}
-                                    variant={link.active ? 'default' : 'outline'}
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
                                     size="sm"
                                     disabled={!link.url}
-                                    onClick={() => link.url && router.visit(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                    onClick={() =>
+                                        link.url && router.visit(link.url)
+                                    }
+                                    dangerouslySetInnerHTML={{
+                                        __html: link.label,
+                                    }}
                                 />
                             ))}
                         </div>

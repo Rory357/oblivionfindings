@@ -263,7 +263,10 @@ function BookingCard({
                 ) : null}
                 {b.serviceAgreement?.endsAt ? (
                     <Pill tone="neutral">
-                        Ends {new Date(b.serviceAgreement.endsAt).toLocaleDateString('en-NZ')}
+                        Ends{' '}
+                        {new Date(b.serviceAgreement.endsAt).toLocaleDateString(
+                            'en-NZ',
+                        )}
                     </Pill>
                 ) : null}
                 {!b.codeOfRightsProvided || !b.consentToRespite ? (

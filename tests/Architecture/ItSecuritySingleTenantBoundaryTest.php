@@ -36,6 +36,18 @@ it('keeps native monitoring to IT independent of the Control Room Device project
         ->and($signals)->toContain('context->normalized_data->canonical_device_id');
 });
 
+it('keeps IT report Device metrics behind canonical Security and Devices visibility', function () {
+    $root = str_replace('\\', '/', dirname(__DIR__, 2));
+    $controller = file_get_contents($root.'/app/Http/Controllers/It/ItReportsController.php');
+
+    expect($controller)->toBeString()
+        ->and($controller)->toContain("canDo('securityDevices.devices.view')")
+        ->and($controller)->toContain('visibleDevices($user)')
+        ->and($controller)->toContain("where('work_type', 'incident')")
+        ->and($controller)->toContain("distinct('ticket_id')")
+        ->and($controller)->not->toContain('Device::query()');
+});
+
 it('keeps Device health monitoring out of the retained Control Room projection', function () {
     $root = str_replace('\\', '/', dirname(__DIR__, 2));
     $consoleSchedule = file_get_contents($root.'/routes/console.php');
@@ -86,6 +98,69 @@ it('keeps Security and Devices command batch navigation free of inert hash targe
     expect($batchPage)
         ->not->toContain("href: '#'")
         ->not->toContain('href="#"');
+});
+
+it('keeps Device assignment history in the canonical Device profile payload only', function () {
+    $root = str_replace('\\', '/', dirname(__DIR__, 2));
+    $routes = file_get_contents($root.'/routes/security-devices.php');
+    $assignmentController = file_get_contents($root.'/app/Domain/SecurityDevices/Http/Controllers/DeviceAssignmentController.php');
+    $deviceController = file_get_contents($root.'/app/Domain/SecurityDevices/Http/Controllers/DeviceController.php');
+    $deviceProfile = file_get_contents($root.'/resources/js/pages/security-devices/devices/show.tsx');
+
+    expect($routes)
+        ->not->toContain("Route::get('/devices/{device}/assignments'")
+        ->and($assignmentController)
+        ->not->toContain('function history(')
+        ->and($deviceController)
+        ->toContain("'assignmentHistory' =>")
+        ->and($deviceProfile)
+        ->toContain('assignmentHistory.map(');
+});
+
+it('keeps active IT and Security Devices surfaces free of known inert interaction patterns', function () {
+    $root = str_replace('\\', '/', dirname(__DIR__, 2));
+    $directories = [
+        $root.'/app/Http/Controllers/It',
+        $root.'/app/Domain/It',
+        $root.'/app/Domain/SecurityDevices',
+        $root.'/resources/js/pages/it',
+        $root.'/resources/js/pages/security-devices',
+        $root.'/resources/js/components/it',
+        $root.'/resources/js/components/security-devices',
+    ];
+    $patterns = [
+        'hash JSX target' => '/href\s*=\s*[\'\"]#[\'\"]/u',
+        'hash object target' => '/href\s*:\s*[\'\"]#[\'\"]/u',
+        'empty click handler' => '/onClick\s*=\s*\{\s*\(\s*\)\s*=>\s*\{\s*\}\s*\}/u',
+        'browser-native dialog' => '/\b(?:window\.)?(?:alert|confirm|prompt)\s*\(/u',
+        'coming-soon control' => '/\bcoming\s+soon\b/iu',
+        'mock-only data' => '/\b(?:mock|sample|demo)\s+(?:data|dashboard)\b/iu',
+        'unimplemented control' => '/\bnot\s+implemented\b/iu',
+        'deferred implementation marker' => '/\b(?:TODO|FIXME)\b/u',
+    ];
+    $findings = [];
+
+    foreach ($directories as $directory) {
+        $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory));
+        foreach ($files as $file) {
+            if (! $file->isFile()
+                || ! in_array($file->getExtension(), ['php', 'ts', 'tsx'], true)
+                || preg_match('/\.(?:test|spec)\.[^.]+$/u', $file->getFilename()) === 1) {
+                continue;
+            }
+
+            $contents = file_get_contents($file->getPathname());
+            $scannable = preg_replace('/\/\*.*?\*\//su', '', (string) $contents) ?? (string) $contents;
+            foreach ($patterns as $label => $pattern) {
+                if (preg_match($pattern, $scannable) === 1) {
+                    $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($root) + 1));
+                    $findings[] = "{$relative}: {$label}";
+                }
+            }
+        }
+    }
+
+    expect($findings)->toBe([]);
 });
 
 it('keeps Queclink governed actions safe when no tracker is paired', function () {
@@ -1437,6 +1512,7 @@ function itSecurityScopedFiles(string $root): array
         'app/Http/Controllers/Settings/CalendarSyncOAuthController.php',
         'app/Http/Controllers/Settings/CalendarSyncSettingsController.php',
         'app/Http/Controllers/Settings/AuditLogSettingsController.php',
+        'app/Console/Commands/ReconcileDeviceDocumentStorage.php',
         'app/Http/Middleware/AuthenticateItServiceIdentity.php',
         'app/Http/Middleware/EnsureItApiAbility.php',
         'app/Http/Middleware/HandleInertiaRequests.php',

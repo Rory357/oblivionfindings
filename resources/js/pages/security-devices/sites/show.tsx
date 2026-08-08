@@ -4,8 +4,12 @@ import {
     CoverageIndicator,
     OperationalStateBadge,
 } from '@/components/security-devices/estate-operations';
+import {
+    ControlRoomAlertAccessRequired,
+    SiteProfileDestination,
+    type ControlRoomAlertAccess,
+} from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
@@ -13,7 +17,6 @@ import { formatDateTime, formatRelative } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import {
     Activity,
-    ArrowUpRight,
     BellRing,
     Building2,
     Cable,
@@ -28,7 +31,7 @@ import {
     Wrench,
 } from 'lucide-react';
 
-import { DeviceCard, type DeviceListItem, StatCard } from '../devices/shared';
+import { DeviceCard, StatCard, type DeviceListItem } from '../devices/shared';
 
 interface SiteTechnology {
     id: number;
@@ -82,11 +85,12 @@ type Monitor = {
 type Alert = {
     id: number;
     reference: string | null;
-    title: string;
-    severity: string;
-    status: string;
+    title: string | null;
+    severity: string | null;
+    status: string | null;
     triggered_at: string | null;
-    href: string;
+    href: string | null;
+    access: ControlRoomAlertAccess;
 };
 
 type ItWork = {
@@ -176,6 +180,7 @@ type Props = {
     can: {
         view_control_room: boolean;
         view_it_work: boolean;
+        view_site_profile: boolean;
         export: boolean;
     };
 };
@@ -238,12 +243,10 @@ export default function SiteTechnologyShow({
                     ]}
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
-                            <Button asChild variant="outline" size="sm">
-                                <Link href={`/sites/${site.id}`}>
-                                    Open Site profile
-                                    <ArrowUpRight className="ml-2 h-4 w-4" />
-                                </Link>
-                            </Button>
+                            <SiteProfileDestination
+                                siteId={site.id}
+                                canView={can.view_site_profile}
+                            />
                             <OperationalStateBadge state={summary.health} />
                             {site.type ? (
                                 <Badge variant="outline">
@@ -598,29 +601,44 @@ export default function SiteTechnologyShow({
                                     <ul className="space-y-2">
                                         {alerts.map((alert) => (
                                             <li key={alert.id}>
-                                                <Link
-                                                    href={alert.href}
-                                                    className="frontline-focus block rounded-xl border p-3 hover:bg-muted"
-                                                >
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <p className="font-medium">
-                                                            {alert.title}
+                                                {alert.href &&
+                                                alert.access.state ===
+                                                    'available' ? (
+                                                    <Link
+                                                        href={alert.href}
+                                                        className="frontline-focus block rounded-xl border p-3 hover:bg-muted"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <p className="font-medium">
+                                                                {alert.title}
+                                                            </p>
+                                                            {alert.severity ? (
+                                                                <OperationalStateBadge
+                                                                    state={
+                                                                        alert.severity ===
+                                                                        'critical'
+                                                                            ? 'critical'
+                                                                            : 'warning'
+                                                                    }
+                                                                />
+                                                            ) : null}
+                                                        </div>
+                                                        <p className="mt-1 text-xs text-muted-foreground">
+                                                            {alert.reference ||
+                                                                'Alert'}{' '}
+                                                            · {alert.status}
                                                         </p>
-                                                        <OperationalStateBadge
-                                                            state={
-                                                                alert.severity ===
-                                                                'critical'
-                                                                    ? 'critical'
-                                                                    : 'warning'
+                                                    </Link>
+                                                ) : (
+                                                    <div className="rounded-xl border px-3">
+                                                        <ControlRoomAlertAccessRequired
+                                                            label={
+                                                                alert.access
+                                                                    .label
                                                             }
                                                         />
                                                     </div>
-                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                        {alert.reference ||
-                                                            'Alert'}{' '}
-                                                        · {alert.status}
-                                                    </p>
-                                                </Link>
+                                                )}
                                             </li>
                                         ))}
                                     </ul>

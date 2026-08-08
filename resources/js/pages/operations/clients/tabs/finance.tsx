@@ -8,7 +8,6 @@ import {
     AlertTriangle,
     ArrowDownCircle,
     ArrowUpCircle,
-    DollarSign,
     Receipt,
     ShoppingCart,
     Wallet,
@@ -99,8 +98,8 @@ export function FinanceTab({
     );
     const lowFunds = funds.filter(
         (fund) =>
-            fund.low_balance_threshold != null
-                && fund.balance < fund.low_balance_threshold,
+            fund.low_balance_threshold != null &&
+            fund.balance < fund.low_balance_threshold,
     );
 
     return (
@@ -109,15 +108,17 @@ export function FinanceTab({
             <div className="rounded-lg border bg-card p-4">
                 <div className="flex items-center justify-between gap-3">
                     <div>
-                        <h2 className="text-lg font-semibold">Client finance</h2>
+                        <h2 className="text-lg font-semibold">
+                            Client finance
+                        </h2>
                         <p className="text-sm text-muted-foreground">
                             Fund balances, ledger activity, and approvals.
                             Detailed ledger lives under{' '}
                             <Link
                                 className="text-primary underline-offset-2 hover:underline"
                                 href={
-                                    clientFundsHref
-                                        ?? `/operations/client-funds?client=${clientId}`
+                                    clientFundsHref ??
+                                    `/operations/client-funds?client=${clientId}`
                                 }
                             >
                                 Client Funds
@@ -161,15 +162,15 @@ export function FinanceTab({
                         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                             {funds.map((fund) => {
                                 const low =
-                                    fund.low_balance_threshold != null
-                                    && fund.balance < fund.low_balance_threshold;
+                                    fund.low_balance_threshold != null &&
+                                    fund.balance < fund.low_balance_threshold;
                                 return (
                                     <div
                                         key={fund.id}
                                         className={cn(
                                             'rounded-lg border bg-card p-4',
-                                            low
-                                                && 'border-status-warning/40 bg-status-warning-bg/30',
+                                            low &&
+                                                'border-status-warning/40 bg-status-warning-bg/30',
                                         )}
                                     >
                                         <div className="flex items-start justify-between gap-2">
@@ -243,8 +244,9 @@ export function FinanceTab({
                     {transactions.length > 0 ? (
                         <ul className="divide-y">
                             {transactions.map((tx) => {
-                                const isOutflow = tx.amount < 0
-                                    || ['debit', 'spend', 'withdrawal'].includes(
+                                const isOutflow =
+                                    tx.amount < 0 ||
+                                    ['debit', 'spend', 'withdrawal'].includes(
                                         String(tx.type ?? '').toLowerCase(),
                                     );
                                 const Icon = isOutflow
@@ -265,9 +267,9 @@ export function FinanceTab({
                                         />
                                         <div className="min-w-0 flex-1">
                                             <p className="text-sm font-medium">
-                                                {tx.description
-                                                    ?? tx.category
-                                                    ?? 'Transaction'}
+                                                {tx.description ??
+                                                    tx.category ??
+                                                    'Transaction'}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
                                                 {dateLabel(tx.transaction_date)}
@@ -294,7 +296,7 @@ export function FinanceTab({
                             })}
                         </ul>
                     ) : (
-                        <p className="text-sm italic text-muted-foreground">
+                        <p className="text-sm text-muted-foreground italic">
                             No transactions yet.
                         </p>
                     )}
@@ -328,8 +330,8 @@ export function FinanceTab({
                                         </Badge>
                                         <div className="min-w-0 flex-1">
                                             <p className="font-medium">
-                                                {req.description
-                                                    ?? 'Purchase request'}
+                                                {req.description ??
+                                                    'Purchase request'}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
                                                 {dateLabel(req.requested_at)}
@@ -408,8 +410,8 @@ export function FinanceTab({
                 <Button asChild variant="outline">
                     <Link
                         href={
-                            clientFundsHref
-                                ?? `/operations/client-funds?client=${clientId}`
+                            clientFundsHref ??
+                            `/operations/client-funds?client=${clientId}`
                         }
                     >
                         Open full Client Funds

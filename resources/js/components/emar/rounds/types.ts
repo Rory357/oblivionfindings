@@ -1,7 +1,12 @@
 /* Shared types for the redesigned eMAR Medication Rounds page (`/emar/rounds`).
  * Shapes mirror EmarController@rounds + GuidedRoundService. */
 
-export type RoundStatus = 'pending' | 'in_progress' | 'partial' | 'completed' | string;
+export type RoundStatus =
+    | 'pending'
+    | 'in_progress'
+    | 'partial'
+    | 'completed'
+    | string;
 
 /** One scheduled dose in a round — powers the Chart matrix and audit timeline. */
 export interface RoundCell {
@@ -206,11 +211,23 @@ export function roundCounts(cells: RoundCell[]): RoundCounts {
     }
     const total = cells.length;
     const recorded = given + refused + held + missed;
-    return { given, refused, held, missed, due, total, recorded, pct: total ? Math.round((recorded / total) * 100) : 0 };
+    return {
+        given,
+        refused,
+        held,
+        missed,
+        due,
+        total,
+        recorded,
+        pct: total ? Math.round((recorded / total) * 100) : 0,
+    };
 }
 
 /** Round status → display label + semantic tone suffix. */
-export function roundStatusMeta(status: RoundStatus): { label: string; tone: string } {
+export function roundStatusMeta(status: RoundStatus): {
+    label: string;
+    tone: string;
+} {
     switch (status) {
         case 'completed':
             return { label: 'Complete', tone: 'success' };
@@ -230,7 +247,10 @@ export function roundActionLabel(status: RoundStatus): string {
 }
 
 /** Dose status → label + semantic tone (given=success, refused/held=warning, missed=critical, due=muted). */
-export function doseStatusMeta(status: string): { label: string; tone: string } {
+export function doseStatusMeta(status: string): {
+    label: string;
+    tone: string;
+} {
     switch (status) {
         case 'given':
             return { label: 'Given', tone: 'success' };

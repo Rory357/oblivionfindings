@@ -4,7 +4,13 @@
  * WorkerParticipationController. */
 import type { Tone } from '@/pages/health-safety/components/register-row-kit';
 import {
-    AlertTriangle, Boxes, ClipboardList, FileText, MessageSquare, ShieldAlert, Wrench,
+    AlertTriangle,
+    Boxes,
+    ClipboardList,
+    FileText,
+    MessageSquare,
+    ShieldAlert,
+    Wrench,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -57,7 +63,11 @@ export type ActionItem = {
     status?: 'open' | 'in_progress' | 'done' | null;
 };
 
-export type AttendeeUser = { id: number; name: string; pivot?: { response?: string; attended?: boolean } };
+export type AttendeeUser = {
+    id: number;
+    name: string;
+    pivot?: { response?: string; attended?: boolean };
+};
 
 export type RepDetail = RepRow & {
     term_expires_at: string | null;
@@ -98,9 +108,15 @@ export type ConsultationDetail = ConsultationRow & {
 
 /** Which sub-action a detail dialog should open straight onto (right-click → pane). */
 export type WpDetailAction =
-    | 'edit' | 'training'                          // representative
-    | 'attendees' | 'complete' | 'minutes'        // meeting
-    | 'feedback' | 'outcome' | 'upload' | 'close'; // consultation
+    | 'edit'
+    | 'training' // representative
+    | 'attendees'
+    | 'complete'
+    | 'minutes' // meeting
+    | 'feedback'
+    | 'outcome'
+    | 'upload'
+    | 'close'; // consultation
 
 export type WpCan = { manage: boolean };
 
@@ -108,8 +124,17 @@ export type WpCan = { manage: boolean };
 /*  Status tone maps                                                    */
 /* ------------------------------------------------------------------ */
 
-export const REP_STATUS: Record<string, Tone> = { active: 'success', inactive: 'neutral', resigned: 'critical' };
-export const MEETING_STATUS: Record<string, Tone> = { scheduled: 'neutral', completed: 'success', cancelled: 'critical', in_progress: 'warning' };
+export const REP_STATUS: Record<string, Tone> = {
+    active: 'success',
+    inactive: 'neutral',
+    resigned: 'critical',
+};
+export const MEETING_STATUS: Record<string, Tone> = {
+    scheduled: 'neutral',
+    completed: 'success',
+    cancelled: 'critical',
+    in_progress: 'warning',
+};
 
 export const CONSULT_STATUS: Record<string, { tone: Tone; label: string }> = {
     open: { tone: 'warning', label: 'Open' },
@@ -117,13 +142,26 @@ export const CONSULT_STATUS: Record<string, { tone: Tone; label: string }> = {
     actioned: { tone: 'neutral', label: 'Actioned' },
     closed: { tone: 'success', label: 'Closed' },
 };
-export const CONSULT_ORDER: Record<string, number> = { open: 1, feedback_received: 2, actioned: 3, closed: 4 };
+export const CONSULT_ORDER: Record<string, number> = {
+    open: 1,
+    feedback_received: 2,
+    actioned: 3,
+    closed: 4,
+};
 
 /** Canonical consultation lifecycle, in order — drives the detail timeline. */
 export const CONSULT_STAGES: { key: string; label: string; blurb: string }[] = [
     { key: 'open', label: 'Opened', blurb: 'Consultation raised with kaimahi' },
-    { key: 'feedback_received', label: 'Feedback received', blurb: 'Worker feedback captured' },
-    { key: 'actioned', label: 'Actioned', blurb: 'Outcome decided + changes made' },
+    {
+        key: 'feedback_received',
+        label: 'Feedback received',
+        blurb: 'Worker feedback captured',
+    },
+    {
+        key: 'actioned',
+        label: 'Actioned',
+        blurb: 'Outcome decided + changes made',
+    },
     { key: 'closed', label: 'Closed', blurb: 'Consultation completed' },
 ];
 
@@ -132,20 +170,76 @@ export const CONSULT_STAGES: { key: string; label: string; blurb: string }[] = [
 /* ------------------------------------------------------------------ */
 
 /** ONE canonical NZ consultation-type set — mirrors StoreConsultationRequest. */
-export const CONSULTATION_TYPES: { key: string; label: string; description: string; icon: LucideIcon }[] = [
-    { key: 'hazard_review', label: 'Hazard review', description: 'Identifying or reviewing a workplace hazard', icon: AlertTriangle },
-    { key: 'risk_assessment', label: 'Risk assessment', description: 'Assessing risk for a task or change', icon: ShieldAlert },
-    { key: 'procedure_change', label: 'Procedure change', description: 'New or changed way of working', icon: ClipboardList },
-    { key: 'policy_review', label: 'Policy review', description: 'A H&S policy is being introduced or revised', icon: FileText },
-    { key: 'equipment_change', label: 'Equipment change', description: 'New plant, equipment or substance', icon: Boxes },
-    { key: 'change_notification', label: 'Change notification', description: 'Notifying workers of a proposed change', icon: MessageSquare },
-    { key: 'general', label: 'General consultation', description: 'Any other matter affecting H&S', icon: Wrench },
+export const CONSULTATION_TYPES: {
+    key: string;
+    label: string;
+    description: string;
+    icon: LucideIcon;
+}[] = [
+    {
+        key: 'hazard_review',
+        label: 'Hazard review',
+        description: 'Identifying or reviewing a workplace hazard',
+        icon: AlertTriangle,
+    },
+    {
+        key: 'risk_assessment',
+        label: 'Risk assessment',
+        description: 'Assessing risk for a task or change',
+        icon: ShieldAlert,
+    },
+    {
+        key: 'procedure_change',
+        label: 'Procedure change',
+        description: 'New or changed way of working',
+        icon: ClipboardList,
+    },
+    {
+        key: 'policy_review',
+        label: 'Policy review',
+        description: 'A H&S policy is being introduced or revised',
+        icon: FileText,
+    },
+    {
+        key: 'equipment_change',
+        label: 'Equipment change',
+        description: 'New plant, equipment or substance',
+        icon: Boxes,
+    },
+    {
+        key: 'change_notification',
+        label: 'Change notification',
+        description: 'Notifying workers of a proposed change',
+        icon: MessageSquare,
+    },
+    {
+        key: 'general',
+        label: 'General consultation',
+        description: 'Any other matter affecting H&S',
+        icon: Wrench,
+    },
 ];
 
-export const ELECTION_METHODS: { key: string; label: string; description: string }[] = [
-    { key: 'elected', label: 'Elected', description: 'Chosen by a vote of the work group' },
-    { key: 'appointed', label: 'Appointed', description: 'Appointed by agreement (no contest)' },
-    { key: 'volunteered', label: 'Volunteered', description: 'Stepped forward voluntarily' },
+export const ELECTION_METHODS: {
+    key: string;
+    label: string;
+    description: string;
+}[] = [
+    {
+        key: 'elected',
+        label: 'Elected',
+        description: 'Chosen by a vote of the work group',
+    },
+    {
+        key: 'appointed',
+        label: 'Appointed',
+        description: 'Appointed by agreement (no contest)',
+    },
+    {
+        key: 'volunteered',
+        label: 'Volunteered',
+        description: 'Stepped forward voluntarily',
+    },
 ];
 
 export const MEETING_FREQUENCIES: { value: string; label: string }[] = [
@@ -160,10 +254,25 @@ export const MEETING_FREQUENCIES: { value: string; label: string }[] = [
 /* ------------------------------------------------------------------ */
 
 export const fmtDate = (d: string | null | undefined) =>
-    d ? new Date(d).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+    d
+        ? new Date(d).toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          })
+        : '—';
 
 export const fmtDateTime = (d: string | null | undefined) =>
-    d ? new Date(d).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+    d
+        ? new Date(d).toLocaleString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+          })
+        : '—';
 
 export const consultationTypeLabel = (t: string) =>
-    CONSULTATION_TYPES.find((x) => x.key === t)?.label ?? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    CONSULTATION_TYPES.find((x) => x.key === t)?.label ??
+    t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());

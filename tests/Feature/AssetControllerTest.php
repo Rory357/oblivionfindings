@@ -328,7 +328,7 @@ class AssetControllerTest extends TestCase
     // Delete
     // ──────────────────────────────────────
 
-    public function test_asset_delete_successful(): void
+    public function test_asset_delete_retires_and_retains_the_record(): void
     {
         $asset = Asset::factory()->forSite($this->site)->create();
 
@@ -336,7 +336,14 @@ class AssetControllerTest extends TestCase
             ->delete("/assets/{$asset->id}")
             ->assertRedirect(route('fleet-assets.assets.index'));
 
-        $this->assertDatabaseMissing('assets', ['id' => $asset->id]);
+        $this->assertDatabaseHas('assets', [
+            'id' => $asset->id,
+            'status' => 'retired',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'assets.retired',
+            'auditable_id' => $asset->id,
+        ]);
     }
 
     public function test_asset_delete_blocked_for_coordinator(): void

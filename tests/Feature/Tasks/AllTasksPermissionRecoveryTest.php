@@ -20,7 +20,6 @@ beforeEach(function () {
 function makeTaskRecoveryUser(Site $site, array $permissionKeys, string $name): User
 {
     $user = User::factory()->create([
-        'organization_id' => $site->tenant_id,
         'role' => 'support_worker',
         'name' => $name,
         'approved_at' => now(),
@@ -34,7 +33,6 @@ function makeTaskRecoveryUser(Site $site, array $permissionKeys, string $name): 
     }
 
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => $site->tenant_id,
         'user_id' => $user->id,
         'position_role' => 'support_worker',
         'primary_site_id' => $site->id,
@@ -58,7 +56,7 @@ function denyTaskRecoveryPermissions(User $user, array $permissionKeys): void
 }
 
 it('maps Control Room task destinations to the same manage view and no-access decisions', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $owner = makeTaskRecoveryUser($site, ['controlRoom.viewAny'], 'Current Control Room Owner');
     $manager = makeTaskRecoveryUser($site, [
         'controlRoom.viewAny',
@@ -104,7 +102,6 @@ it('maps Control Room task destinations to the same manage view and no-access de
         );
 
     AuditLog::query()->create([
-        'organization_id' => $site->tenant_id,
         'user_id' => $owner->id,
         'action' => 'controlRoom.alert.view',
         'auditable_type' => ControlRoomAlert::class,
@@ -148,7 +145,7 @@ it('maps Control Room task destinations to the same manage view and no-access de
 });
 
 it('returns permission-scoped task detail actions and preserves the filtered return path', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $viewer = makeTaskRecoveryUser($site, [
         'controlRoom.alerts.view',
     ], 'Read Only Worker');
@@ -197,7 +194,7 @@ it('returns permission-scoped task detail actions and preserves the filtered ret
 });
 
 it('recovers permission drift to the exact safe task filters instead of a bare 403', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $user = makeTaskRecoveryUser($site, [
         'controlRoom.viewAny',
         'controlRoom.alerts.view',
@@ -226,7 +223,7 @@ it('recovers permission drift to the exact safe task filters instead of a bare 4
 });
 
 it('keeps invalid recovery targets and unrelated authorization failures as normal 403 responses', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $user = makeTaskRecoveryUser($site, [], 'Unauthorized Worker');
     $alert = ControlRoomAlert::factory()->triaging()->create([
         'site_id' => $site->id,
@@ -260,7 +257,7 @@ it('keeps invalid recovery targets and unrelated authorization failures as norma
 });
 
 it('keeps the provider row action aligned with the shared access decision', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $viewer = makeTaskRecoveryUser($site, [
         'controlRoom.alerts.view',
     ], 'Read Only Worker');
@@ -279,13 +276,13 @@ it('keeps the provider row action aligned with the shared access decision', func
 });
 
 it('rejects a Control Room watch mutation when the alert is outside the shared readable scope', function () {
-    $localSite = Site::factory()->create(['tenant_id' => 1]);
-    $foreignSite = Site::factory()->create(['tenant_id' => 1]);
-    $viewer = makeTaskRecoveryUser($localSite, [
+    $visibleSite = Site::factory()->create();
+    $hiddenSite = Site::factory()->create();
+    $viewer = makeTaskRecoveryUser($visibleSite, [
         'controlRoom.alerts.view',
     ], 'Site Scoped Viewer');
     $alert = ControlRoomAlert::factory()->triaging()->create([
-        'site_id' => $foreignSite->id,
+        'site_id' => $hiddenSite->id,
     ]);
 
     $this->actingAs($viewer)
@@ -300,7 +297,7 @@ it('rejects a Control Room watch mutation when the alert is outside the shared r
 });
 
 it('removes and rejects assignment when readable alert access drifts away', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $actor = makeTaskRecoveryUser($site, [
         'controlRoom.viewAny',
         'controlRoom.alerts.view',
@@ -349,24 +346,24 @@ it('removes and rejects assignment when readable alert access drifts away', func
 });
 
 it('prunes a stale cross-site watcher before assignment notifications are sent', function () {
-    $localSite = Site::factory()->create(['tenant_id' => 1]);
-    $foreignSite = Site::factory()->create(['tenant_id' => 1]);
-    $actor = makeTaskRecoveryUser($localSite, [
+    $visibleSite = Site::factory()->create();
+    $hiddenSite = Site::factory()->create();
+    $actor = makeTaskRecoveryUser($visibleSite, [
         'controlRoom.viewAny',
         'controlRoom.alerts.view',
         'controlRoom.alerts.assign',
     ], 'Scoped Alert Assigner');
-    $assignee = makeTaskRecoveryUser($localSite, [
+    $assignee = makeTaskRecoveryUser($visibleSite, [
         'controlRoom.alerts.view',
     ], 'Scoped Alert Assignee');
     $assignee->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'coordinator')->value('id'),
     ]);
-    $staleWatcher = makeTaskRecoveryUser($foreignSite, [
+    $staleWatcher = makeTaskRecoveryUser($hiddenSite, [
         'controlRoom.alerts.view',
-    ], 'Stale Foreign Watcher');
+    ], 'Stale Hidden Site Watcher');
     $alert = ControlRoomAlert::factory()->triaging()->create([
-        'site_id' => $localSite->id,
+        'site_id' => $visibleSite->id,
         'assigned_to_user_id' => null,
     ]);
     TaskWatcher::query()->create([
@@ -391,7 +388,7 @@ it('prunes a stale cross-site watcher before assignment notifications are sent',
 });
 
 it('keeps an authorized watcher for an exact alert beyond the 300-row feed cap', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $watcher = makeTaskRecoveryUser($site, [
         'controlRoom.alerts.view',
     ], 'Authorized Older Alert Watcher');
@@ -424,16 +421,16 @@ it('keeps an authorized watcher for an exact alert beyond the 300-row feed cap',
 });
 
 it('filters stale follower names from readable detail without mutating on GET', function () {
-    $localSite = Site::factory()->create(['tenant_id' => 1]);
-    $foreignSite = Site::factory()->create(['tenant_id' => 1]);
-    $viewer = makeTaskRecoveryUser($localSite, [
+    $visibleSite = Site::factory()->create();
+    $hiddenSite = Site::factory()->create();
+    $viewer = makeTaskRecoveryUser($visibleSite, [
         'controlRoom.alerts.view',
     ], 'Readable Alert Viewer');
-    $staleWatcher = makeTaskRecoveryUser($foreignSite, [
+    $staleWatcher = makeTaskRecoveryUser($hiddenSite, [
         'controlRoom.alerts.view',
-    ], 'Foreign Historical Watcher');
+    ], 'Hidden Site Historical Watcher');
     $alert = ControlRoomAlert::factory()->triaging()->create([
-        'site_id' => $localSite->id,
+        'site_id' => $visibleSite->id,
     ]);
     TaskWatcher::query()->create([
         'source' => 'alert',

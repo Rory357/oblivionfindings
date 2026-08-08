@@ -1,11 +1,19 @@
-import { AlertTriangle, Check, Clock, Heart, MoreHorizontal, Pill, StickyNote } from 'lucide-react';
+import {
+    AlertTriangle,
+    Check,
+    Clock,
+    Heart,
+    MoreHorizontal,
+    Pill,
+    StickyNote,
+} from 'lucide-react';
 import { type MouseEvent, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-import type { MyDayResident } from '../lib/types';
 import type { StreamItem as Item } from '../lib/stream-grouping';
+import type { MyDayResident } from '../lib/types';
 
 import { HoverAction } from './hover-action';
 import { ResidentDot } from './resident-dot';
@@ -82,7 +90,9 @@ function TaskRow({
                     className={cn(
                         'text-sm',
                         isNow ? 'font-semibold' : 'font-medium',
-                        task.is_completed ? 'text-muted-foreground line-through' : 'text-foreground',
+                        task.is_completed
+                            ? 'text-muted-foreground line-through'
+                            : 'text-foreground',
                     )}
                 >
                     {task.label}
@@ -90,7 +100,10 @@ function TaskRow({
                 <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                     {showResident && resident ? (
                         <span className="inline-flex items-center gap-1">
-                            <ResidentDot hue={resident.hue} initials={resident.initials} />
+                            <ResidentDot
+                                hue={resident.hue}
+                                initials={resident.initials}
+                            />
                             {resident.first_name}
                         </span>
                     ) : null}
@@ -122,13 +135,19 @@ function TaskRow({
                         onClick={() => onToggleTask(task.id)}
                     />
                 ) : null}
-                <HoverAction icon={StickyNote} label="Add note" onClick={() => onAddNote?.(item)} />
+                <HoverAction
+                    icon={StickyNote}
+                    label="Add note"
+                    onClick={() => onAddNote?.(item)}
+                />
                 <HoverAction
                     icon={MoreHorizontal}
                     label="More"
                     onClick={(e) => {
                         e.stopPropagation();
-                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                        const rect = (
+                            e.currentTarget as HTMLElement
+                        ).getBoundingClientRect();
                         onOpenContextMenu(item, rect.right, rect.bottom);
                     }}
                 />
@@ -155,7 +174,11 @@ function MedRow({
     const given = med.status === 'given';
     const notGiven = med.status === 'refused' || med.status === 'withheld';
     const resolved = given || notGiven;
-    const resolvedLabel = given ? 'Given' : med.status === 'withheld' ? 'Withheld' : 'Refused';
+    const resolvedLabel = given
+        ? 'Given'
+        : med.status === 'withheld'
+          ? 'Withheld'
+          : 'Refused';
 
     const handleContext = (e: MouseEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -179,7 +202,9 @@ function MedRow({
             {/* eslint-disable-next-line no-restricted-syntax -- 20px circular checkbox with status-tinted border; not a shadcn Button. */}
             <button
                 type="button"
-                onClick={() => !resolved && onGiveMed(med.medication_id, med.scheduled_for)}
+                onClick={() =>
+                    !resolved && onGiveMed(med.medication_id, med.scheduled_for)
+                }
                 title={resolved ? resolvedLabel : 'Mark as given'}
                 aria-pressed={resolved}
                 className={cn(
@@ -188,9 +213,9 @@ function MedRow({
                         ? 'border-status-success bg-status-success text-status-success-foreground'
                         : notGiven
                           ? 'border-status-warning bg-status-warning text-status-warning-foreground'
-                        : overdue
-                          ? 'border-status-critical text-transparent'
-                          : 'border-muted-foreground text-transparent',
+                          : overdue
+                            ? 'border-status-critical text-transparent'
+                            : 'border-muted-foreground text-transparent',
                 )}
             >
                 {resolved ? <Check className="h-2.5 w-2.5" /> : null}
@@ -203,9 +228,9 @@ function MedRow({
                         ? 'bg-status-success-bg text-status-success'
                         : notGiven
                           ? 'bg-status-warning-bg text-status-warning'
-                        : overdue
-                          ? 'bg-status-critical-bg text-status-critical'
-                          : 'bg-accent text-primary',
+                          : overdue
+                            ? 'bg-status-critical-bg text-status-critical'
+                            : 'bg-accent text-primary',
                 )}
             >
                 <Pill className="h-3 w-3" />
@@ -215,16 +240,23 @@ function MedRow({
                 <div
                     className={cn(
                         'text-[13.5px] font-medium',
-                        resolved ? 'text-muted-foreground line-through' : 'text-foreground',
+                        resolved
+                            ? 'text-muted-foreground line-through'
+                            : 'text-foreground',
                     )}
                 >
                     {med.medication_name}
-                    <span className="ml-1 text-muted-foreground font-normal">· {med.dose}</span>
+                    <span className="ml-1 font-normal text-muted-foreground">
+                        · {med.dose}
+                    </span>
                 </div>
                 <div className="mt-px flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     {showResident && resident ? (
                         <>
-                            <ResidentDot hue={resident.hue} initials={resident.initials} />
+                            <ResidentDot
+                                hue={resident.hue}
+                                initials={resident.initials}
+                            />
                             <span>{resident.first_name}</span>
                             <span>·</span>
                         </>
@@ -280,25 +312,33 @@ function MedRow({
                         icon={Check}
                         label="Mark as given"
                         tone="success"
-                        onClick={() => onGiveMed(med.medication_id, med.scheduled_for)}
+                        onClick={() =>
+                            onGiveMed(med.medication_id, med.scheduled_for)
+                        }
                     />
                     <HoverAction
                         icon={Clock}
                         label="Snooze 15m"
-                        onClick={() => onSnoozeMed?.(med.medication_id, med.scheduled_for)}
+                        onClick={() =>
+                            onSnoozeMed?.(med.medication_id, med.scheduled_for)
+                        }
                     />
                     <HoverAction
                         icon={AlertTriangle}
                         label="Refuse / not given"
                         tone="danger"
-                        onClick={() => onRefuseMed?.(med.medication_id, med.scheduled_for)}
+                        onClick={() =>
+                            onRefuseMed?.(med.medication_id, med.scheduled_for)
+                        }
                     />
                     <HoverAction
                         icon={MoreHorizontal}
                         label="More"
                         onClick={(e) => {
                             e.stopPropagation();
-                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            const rect = (
+                                e.currentTarget as HTMLElement
+                            ).getBoundingClientRect();
                             onOpenContextMenu(item, rect.right, rect.bottom);
                         }}
                     />

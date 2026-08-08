@@ -227,6 +227,7 @@ class EstateSiteOperationsTest extends TestCase
             'parent_device_id' => $router->id,
             'child_device_id' => $camera->id,
             'relationship_type' => 'connected_to',
+            'created_by_user_id' => $this->admin->id,
         ]);
         $group = DeviceGroup::create([
             'name' => 'Front entrance',
@@ -281,11 +282,14 @@ class EstateSiteOperationsTest extends TestCase
             $this->assertSame(2, $props['monitoring']['total_devices']);
             $this->assertSame(1, $props['monitoring']['unmonitored_devices']);
             $this->assertSame(['WAN path unavailable'], collect($props['alerts'])->pluck('title')->all());
+            $this->assertSame('available', $props['alerts'][0]['access']['state']);
+            $this->assertNotNull($props['alerts'][0]['href']);
             $this->assertSame(['Review WAN failover'], collect($props['itWork'])->pluck('title')->all());
             $this->assertSame(['Camera inspection'], collect($props['maintenance'])->pluck('description')->all());
             $this->assertSame(['Alex Technician'], collect($props['contacts'])->pluck('name')->all());
             $this->assertTrue($props['can']['view_control_room']);
             $this->assertTrue($props['can']['view_it_work']);
+            $this->assertTrue($props['can']['view_site_profile']);
         });
     }
 
@@ -299,7 +303,12 @@ class EstateSiteOperationsTest extends TestCase
         ]);
         $viewer->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
         $deniedCrossModulePermissions = Permission::query()
-            ->whereIn('key', ['controlRoom.viewAny', 'controlRoom.alerts.view', 'it.view'])
+            ->whereIn('key', [
+                'controlRoom.viewAny',
+                'controlRoom.alerts.view',
+                'it.view',
+                'sites.viewAny',
+            ])
             ->pluck('id')
             ->mapWithKeys(fn (int $id) => [$id => ['allowed' => false]])
             ->all();
@@ -340,7 +349,8 @@ class EstateSiteOperationsTest extends TestCase
                 ->has('alerts', 0)
                 ->has('itWork', 0)
                 ->where('can.view_control_room', false)
-                ->where('can.view_it_work', false));
+                ->where('can.view_it_work', false)
+                ->where('can.view_site_profile', false));
 
         $this->actingAs($viewer)
             ->get("/security-devices/sites/{$hiddenSite->id}")
@@ -354,6 +364,75 @@ class EstateSiteOperationsTest extends TestCase
         $this->actingAs($this->admin)
             ->get("/security-devices/sites/{$unrelatedSite->id}")
             ->assertOk();
+    }
+
+    public function test_all_sites_security_scope_retains_only_restricted_control_room_context(): void
+    {
+        $assignedSite = Site::factory()->create();
+        $unrelatedSite = Site::factory()->create();
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $viewer->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+        $permissionIds = Permission::query()
+            ->whereIn('key', [
+                'securityDevices.devices.viewAllSites',
+                'controlRoom.viewAny',
+                'controlRoom.alerts.view',
+            ])
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])
+            ->all();
+        $viewer->permissionOverrides()->syncWithoutDetaching($permissionIds);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $assignedSite->id,
+            'secondary_site_ids' => [],
+        ]);
+        ControlRoomAlert::factory()->critical()->create([
+            'site_id' => $unrelatedSite->id,
+            'status' => ControlRoomAlert::STATUS_OPEN,
+            'alert_type' => 'Private site alert detail',
+        ]);
+
+        $this->actingAs($viewer)
+            ->get("/security-devices/sites/{$unrelatedSite->id}")
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $alert = $page->toArray()['props']['alerts'][0];
+
+                $this->assertSame('restricted', $alert['access']['state']);
+                $this->assertNull($alert['href']);
+                $this->assertNull($alert['reference']);
+                $this->assertSame('Control Room alert', $alert['title']);
+                $this->assertNotSame('Private site alert detail', $alert['title']);
+            });
+    }
+
+    public function test_site_profile_destination_requires_exact_canonical_site_visibility(): void
+    {
+        $assignedSite = Site::factory()->create();
+        $unrelatedSite = Site::factory()->create();
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $viewer->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+        $permissionIds = Permission::query()
+            ->whereIn('key', [
+                'securityDevices.devices.viewAllSites',
+                'sites.viewAny',
+            ])
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])
+            ->all();
+        $viewer->permissionOverrides()->syncWithoutDetaching($permissionIds);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $assignedSite->id,
+            'secondary_site_ids' => [],
+        ]);
+
+        $this->actingAs($viewer)
+            ->get("/security-devices/sites/{$unrelatedSite->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('can.view_site_profile', false));
     }
 
     private function assignToSite(Device $device, Site $site): void

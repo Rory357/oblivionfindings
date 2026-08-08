@@ -45,16 +45,23 @@ describe('TomorrowPanel', () => {
                     what_to_know: null,
                     incoming_handover: {
                         id: 99,
-                        handover_notes: 'Mere slept poorly and needs a calm start.',
+                        handover_notes:
+                            'Mere slept poorly and needs a calm start.',
                         client_mood: 'mixed',
                         medications_due: [
-                            { label: 'Morning meds still due', severity: 'high' },
+                            {
+                                label: 'Morning meds still due',
+                                severity: 'high',
+                            },
                         ],
                         incidents_to_note: [
                             { label: 'Near fall overnight', severity: 'high' },
                         ],
                         follow_up_items: [
-                            { label: 'Call GP after breakfast', priority: 'medium' },
+                            {
+                                label: 'Call GP after breakfast',
+                                priority: 'medium',
+                            },
                         ],
                         submitted_at: '2026-06-09T07:00:00+12:00',
                         outgoing_staff_name: 'Alex Taylor',

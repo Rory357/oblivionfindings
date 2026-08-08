@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
 import { ItModuleShell } from '@/components/it/it-module-shell';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -144,209 +144,218 @@ export default function ItMajorIncidentsIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Major incidents" />
             <ItModuleShell>
-            <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
-                <header className="overflow-hidden rounded-2xl border border-status-critical/25 bg-card shadow-sm">
-                    <div className="border-l-4 border-status-critical p-5">
-                        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                            <div>
-                                <div className="flex items-center gap-2 text-status-critical">
-                                    <Siren
-                                        className="h-5 w-5"
-                                        aria-hidden="true"
-                                    />
-                                    <span className="text-xs font-bold tracking-wide uppercase">
-                                        IT command
-                                    </span>
+                <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
+                    <header className="overflow-hidden rounded-2xl border border-status-critical/25 bg-card shadow-sm">
+                        <div className="border-l-4 border-status-critical p-5">
+                            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                                <div>
+                                    <div className="flex items-center gap-2 text-status-critical">
+                                        <Siren
+                                            className="h-5 w-5"
+                                            aria-hidden="true"
+                                        />
+                                        <span className="text-xs font-bold tracking-wide uppercase">
+                                            IT command
+                                        </span>
+                                    </div>
+                                    <h1 className="mt-2 text-2xl font-bold tracking-tight">
+                                        Major incidents
+                                    </h1>
+                                    <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                                        Coordinate technical response, link
+                                        operational impact, and publish
+                                        audience-safe updates from one
+                                        accountable command record.
+                                    </p>
                                 </div>
-                                <h1 className="mt-2 text-2xl font-bold tracking-tight">
-                                    Major incidents
-                                </h1>
-                                <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                                    Coordinate technical response, link
-                                    operational impact, and publish
-                                    audience-safe updates from one accountable
-                                    command record.
+                                {can.manage ? (
+                                    <Button
+                                        onClick={() => setCreating(true)}
+                                        className="min-h-11"
+                                    >
+                                        <Plus
+                                            className="h-4 w-4"
+                                            aria-hidden="true"
+                                        />{' '}
+                                        Declare major incident
+                                    </Button>
+                                ) : null}
+                            </div>
+                        </div>
+                    </header>
+
+                    <form
+                        onSubmit={search}
+                        className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-[minmax(18rem,1fr)_11rem_14rem_auto]"
+                    >
+                        <label className="relative">
+                            <span className="sr-only">
+                                Search major incidents
+                            </span>
+                            <Search
+                                className="pointer-events-none absolute top-3 left-3 h-4 w-4 text-muted-foreground"
+                                aria-hidden="true"
+                            />
+                            <Input
+                                value={query}
+                                onChange={(event) =>
+                                    setQuery(event.target.value)
+                                }
+                                className="min-h-11 pl-9"
+                                placeholder="Search reference, title, or impact"
+                            />
+                        </label>
+                        <Filter
+                            label="Severity"
+                            value={severity}
+                            onChange={setSeverity}
+                            values={['all', 'sev1', 'sev2', 'sev3', 'sev4']}
+                        />
+                        <Filter
+                            label="Command state"
+                            value={state}
+                            onChange={setState}
+                            values={[
+                                'all',
+                                'declared',
+                                'responding',
+                                'monitoring',
+                                'restored',
+                                'resolved',
+                                'review',
+                                'closed',
+                            ]}
+                        />
+                        <Button
+                            type="submit"
+                            variant="secondary"
+                            className="min-h-11"
+                        >
+                            Apply filters
+                        </Button>
+                    </form>
+
+                    <section
+                        aria-label="Major incident records"
+                        className="overflow-hidden rounded-2xl border border-border bg-card"
+                    >
+                        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                            <div>
+                                <h2 className="font-semibold">
+                                    Command register
+                                </h2>
+                                <p className="text-xs text-muted-foreground">
+                                    {majorIncidents.total} accountable records
                                 </p>
                             </div>
-                            {can.manage ? (
-                                <Button
-                                    onClick={() => setCreating(true)}
-                                    className="min-h-11"
-                                >
-                                    <Plus
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />{' '}
-                                    Declare major incident
-                                </Button>
-                            ) : null}
+                            <Megaphone
+                                className="h-5 w-5 text-muted-foreground"
+                                aria-hidden="true"
+                            />
                         </div>
-                    </div>
-                </header>
-
-                <form
-                    onSubmit={search}
-                    className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-[minmax(18rem,1fr)_11rem_14rem_auto]"
-                >
-                    <label className="relative">
-                        <span className="sr-only">Search major incidents</span>
-                        <Search
-                            className="pointer-events-none absolute top-3 left-3 h-4 w-4 text-muted-foreground"
-                            aria-hidden="true"
-                        />
-                        <Input
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            className="min-h-11 pl-9"
-                            placeholder="Search reference, title, or impact"
-                        />
-                    </label>
-                    <Filter
-                        label="Severity"
-                        value={severity}
-                        onChange={setSeverity}
-                        values={['all', 'sev1', 'sev2', 'sev3', 'sev4']}
-                    />
-                    <Filter
-                        label="Command state"
-                        value={state}
-                        onChange={setState}
-                        values={[
-                            'all',
-                            'declared',
-                            'responding',
-                            'monitoring',
-                            'restored',
-                            'resolved',
-                            'review',
-                            'closed',
-                        ]}
-                    />
-                    <Button
-                        type="submit"
-                        variant="secondary"
-                        className="min-h-11"
-                    >
-                        Apply filters
-                    </Button>
-                </form>
-
-                <section
-                    aria-label="Major incident records"
-                    className="overflow-hidden rounded-2xl border border-border bg-card"
-                >
-                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                        <div>
-                            <h2 className="font-semibold">Command register</h2>
-                            <p className="text-xs text-muted-foreground">
-                                {majorIncidents.total} accountable records
-                            </p>
-                        </div>
-                        <Megaphone
-                            className="h-5 w-5 text-muted-foreground"
-                            aria-hidden="true"
-                        />
-                    </div>
-                    {majorIncidents.data.length === 0 ? (
-                        <div className="px-6 py-14 text-center text-sm text-muted-foreground">
-                            No major incidents match these filters.
-                        </div>
-                    ) : (
-                        <ul className="divide-y divide-border">
-                            {majorIncidents.data.map((incident) => (
-                                <li
-                                    key={incident.major_incident_id}
-                                    className="p-4 transition-colors hover:bg-muted/25"
-                                >
-                                    <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-                                        <div className="min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <StatusBadge
-                                                    variant={
-                                                        incident.severity ===
-                                                            'sev1' ||
-                                                        incident.severity ===
-                                                            'sev2'
-                                                            ? 'critical'
-                                                            : 'warning'
-                                                    }
-                                                >
-                                                    {incident.severity.toUpperCase()}
-                                                </StatusBadge>
-                                                <StatusBadge
-                                                    variant={
-                                                        majorIncidentStateVariant[
-                                                            incident
-                                                                .workflow_state
-                                                        ] ?? 'neutral'
-                                                    }
-                                                >
-                                                    {majorIncidentLabel(
-                                                        incident.workflow_state,
+                        {majorIncidents.data.length === 0 ? (
+                            <div className="px-6 py-14 text-center text-sm text-muted-foreground">
+                                No major incidents match these filters.
+                            </div>
+                        ) : (
+                            <ul className="divide-y divide-border">
+                                {majorIncidents.data.map((incident) => (
+                                    <li
+                                        key={incident.major_incident_id}
+                                        className="p-4 transition-colors hover:bg-muted/25"
+                                    >
+                                        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <StatusBadge
+                                                        variant={
+                                                            incident.severity ===
+                                                                'sev1' ||
+                                                            incident.severity ===
+                                                                'sev2'
+                                                                ? 'critical'
+                                                                : 'warning'
+                                                        }
+                                                    >
+                                                        {incident.severity.toUpperCase()}
+                                                    </StatusBadge>
+                                                    <StatusBadge
+                                                        variant={
+                                                            majorIncidentStateVariant[
+                                                                incident
+                                                                    .workflow_state
+                                                            ] ?? 'neutral'
+                                                        }
+                                                    >
+                                                        {majorIncidentLabel(
+                                                            incident.workflow_state,
+                                                        )}
+                                                    </StatusBadge>
+                                                    {incident.update_state ===
+                                                    'overdue' ? (
+                                                        <StatusBadge variant="critical">
+                                                            Update overdue
+                                                        </StatusBadge>
+                                                    ) : (
+                                                        <StatusBadge variant="success">
+                                                            Updates on time
+                                                        </StatusBadge>
                                                     )}
-                                                </StatusBadge>
-                                                {incident.update_state ===
-                                                'overdue' ? (
-                                                    <StatusBadge variant="critical">
-                                                        Update overdue
-                                                    </StatusBadge>
-                                                ) : (
-                                                    <StatusBadge variant="success">
-                                                        Updates on time
-                                                    </StatusBadge>
-                                                )}
+                                                </div>
+                                                <Link
+                                                    href={`/it/major-incidents/${incident.major_incident_id}`}
+                                                    className="frontline-focus mt-2 inline-flex items-center gap-2 rounded-md font-semibold text-foreground hover:text-primary"
+                                                >
+                                                    <span className="font-mono text-sm text-primary">
+                                                        {incident.reference}
+                                                    </span>
+                                                    {incident.title}
+                                                    <ArrowRight
+                                                        className="h-4 w-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                </Link>
+                                                <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
+                                                    {incident.impact_summary ||
+                                                        'Impact summary not recorded.'}
+                                                </p>
                                             </div>
-                                            <Link
-                                                href={`/it/major-incidents/${incident.major_incident_id}`}
-                                                className="frontline-focus mt-2 inline-flex items-center gap-2 rounded-md font-semibold text-foreground hover:text-primary"
-                                            >
-                                                <span className="font-mono text-sm text-primary">
-                                                    {incident.reference}
-                                                </span>
-                                                {incident.title}
-                                                <ArrowRight
-                                                    className="h-4 w-4"
-                                                    aria-hidden="true"
+                                            <div className="grid min-w-[18rem] gap-2 text-xs sm:grid-cols-2">
+                                                <CommandFact
+                                                    label="Commander"
+                                                    value={
+                                                        incident.commander
+                                                            ?.name ??
+                                                        'Unassigned'
+                                                    }
                                                 />
-                                            </Link>
-                                            <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
-                                                {incident.impact_summary ||
-                                                    'Impact summary not recorded.'}
-                                            </p>
-                                        </div>
-                                        <div className="grid min-w-[18rem] gap-2 text-xs sm:grid-cols-2">
-                                            <CommandFact
-                                                label="Commander"
-                                                value={
-                                                    incident.commander?.name ??
-                                                    'Unassigned'
-                                                }
-                                            />
-                                            <CommandFact
-                                                label="Communications"
-                                                value={
-                                                    incident.communications_lead
-                                                        ?.name ?? 'Unassigned'
-                                                }
-                                            />
-                                            <div className="flex items-center gap-2 rounded-lg bg-muted/45 px-3 py-2 text-muted-foreground sm:col-span-2">
-                                                <Clock3
-                                                    className="h-4 w-4"
-                                                    aria-hidden="true"
-                                                />{' '}
-                                                Next update{' '}
-                                                {formatDateTime(
-                                                    incident.next_update_due_at,
-                                                )}
+                                                <CommandFact
+                                                    label="Communications"
+                                                    value={
+                                                        incident
+                                                            .communications_lead
+                                                            ?.name ??
+                                                        'Unassigned'
+                                                    }
+                                                />
+                                                <div className="flex items-center gap-2 rounded-lg bg-muted/45 px-3 py-2 text-muted-foreground sm:col-span-2">
+                                                    <Clock3
+                                                        className="h-4 w-4"
+                                                        aria-hidden="true"
+                                                    />{' '}
+                                                    Next update{' '}
+                                                    {formatDateTime(
+                                                        incident.next_update_due_at,
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </section>
-            </main>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
+                </main>
             </ItModuleShell>
 
             <Dialog open={creating} onOpenChange={setCreating}>

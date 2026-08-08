@@ -97,16 +97,33 @@ export interface EventAttachment {
 
 /** Read Laravel's XSRF cookie for non-Inertia multipart uploads. */
 function xsrfToken(): string {
-    const match = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='));
+    const match = document.cookie
+        .split('; ')
+        .find((c) => c.startsWith('XSRF-TOKEN='));
     return match ? decodeURIComponent(match.split('=')[1]) : '';
 }
 
 const STEPS: readonly WizardStep[] = [
     { key: 'basics', label: 'Basics', blurb: 'Title & type', icon: Megaphone },
     { key: 'when', label: 'When', blurb: 'Dates & times', icon: CalendarRange },
-    { key: 'who', label: 'Who & where', blurb: 'Audience & place', icon: Users },
-    { key: 'details', label: 'Details', blurb: 'Reminders & files', icon: Bell },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ClipboardCheck },
+    {
+        key: 'who',
+        label: 'Who & where',
+        blurb: 'Audience & place',
+        icon: Users,
+    },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Reminders & files',
+        icon: Bell,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: ClipboardCheck,
+    },
 ];
 
 /** Reminder lead-time presets the user can toggle. */
@@ -127,9 +144,16 @@ const CATEGORY_STYLE: Record<string, { icon: LucideIcon; sub: string }> = {
     social: { icon: PartyPopper, sub: 'Get-together' },
     holiday: { icon: CalendarRange, sub: 'Closure or obs.' },
 };
-const styleFor = (key: string) => CATEGORY_STYLE[key] ?? { icon: CalendarRange, sub: '' };
+const styleFor = (key: string) =>
+    CATEGORY_STYLE[key] ?? { icon: CalendarRange, sub: '' };
 
-type CategoryMeta = { value: string; label: string; icon: LucideIcon; accent: string; sub: string };
+type CategoryMeta = {
+    value: string;
+    label: string;
+    icon: LucideIcon;
+    accent: string;
+    sub: string;
+};
 const metaFor = (cat: EventCategoryOption): CategoryMeta => ({
     value: cat.key,
     label: cat.label,
@@ -143,9 +167,17 @@ const RECUR_PRESETS: { key: string; label: string; rrule: string | null }[] = [
     { key: 'none', label: 'Does not repeat', rrule: null },
     { key: 'DAILY', label: 'Daily', rrule: 'FREQ=DAILY' },
     { key: 'WEEKLY', label: 'Weekly', rrule: 'FREQ=WEEKLY' },
-    { key: 'FORTNIGHTLY', label: 'Every 2 weeks', rrule: 'FREQ=WEEKLY;INTERVAL=2' },
+    {
+        key: 'FORTNIGHTLY',
+        label: 'Every 2 weeks',
+        rrule: 'FREQ=WEEKLY;INTERVAL=2',
+    },
     { key: 'MONTHLY', label: 'Monthly', rrule: 'FREQ=MONTHLY' },
-    { key: 'QUARTERLY', label: 'Every 3 months', rrule: 'FREQ=MONTHLY;INTERVAL=3' },
+    {
+        key: 'QUARTERLY',
+        label: 'Every 3 months',
+        rrule: 'FREQ=MONTHLY;INTERVAL=3',
+    },
 ];
 const presetFromRrule = (rrule: string | null | undefined): string =>
     RECUR_PRESETS.find((p) => p.rrule === (rrule || null))?.key ?? 'none';
@@ -153,7 +185,8 @@ const rruleFromPreset = (key: string): string | null =>
     RECUR_PRESETS.find((p) => p.key === key)?.rrule ?? null;
 
 function recurrenceSummary(preset: string, until: string): string {
-    const label = RECUR_PRESETS.find((p) => p.key === preset)?.label ?? 'Does not repeat';
+    const label =
+        RECUR_PRESETS.find((p) => p.key === preset)?.label ?? 'Does not repeat';
     if (preset === 'none') return 'Occurs once';
     const base = `Occurs ${label.toLowerCase()}`;
     if (!until) return base;
@@ -216,10 +249,16 @@ export function EventWizardDialog({
     const [submitted, setSubmitted] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [keepAdding, setKeepAdding] = useState(false);
-    const [reminderChannel, setReminderChannel] = useState<'notification' | 'email'>('notification');
+    const [reminderChannel, setReminderChannel] = useState<
+        'notification' | 'email'
+    >('notification');
     const [stagedFiles, setStagedFiles] = useState<File[]>([]);
-    const [existingAttachments, setExistingAttachments] = useState<EventAttachment[]>([]);
-    const [removedAttachmentIds, setRemovedAttachmentIds] = useState<number[]>([]);
+    const [existingAttachments, setExistingAttachments] = useState<
+        EventAttachment[]
+    >([]);
+    const [removedAttachmentIds, setRemovedAttachmentIds] = useState<number[]>(
+        [],
+    );
 
     const form = useForm({
         title: '',
@@ -230,7 +269,12 @@ export function EventWizardDialog({
         is_all_day: false,
         rrule: '' as string,
         recurrence_until: '' as string,
-        audience_type: 'org' as 'org' | 'site' | 'department' | 'team' | 'people',
+        audience_type: 'org' as
+            | 'org'
+            | 'site'
+            | 'department'
+            | 'team'
+            | 'people',
         audience_team: '',
         audience_user_ids: [] as number[],
         reminders: [] as { offset_minutes: number; channel: string }[],
@@ -251,17 +295,22 @@ export function EventWizardDialog({
                 ends_at: toLocalInput(initial.ends_at, initial.is_all_day),
                 is_all_day: initial.is_all_day,
                 rrule: initial.rrule ?? '',
-                recurrence_until: initial.recurrence_until ? initial.recurrence_until.substring(0, 10) : '',
+                recurrence_until: initial.recurrence_until
+                    ? initial.recurrence_until.substring(0, 10)
+                    : '',
                 audience_type: initial.audience_type ?? 'org',
                 audience_team: initial.audience_team ?? '',
                 audience_user_ids: initial.audience_user_ids ?? [],
                 reminders: initial.reminders ?? [],
                 location: initial.location ?? '',
-                department_id: initial.department_id ? String(initial.department_id) : '',
+                department_id: initial.department_id
+                    ? String(initial.department_id)
+                    : '',
                 site_id: initial.site_id ? String(initial.site_id) : '',
             });
             setReminderChannel(
-                (initial.reminders?.[0]?.channel as 'notification' | 'email') ?? 'notification',
+                (initial.reminders?.[0]?.channel as 'notification' | 'email') ??
+                    'notification',
             );
             setExistingAttachments(initial.attachments ?? []);
         } else if (defaultDate) {
@@ -316,13 +365,18 @@ export function EventWizardDialog({
         categories.find((c) => c.key === form.data.event_type) ?? categories[0];
     const meta = selectedCategory
         ? metaFor(selectedCategory)
-        : { value: 'company', label: 'Company', icon: Building2, accent: 'var(--category-hr)', sub: '' };
+        : {
+              value: 'company',
+              label: 'Company',
+              icon: Building2,
+              accent: 'var(--category-hr)',
+              sub: '',
+          };
     const canSubmit =
         form.data.title.trim() !== '' &&
         form.data.starts_at !== '' &&
         form.data.ends_at !== '' &&
-        (form.data.audience_type !== 'team' ||
-            form.data.audience_team !== '');
+        (form.data.audience_type !== 'team' || form.data.audience_team !== '');
 
     // Completeness meter (matches the prototype) — required basics + nice-to-haves.
     const completeness = useMemo(() => {
@@ -330,7 +384,11 @@ export function EventWizardDialog({
             form.data.title.trim() !== '',
             form.data.starts_at !== '' && form.data.ends_at !== '',
             !!form.data.event_type,
-            !!(form.data.location || form.data.site_id || form.data.department_id),
+            !!(
+                form.data.location ||
+                form.data.site_id ||
+                form.data.department_id
+            ),
             !!(
                 form.data.description ||
                 form.data.reminders.length ||
@@ -338,7 +396,9 @@ export function EventWizardDialog({
                 stagedFiles.length
             ),
         ];
-        return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+        return Math.round(
+            (checks.filter(Boolean).length / checks.length) * 100,
+        );
     }, [
         form.data.title,
         form.data.starts_at,
@@ -354,11 +414,15 @@ export function EventWizardDialog({
     ]);
 
     const siteName = useMemo(
-        () => sites.find((s) => String(s.id) === form.data.site_id)?.name ?? 'All sites',
+        () =>
+            sites.find((s) => String(s.id) === form.data.site_id)?.name ??
+            'All sites',
         [sites, form.data.site_id],
     );
     const departmentName = useMemo(
-        () => departments.find((d) => String(d.id) === form.data.department_id)?.name ?? '',
+        () =>
+            departments.find((d) => String(d.id) === form.data.department_id)
+                ?.name ?? '',
         [departments, form.data.department_id],
     );
     const reachText = useMemo(() => {
@@ -366,7 +430,9 @@ export function EventWizardDialog({
             case 'org':
                 return 'Visible to everyone in the organisation.';
             case 'site':
-                return form.data.site_id ? `Everyone at ${siteName}.` : 'Pick a site above to scope this.';
+                return form.data.site_id
+                    ? `Everyone at ${siteName}.`
+                    : 'Pick a site above to scope this.';
             case 'department':
                 return form.data.department_id
                     ? `Everyone in ${departmentName}.`
@@ -405,13 +471,18 @@ export function EventWizardDialog({
         form.transform((data) => ({
             ...data,
             site_id: data.site_id === '' ? null : data.site_id,
-            department_id: data.department_id === '' ? null : data.department_id,
+            department_id:
+                data.department_id === '' ? null : data.department_id,
             audience_team:
                 data.audience_type === 'team' ? data.audience_team : null,
             rrule: data.rrule === '' ? null : data.rrule,
-            recurrence_until: data.recurrence_until === '' ? null : data.recurrence_until,
+            recurrence_until:
+                data.recurrence_until === '' ? null : data.recurrence_until,
             ...(isEdit && initial?.scope
-                ? { scope: initial.scope, occurrence_date: initial.occurrence_date ?? null }
+                ? {
+                      scope: initial.scope,
+                      occurrence_date: initial.occurrence_date ?? null,
+                  }
                 : {}),
         }));
 
@@ -420,8 +491,14 @@ export function EventWizardDialog({
         else if (form.errors.starts_at || form.errors.ends_at) wizard.goTo(1);
     };
 
-    const finishSave = async (eventId: number | undefined, addAnother: boolean) => {
-        if ((stagedFiles.length > 0 || removedAttachmentIds.length > 0) && eventId) {
+    const finishSave = async (
+        eventId: number | undefined,
+        addAnother: boolean,
+    ) => {
+        if (
+            (stagedFiles.length > 0 || removedAttachmentIds.length > 0) &&
+            eventId
+        ) {
             await uploadStagedFiles(eventId);
         }
         onSaved();
@@ -454,7 +531,9 @@ export function EventWizardDialog({
             form.post('/hr/calendar/events', {
                 ...opts,
                 onSuccess: (page) => {
-                    const flash = (page.props as { flash?: { createdEventId?: number } }).flash;
+                    const flash = (
+                        page.props as { flash?: { createdEventId?: number } }
+                    ).flash;
                     void finishSave(flash?.createdEventId, addAnother);
                 },
             });
@@ -550,7 +629,8 @@ export function EventWizardDialog({
                                         disabled={!canSubmit || form.processing}
                                         className={cn(
                                             'rounded-[10px] border border-border bg-card px-[16px] py-2.5 text-sm font-semibold text-foreground hover:bg-muted',
-                                            (!canSubmit || form.processing) && 'cursor-not-allowed opacity-50',
+                                            (!canSubmit || form.processing) &&
+                                                'cursor-not-allowed opacity-50',
                                         )}
                                     >
                                         Save &amp; add another
@@ -563,22 +643,35 @@ export function EventWizardDialog({
                                     style={
                                         !canSubmit || form.processing
                                             ? undefined
-                                            : { boxShadow: '0 6px 16px -6px oklch(from var(--primary) l c h / 0.7)' }
+                                            : {
+                                                  boxShadow:
+                                                      '0 6px 16px -6px oklch(from var(--primary) l c h / 0.7)',
+                                              }
                                     }
                                     className={cn(
                                         'inline-flex items-center gap-2 rounded-[10px] bg-primary px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-primary-foreground hover:brightness-95',
-                                        (!canSubmit || form.processing) && 'cursor-not-allowed opacity-50',
+                                        (!canSubmit || form.processing) &&
+                                            'cursor-not-allowed opacity-50',
                                     )}
                                 >
-                                    {form.processing ? 'Saving…' : isEdit ? 'Save changes' : 'Create event'}
-                                    {!form.processing && <ArrowRight className="h-[15px] w-[15px]" />}
+                                    {form.processing
+                                        ? 'Saving…'
+                                        : isEdit
+                                          ? 'Save changes'
+                                          : 'Create event'}
+                                    {!form.processing && (
+                                        <ArrowRight className="h-[15px] w-[15px]" />
+                                    )}
                                 </button>
                             </>
                         ) : (
                             <button
                                 type="button"
                                 onClick={wizard.next}
-                                style={{ boxShadow: '0 6px 16px -6px oklch(from var(--primary) l c h / 0.7)' }}
+                                style={{
+                                    boxShadow:
+                                        '0 6px 16px -6px oklch(from var(--primary) l c h / 0.7)',
+                                }}
                                 className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-primary-foreground hover:brightness-95"
                             >
                                 Continue
@@ -591,12 +684,22 @@ export function EventWizardDialog({
                 {/* ── Step 1 · Basics ── */}
                 {wizard.index === 0 && (
                     <WizardStepPane>
-                        <StepHead icon={Megaphone} title="What's the event?" blurb="Give it a clear title and pick a category." />
+                        <StepHead
+                            icon={Megaphone}
+                            title="What's the event?"
+                            blurb="Give it a clear title and pick a category."
+                        />
                         <div className="mb-[18px]">
-                            <Field label="Title" required error={form.errors.title}>
+                            <Field
+                                label="Title"
+                                required
+                                error={form.errors.title}
+                            >
                                 <Input
                                     value={form.data.title}
-                                    onChange={(e) => form.setData('title', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('title', e.target.value)
+                                    }
                                     placeholder="e.g. All-staff hui, Fire drill, Team lunch"
                                     autoFocus
                                 />
@@ -613,22 +716,37 @@ export function EventWizardDialog({
                                     <button
                                         key={c.key}
                                         type="button"
-                                        onClick={() => form.setData('event_type', c.key)}
-                                        style={active ? { borderColor: m.accent } : undefined}
+                                        onClick={() =>
+                                            form.setData('event_type', c.key)
+                                        }
+                                        style={
+                                            active
+                                                ? { borderColor: m.accent }
+                                                : undefined
+                                        }
                                         className={cn(
                                             'flex items-start gap-2.5 rounded-xl border p-3 text-left transition-colors',
-                                            active ? 'bg-accent' : 'border-border hover:bg-muted/50',
+                                            active
+                                                ? 'bg-accent'
+                                                : 'border-border hover:bg-muted/50',
                                         )}
                                     >
                                         <span
                                             className="grid h-9 w-9 flex-none place-items-center rounded-lg"
-                                            style={{ background: `color-mix(in oklch, ${m.accent} 16%, transparent)`, color: m.accent }}
+                                            style={{
+                                                background: `color-mix(in oklch, ${m.accent} 16%, transparent)`,
+                                                color: m.accent,
+                                            }}
                                         >
                                             <Icon className="h-[18px] w-[18px]" />
                                         </span>
                                         <span className="min-w-0">
-                                            <span className="block text-[13px] font-semibold">{c.label}</span>
-                                            <span className="block text-[11px] text-muted-foreground">{m.sub}</span>
+                                            <span className="block text-[13px] font-semibold">
+                                                {c.label}
+                                            </span>
+                                            <span className="block text-[11px] text-muted-foreground">
+                                                {m.sub}
+                                            </span>
                                         </span>
                                     </button>
                                 );
@@ -636,10 +754,18 @@ export function EventWizardDialog({
                         </div>
 
                         <div className="mt-[18px]">
-                            <Field label="Description" error={form.errors.description}>
+                            <Field
+                                label="Description"
+                                error={form.errors.description}
+                            >
                                 <Textarea
                                     value={form.data.description}
-                                    onChange={(e) => form.setData('description', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'description',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                     placeholder="Optional — what's happening, who should come, anything to bring."
                                 />
@@ -651,7 +777,11 @@ export function EventWizardDialog({
                 {/* ── Step 2 · When ── */}
                 {wizard.index === 1 && (
                     <WizardStepPane>
-                        <StepHead icon={CalendarRange} title="When is it?" blurb="Set the start and end. Toggle all-day for closures or full-day events." />
+                        <StepHead
+                            icon={CalendarRange}
+                            title="When is it?"
+                            blurb="Set the start and end. Toggle all-day for closures or full-day events."
+                        />
                         <label className="mb-4 inline-flex cursor-pointer items-center gap-2 text-sm font-medium">
                             <input
                                 type="checkbox"
@@ -662,24 +792,51 @@ export function EventWizardDialog({
                             All-day event
                         </label>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Starts" required error={form.errors.starts_at}>
+                            <Field
+                                label="Starts"
+                                required
+                                error={form.errors.starts_at}
+                            >
                                 <Input
-                                    type={form.data.is_all_day ? 'date' : 'datetime-local'}
+                                    type={
+                                        form.data.is_all_day
+                                            ? 'date'
+                                            : 'datetime-local'
+                                    }
                                     value={form.data.starts_at}
-                                    onChange={(e) => form.setData('starts_at', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'starts_at',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </Field>
-                            <Field label="Ends" required error={form.errors.ends_at}>
+                            <Field
+                                label="Ends"
+                                required
+                                error={form.errors.ends_at}
+                            >
                                 <Input
-                                    type={form.data.is_all_day ? 'date' : 'datetime-local'}
+                                    type={
+                                        form.data.is_all_day
+                                            ? 'date'
+                                            : 'datetime-local'
+                                    }
                                     value={form.data.ends_at}
-                                    onChange={(e) => form.setData('ends_at', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('ends_at', e.target.value)
+                                    }
                                 />
                             </Field>
                         </div>
                         <div className="mt-4 flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-[12.5px] text-muted-foreground">
                             <AlarmClock className="h-4 w-4" />
-                            {prettyWhen(form.data.starts_at, form.data.ends_at, form.data.is_all_day)}
+                            {prettyWhen(
+                                form.data.starts_at,
+                                form.data.ends_at,
+                                form.data.is_all_day,
+                            )}
                         </div>
 
                         {/* Recurrence */}
@@ -693,12 +850,18 @@ export function EventWizardDialog({
                                             form.setData((d) => ({
                                                 ...d,
                                                 rrule: rruleFromPreset(v) ?? '',
-                                                recurrence_until: v === 'none' ? '' : d.recurrence_until,
+                                                recurrence_until:
+                                                    v === 'none'
+                                                        ? ''
+                                                        : d.recurrence_until,
                                             }))
                                         }
                                         placeholder="Does not repeat"
                                         ariaLabel="Repeat"
-                                        options={RECUR_PRESETS.map((p) => ({ value: p.key, label: p.label }))}
+                                        options={RECUR_PRESETS.map((p) => ({
+                                            value: p.key,
+                                            label: p.label,
+                                        }))}
                                     />
                                 </Field>
                                 {form.data.rrule ? (
@@ -706,14 +869,22 @@ export function EventWizardDialog({
                                         <Input
                                             type="date"
                                             value={form.data.recurrence_until}
-                                            onChange={(e) => form.setData('recurrence_until', e.target.value)}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'recurrence_until',
+                                                    e.target.value,
+                                                )
+                                            }
                                         />
                                     </Field>
                                 ) : null}
                             </div>
                             {form.data.rrule ? (
                                 <p className="mt-2 text-[12px] font-medium text-primary">
-                                    {recurrenceSummary(presetFromRrule(form.data.rrule), form.data.recurrence_until)}
+                                    {recurrenceSummary(
+                                        presetFromRrule(form.data.rrule),
+                                        form.data.recurrence_until,
+                                    )}
                                 </p>
                             ) : null}
                         </div>
@@ -723,38 +894,72 @@ export function EventWizardDialog({
                 {/* ── Step 3 · Who & where ── */}
                 {wizard.index === 2 && (
                     <WizardStepPane>
-                        <StepHead icon={Users} title="Who & where" blurb="Scope it to a site and add a location. Leave the site blank for org-wide." />
+                        <StepHead
+                            icon={Users}
+                            title="Who & where"
+                            blurb="Scope it to a site and add a location. Leave the site blank for org-wide."
+                        />
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Field label="Site" error={form.errors.site_id}>
                                 <SelectInput
                                     value={form.data.site_id || 'none'}
-                                    onChange={(v) => form.setData('site_id', v === 'none' ? '' : v)}
+                                    onChange={(v) =>
+                                        form.setData(
+                                            'site_id',
+                                            v === 'none' ? '' : v,
+                                        )
+                                    }
                                     placeholder="All sites"
                                     ariaLabel="Site"
                                     options={[
-                                        { value: 'none', label: 'All sites (org-wide)' },
-                                        ...sites.map((s) => ({ value: String(s.id), label: s.name })),
+                                        {
+                                            value: 'none',
+                                            label: 'All sites (org-wide)',
+                                        },
+                                        ...sites.map((s) => ({
+                                            value: String(s.id),
+                                            label: s.name,
+                                        })),
                                     ]}
                                 />
                             </Field>
-                            <Field label="Department" error={form.errors.department_id}>
+                            <Field
+                                label="Department"
+                                error={form.errors.department_id}
+                            >
                                 <SelectInput
                                     value={form.data.department_id || 'none'}
-                                    onChange={(v) => form.setData('department_id', v === 'none' ? '' : v)}
+                                    onChange={(v) =>
+                                        form.setData(
+                                            'department_id',
+                                            v === 'none' ? '' : v,
+                                        )
+                                    }
                                     placeholder="Any department"
                                     ariaLabel="Department"
                                     options={[
-                                        { value: 'none', label: 'Any department' },
-                                        ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+                                        {
+                                            value: 'none',
+                                            label: 'Any department',
+                                        },
+                                        ...departments.map((d) => ({
+                                            value: String(d.id),
+                                            label: d.name,
+                                        })),
                                     ]}
                                 />
                             </Field>
                         </div>
                         <div className="mt-4">
-                            <Field label="Location" error={form.errors.location}>
+                            <Field
+                                label="Location"
+                                error={form.errors.location}
+                            >
                                 <Input
                                     value={form.data.location}
-                                    onChange={(e) => form.setData('location', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('location', e.target.value)
+                                    }
                                     placeholder="e.g. Head office boardroom, Zoom link"
                                 />
                             </Field>
@@ -766,13 +971,28 @@ export function EventWizardDialog({
                             <div className="mt-2">
                                 <Segmented
                                     value={form.data.audience_type}
-                                    onChange={(v) => form.setData('audience_type', v as typeof form.data.audience_type)}
+                                    onChange={(v) =>
+                                        form.setData(
+                                            'audience_type',
+                                            v as typeof form.data.audience_type,
+                                        )
+                                    }
                                     options={[
                                         { value: 'org', label: 'Everyone' },
                                         { value: 'site', label: 'This site' },
-                                        { value: 'department', label: 'This department' },
-                                        { value: 'team', label: 'A team', disabled: teams.length === 0 },
-                                        { value: 'people', label: 'Specific people' },
+                                        {
+                                            value: 'department',
+                                            label: 'This department',
+                                        },
+                                        {
+                                            value: 'team',
+                                            label: 'A team',
+                                            disabled: teams.length === 0,
+                                        },
+                                        {
+                                            value: 'people',
+                                            label: 'Specific people',
+                                        },
                                     ]}
                                 />
                             </div>
@@ -783,39 +1003,69 @@ export function EventWizardDialog({
                                         value=""
                                         onChange={(v) => {
                                             const id = Number(v);
-                                            if (id && !form.data.audience_user_ids.includes(id)) {
-                                                form.setData('audience_user_ids', [...form.data.audience_user_ids, id]);
+                                            if (
+                                                id &&
+                                                !form.data.audience_user_ids.includes(
+                                                    id,
+                                                )
+                                            ) {
+                                                form.setData(
+                                                    'audience_user_ids',
+                                                    [
+                                                        ...form.data
+                                                            .audience_user_ids,
+                                                        id,
+                                                    ],
+                                                );
                                             }
                                         }}
-                                        people={staff.filter((s) => !form.data.audience_user_ids.includes(Number(s.value)))}
+                                        people={staff.filter(
+                                            (s) =>
+                                                !form.data.audience_user_ids.includes(
+                                                    Number(s.value),
+                                                ),
+                                        )}
                                         placeholder="Add a person…"
                                     />
                                     {form.data.audience_user_ids.length > 0 ? (
                                         <div className="flex flex-wrap gap-1.5">
-                                            {form.data.audience_user_ids.map((id) => {
-                                                const person = staff.find((s) => Number(s.value) === id);
-                                                return (
-                                                    <span
-                                                        key={id}
-                                                        className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[12px] font-medium"
-                                                    >
-                                                        {person?.label ?? `#${id}`}
-                                                        <button
-                                                            type="button"
-                                                            aria-label={`Remove ${person?.label ?? 'person'}`}
-                                                            onClick={() =>
-                                                                form.setData(
-                                                                    'audience_user_ids',
-                                                                    form.data.audience_user_ids.filter((x) => x !== id),
-                                                                )
-                                                            }
-                                                            className="text-muted-foreground hover:text-status-critical"
+                                            {form.data.audience_user_ids.map(
+                                                (id) => {
+                                                    const person = staff.find(
+                                                        (s) =>
+                                                            Number(s.value) ===
+                                                            id,
+                                                    );
+                                                    return (
+                                                        <span
+                                                            key={id}
+                                                            className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[12px] font-medium"
                                                         >
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </span>
-                                                );
-                                            })}
+                                                            {person?.label ??
+                                                                `#${id}`}
+                                                            <button
+                                                                type="button"
+                                                                aria-label={`Remove ${person?.label ?? 'person'}`}
+                                                                onClick={() =>
+                                                                    form.setData(
+                                                                        'audience_user_ids',
+                                                                        form.data.audience_user_ids.filter(
+                                                                            (
+                                                                                x,
+                                                                            ) =>
+                                                                                x !==
+                                                                                id,
+                                                                        ),
+                                                                    )
+                                                                }
+                                                                className="text-muted-foreground hover:text-status-critical"
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                            </button>
+                                                        </span>
+                                                    );
+                                                },
+                                            )}
                                         </div>
                                     ) : null}
                                 </div>
@@ -830,7 +1080,8 @@ export function EventWizardDialog({
                                     >
                                         <SelectInput
                                             value={
-                                                form.data.audience_team || 'none'
+                                                form.data.audience_team ||
+                                                'none'
                                             }
                                             onChange={(value) =>
                                                 form.setData(
@@ -859,15 +1110,21 @@ export function EventWizardDialog({
 
                             {teams.length === 0 ? (
                                 <div className="mt-3 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-                                    No teams are configured for active employees. Assign a team from the{' '}
-                                    <Link href="/hr/people" className="font-semibold text-primary underline-offset-4 hover:underline">
+                                    No teams are configured for active
+                                    employees. Assign a team from the{' '}
+                                    <Link
+                                        href="/hr/people"
+                                        className="font-semibold text-primary underline-offset-4 hover:underline"
+                                    >
                                         People workspace
                                     </Link>{' '}
                                     before creating a team event.
                                 </div>
                             ) : null}
 
-                            <p className="mt-2 text-[12px] text-muted-foreground">{reachText}</p>
+                            <p className="mt-2 text-[12px] text-muted-foreground">
+                                {reachText}
+                            </p>
                         </div>
                     </WizardStepPane>
                 )}
@@ -875,7 +1132,11 @@ export function EventWizardDialog({
                 {/* ── Step 4 · Details (reminders & files) ── */}
                 {wizard.index === 3 && (
                     <WizardStepPane>
-                        <StepHead icon={Bell} title="Reminders & files" blurb="Nudge attendees ahead of time and attach anything useful." />
+                        <StepHead
+                            icon={Bell}
+                            title="Reminders & files"
+                            blurb="Nudge attendees ahead of time and attach anything useful."
+                        />
 
                         <SubHead icon={Bell}>Reminders</SubHead>
                         <div className="mt-2">
@@ -886,7 +1147,10 @@ export function EventWizardDialog({
                                     setReminderChannel(ch);
                                     form.setData(
                                         'reminders',
-                                        form.data.reminders.map((r) => ({ ...r, channel: ch })),
+                                        form.data.reminders.map((r) => ({
+                                            ...r,
+                                            channel: ch,
+                                        })),
                                     );
                                 }}
                                 options={[
@@ -897,7 +1161,9 @@ export function EventWizardDialog({
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                             {REMINDER_PRESETS.map((p) => {
-                                const active = form.data.reminders.some((r) => r.offset_minutes === p.minutes);
+                                const active = form.data.reminders.some(
+                                    (r) => r.offset_minutes === p.minutes,
+                                );
                                 return (
                                     <button
                                         key={p.minutes}
@@ -906,8 +1172,21 @@ export function EventWizardDialog({
                                             form.setData(
                                                 'reminders',
                                                 active
-                                                    ? form.data.reminders.filter((r) => r.offset_minutes !== p.minutes)
-                                                    : [...form.data.reminders, { offset_minutes: p.minutes, channel: reminderChannel }],
+                                                    ? form.data.reminders.filter(
+                                                          (r) =>
+                                                              r.offset_minutes !==
+                                                              p.minutes,
+                                                      )
+                                                    : [
+                                                          ...form.data
+                                                              .reminders,
+                                                          {
+                                                              offset_minutes:
+                                                                  p.minutes,
+                                                              channel:
+                                                                  reminderChannel,
+                                                          },
+                                                      ],
                                             )
                                         }
                                         aria-pressed={active}
@@ -918,7 +1197,9 @@ export function EventWizardDialog({
                                                 : 'border-border text-muted-foreground hover:bg-muted/50',
                                         )}
                                     >
-                                        {active ? <Bell className="h-3.5 w-3.5" /> : null}
+                                        {active ? (
+                                            <Bell className="h-3.5 w-3.5" />
+                                        ) : null}
                                         {p.label}
                                     </button>
                                 );
@@ -953,8 +1234,20 @@ export function EventWizardDialog({
                                                 type="button"
                                                 aria-label={`Remove ${a.name}`}
                                                 onClick={() => {
-                                                    setRemovedAttachmentIds((prev) => [...prev, a.id]);
-                                                    setExistingAttachments((prev) => prev.filter((x) => x.id !== a.id));
+                                                    setRemovedAttachmentIds(
+                                                        (prev) => [
+                                                            ...prev,
+                                                            a.id,
+                                                        ],
+                                                    );
+                                                    setExistingAttachments(
+                                                        (prev) =>
+                                                            prev.filter(
+                                                                (x) =>
+                                                                    x.id !==
+                                                                    a.id,
+                                                            ),
+                                                    );
                                                 }}
                                                 className="text-muted-foreground hover:text-status-critical"
                                             >
@@ -967,7 +1260,12 @@ export function EventWizardDialog({
 
                             <div className="mt-2">
                                 <FileDropzone
-                                    onFiles={(files) => setStagedFiles((prev) => [...prev, ...files])}
+                                    onFiles={(files) =>
+                                        setStagedFiles((prev) => [
+                                            ...prev,
+                                            ...files,
+                                        ])
+                                    }
                                     hint="PDF, Word, Excel, images — up to 10 MB each"
                                 />
                             </div>
@@ -977,7 +1275,13 @@ export function EventWizardDialog({
                                         <StagedFileCard
                                             key={`${file.name}-${i}`}
                                             file={file}
-                                            onRemove={() => setStagedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                            onRemove={() =>
+                                                setStagedFiles((prev) =>
+                                                    prev.filter(
+                                                        (_, idx) => idx !== i,
+                                                    ),
+                                                )
+                                            }
                                         />
                                     ))}
                                 </div>
@@ -989,38 +1293,70 @@ export function EventWizardDialog({
                 {/* ── Step 5 · Review ── */}
                 {wizard.index === 4 && (
                     <WizardStepPane>
-                        <StepHead icon={ClipboardCheck} title="Review & save" blurb="Check the details, then save the event." />
+                        <StepHead
+                            icon={ClipboardCheck}
+                            title="Review & save"
+                            blurb="Check the details, then save the event."
+                        />
                         <ReviewCard
                             icon={RailIcon}
                             title={form.data.title || 'Untitled event'}
                         >
-                            <ReviewRow label="When" value={prettyWhen(form.data.starts_at, form.data.ends_at, form.data.is_all_day)} />
+                            <ReviewRow
+                                label="When"
+                                value={prettyWhen(
+                                    form.data.starts_at,
+                                    form.data.ends_at,
+                                    form.data.is_all_day,
+                                )}
+                            />
                             {form.data.rrule ? (
                                 <ReviewRow
                                     label="Repeats"
-                                    value={recurrenceSummary(presetFromRrule(form.data.rrule), form.data.recurrence_until)}
+                                    value={recurrenceSummary(
+                                        presetFromRrule(form.data.rrule),
+                                        form.data.recurrence_until,
+                                    )}
                                 />
                             ) : null}
                             <ReviewRow label="Category" value={meta.label} />
                             <ReviewRow label="Site" value={siteName} />
-                            {departmentName ? <ReviewRow label="Department" value={departmentName} /> : null}
+                            {departmentName ? (
+                                <ReviewRow
+                                    label="Department"
+                                    value={departmentName}
+                                />
+                            ) : null}
                             <ReviewRow label="Audience" value={reachText} />
                             {form.data.reminders.length > 0 ? (
                                 <ReviewRow
                                     label="Reminders"
                                     value={form.data.reminders
-                                        .map((r) => reminderLabel(r.offset_minutes))
+                                        .map((r) =>
+                                            reminderLabel(r.offset_minutes),
+                                        )
                                         .join(', ')}
                                 />
                             ) : null}
-                            {existingAttachments.length + stagedFiles.length > 0 ? (
+                            {existingAttachments.length + stagedFiles.length >
+                            0 ? (
                                 <ReviewRow
                                     label="Attachments"
                                     value={`${existingAttachments.length + stagedFiles.length} file${existingAttachments.length + stagedFiles.length === 1 ? '' : 's'}`}
                                 />
                             ) : null}
-                            {form.data.location ? <ReviewRow label="Location" value={form.data.location} /> : null}
-                            {form.data.description ? <ReviewRow label="Description" value={form.data.description} /> : null}
+                            {form.data.location ? (
+                                <ReviewRow
+                                    label="Location"
+                                    value={form.data.location}
+                                />
+                            ) : null}
+                            {form.data.description ? (
+                                <ReviewRow
+                                    label="Description"
+                                    value={form.data.description}
+                                />
+                            ) : null}
                         </ReviewCard>
                     </WizardStepPane>
                 )}
@@ -1031,14 +1367,14 @@ export function EventWizardDialog({
                     <AlertDialogHeader>
                         <AlertDialogTitle>Archive event?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Archiving “{form.data.title}” removes it from active calendars but retains attendees, reminders, and attachments. It can be restored later.
+                            Archiving “{form.data.title}” removes it from active
+                            calendars but retains attendees, reminders, and
+                            attachments. It can be restored later.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Keep event</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={doArchive}
-                        >
+                        <AlertDialogAction onClick={doArchive}>
                             Archive event
                         </AlertDialogAction>
                     </AlertDialogFooter>

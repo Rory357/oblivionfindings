@@ -15,8 +15,8 @@ import type {
     JobPost,
 } from '@/components/job-board/types';
 import { Button } from '@/components/ui/button';
-import AppLayout from '@/layouts/app-layout';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 
 type PaginatedJobs = {
     data: JobPost[];
@@ -179,7 +179,8 @@ export default function JobBoardIndex({
                 },
                 onError: () => {
                     toast.error('Could not claim this shift', {
-                        description: 'It may have been claimed by another worker.',
+                        description:
+                            'It may have been claimed by another worker.',
                     });
                 },
             },
@@ -194,12 +195,11 @@ export default function JobBoardIndex({
                 preserveScroll: true,
                 preserveState: true,
                 onSuccess: (page) => {
-                    const nowEnabled = !!(page.props.viewer as JobBoardViewer | undefined)
-                        ?.alerts_enabled;
+                    const nowEnabled = !!(
+                        page.props.viewer as JobBoardViewer | undefined
+                    )?.alerts_enabled;
                     toast.success(
-                        nowEnabled
-                            ? 'Alerts enabled'
-                            : 'Alerts disabled',
+                        nowEnabled ? 'Alerts enabled' : 'Alerts disabled',
                         {
                             description: nowEnabled
                                 ? "We'll notify you when matching shifts open."
@@ -309,16 +309,19 @@ export default function JobBoardIndex({
                         </h2>
                     </header>
 
-                    <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
+                    <div className="grid [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))] gap-4">
                         {visibleJobs.length === 0 ? (
-                            <GuardrailCard unstyled className="col-span-full rounded-xl border border-dashed border-border bg-card p-14 text-center text-muted-foreground">
+                            <GuardrailCard
+                                unstyled
+                                className="col-span-full rounded-xl border border-dashed border-border bg-card p-14 text-center text-muted-foreground"
+                            >
                                 <Briefcase className="mx-auto mb-3 h-8 w-8 opacity-40" />
                                 <h3 className="m-0 mb-1 text-base font-semibold text-foreground">
                                     No shifts match those filters
                                 </h3>
                                 <p className="m-0 text-sm">
-                                    Try widening your date range, clearing a skill
-                                    filter, or switching to "All open".
+                                    Try widening your date range, clearing a
+                                    skill filter, or switching to "All open".
                                 </p>
                             </GuardrailCard>
                         ) : (
@@ -339,7 +342,9 @@ export default function JobBoardIndex({
                                 <Button
                                     key={idx}
                                     size="sm"
-                                    variant={link.active ? 'default' : 'outline'}
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
                                     className="h-7 min-w-[28px] px-2 text-xs"
                                     disabled={!link.url}
                                     onClick={() =>

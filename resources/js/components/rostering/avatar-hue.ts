@@ -7,7 +7,10 @@
  * at ~3.83:1 for green hues (e.g. #2d8661 on #d7f4e8); the worst-case hue (~yellow)
  * now sits at ~4.97:1. Centralised so the fix applies to every rostering avatar chip.
  */
-export function avatarHueStyle(hue: number): { background: string; color: string } {
+export function avatarHueStyle(hue: number): {
+    background: string;
+    color: string;
+} {
     return {
         background: `hsl(${hue} 55% 90%)`,
         color: `hsl(${hue} 50% 28%)`,

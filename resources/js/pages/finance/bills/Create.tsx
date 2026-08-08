@@ -1,3 +1,5 @@
+import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,8 +20,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero, PageLayout } from '@/components/page';
-import { formatMoney } from '@/components/finance/money';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -242,7 +242,8 @@ export default function BillCreate({
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/bills"
                         title="New Bill"

@@ -2,17 +2,21 @@
 
 namespace App\Domain\SecurityDevices\Services;
 
+use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
+use App\Models\Queclink\QueclinkDevice;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use UnexpectedValueException;
 
 class DeviceRegistryService
@@ -20,6 +24,8 @@ class DeviceRegistryService
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
         private readonly DeviceAssignmentService $deviceAssignments,
+        private readonly DeviceLinkService $deviceLinks,
+        private readonly NativeMonitoringDefinitionService $monitoringDefinitions,
     ) {}
 
     /** Base query for the single application registry. */
@@ -81,6 +87,72 @@ class DeviceRegistryService
 
             return $device;
         }, 3);
+    }
+
+    /**
+     * Decommission the canonical Device without leaving live ownership,
+     * monitoring or provider execution behind.
+     */
+    public function decommission(Device $device, User $actor): Device
+    {
+        return DB::transaction(function () use ($device, $actor): Device {
+            $lockedActor = User::query()
+                ->whereKey($actor->getKey())
+                ->whereNotNull('approved_at')
+                ->first();
+            abort_unless($lockedActor?->canDo('securityDevices.devices.delete'), 403);
+
+            $lockedDevice = Device::query()
+                ->whereKey($device->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Re-evaluate visibility after the Device lock. A concurrent Site
+            // move must not turn an earlier authorised lookup into a write.
+            $this->access->assertCanViewDevice($lockedActor, $lockedDevice);
+            $this->assertProviderLifecycleClosed($lockedDevice);
+            $this->monitoringDefinitions->assertDeviceCanBeDecommissioned($lockedDevice);
+
+            // Write the integrity-sensitive audit while canonical assignment
+            // scope still exists. Any later failure rolls this row back too.
+            AuditLogger::logOrFail('device.decommissioned', $lockedDevice, [
+                'actor_id' => (int) $lockedActor->id,
+                'fields' => ['status', 'released_at', 'unlinked_at', 'deleted_at'],
+                'before' => ['status' => $lockedDevice->getRawOriginal('status')],
+                'after' => ['status' => DeviceStatus::Decommissioned->value],
+            ]);
+
+            $this->deviceAssignments->releaseAllForDecommission($lockedDevice, (int) $lockedActor->id);
+            $this->deviceLinks->unlinkAllForDevice($lockedDevice, 'device_decommissioned');
+
+            $lockedDevice->forceFill(['status' => DeviceStatus::Decommissioned->value])->save();
+            $lockedDevice->delete();
+
+            return $lockedDevice;
+        }, 3);
+    }
+
+    private function assertProviderLifecycleClosed(Device $device): void
+    {
+        $provider = strtolower(trim((string) $device->provider));
+        $providerEntityId = data_get($device->external_ref, 'provider_entity_id');
+        $hasExternalIdentity = $provider !== 'queclink'
+            && is_scalar($providerEntityId)
+            && trim((string) $providerEntityId) !== '';
+        $hasQueclinkBinding = QueclinkDevice::query()
+            ->where('device_id', $device->id)
+            ->lockForUpdate()
+            ->get(['id'])
+            ->isNotEmpty();
+        // Queclink's existing release lifecycle deliberately retains provider
+        // provenance on the canonical Device while clearing its live binding.
+        $isExternallyManaged = ! in_array($provider, ['', 'manual', 'native', 'oblivion', 'queclink'], true);
+
+        if ($hasQueclinkBinding || $hasExternalIdentity || $isExternallyManaged) {
+            throw ValidationException::withMessages([
+                'device' => 'Release this Device from its provider integration before decommissioning it.',
+            ]);
+        }
     }
 
     /**

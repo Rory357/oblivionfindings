@@ -47,6 +47,7 @@ import {
     TicketWaitingDialog,
     waitingStatusLabel,
 } from '@/components/it/ticket-waiting-dialog';
+import { WorkflowTemplateDestination } from '@/components/it/workflow-template-destination';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -354,6 +355,14 @@ const TICKET_STATUSES = [
 const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 const TICKET_CATEGORIES = ['hardware', 'account', 'network', 'other'];
 const SLA_STATES = ['ok', 'at_risk', 'breached', 'met'];
+const VIEW_TABS = new Set([
+    'overview',
+    'tickets',
+    'provisioning',
+    'knowledge',
+    'reports',
+]);
+const REQUEST_TABS = new Set(['catalog', 'my-tickets', 'knowledge']);
 
 /** Predefined views — server `view` param; counts come from `summary.tickets.views`
  *  keyed identically. Order mirrors the triage funnel (open → attention → done). */
@@ -416,10 +425,11 @@ export default function ItIndex({
     const capabilityDefault = can.view ? 'overview' : 'my-tickets';
     const tabIsAllowed = (id: string | null): id is string => {
         if (!id) return false;
-        if (id === 'my-tickets') return can.request;
-        if (id === 'catalog') return can.request;
         if (id === 'knowledge') return can.view || can.request;
-        return can.view; // overview / tickets / provisioning / reports
+        if (VIEW_TABS.has(id)) return can.view;
+        if (REQUEST_TABS.has(id)) return can.request;
+
+        return false;
     };
     const [storedDefault] = useState<string | null>(() => {
         if (typeof window === 'undefined') return null;
@@ -427,10 +437,15 @@ export default function ItIndex({
         return tabIsAllowed(v) ? v : null;
     });
     const [defaultTab, setDefaultTab] = useState<string | null>(storedDefault);
-    const [tab, setTab] = useHrTab(storedDefault ?? capabilityDefault);
+    const [requestedTab, setTab] = useHrTab(storedDefault ?? capabilityDefault);
+    const tab = tabIsAllowed(requestedTab) ? requestedTab : capabilityDefault;
     const [modal, setModal] = useState<ItModal | null>(null);
     const [peekId, setPeekId] = useState<number | null>(null);
     const ctx = useLeaveContextMenu();
+
+    useEffect(() => {
+        if (requestedTab !== tab) setTab(tab);
+    }, [requestedTab, setTab, tab]);
 
     useEffect(() => {
         if (
@@ -1585,11 +1600,9 @@ export default function ItIndex({
                                             </div>
                                         </div>
                                     </div>
-                                    <Button asChild size="sm" variant="outline">
-                                        <a href="/it/setup">
-                                            Manage workflow templates
-                                        </a>
-                                    </Button>
+                                    <WorkflowTemplateDestination
+                                        canManage={can.manage}
+                                    />
                                 </div>
                                 {provisioningWorkflows.length > 0 ? (
                                     <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">

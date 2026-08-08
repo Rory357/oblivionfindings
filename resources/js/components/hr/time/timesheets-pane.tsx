@@ -1,8 +1,8 @@
 /* eslint-disable no-restricted-syntax -- The read-only timesheets window uses
  * styled native <button>s for the segmented filter and the inline deep-link to
  * Operations (custom layout surfaces, not shadcn <Button> cases). */
-import { ArrowUpRight, Info } from 'lucide-react';
 import { router } from '@inertiajs/react';
+import { ArrowUpRight, Info } from 'lucide-react';
 import { useState } from 'react';
 
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
@@ -35,7 +35,9 @@ export function TimesheetsPane({
     timesheets: PaginatedData<TimesheetRow>;
     canApproveAny: boolean;
 }) {
-    const [segment, setSegment] = useState<'all' | 'submitted' | 'approved'>('all');
+    const [segment, setSegment] = useState<'all' | 'submitted' | 'approved'>(
+        'all',
+    );
 
     const rows = timesheets.data.filter((t) =>
         segment === 'all'
@@ -57,8 +59,9 @@ export function TimesheetsPane({
             <div className="flex items-start gap-2.5 rounded-xl border border-primary/25 bg-accent px-4 py-3">
                 <Info className="mt-0.5 h-[18px] w-[18px] flex-none text-primary" />
                 <div className="text-[12.5px] leading-relaxed text-foreground">
-                    <span className="font-bold">Read-only.</span> Shift timesheets are owned
-                    by Operations. Approve, reject, return and bulk actions happen in the{' '}
+                    <span className="font-bold">Read-only.</span> Shift
+                    timesheets are owned by Operations. Approve, reject, return
+                    and bulk actions happen in the{' '}
                     <button
                         type="button"
                         onClick={() => router.visit('/operations/timesheets')}
@@ -66,7 +69,8 @@ export function TimesheetsPane({
                     >
                         Operations timesheet flow ↗
                     </button>
-                    . This is a payroll-readiness view of per-shift hours, bucketed by week.
+                    . This is a payroll-readiness view of per-shift hours,
+                    bucketed by week.
                 </div>
             </div>
 
@@ -95,7 +99,7 @@ export function TimesheetsPane({
             ) : null}
 
             <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                <div className="grid grid-cols-[1.4fr_1.2fr_1fr_0.8fr_1fr_90px] gap-3 border-b border-border px-[18px] py-2.5 text-[10.5px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                <div className="grid grid-cols-[1.4fr_1.2fr_1fr_0.8fr_1fr_90px] gap-3 border-b border-border px-[18px] py-2.5 text-[10.5px] font-bold tracking-[0.06em] text-muted-foreground uppercase">
                     <span>Staff</span>
                     <span>Period</span>
                     <span>Client</span>
@@ -125,23 +129,28 @@ export function TimesheetsPane({
                                     {t.user_name}
                                 </span>
                             </div>
-                            <div className="text-[12.5px] tabular-nums text-muted-foreground">
+                            <div className="text-[12.5px] text-muted-foreground tabular-nums">
                                 {t.period_start} → {t.period_end}
                             </div>
                             <div className="truncate text-[12.5px]">
                                 {t.client_name ?? '—'}
                             </div>
                             <div className="text-[13px] font-bold tabular-nums">
-                                {t.total_hours != null ? `${t.total_hours}h` : '—'}
+                                {t.total_hours != null
+                                    ? `${t.total_hours}h`
+                                    : '—'}
                             </div>
                             <div>
-                                <StatusBadge variant={statusVariant(t.status)} size="sm">
+                                <StatusBadge
+                                    variant={statusVariant(t.status)}
+                                    size="sm"
+                                >
                                     {statusLabel(t.status)}
                                 </StatusBadge>
                             </div>
                             <a
                                 href={t.module_url}
-                                className="inline-flex h-[30px] items-center justify-self-end gap-1 rounded-lg border border-border bg-card px-2.5 text-[12px] font-semibold opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:opacity-100"
+                                className="inline-flex h-[30px] items-center gap-1 justify-self-end rounded-lg border border-border bg-card px-2.5 text-[12px] font-semibold opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:opacity-100"
                             >
                                 Open
                                 <ArrowUpRight className="h-3.5 w-3.5" />

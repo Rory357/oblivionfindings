@@ -3,7 +3,6 @@
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\SecurityDevices\Enums\AssignmentType;
-use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
@@ -11,14 +10,11 @@ use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\ClientConsent;
 use App\Services\ConsentValidationService;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 
 class DeviceAssignmentController extends Controller
 {
-    use MapsDevicesForList;
-
     public function __construct(
         private readonly DeviceAssignmentService $service,
         private readonly SecurityDevicesAccessService $access,
@@ -143,59 +139,5 @@ class DeviceAssignmentController extends Controller
         }
 
         return back()->with('success', 'Device released to pool.');
-    }
-
-    /**
-     * Return assignment history for a device (JSON for Inertia partial reload).
-     */
-    public function history(Request $request, Device $device)
-    {
-        $user = $request->user();
-        abort_unless($user->canDo('securityDevices.devices.view'), 403);
-        $this->access->assertCanViewDevice($user, $device);
-
-        $visibleAssignments = $device->assignments()
-            ->with(['assignedBy:id,name', 'releasedBy:id,name'])
-            ->latest('assigned_at')
-            ->get()
-            ->filter(fn (DeviceAssignment $assignment): bool => $this->access->canAccessAssignmentTarget(
-                $user,
-                $device,
-                $assignment->assignable_type,
-                (int) $assignment->assignable_id,
-            ))
-            ->values();
-        $page = max(1, $request->integer('page', 1));
-        $assignments = new LengthAwarePaginator(
-            $visibleAssignments->forPage($page, 20)->values(),
-            $visibleAssignments->count(),
-            20,
-            $page,
-            ['path' => $request->url(), 'query' => $request->query()],
-        );
-
-        return response()->json([
-            'data' => $assignments->getCollection()->map(fn (DeviceAssignment $a) => [
-                'id' => $a->id,
-                'assignable_type' => $a->assignable_type,
-                'assignable_id' => $a->assignable_id,
-                'assignable_name' => $this->resolveAssignableName($a),
-                'assignment_type' => $a->assignment_type?->value,
-                'assigned_at' => $a->assigned_at?->toISOString(),
-                'expected_return_at' => $a->expected_return_at?->toISOString(),
-                'released_at' => $a->released_at?->toISOString(),
-                'assigned_by' => $a->assignedBy ? ['id' => $a->assignedBy->id, 'name' => $a->assignedBy->name] : null,
-                'released_by' => $a->releasedBy ? ['id' => $a->releasedBy->id, 'name' => $a->releasedBy->name] : null,
-                'consent_id' => $a->consent_id,
-                'notes' => $a->notes,
-                'is_active' => $a->isActive(),
-                'is_overdue' => $a->isOverdue(),
-            ]),
-            'meta' => [
-                'current_page' => $assignments->currentPage(),
-                'last_page' => $assignments->lastPage(),
-                'total' => $assignments->total(),
-            ],
-        ]);
     }
 }

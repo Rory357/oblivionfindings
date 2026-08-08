@@ -79,7 +79,7 @@ final class ItTicketContextPresenter
                 && $link->linkable instanceof ItTicket
                 && $link->linkable->work_type === 'major_incident'
                 && Gate::forUser($viewer)->allows('view', $link->linkable))
-            ->map(function (ItTicketLink $link): ?array {
+            ->map(function (ItTicketLink $link) use ($viewer): ?array {
                 $majorIncidentTicket = $link->linkable;
                 $majorIncidentTicket->loadMissing('majorIncidentProfile');
                 if (! $majorIncidentTicket->majorIncidentProfile) {
@@ -96,7 +96,10 @@ final class ItTicketContextPresenter
                     'impact_summary' => $profile->impact_summary,
                     'restored_at' => $profile->restored_at?->toIso8601String(),
                     'next_update_due_at' => $profile->next_update_due_at?->toIso8601String(),
-                    'href' => "/it/major-incidents/{$profile->id}",
+                    'href' => $viewer->canDo('it.view')
+                        ? "/it/major-incidents/{$profile->id}"
+                        : null,
+                    'workspace_access' => $this->workspaceAccess($viewer),
                     'ticket_href' => "/it/tickets/{$majorIncidentTicket->id}",
                 ];
             })
@@ -113,7 +116,7 @@ final class ItTicketContextPresenter
                 && $link->linkable instanceof ItTicket
                 && $link->linkable->work_type === 'change'
                 && Gate::forUser($viewer)->allows('view', $link->linkable))
-            ->map(function (ItTicketLink $link): ?array {
+            ->map(function (ItTicketLink $link) use ($viewer): ?array {
                 $changeTicket = $link->linkable;
                 $changeTicket->loadMissing('changeProfile');
                 if (! $changeTicket->changeProfile) {
@@ -130,7 +133,10 @@ final class ItTicketContextPresenter
                     'is_restricted' => $changeTicket->changeProfile->is_restricted,
                     'maintenance_starts_at' => $changeTicket->changeProfile->maintenance_starts_at?->toIso8601String(),
                     'maintenance_ends_at' => $changeTicket->changeProfile->maintenance_ends_at?->toIso8601String(),
-                    'href' => "/it/changes/{$changeTicket->changeProfile->id}",
+                    'href' => $viewer->canDo('it.view')
+                        ? "/it/changes/{$changeTicket->changeProfile->id}"
+                        : null,
+                    'workspace_access' => $this->workspaceAccess($viewer),
                     'ticket_href' => "/it/tickets/{$changeTicket->id}",
                 ];
             })
@@ -147,7 +153,7 @@ final class ItTicketContextPresenter
                 && $link->linkable instanceof ItTicket
                 && $link->linkable->work_type === 'problem'
                 && Gate::forUser($viewer)->allows('view', $link->linkable))
-            ->map(function (ItTicketLink $link): ?array {
+            ->map(function (ItTicketLink $link) use ($viewer): ?array {
                 $problemTicket = $link->linkable;
                 $problemTicket->loadMissing('problemProfile');
                 if (! $problemTicket->problemProfile) {
@@ -162,7 +168,10 @@ final class ItTicketContextPresenter
                     'root_cause' => $problemTicket->problemProfile->root_cause,
                     'workaround' => $problemTicket->problemProfile->workaround,
                     'known_error_at' => $problemTicket->problemProfile->known_error_at?->toIso8601String(),
-                    'href' => "/it/problems/{$problemTicket->problemProfile->id}",
+                    'href' => $viewer->canDo('it.view')
+                        ? "/it/problems/{$problemTicket->problemProfile->id}"
+                        : null,
+                    'workspace_access' => $this->workspaceAccess($viewer),
                     'ticket_href' => "/it/tickets/{$problemTicket->id}",
                 ];
             })
@@ -276,5 +285,18 @@ final class ItTicketContextPresenter
     private function value(mixed $value): mixed
     {
         return $value instanceof BackedEnum ? $value->value : $value;
+    }
+
+    /** @return array{state: 'available'|'restricted', message: string|null} */
+    private function workspaceAccess(User $viewer): array
+    {
+        if ($viewer->canDo('it.view')) {
+            return ['state' => 'available', 'message' => null];
+        }
+
+        return [
+            'state' => 'restricted',
+            'message' => 'IT workspace access is required to open this record.',
+        ];
     }
 }

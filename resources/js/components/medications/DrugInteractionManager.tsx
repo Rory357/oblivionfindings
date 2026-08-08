@@ -1,13 +1,19 @@
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useEffect, useState } from 'react';
 
-import { AlertTriangle, Plus, ShieldAlert } from 'lucide-react';
 import axios from 'axios';
+import { AlertTriangle, Plus, ShieldAlert } from 'lucide-react';
 
 interface DrugInteraction {
     id: number;
@@ -29,7 +35,9 @@ interface DrugInteractionManagerProps {
     canManage: boolean;
 }
 
-export default function DrugInteractionManager({ canManage }: DrugInteractionManagerProps) {
+export default function DrugInteractionManager({
+    canManage,
+}: DrugInteractionManagerProps) {
     const [interactions, setInteractions] = useState<DrugInteraction[]>([]);
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
@@ -93,7 +101,9 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
             major: 'bg-status-warning-bg text-status-warning',
             contraindicated: 'bg-status-critical-bg text-status-critical',
         };
-        return <Badge className={colors[severity] || 'bg-muted'}>{severity}</Badge>;
+        return (
+            <Badge className={colors[severity] || 'bg-muted'}>{severity}</Badge>
+        );
     };
 
     return (
@@ -104,12 +114,15 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                     Drug Interactions
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[80vh]">
+            <DialogContent className="max-h-[80vh] max-w-3xl">
                 <DialogHeader>
-                    <DialogTitle className="text-lg flex items-center justify-between">
+                    <DialogTitle className="flex items-center justify-between text-lg">
                         <span>Drug Interaction Database</span>
                         {canManage && (
-                            <Button size="sm" onClick={() => setShowAddForm(!showAddForm)}>
+                            <Button
+                                size="sm"
+                                onClick={() => setShowAddForm(!showAddForm)}
+                            >
                                 <Plus className="mr-1 h-3 w-3" />
                                 Add Interaction
                             </Button>
@@ -118,11 +131,18 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                 </DialogHeader>
 
                 {showAddForm && canManage && (
-                    <form onSubmit={handleCreate} className="rounded-lg border p-4 space-y-3">
-                        <h4 className="font-medium text-sm">Add New Drug Interaction</h4>
+                    <form
+                        onSubmit={handleCreate}
+                        className="space-y-3 rounded-lg border p-4"
+                    >
+                        <h4 className="text-sm font-medium">
+                            Add New Drug Interaction
+                        </h4>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <Label className="text-xs">Medication A *</Label>
+                                <Label className="text-xs">
+                                    Medication A *
+                                </Label>
                                 <Input
                                     value={medA}
                                     onChange={(e) => setMedA(e.target.value)}
@@ -131,7 +151,9 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                                 />
                             </div>
                             <div>
-                                <Label className="text-xs">Medication B *</Label>
+                                <Label className="text-xs">
+                                    Medication B *
+                                </Label>
                                 <Input
                                     value={medB}
                                     onChange={(e) => setMedB(e.target.value)}
@@ -143,15 +165,24 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                         <div>
                             <Label className="text-xs">Severity *</Label>
                             <select
-                                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                                 value={severity}
                                 onChange={(e) => setSeverity(e.target.value)}
                                 required
                             >
-                                <option value="minor">Minor - Minimally clinically significant</option>
-                                <option value="moderate">Moderate - Moderately clinically significant</option>
-                                <option value="major">Major - Highly clinically significant</option>
-                                <option value="contraindicated">Contraindicated - Combination should be avoided</option>
+                                <option value="minor">
+                                    Minor - Minimally clinically significant
+                                </option>
+                                <option value="moderate">
+                                    Moderate - Moderately clinically significant
+                                </option>
+                                <option value="major">
+                                    Major - Highly clinically significant
+                                </option>
+                                <option value="contraindicated">
+                                    Contraindicated - Combination should be
+                                    avoided
+                                </option>
                             </select>
                         </div>
                         <div>
@@ -168,7 +199,9 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                             <Label className="text-xs">Clinical Effects</Label>
                             <Input
                                 value={clinicalEffects}
-                                onChange={(e) => setClinicalEffects(e.target.value)}
+                                onChange={(e) =>
+                                    setClinicalEffects(e.target.value)
+                                }
                                 placeholder="Expected clinical effects..."
                             />
                         </div>
@@ -181,8 +214,15 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                             />
                         </div>
                         <div className="flex gap-2">
-                            <Button type="submit" size="sm">Add Interaction</Button>
-                            <Button type="button" variant="outline" size="sm" onClick={() => setShowAddForm(false)}>
+                            <Button type="submit" size="sm">
+                                Add Interaction
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowAddForm(false)}
+                            >
                                 Cancel
                             </Button>
                         </div>
@@ -190,9 +230,13 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                 )}
 
                 {loading ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">Loading interactions...</div>
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                        Loading interactions...
+                    </div>
                 ) : interactions.length === 0 ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">No drug interactions defined.</div>
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                        No drug interactions defined.
+                    </div>
                 ) : (
                     <div className="max-h-[50vh] overflow-y-auto">
                         <div className="space-y-2 pr-4">
@@ -200,35 +244,46 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                                 <div
                                     key={interaction.id}
                                     className={`rounded-lg border p-3 ${
-                                        interaction.severity === 'contraindicated'
+                                        interaction.severity ===
+                                        'contraindicated'
                                             ? 'border-status-critical/30 bg-status-critical-bg'
                                             : interaction.severity === 'major'
-                                            ? 'border-status-warning/30 bg-status-warning-bg'
-                                            : 'bg-muted'
+                                              ? 'border-status-warning/30 bg-status-warning-bg'
+                                              : 'bg-muted'
                                     }`}
                                 >
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                {getSeverityBadge(interaction.severity)}
+                                            <div className="mb-1 flex items-center gap-2">
+                                                {getSeverityBadge(
+                                                    interaction.severity,
+                                                )}
                                                 <span className="font-medium">
-                                                    {interaction.medication_a} + {interaction.medication_b}
+                                                    {interaction.medication_a} +{' '}
+                                                    {interaction.medication_b}
                                                 </span>
                                             </div>
-                                            <p className="text-sm text-foreground">{interaction.description}</p>
+                                            <p className="text-sm text-foreground">
+                                                {interaction.description}
+                                            </p>
                                             {interaction.clinical_effects && (
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    <strong>Effects:</strong> {interaction.clinical_effects}
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    <strong>Effects:</strong>{' '}
+                                                    {
+                                                        interaction.clinical_effects
+                                                    }
                                                 </p>
                                             )}
                                             {interaction.management && (
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    <strong>Management:</strong> {interaction.management}
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    <strong>Management:</strong>{' '}
+                                                    {interaction.management}
                                                 </p>
                                             )}
                                         </div>
-                                        {interaction.severity === 'contraindicated' && (
-                                            <AlertTriangle className="h-5 w-5 text-status-critical ml-2" />
+                                        {interaction.severity ===
+                                            'contraindicated' && (
+                                            <AlertTriangle className="ml-2 h-5 w-5 text-status-critical" />
                                         )}
                                     </div>
                                 </div>
@@ -237,8 +292,11 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                     </div>
                 )}
 
-                <div className="text-xs text-muted-foreground pt-2 border-t">
-                    <p>These interactions are automatically checked when administering medications.</p>
+                <div className="border-t pt-2 text-xs text-muted-foreground">
+                    <p>
+                        These interactions are automatically checked when
+                        administering medications.
+                    </p>
                 </div>
             </DialogContent>
         </Dialog>

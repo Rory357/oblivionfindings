@@ -24,6 +24,7 @@ import {
     CircleHelp,
     ExternalLink,
     Link2,
+    LockKeyhole,
     Megaphone,
     Server,
     ShieldAlert,
@@ -71,7 +72,8 @@ export interface TicketLinkedProblem {
     root_cause: string | null;
     workaround: string | null;
     known_error_at: string | null;
-    href: string;
+    href: string | null;
+    workspace_access: LinkedWorkspaceAccess;
     ticket_href: string;
 }
 
@@ -85,7 +87,8 @@ export interface TicketLinkedChange {
     is_restricted: boolean;
     maintenance_starts_at: string | null;
     maintenance_ends_at: string | null;
-    href: string;
+    href: string | null;
+    workspace_access: LinkedWorkspaceAccess;
     ticket_href: string;
 }
 
@@ -98,8 +101,14 @@ export interface TicketLinkedMajorIncident {
     impact_summary: string | null;
     restored_at: string | null;
     next_update_due_at: string | null;
-    href: string;
+    href: string | null;
+    workspace_access: LinkedWorkspaceAccess;
     ticket_href: string;
+}
+
+interface LinkedWorkspaceAccess {
+    state: 'available' | 'restricted';
+    message: string | null;
 }
 
 interface Props {
@@ -111,6 +120,7 @@ interface Props {
     majorIncidents?: TicketLinkedMajorIncident[];
     incidentEvidence?: MonitoringIncidentEvidence[];
     canManage?: boolean;
+    canLinkDevices?: boolean;
     deviceOptions?: TicketDeviceOption[];
     ticketId?: number;
 }
@@ -169,6 +179,74 @@ function ContextStatus({ value }: { value: string }) {
     );
 }
 
+function WorkspaceRecordDestination({
+    href,
+    access,
+    icon: Icon,
+    iconClassName,
+    reference,
+    title,
+}: {
+    href: string | null;
+    access: LinkedWorkspaceAccess;
+    icon: LucideIcon;
+    iconClassName: string;
+    reference: string;
+    title: string;
+}) {
+    const content = (
+        <>
+            <Icon
+                aria-hidden="true"
+                className={`mt-0.5 h-4 w-4 flex-none ${iconClassName}`}
+            />
+            <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[12px] font-bold">
+                        {reference}
+                    </span>
+                    {href && access.state === 'available' ? (
+                        <ExternalLink
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 text-muted-foreground"
+                        />
+                    ) : null}
+                </span>
+                <span className="mt-0.5 block truncate text-[11.5px] font-medium">
+                    {title}
+                </span>
+                {!href || access.state === 'restricted' ? (
+                    <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                        <LockKeyhole
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 flex-none"
+                        />
+                        {access.message ??
+                            'IT workspace access is required to open this record.'}
+                    </span>
+                ) : null}
+            </span>
+        </>
+    );
+
+    if (href && access.state === 'available') {
+        return (
+            <Link
+                href={href}
+                className="frontline-focus flex min-h-11 items-start gap-2.5 px-3 py-2.5 hover:bg-muted/40"
+            >
+                {content}
+            </Link>
+        );
+    }
+
+    return (
+        <div className="flex min-h-11 items-start gap-2.5 px-3 py-2.5">
+            {content}
+        </div>
+    );
+}
+
 export function TicketLinkedContext({
     recoveredAt,
     devices,
@@ -178,6 +256,7 @@ export function TicketLinkedContext({
     majorIncidents = [],
     incidentEvidence = [],
     canManage = false,
+    canLinkDevices = false,
     deviceOptions = [],
     ticketId,
 }: Props) {
@@ -189,7 +268,8 @@ export function TicketLinkedContext({
     const availableDevices = deviceOptions.filter(
         (device) => !linkedDeviceIds.has(device.id),
     );
-    const canChangeDevices = canManage && ticketId !== undefined;
+    const canChangeDevices =
+        canManage && canLinkDevices && ticketId !== undefined;
     const hasLinks =
         incidentEvidence.length > 0 ||
         devices.length > 0 ||
@@ -215,6 +295,20 @@ export function TicketLinkedContext({
                     Linked context
                 </h2>
             </div>
+
+            {canManage && !canLinkDevices ? (
+                <div
+                    role="note"
+                    className="mt-3 flex min-h-11 items-center gap-2 rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5 text-[11.5px] text-muted-foreground"
+                >
+                    <LockKeyhole
+                        aria-hidden="true"
+                        className="h-4 w-4 flex-none"
+                    />
+                    Security &amp; Devices access is required to add affected
+                    Devices.
+                </div>
+            ) : null}
 
             {canChangeDevices ? (
                 <div className="mt-3 rounded-xl border border-border/70 bg-muted/20 p-3">
@@ -289,8 +383,9 @@ export function TicketLinkedContext({
                         </Select>
                     ) : (
                         <p className="mt-2 text-[11.5px] text-muted-foreground">
-                            All available Devices for this Site are already
-                            linked.
+                            {deviceOptions.length === 0
+                                ? 'No visible Devices are available for this Site.'
+                                : 'All available Devices for this Site are already linked.'}
                         </p>
                     )}
                 </div>
@@ -353,29 +448,14 @@ export function TicketLinkedContext({
                                 key={incident.id}
                                 className="overflow-hidden rounded-xl border border-status-critical/35 bg-status-critical-bg"
                             >
-                                <Link
+                                <WorkspaceRecordDestination
                                     href={incident.href}
-                                    className="frontline-focus flex min-h-11 items-start gap-2.5 px-3 py-2.5 hover:bg-muted/40"
-                                >
-                                    <Megaphone
-                                        aria-hidden="true"
-                                        className="mt-0.5 h-4 w-4 flex-none text-status-critical"
-                                    />
-                                    <span className="min-w-0 flex-1">
-                                        <span className="flex items-center justify-between gap-2">
-                                            <span className="font-mono text-[12px] font-bold">
-                                                {incident.reference}
-                                            </span>
-                                            <ExternalLink
-                                                aria-hidden="true"
-                                                className="h-3.5 w-3.5 text-muted-foreground"
-                                            />
-                                        </span>
-                                        <span className="mt-0.5 block truncate text-[11.5px] font-medium">
-                                            {incident.title}
-                                        </span>
-                                    </span>
-                                </Link>
+                                    access={incident.workspace_access}
+                                    icon={Megaphone}
+                                    iconClassName="text-status-critical"
+                                    reference={incident.reference}
+                                    title={incident.title}
+                                />
                                 <div className="space-y-1 border-t border-status-critical/20 px-3 py-2">
                                     <div className="flex flex-wrap gap-1.5">
                                         <ContextStatus
@@ -566,29 +646,14 @@ export function TicketLinkedContext({
                                 key={problem.id}
                                 className="overflow-hidden rounded-xl border border-status-warning/30 bg-status-warning-bg"
                             >
-                                <Link
+                                <WorkspaceRecordDestination
                                     href={problem.href}
-                                    className="frontline-focus flex min-h-11 items-start gap-2.5 px-3 py-2.5 hover:bg-muted/40"
-                                >
-                                    <BookOpenCheck
-                                        aria-hidden="true"
-                                        className="mt-0.5 h-4 w-4 flex-none text-status-warning"
-                                    />
-                                    <span className="min-w-0 flex-1">
-                                        <span className="flex items-center justify-between gap-2">
-                                            <span className="font-mono text-[12px] font-bold">
-                                                {problem.reference}
-                                            </span>
-                                            <ExternalLink
-                                                aria-hidden="true"
-                                                className="h-3.5 w-3.5 text-muted-foreground"
-                                            />
-                                        </span>
-                                        <span className="mt-0.5 block truncate text-[11.5px] font-medium">
-                                            {problem.title}
-                                        </span>
-                                    </span>
-                                </Link>
+                                    access={problem.workspace_access}
+                                    icon={BookOpenCheck}
+                                    iconClassName="text-status-warning"
+                                    reference={problem.reference}
+                                    title={problem.title}
+                                />
                                 <div className="space-y-1 border-t border-status-warning/20 px-3 py-2">
                                     <ContextStatus
                                         value={problem.workflow_state}
@@ -619,29 +684,14 @@ export function TicketLinkedContext({
                                 key={change.id}
                                 className="overflow-hidden rounded-xl border border-primary/25 bg-primary/5"
                             >
-                                <Link
+                                <WorkspaceRecordDestination
                                     href={change.href}
-                                    className="frontline-focus flex min-h-11 items-start gap-2.5 px-3 py-2.5 hover:bg-muted/40"
-                                >
-                                    <CalendarClock
-                                        aria-hidden="true"
-                                        className="mt-0.5 h-4 w-4 flex-none text-primary"
-                                    />
-                                    <span className="min-w-0 flex-1">
-                                        <span className="flex items-center justify-between gap-2">
-                                            <span className="font-mono text-[12px] font-bold">
-                                                {change.reference}
-                                            </span>
-                                            <ExternalLink
-                                                aria-hidden="true"
-                                                className="h-3.5 w-3.5 text-muted-foreground"
-                                            />
-                                        </span>
-                                        <span className="mt-0.5 block truncate text-[11.5px] font-medium">
-                                            {change.title}
-                                        </span>
-                                    </span>
-                                </Link>
+                                    access={change.workspace_access}
+                                    icon={CalendarClock}
+                                    iconClassName="text-primary"
+                                    reference={change.reference}
+                                    title={change.title}
+                                />
                                 <div className="space-y-1 border-t border-primary/15 px-3 py-2">
                                     <div className="flex flex-wrap gap-1.5">
                                         <ContextStatus

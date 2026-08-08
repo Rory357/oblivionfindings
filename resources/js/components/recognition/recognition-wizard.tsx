@@ -19,7 +19,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
-import { PeopleMultiPicker, type PersonOption } from '@/components/hr/people-picker';
+import {
+    PeopleMultiPicker,
+    type PersonOption,
+} from '@/components/hr/people-picker';
 import {
     Field,
     ReviewCard,
@@ -53,9 +56,24 @@ export type RecognitionDefaults = {
 };
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'recipients', label: 'Recipients', blurb: 'Who to recognise', icon: Users },
-    { key: 'recognition', label: 'Recognition', blurb: 'Value, impact & message', icon: Sparkles },
-    { key: 'review', label: 'Review', blurb: 'Confirm & send', icon: ClipboardCheck },
+    {
+        key: 'recipients',
+        label: 'Recipients',
+        blurb: 'Who to recognise',
+        icon: Users,
+    },
+    {
+        key: 'recognition',
+        label: 'Recognition',
+        blurb: 'Value, impact & message',
+        icon: Sparkles,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & send',
+        icon: ClipboardCheck,
+    },
 ];
 
 const CATEGORY_ICONS: Record<string, IconType> = {
@@ -150,7 +168,10 @@ export function RecognitionWizard({
             employees.map((e) => ({
                 value: String(e.id),
                 label: e.name,
-                sub: [e.role, e.site].filter(Boolean).join(' · ') || e.email || undefined,
+                sub:
+                    [e.role, e.site].filter(Boolean).join(' · ') ||
+                    e.email ||
+                    undefined,
             })),
         [employees],
     );
@@ -193,7 +214,8 @@ export function RecognitionWizard({
 
     const stepValid = (i: number): boolean => {
         if (i === 0) return form.data.to_user_ids.length > 0;
-        if (i === 1) return form.data.category !== '' && form.data.message.trim() !== '';
+        if (i === 1)
+            return form.data.category !== '' && form.data.message.trim() !== '';
         return true;
     };
 
@@ -211,8 +233,13 @@ export function RecognitionWizard({
                 }
             },
             onError: () => {
-                if (form.errors.to_user_ids || form.errors['to_user_ids.0']) wizard.goTo(0);
-                else if (form.errors.category || form.errors.message || form.errors.impact) {
+                if (form.errors.to_user_ids || form.errors['to_user_ids.0'])
+                    wizard.goTo(0);
+                else if (
+                    form.errors.category ||
+                    form.errors.message ||
+                    form.errors.impact
+                ) {
                     wizard.goTo(1);
                 }
             },
@@ -224,8 +251,10 @@ export function RecognitionWizard({
             title="Recognition sent 🎉"
             blurb={
                 <>
-                    Your kudos to <strong>{recipientNames || 'your colleagues'}</strong> is
-                    now on the community wall and counts toward this month's recognition.
+                    Your kudos to{' '}
+                    <strong>{recipientNames || 'your colleagues'}</strong> is
+                    now on the community wall and counts toward this month's
+                    recognition.
                 </>
             }
             actions={
@@ -293,10 +322,16 @@ export function RecognitionWizard({
                             <button
                                 type="button"
                                 onClick={() => submit(true)}
-                                disabled={!stepValid(0) || !stepValid(1) || form.processing}
+                                disabled={
+                                    !stepValid(0) ||
+                                    !stepValid(1) ||
+                                    form.processing
+                                }
                                 className={cn(
                                     'rounded-md border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted',
-                                    (!stepValid(0) || !stepValid(1) || form.processing) &&
+                                    (!stepValid(0) ||
+                                        !stepValid(1) ||
+                                        form.processing) &&
                                         'cursor-not-allowed opacity-50',
                                 )}
                             >
@@ -305,14 +340,22 @@ export function RecognitionWizard({
                             <button
                                 type="button"
                                 onClick={() => submit(false)}
-                                disabled={!stepValid(0) || !stepValid(1) || form.processing}
+                                disabled={
+                                    !stepValid(0) ||
+                                    !stepValid(1) ||
+                                    form.processing
+                                }
                                 className={cn(
                                     'rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity',
-                                    (!stepValid(0) || !stepValid(1) || form.processing) &&
+                                    (!stepValid(0) ||
+                                        !stepValid(1) ||
+                                        form.processing) &&
                                         'cursor-not-allowed opacity-50',
                                 )}
                             >
-                                {form.processing ? 'Sending…' : 'Send recognition'}
+                                {form.processing
+                                    ? 'Sending…'
+                                    : 'Send recognition'}
                             </button>
                         </>
                     ) : (
@@ -322,7 +365,8 @@ export function RecognitionWizard({
                             disabled={!stepValid(wizard.index)}
                             className={cn(
                                 'rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground',
-                                !stepValid(wizard.index) && 'cursor-not-allowed opacity-50',
+                                !stepValid(wizard.index) &&
+                                    'cursor-not-allowed opacity-50',
                             )}
                         >
                             Continue
@@ -341,7 +385,10 @@ export function RecognitionWizard({
                     <Field
                         label="Recipients"
                         required
-                        error={form.errors.to_user_ids ?? form.errors['to_user_ids.0']}
+                        error={
+                            form.errors.to_user_ids ??
+                            form.errors['to_user_ids.0']
+                        }
                         hint={
                             form.data.to_user_ids.length > 0
                                 ? `${form.data.to_user_ids.length} selected`
@@ -399,11 +446,12 @@ export function RecognitionWizard({
                         title="Review & send"
                         blurb="This recognition will appear on the community wall."
                     />
-                    <ReviewCard icon={Heart} title="Recognition" onEdit={() => wizard.goTo(1)}>
-                        <ReviewRow
-                            label="To"
-                            value={recipientNames || '—'}
-                        />
+                    <ReviewCard
+                        icon={Heart}
+                        title="Recognition"
+                        onEdit={() => wizard.goTo(1)}
+                    >
+                        <ReviewRow label="To" value={recipientNames || '—'} />
                         <ReviewRow label="Value" value={categoryLabel} />
                         <ReviewRow label="Impact" value={impactLabel} />
                         <ReviewRow label="Message" value={form.data.message} />

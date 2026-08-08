@@ -1,18 +1,49 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { type BreadcrumbItem, PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
+import {
+    NewBillDialog,
+    PayablesTabsFooter,
+    formatMoney,
+    useRowContextMenu,
+    type AccountOption,
+    type RowCtxItem,
+    type SpendApprovalOption,
+} from '@/components/finance';
+import { FinanceSummaryCard } from '@/components/finance/summary-card';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewBillDialog, PayablesTabsFooter, formatMoney, useRowContextMenu, type AccountOption, type RowCtxItem, type SpendApprovalOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { FinanceSummaryCard } from '@/components/finance/summary-card';
-import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock, ArrowDownToLine, Download, Eye, Pencil } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { PageProps, type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    ArrowDownToLine,
+    CalendarClock,
+    DollarSign,
+    Download,
+    Eye,
+    Pencil,
+    Plus,
+    Search,
+} from 'lucide-react';
 import { useState } from 'react';
 
 interface Vendor {
@@ -77,14 +108,27 @@ interface Props extends PageProps {
 }
 
 const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+    new Date(date).toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance' },
     { title: 'Bills', href: '/finance/bills' },
 ];
 
-export default function BillsIndex({ auth, bills, vendors, filters, summary, canManage, accounts, spendApprovals }: Props) {
+export default function BillsIndex({
+    auth,
+    bills,
+    vendors,
+    filters,
+    summary,
+    canManage,
+    accounts,
+    spendApprovals,
+}: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [vendorId, setVendorId] = useState(filters.vendor_id ?? '');
@@ -101,7 +145,10 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
         if (dateFrom) params.date_from = dateFrom;
         if (dateTo) params.date_to = dateTo;
 
-        router.get('/finance/bills', params, { preserveState: true, preserveScroll: true });
+        router.get('/finance/bills', params, {
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
 
     const clearFilters = () => {
@@ -113,7 +160,13 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
         router.get('/finance/bills', {}, { preserveState: true });
     };
 
-    const hasFilters = Boolean(search || (status && status !== 'all') || (vendorId && vendorId !== 'all') || dateFrom || dateTo);
+    const hasFilters = Boolean(
+        search ||
+        (status && status !== 'all') ||
+        (vendorId && vendorId !== 'all') ||
+        dateFrom ||
+        dateTo,
+    );
 
     const isOverdue = (bill: Bill) => {
         if (bill.status === 'paid' || bill.status === 'cancelled') return false;
@@ -124,10 +177,20 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
     const rowMenu = useRowContextMenu();
     const rowMenuItems = (bill: Bill): RowCtxItem[] => {
         const items: RowCtxItem[] = [
-            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/bills/${bill.id}`) },
+            {
+                kind: 'item',
+                label: 'Open',
+                icon: Eye,
+                onSelect: () => router.get(`/finance/bills/${bill.id}`),
+            },
         ];
         if (canManage && bill.status === 'draft') {
-            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => setEditBill(bill) });
+            items.push({
+                kind: 'item',
+                label: 'Edit',
+                icon: Pencil,
+                onSelect: () => setEditBill(bill),
+            });
         }
         return items;
     };
@@ -138,26 +201,41 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={ArrowDownToLine}
                         title="Bills"
                         description="Manage accounts payable"
                         stats={[
-                            { label: 'Total unpaid', value: formatMoney(summary.total_unpaid) },
-                            { label: 'Overdue', value: formatMoney(summary.total_overdue) },
-                            { label: 'Due this week', value: formatMoney(summary.due_this_week) },
+                            {
+                                label: 'Total unpaid',
+                                value: formatMoney(summary.total_unpaid),
+                            },
+                            {
+                                label: 'Overdue',
+                                value: formatMoney(summary.total_overdue),
+                            },
+                            {
+                                label: 'Due this week',
+                                value: formatMoney(summary.due_this_week),
+                            },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button size="sm" variant="outline" asChild>
-                                    <a href={`/finance/bills/export?${new URLSearchParams(Object.entries({ status, vendor_id: vendorId, search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}>
-                                        <Download className="w-4 h-4 mr-1.5" />
+                                    <a
+                                        href={`/finance/bills/export?${new URLSearchParams(Object.entries({ status, vendor_id: vendorId, search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}
+                                    >
+                                        <Download className="mr-1.5 h-4 w-4" />
                                         Export CSV
                                     </a>
                                 </Button>
                                 {canManage && (
-                                    <Button size="sm" onClick={() => setNewBillOpen(true)}>
-                                        <Plus className="w-4 h-4 mr-1.5" />
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setNewBillOpen(true)}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
                                         New Bill
                                     </Button>
                                 )}
@@ -168,23 +246,40 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                 }
             >
                 {/* KPI Summary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Total Unpaid" value={formatMoney(summary.total_unpaid)} />
-                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatMoney(summary.total_overdue)} />
-                    <FinanceSummaryCard icon={CalendarClock} tone="warning" label="Due This Week" value={formatMoney(summary.due_this_week)} />
+                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <FinanceSummaryCard
+                        icon={DollarSign}
+                        tone="info"
+                        label="Total Unpaid"
+                        value={formatMoney(summary.total_unpaid)}
+                    />
+                    <FinanceSummaryCard
+                        icon={AlertTriangle}
+                        tone="critical"
+                        label="Overdue"
+                        value={formatMoney(summary.total_overdue)}
+                    />
+                    <FinanceSummaryCard
+                        icon={CalendarClock}
+                        tone="warning"
+                        label="Due This Week"
+                        value={formatMoney(summary.due_this_week)}
+                    />
                 </div>
 
                 {/* Filters */}
                 <Card className="mb-6">
                     <CardContent className="pt-6">
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                 <Input
                                     placeholder="Search bill # or vendor ref..."
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    onKeyDown={(e) =>
+                                        e.key === 'Enter' && applyFilters()
+                                    }
                                     className="pl-9"
                                 />
                             </div>
@@ -193,23 +288,43 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="all">
+                                        All Statuses
+                                    </SelectItem>
                                     <SelectItem value="draft">Draft</SelectItem>
-                                    <SelectItem value="awaiting_approval">Awaiting Approval</SelectItem>
-                                    <SelectItem value="approved">Approved</SelectItem>
-                                    <SelectItem value="partially_paid">Partially Paid</SelectItem>
+                                    <SelectItem value="awaiting_approval">
+                                        Awaiting Approval
+                                    </SelectItem>
+                                    <SelectItem value="approved">
+                                        Approved
+                                    </SelectItem>
+                                    <SelectItem value="partially_paid">
+                                        Partially Paid
+                                    </SelectItem>
                                     <SelectItem value="paid">Paid</SelectItem>
-                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                    <SelectItem value="cancelled">
+                                        Cancelled
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Select value={vendorId} onValueChange={setVendorId}>
+                            <Select
+                                value={vendorId}
+                                onValueChange={setVendorId}
+                            >
                                 <SelectTrigger aria-label="Filter by vendor">
                                     <SelectValue placeholder="All Vendors" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Vendors</SelectItem>
+                                    <SelectItem value="all">
+                                        All Vendors
+                                    </SelectItem>
                                     {vendors.map((v) => (
-                                        <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                                        <SelectItem
+                                            key={v.id}
+                                            value={String(v.id)}
+                                        >
+                                            {v.name}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -226,10 +341,18 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                     onChange={(e) => setDateTo(e.target.value)}
                                     placeholder="To"
                                 />
-                                <Button onClick={applyFilters} variant="secondary" className="shrink-0">
+                                <Button
+                                    onClick={applyFilters}
+                                    variant="secondary"
+                                    className="shrink-0"
+                                >
                                     Filter
                                 </Button>
-                                <Button onClick={clearFilters} variant="ghost" className="shrink-0">
+                                <Button
+                                    onClick={clearFilters}
+                                    variant="ghost"
+                                    className="shrink-0"
+                                >
                                     Clear
                                 </Button>
                             </div>
@@ -247,16 +370,27 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                 <TableHead>Vendor</TableHead>
                                 <TableHead>Bill Date</TableHead>
                                 <TableHead>Due Date</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
-                                <TableHead className="text-right">Paid</TableHead>
+                                <TableHead className="text-right">
+                                    Total
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Paid
+                                </TableHead>
                                 <TableHead>Status</TableHead>
-                                {canManage && <TableHead className="text-right">Actions</TableHead>}
+                                {canManage && (
+                                    <TableHead className="text-right">
+                                        Actions
+                                    </TableHead>
+                                )}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {bills.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={canManage ? 9 : 8} className="p-0">
+                                    <TableCell
+                                        colSpan={canManage ? 9 : 8}
+                                        className="p-0"
+                                    >
                                         {hasFilters ? (
                                             <EmptySearch
                                                 onClear={clearFilters}
@@ -272,7 +406,14 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                                 className="border-0"
                                                 action={
                                                     canManage ? (
-                                                        <Button size="sm" onClick={() => setNewBillOpen(true)}>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                setNewBillOpen(
+                                                                    true,
+                                                                )
+                                                            }
+                                                        >
                                                             New bill
                                                         </Button>
                                                     ) : undefined
@@ -287,29 +428,56 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                         key={bill.id}
                                         className={cn(
                                             'cursor-pointer hover:bg-muted/50',
-                                            isOverdue(bill) && 'bg-status-critical-bg hover:bg-status-critical-bg dark:hover:bg-status-critical',
+                                            isOverdue(bill) &&
+                                                'bg-status-critical-bg hover:bg-status-critical-bg dark:hover:bg-status-critical',
                                         )}
-                                        onClick={() => router.get(`/finance/bills/${bill.id}`)}
-                                        onContextMenu={rowMenu.open(rowMenuItems(bill))}
+                                        onClick={() =>
+                                            router.get(
+                                                `/finance/bills/${bill.id}`,
+                                            )
+                                        }
+                                        onContextMenu={rowMenu.open(
+                                            rowMenuItems(bill),
+                                        )}
                                     >
                                         <TableCell className="font-medium">
-                                            <Link href={`/finance/bills/${bill.id}`} className="text-primary hover:underline">
+                                            <Link
+                                                href={`/finance/bills/${bill.id}`}
+                                                className="text-primary hover:underline"
+                                            >
                                                 {bill.bill_number}
                                             </Link>
                                         </TableCell>
-                                        <TableCell className="text-muted-foreground">{bill.vendor_reference ?? '-'}</TableCell>
-                                        <TableCell>{bill.vendor?.name ?? '-'}</TableCell>
-                                        <TableCell>{formatDate(bill.bill_date)}</TableCell>
+                                        <TableCell className="text-muted-foreground">
+                                            {bill.vendor_reference ?? '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {bill.vendor?.name ?? '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {formatDate(bill.bill_date)}
+                                        </TableCell>
                                         <TableCell>
                                             <span className="inline-flex items-center gap-1">
-                                                {isOverdue(bill) && <AlertTriangle className="w-3.5 h-3.5 text-status-critical" />}
-                                                <span className={cn(isOverdue(bill) && 'text-status-critical font-medium dark:text-status-critical')}>
+                                                {isOverdue(bill) && (
+                                                    <AlertTriangle className="h-3.5 w-3.5 text-status-critical" />
+                                                )}
+                                                <span
+                                                    className={cn(
+                                                        isOverdue(bill) &&
+                                                            'font-medium text-status-critical dark:text-status-critical',
+                                                    )}
+                                                >
                                                     {formatDate(bill.due_date)}
                                                 </span>
                                             </span>
                                         </TableCell>
-                                        <TableCell className="text-right font-medium">{formatMoney(bill.total_amount)}</TableCell>
-                                        <TableCell className="text-right">{formatMoney(bill.amount_paid)}</TableCell>
+                                        <TableCell className="text-right font-medium">
+                                            {formatMoney(bill.total_amount)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {formatMoney(bill.amount_paid)}
+                                        </TableCell>
                                         <TableCell>
                                             <StatusBadge status={bill.status} />
                                         </TableCell>
@@ -337,15 +505,24 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
 
                     {/* Pagination */}
                     {bills.last_page > 1 && (
-                        <div className="flex items-center justify-center gap-1 p-4 border-t">
+                        <div className="flex items-center justify-center gap-1 border-t p-4">
                             {bills.links.map((link, i) => (
                                 <Button
                                     key={i}
                                     variant={link.active ? 'default' : 'ghost'}
                                     size="sm"
                                     disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                    onClick={() =>
+                                        link.url &&
+                                        router.get(
+                                            link.url,
+                                            {},
+                                            { preserveState: true },
+                                        )
+                                    }
+                                    dangerouslySetInnerHTML={{
+                                        __html: link.label,
+                                    }}
                                 />
                             ))}
                         </div>

@@ -195,10 +195,13 @@ export default function HrCasesIndex({
         const employee = params.get('employee');
         const sourcePip = params.get('source_pip');
         const employeeId =
-            employee && /^\d+$/.test(employee) && staff.some((s) => String(s.id) === employee)
+            employee &&
+            /^\d+$/.test(employee) &&
+            staff.some((s) => String(s.id) === employee)
                 ? employee
                 : undefined;
-        const pipId = sourcePip && /^\d+$/.test(sourcePip) ? sourcePip : undefined;
+        const pipId =
+            sourcePip && /^\d+$/.test(sourcePip) ? sourcePip : undefined;
 
         return {
             user_id: employeeId,
@@ -236,19 +239,32 @@ export default function HrCasesIndex({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={Folder}
                         title="HR Cases"
                         description="Manage disciplinary, grievance, and investigation workflows."
                         stats={[
                             { label: 'Open', value: summary.open_cases },
-                            { label: 'Unassigned', value: summary.unassigned_open_cases },
-                            { label: 'High severity', value: summary.high_severity_open_cases },
-                            { label: 'SLA overdue', value: summary.disciplinary_sla_overdue },
+                            {
+                                label: 'Unassigned',
+                                value: summary.unassigned_open_cases,
+                            },
+                            {
+                                label: 'High severity',
+                                value: summary.high_severity_open_cases,
+                            },
+                            {
+                                label: 'SLA overdue',
+                                value: summary.disciplinary_sla_overdue,
+                            },
                         ]}
                         actions={
                             can.manage ? (
-                                <Button size="sm" onClick={() => setWizardOpen(true)}>
+                                <Button
+                                    size="sm"
+                                    onClick={() => setWizardOpen(true)}
+                                >
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     Open Case
                                 </Button>

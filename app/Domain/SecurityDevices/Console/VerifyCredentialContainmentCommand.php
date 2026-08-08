@@ -55,13 +55,19 @@ final class VerifyCredentialContainmentCommand extends Command
         $outstandingPrior = CredentialLeaseGrant::query()
             ->where('credential_reference_id', $reference->id)
             ->where('reference_version', '<', $reference->version)
-            ->whereIn('status', [
-                CredentialLeaseGrant::STATUS_ISSUED,
-                CredentialLeaseGrant::STATUS_REVOKE_PENDING,
-            ])
+            ->where(function ($query): void {
+                $query
+                    ->whereNotIn('status', [
+                        CredentialLeaseGrant::STATUS_RELEASED,
+                        CredentialLeaseGrant::STATUS_CONTAINED,
+                        CredentialLeaseGrant::STATUS_EXPIRED,
+                    ])
+                    ->orWhereNotNull('lease_id')
+                    ->orWhereNull('ended_at');
+            })
             ->count();
         if ($outstandingPrior > 0) {
-            $this->error("Containment is incomplete: {$outstandingPrior} prior lease(s) remain pending.");
+            $this->error("Containment is incomplete: {$outstandingPrior} prior lease lifecycle record(s) are not terminal and erased.");
 
             return self::FAILURE;
         }

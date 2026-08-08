@@ -14,18 +14,24 @@ const STATUS_LABELS: Record<string, string> = {
     archived: 'Archived',
 };
 
-export function StatusTimeline({ currentStatus, statuses = DEFAULT_STATUSES }: StatusTimelineProps) {
+export function StatusTimeline({
+    currentStatus,
+    statuses = DEFAULT_STATUSES,
+}: StatusTimelineProps) {
     const currentIndex = statuses.indexOf(currentStatus);
 
     return (
-        <div className="flex items-center w-full">
+        <div className="flex w-full items-center">
             {statuses.map((status, i) => {
                 const isCompleted = currentIndex > i;
                 const isCurrent = currentIndex === i;
                 const isFuture = currentIndex < i;
 
                 return (
-                    <div key={status} className="flex items-center flex-1 last:flex-none">
+                    <div
+                        key={status}
+                        className="flex flex-1 items-center last:flex-none"
+                    >
                         {/* Node */}
                         <div className="flex flex-col items-center">
                             <div
@@ -61,7 +67,7 @@ export function StatusTimeline({ currentStatus, statuses = DEFAULT_STATUSES }: S
                         {/* Connecting line */}
                         {i < statuses.length - 1 && (
                             <div
-                                className={`h-0.5 flex-1 mx-1 ${
+                                className={`mx-1 h-0.5 flex-1 ${
                                     currentIndex > i
                                         ? 'bg-status-success'
                                         : 'bg-muted dark:bg-muted'

@@ -761,6 +761,62 @@ describe('QueclinkHub page chrome', () => {
 });
 
 describe('QueclinkHub device settings', () => {
+    it('shows immutable retired preset actor, reason and profile version', () => {
+        render(
+            <DeviceSettingsTab
+                can={{ manage: true }}
+                presets={[]}
+                retiredPresets={[
+                    {
+                        id: 91,
+                        name: 'Previous resident baseline',
+                        slug: 'previous-resident-baseline',
+                        description: null,
+                        target_category: 'personal_tracker',
+                        is_system: false,
+                        sections: ['tracking'],
+                        profile_version: 3,
+                        payload_hash: null,
+                        created_at: '2026-08-01T01:00:00Z',
+                        retired_at: '2026-08-06T02:00:00Z',
+                        retired_by: 'Moana Jones',
+                        retirement_reason:
+                            'Replaced by the approved current resident baseline.',
+                    },
+                ]}
+                listener={{
+                    port: 8090,
+                    endpoint_configured: true,
+                    service_state: 'active',
+                    connected_count: 0,
+                }}
+                devices={[
+                    {
+                        id: 2,
+                        canonical_device_id: 42,
+                        reference: 'Tracker ending 6998',
+                        status: 'paired',
+                        model_hint: 'GL30MEU',
+                        protocol_version: '970204',
+                        firmware_version: null,
+                        connection_state: 'connected',
+                        first_seen_at: null,
+                        last_seen_at: '2026-08-06T01:00:00Z',
+                        last_frame_at: '2026-08-06T01:00:00Z',
+                        assignment: null,
+                        configuration: null,
+                        recent_commands: [],
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByText('Retired preset history')).toBeVisible();
+        expect(screen.getByText(/Moana Jones/)).toBeVisible();
+        expect(screen.getByText(/Profile v3/)).toBeVisible();
+        expect(screen.getByText(/Replaced by the approved/)).toBeVisible();
+    });
+
     it('renders the latest config snapshot and safe GL30 controls', () => {
         inertiaMocks.router.post.mockClear();
 

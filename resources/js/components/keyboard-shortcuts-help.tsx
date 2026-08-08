@@ -7,15 +7,10 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { useAppShortcuts } from '@/hooks/use-keyboard-shortcut';
-import { useState } from 'react';
 import { Keyboard } from 'lucide-react';
+import { useState } from 'react';
 
 interface ShortcutHelpItem {
     keys: string[];
@@ -42,7 +37,7 @@ export function KeyboardShortcutsHelp() {
         {
             onHelp: () => setOpen(true),
         },
-        { enabled: true }
+        { enabled: true },
     );
 
     return (
@@ -68,10 +63,12 @@ export function KeyboardShortcutsHelp() {
                                     <div className="flex items-center gap-1">
                                         {shortcut.keys.map((key, keyIndex) => (
                                             <span key={keyIndex}>
-                                                <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs font-mono">
+                                                <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">
                                                     {key}
                                                 </kbd>
-                                                {keyIndex < shortcut.keys.length - 1 && (
+                                                {keyIndex <
+                                                    shortcut.keys.length -
+                                                        1 && (
                                                     <span className="mx-1 text-muted-foreground">
                                                         +
                                                     </span>

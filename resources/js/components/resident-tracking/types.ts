@@ -5,7 +5,13 @@
  *   - app/Http/Controllers/ClientController::buildLocationData
  */
 
-export type CommandStatus = 'queued' | 'sent' | 'acked' | 'failed' | 'expired' | null;
+export type CommandStatus =
+    | 'queued'
+    | 'sent'
+    | 'acked'
+    | 'failed'
+    | 'expired'
+    | null;
 
 export type GeofenceStatus = 'in_zone' | 'outside_zone' | 'unknown';
 
@@ -86,6 +92,6 @@ export type Resident = {
     acknowledge_panic_url?: string;
     profile_url?: string;
     history_url?: string;
-    detail_url?: string;
+    detail_url?: string | null;
     last_command_status?: CommandStatus;
 };

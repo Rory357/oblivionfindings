@@ -1,4 +1,10 @@
-import { LedgerTabsFooter, NewAccountDialog, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
+import {
+    LedgerTabsFooter,
+    NewAccountDialog,
+    formatMoney,
+    useRowContextMenu,
+    type RowCtxItem,
+} from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,10 +15,25 @@ import {
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { ChevronDown, ChevronRight, DollarSign, Download, Eye, Plus, Search, Wallet } from 'lucide-react';
+import {
+    ChevronDown,
+    ChevronRight,
+    DollarSign,
+    Download,
+    Eye,
+    Plus,
+    Search,
+    Wallet,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type Account = {
@@ -210,11 +231,16 @@ type ActiveFilter = 'all' | 'active' | 'inactive';
  * Runs client-side — the whole chart is already loaded, so a tree filter is the
  * right idiom (you never paginate a chart of accounts).
  */
-function filterAccounts(nodes: Account[], q: string, active: ActiveFilter): Account[] {
+function filterAccounts(
+    nodes: Account[],
+    q: string,
+    active: ActiveFilter,
+): Account[] {
     const needle = q.trim().toLowerCase();
     const matches = (a: Account) => {
         const activeOk =
-            active === 'all' || (active === 'active' ? a.is_active : !a.is_active);
+            active === 'all' ||
+            (active === 'active' ? a.is_active : !a.is_active);
         const textOk =
             needle === '' ||
             a.code.toLowerCase().includes(needle) ||
@@ -248,7 +274,13 @@ export default function AccountsIndex({
         { title: 'Chart of Accounts', href: '/finance/accounts' },
     ];
 
-    const TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const;
+    const TYPES = [
+        'asset',
+        'liability',
+        'equity',
+        'revenue',
+        'expense',
+    ] as const;
 
     const countTree = (nodes: Account[]): number =>
         nodes.reduce((t, n) => t + 1 + countTree(n.children), 0);
@@ -259,7 +291,11 @@ export default function AccountsIndex({
 
     const hasFilters = search.trim() !== '' || activeFilter !== 'all';
     const filteredTree = TYPES.reduce((acc, type) => {
-        acc[type] = filterAccounts(accountTree[type] || [], search, activeFilter);
+        acc[type] = filterAccounts(
+            accountTree[type] || [],
+            search,
+            activeFilter,
+        );
         return acc;
     }, {} as AccountTree);
     const visibleCount = TYPES.reduce(
@@ -270,7 +306,12 @@ export default function AccountsIndex({
     // Right-click row menu — mirrors the account row's existing navigation (Open).
     const rowMenu = useRowContextMenu();
     const rowMenuItems = (account: Account): RowCtxItem[] => [
-        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/accounts/${account.id}`) },
+        {
+            kind: 'item',
+            label: 'Open',
+            icon: Eye,
+            onSelect: () => router.visit(`/finance/accounts/${account.id}`),
+        },
     ];
 
     return (
@@ -286,7 +327,10 @@ export default function AccountsIndex({
                         description="Manage your organisation's account structure"
                         stats={[
                             { label: 'Total accounts', value: totalAccounts },
-                            { label: 'Account types', value: accountTypes.length },
+                            {
+                                label: 'Account types',
+                                value: accountTypes.length,
+                            },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
@@ -297,7 +341,10 @@ export default function AccountsIndex({
                                     </a>
                                 </Button>
                                 {canManage && (
-                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         Add Account
                                     </Button>
@@ -316,7 +363,7 @@ export default function AccountsIndex({
                         </div>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                 <Input
                                     placeholder="Search code or name..."
                                     value={search}
@@ -326,15 +373,26 @@ export default function AccountsIndex({
                             </div>
                             <Select
                                 value={activeFilter}
-                                onValueChange={(v) => setActiveFilter(v as ActiveFilter)}
+                                onValueChange={(v) =>
+                                    setActiveFilter(v as ActiveFilter)
+                                }
                             >
-                                <SelectTrigger className="sm:w-44" aria-label="Filter by active state">
+                                <SelectTrigger
+                                    className="sm:w-44"
+                                    aria-label="Filter by active state"
+                                >
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All accounts</SelectItem>
-                                    <SelectItem value="active">Active only</SelectItem>
-                                    <SelectItem value="inactive">Inactive only</SelectItem>
+                                    <SelectItem value="all">
+                                        All accounts
+                                    </SelectItem>
+                                    <SelectItem value="active">
+                                        Active only
+                                    </SelectItem>
+                                    <SelectItem value="inactive">
+                                        Inactive only
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -346,13 +404,17 @@ export default function AccountsIndex({
                             </div>
                         ) : (
                             TYPES.filter(
-                                (type) => !hasFilters || filteredTree[type].length > 0,
+                                (type) =>
+                                    !hasFilters ||
+                                    filteredTree[type].length > 0,
                             ).map((type) => (
                                 <AccountTypeSection
                                     key={type}
                                     type={type}
                                     accounts={filteredTree[type]}
-                                    onRowContextMenu={(account) => rowMenu.open(rowMenuItems(account))}
+                                    onRowContextMenu={(account) =>
+                                        rowMenu.open(rowMenuItems(account))
+                                    }
                                 />
                             ))
                         )}

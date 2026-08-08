@@ -61,7 +61,11 @@ export function ProvisionAssetDialog({
         const q = query.trim().toLowerCase();
         if (!q) return assets.slice(0, 50);
         return assets
-            .filter((a) => a.name.toLowerCase().includes(q) || (a.asset_tag ?? '').toLowerCase().includes(q))
+            .filter(
+                (a) =>
+                    a.name.toLowerCase().includes(q) ||
+                    (a.asset_tag ?? '').toLowerCase().includes(q),
+            )
             .slice(0, 50);
     }, [assets, query]);
 
@@ -74,9 +78,16 @@ export function ProvisionAssetDialog({
             {
                 ...payload,
                 purpose: purpose.trim() || undefined,
-                signed_off_by: task.sign_off_required && signOff ? currentUserId : undefined,
+                signed_off_by:
+                    task.sign_off_required && signOff
+                        ? currentUserId
+                        : undefined,
             },
-            { preserveScroll: true, onSuccess: () => onClose(), onFinish: () => setProcessing(false) },
+            {
+                preserveScroll: true,
+                onSuccess: () => onClose(),
+                onFinish: () => setProcessing(false),
+            },
         );
     };
 
@@ -97,7 +108,8 @@ export function ProvisionAssetDialog({
                 <DialogHeader className="border-b border-border px-6 py-4">
                     <DialogTitle>Provision asset</DialogTitle>
                     <DialogDescription>
-                        Issue a company asset for “{task.title}” and complete the task.
+                        Issue a company asset for “{task.title}” and complete
+                        the task.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -121,19 +133,24 @@ export function ProvisionAssetDialog({
                             filtered.map((a) => {
                                 const active = assetId === a.id;
                                 return (
-                                    <Button unstyled
+                                    <Button
+                                        unstyled
                                         key={a.id}
                                         type="button"
                                         onClick={() => setAssetId(a.id)}
                                         className={`flex w-full items-center gap-3 rounded-[10px] border px-3 py-2.5 text-left transition-colors ${
-                                            active ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'
+                                            active
+                                                ? 'border-primary bg-primary/10'
+                                                : 'border-border hover:bg-muted'
                                         }`}
                                     >
                                         <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-muted text-muted-foreground">
                                             <Laptop className="h-4 w-4" />
                                         </span>
                                         <span className="min-w-0">
-                                            <span className="block truncate text-[13px] font-semibold">{a.name}</span>
+                                            <span className="block truncate text-[13px] font-semibold">
+                                                {a.name}
+                                            </span>
                                             {a.asset_tag && (
                                                 <span className="block truncate text-[11px] text-muted-foreground">
                                                     Tag {a.asset_tag}
@@ -157,7 +174,10 @@ export function ProvisionAssetDialog({
 
                     {task.sign_off_required && (
                         <label className="flex items-center gap-2.5 text-sm font-medium">
-                            <Checkbox checked={signOff} onCheckedChange={(c) => setSignOff(Boolean(c))} />
+                            <Checkbox
+                                checked={signOff}
+                                onCheckedChange={(c) => setSignOff(Boolean(c))}
+                            />
                             Sign off as me
                         </label>
                     )}
@@ -167,7 +187,9 @@ export function ProvisionAssetDialog({
                     <Button
                         variant="outline"
                         onClick={autoPick}
-                        disabled={processing || signOffMissing || assets.length === 0}
+                        disabled={
+                            processing || signOffMissing || assets.length === 0
+                        }
                         title="Assign the first available asset"
                     >
                         Auto-pick available

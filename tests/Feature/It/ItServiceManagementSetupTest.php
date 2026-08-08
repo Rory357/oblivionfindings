@@ -83,6 +83,23 @@ test('IT pages share the approved grouped navigation while preserving existing d
             ->where('itNavigation.0.label', 'Service Desk'));
 });
 
+test('IT navigation emits the requester catalogue only with exact request access', function () {
+    $requestPermission = Permission::query()->where('key', 'it.request')->firstOrFail();
+    $this->manager->permissionOverrides()->syncWithoutDetaching([
+        $requestPermission->id => ['allowed' => false],
+    ]);
+
+    $agentLabels = collect(ItModuleNavigation::forUser($this->manager->fresh()))
+        ->flatMap(fn (array $group): array => $group['items'])
+        ->pluck('label');
+    $adminLabels = collect(ItModuleNavigation::forUser(serviceManagementSetupUser('admin')))
+        ->flatMap(fn (array $group): array => $group['items'])
+        ->pluck('label');
+
+    expect($agentLabels)->not->toContain('Service catalogue')
+        ->and($adminLabels)->toContain('Service catalogue');
+});
+
 test('IT navigation never produces an unsupported SLA tab', function () {
     $admin = serviceManagementSetupUser('admin');
     serviceManagementAssignSite($admin, $this->site);

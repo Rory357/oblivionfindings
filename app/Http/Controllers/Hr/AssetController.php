@@ -31,10 +31,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class AssetController extends Controller
 {
     /** Equipment whose lifecycle remains in HR. */
-    private const HR_CATEGORIES = ['uniform', 'card', 'other'];
+    private const HR_CATEGORIES = HrAsset::HR_OWNED_CATEGORIES;
 
-    /** Historic HR rows remain editable, but new technology lives in Security & Devices. */
-    private const LEGACY_DEVICE_CATEGORIES = ['laptop', 'phone', 'tablet'];
+    /** Historic technology rows are read-only; active ownership lives in Security & Devices. */
+    private const LEGACY_DEVICE_CATEGORIES = HrAsset::LEGACY_TECHNOLOGY_CATEGORIES;
 
     private const FLEET_CATEGORIES = ['vehicle', 'key'];
 
@@ -213,7 +213,7 @@ class AssetController extends Controller
             'categories' => $this->categoryOptions(),
             'fleetIncidents' => $fleetIncidents,
             'can' => [
-                'manage' => $user->canDo('hr.assets.manage'),
+                'manage' => $user->canDo('hr.assets.manage') && $asset->isHrLifecycleOwned(),
                 'view_fleet' => $canViewFleet,
                 'view_fleet_incidents' => $canViewFleetIncidents,
             ],
@@ -245,14 +245,20 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
-        $asset = DB::transaction(function () use ($request, $user, $asset): HrAsset {
-            $lockedAsset = $this->assetAccess->visibleAsset($user, (int) $asset->id, true)
-                ?? abort(404);
-            $data = $this->validateAsset($request, $user, $lockedAsset->id);
-            $lockedAsset->update($data);
 
-            return $lockedAsset;
-        });
+        try {
+            $asset = DB::transaction(function () use ($request, $user, $asset): HrAsset {
+                $lockedAsset = $this->assetAccess->visibleAsset($user, (int) $asset->id, true)
+                    ?? abort(404);
+                $this->assetService->assertHrLifecycleOwned($lockedAsset);
+                $data = $this->validateAsset($request, $user, $lockedAsset->id);
+                $lockedAsset->update($data);
+
+                return $lockedAsset;
+            });
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         return redirect()->back()->with('success', "Asset {$asset->asset_tag} updated.");
     }
@@ -266,6 +272,12 @@ class AssetController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
         $asset = $this->assetAccess->visibleAsset($user, (int) $asset->id) ?? abort(404);
+
+        try {
+            $this->assetService->assertHrLifecycleOwned($asset);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         $data = $request->validate([
             'employee_profile_id' => ['required', 'integer'],
@@ -434,6 +446,12 @@ class AssetController extends Controller
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
         $asset = $this->assetAccess->visibleAsset($user, (int) $asset->id) ?? abort(404);
 
+        try {
+            $this->assetService->assertHrLifecycleOwned($asset);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', 'in:'.implode(',', self::DOC_CATEGORIES)],
@@ -484,6 +502,12 @@ class AssetController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
         $document = $this->assetAccess->visibleDocument($user, (int) $document->id) ?? abort(404);
+
+        try {
+            $this->assetService->assertHrLifecycleOwned($document->asset()->firstOrFail());
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         Storage::disk($document->storage_disk)->delete($document->storage_path);
         $document->delete();
@@ -550,39 +574,42 @@ class AssetController extends Controller
             'disposal_reason' => ['nullable', 'string', 'in:end-of-life,lost,stolen,sold,damaged'],
         ]);
 
-        $count = DB::transaction(function () use ($user, $data): int {
-            $ids = collect($data['ids'])->unique()->values();
-            $assets = $this->assetAccess->visibleAssets($user)
-                ->whereIn('id', $ids)
-                ->lockForUpdate()
-                ->get();
-            abort_unless($assets->count() === $ids->count(), 404);
-            $updated = 0;
+        try {
+            $count = DB::transaction(function () use ($user, $data): int {
+                $ids = collect($data['ids'])->unique()->values();
+                $assets = $this->assetAccess->visibleAssets($user)
+                    ->whereIn('id', $ids)
+                    ->lockForUpdate()
+                    ->get();
+                abort_unless($assets->count() === $ids->count(), 404);
 
-            foreach ($assets as $asset) {
-                // Fleet-linked rows are read-through pointers — never bulk-mutated here.
-                if ($asset->isFleetLinked()) {
-                    continue;
+                foreach ($assets as $asset) {
+                    $this->assetService->assertHrLifecycleOwned($asset);
                 }
 
-                if ($data['action'] === 'retire') {
-                    if (in_array($asset->status, ['available', 'maintenance'], true)) {
-                        $this->assetService->retireAsset($asset, [
-                            'disposal_reason' => $data['disposal_reason'] ?? 'end-of-life',
-                        ]);
+                $updated = 0;
+                foreach ($assets as $asset) {
+                    if ($data['action'] === 'retire') {
+                        if (in_array($asset->status, ['available', 'maintenance'], true)) {
+                            $this->assetService->retireAsset($asset, [
+                                'disposal_reason' => $data['disposal_reason'] ?? 'end-of-life',
+                            ]);
+                            $updated++;
+                        }
+                    } elseif ($data['action'] === 'set-category' && ! empty($data['category'])) {
+                        $asset->update(['category' => $data['category']]);
+                        $updated++;
+                    } elseif ($data['action'] === 'label') {
+                        $this->assetService->ensureQrToken($asset);
                         $updated++;
                     }
-                } elseif ($data['action'] === 'set-category' && ! empty($data['category'])) {
-                    $asset->update(['category' => $data['category']]);
-                    $updated++;
-                } elseif ($data['action'] === 'label') {
-                    $this->assetService->ensureQrToken($asset);
-                    $updated++;
                 }
-            }
 
-            return $updated;
-        });
+                return $updated;
+            });
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         return redirect()->back()->with('success', "{$count} assets updated.");
     }

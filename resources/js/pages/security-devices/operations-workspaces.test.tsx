@@ -73,6 +73,7 @@ const monitoringWorkspace = {
         privacy_note: 'No secrets',
         control_room_note: 'Control Room triage',
     },
+    can: { view_control_room: false },
     summary: {
         total_devices: 3,
         total_monitors: 4,
@@ -309,6 +310,8 @@ const monitoringWorkspace = {
         time_series: {
             state: 'not_configured',
             series: 0,
+            series_shown: 0,
+            series_truncated: false,
             available: 0,
             missing: 0,
             unavailable: 0,
@@ -635,8 +638,10 @@ describe('Security & Devices operations workspaces', () => {
                     storage: {
                         time_series: {
                             state: 'available',
-                            series: 1,
-                            available: 1,
+                            series: 201,
+                            series_shown: 200,
+                            series_truncated: true,
+                            available: 201,
                             missing: 0,
                             unavailable: 0,
                             capacity_evidence: [
@@ -694,7 +699,15 @@ describe('Security & Devices operations workspaces', () => {
         expect(screen.getByText(/p95 86.2/)).toBeInTheDocument();
         expect(screen.getByText(/Projection Forecast/)).toBeInTheDocument();
         expect(screen.getByText(/91% confidence/)).toBeInTheDocument();
+        expect(
+            screen.getByText(/Measured history:.*1 Jul.*19 Jul/),
+        ).toBeInTheDocument();
         expect(screen.getByText(/raw 14d/)).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                /Showing the 200 most recently active series below.*all 201 retained series/,
+            ),
+        ).toBeInTheDocument();
     });
 
     it('links the root finding to Control Room and the technician-owned IT incident', () => {
@@ -712,6 +725,10 @@ describe('Security & Devices operations workspaces', () => {
                                     reference: 'ALT-000031',
                                     status: 'resolved',
                                     href: '/control-room/alerts/31',
+                                    access: {
+                                        state: 'available',
+                                        label: 'Open Control Room alert',
+                                    },
                                 },
                                 it_incident: {
                                     id: 44,
@@ -739,5 +756,41 @@ describe('Security & Devices operations workspaces', () => {
                 name: /IT incident IT-000044.*technician closure pending/,
             }),
         ).toHaveAttribute('href', '/it/tickets/44');
+    });
+
+    it('shows restricted Control Room correlation without a dead alert link', () => {
+        render(
+            <MonitoringContent
+                workspace={{
+                    ...monitoringWorkspace,
+                    active_tab: 'overview',
+                    monitors: [
+                        {
+                            ...remoteMonitor,
+                            correlation: {
+                                control_room: {
+                                    id: 32,
+                                    reference: null,
+                                    status: null,
+                                    href: null,
+                                    access: {
+                                        state: 'restricted',
+                                        label: 'Control Room alert access required',
+                                    },
+                                },
+                                it_incident: null,
+                            },
+                        },
+                    ],
+                }}
+            />,
+        );
+
+        expect(
+            screen.getByText('Control Room alert access required'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('link', { name: /control room correlation/i }),
+        ).not.toBeInTheDocument();
     });
 });

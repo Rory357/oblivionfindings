@@ -63,10 +63,30 @@ export interface RehireTarget {
 }
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'welcome', label: 'Welcome back', blurb: 'Previous employment', icon: History },
-    { key: 'engagement', label: 'New engagement', blurb: 'Start date, role & site', icon: Briefcase },
-    { key: 'options', label: 'Options', blurb: 'Invite & onboarding', icon: Settings2 },
-    { key: 'review', label: 'Review', blurb: 'Confirm & re-hire', icon: CheckCircle2 },
+    {
+        key: 'welcome',
+        label: 'Welcome back',
+        blurb: 'Previous employment',
+        icon: History,
+    },
+    {
+        key: 'engagement',
+        label: 'New engagement',
+        blurb: 'Start date, role & site',
+        icon: Briefcase,
+    },
+    {
+        key: 'options',
+        label: 'Options',
+        blurb: 'Invite & onboarding',
+        icon: Settings2,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & re-hire',
+        icon: CheckCircle2,
+    },
 ];
 
 const NO_SITE = '__none__';
@@ -86,7 +106,11 @@ function fdate(v?: string | null): string {
     const d = new Date(v);
     return isNaN(d.getTime())
         ? v
-        : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+        : d.toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 }
 
 function typeLabel(v?: string | null): string {
@@ -97,7 +121,9 @@ function typeLabel(v?: string | null): string {
 /** Flash error carried by an Inertia redirect (logic-guard). Read from the page
  *  passed to onSuccess — `back()->with('error')` fires onSuccess, not onError
  *  (see reference_inertia_flash_error). */
-function pageFlashError(page: { props: Record<string, unknown> }): string | null {
+function pageFlashError(page: {
+    props: Record<string, unknown>;
+}): string | null {
     const flash = page.props.flash as { error?: string } | undefined;
     return flash?.error ?? null;
 }
@@ -118,10 +144,18 @@ export function RehireWizard({
     const wizard = useWizard(STEPS.length);
     const [done, setDone] = useState(false);
 
-    const typeOptions = EMPLOYMENT_TYPES.some((t) => t.value === target.employmentType)
+    const typeOptions = EMPLOYMENT_TYPES.some(
+        (t) => t.value === target.employmentType,
+    )
         ? EMPLOYMENT_TYPES
         : target.employmentType
-          ? [{ value: target.employmentType, label: typeLabel(target.employmentType) }, ...EMPLOYMENT_TYPES]
+          ? [
+                {
+                    value: target.employmentType,
+                    label: typeLabel(target.employmentType),
+                },
+                ...EMPLOYMENT_TYPES,
+            ]
           : EMPLOYMENT_TYPES;
 
     const form = useForm({
@@ -129,8 +163,12 @@ export function RehireWizard({
         position_title: target.positionTitle ?? '',
         position_role: target.positionRole ?? '',
         employment_type: target.employmentType ?? 'full_time',
-        primary_site_id: target.primarySiteId != null ? String(target.primarySiteId) : NO_SITE,
-        hours_per_week: target.hoursPerWeek != null ? String(target.hoursPerWeek) : '',
+        primary_site_id:
+            target.primarySiteId != null
+                ? String(target.primarySiteId)
+                : NO_SITE,
+        hours_per_week:
+            target.hoursPerWeek != null ? String(target.hoursPerWeek) : '',
         send_invite: true,
         start_onboarding: true,
     });
@@ -150,7 +188,8 @@ export function RehireWizard({
 
     const siteName =
         form.data.primary_site_id !== NO_SITE
-            ? (sites.find((s) => String(s.id) === form.data.primary_site_id)?.name ?? '—')
+            ? (sites.find((s) => String(s.id) === form.data.primary_site_id)
+                  ?.name ?? '—')
             : 'No primary site';
 
     const canSubmit = form.data.start_date.trim() !== '';
@@ -159,7 +198,9 @@ export function RehireWizard({
         form.transform((data) => ({
             ...data,
             primary_site_id:
-                data.primary_site_id === NO_SITE ? null : Number(data.primary_site_id),
+                data.primary_site_id === NO_SITE
+                    ? null
+                    : Number(data.primary_site_id),
             hours_per_week:
                 data.hours_per_week === '' ? null : Number(data.hours_per_week),
         }));
@@ -201,7 +242,9 @@ export function RehireWizard({
                                 {form.data.start_onboarding
                                     ? ' A fresh onboarding checklist has been generated.'
                                     : ''}
-                                {form.data.send_invite ? ' A login invite is on its way.' : ''}
+                                {form.data.send_invite
+                                    ? ' A login invite is on its way.'
+                                    : ''}
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -221,8 +264,13 @@ export function RehireWizard({
                         Cancel
                     </Button>
                     {wizard.isLast ? (
-                        <Button onClick={submit} disabled={form.processing || !canSubmit}>
-                            {form.processing ? 'Re-hiring…' : 'Re-hire employee'}
+                        <Button
+                            onClick={submit}
+                            disabled={form.processing || !canSubmit}
+                        >
+                            {form.processing
+                                ? 'Re-hiring…'
+                                : 'Re-hire employee'}
                         </Button>
                     ) : (
                         <Button
@@ -258,16 +306,18 @@ export function RehireWizard({
                                     </p>
                                 </div>
                                 <span className="text-xs font-medium text-muted-foreground tabular-nums">
-                                    {fdate(stint.start_date)} → {fdate(stint.end_date)}
+                                    {fdate(stint.start_date)} →{' '}
+                                    {fdate(stint.end_date)}
                                 </span>
                             </div>
                         ))}
                     </div>
                     <div className="mt-4">
                         <InfoCard icon={History}>
-                            Re-hiring archives this stint into the profile's employment
-                            history, restores their login, and starts a fresh engagement —
-                            compliance, training and document records carry over.
+                            Re-hiring archives this stint into the profile's
+                            employment history, restores their login, and starts
+                            a fresh engagement — compliance, training and
+                            document records carry over.
                         </InfoCard>
                     </div>
                 </WizardStepPane>
@@ -281,25 +331,44 @@ export function RehireWizard({
                         blurb="Confirm the terms they're coming back on — prefilled from their previous stint."
                     />
                     <div className="grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Start date" required error={form.errors.start_date}>
+                        <Field
+                            label="Start date"
+                            required
+                            error={form.errors.start_date}
+                        >
                             <Input
                                 type="date"
                                 value={form.data.start_date}
-                                onChange={(e) => form.setData('start_date', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('start_date', e.target.value)
+                                }
                             />
                         </Field>
-                        <Field label="Employment type" error={form.errors.employment_type}>
+                        <Field
+                            label="Employment type"
+                            error={form.errors.employment_type}
+                        >
                             <SelectInput
                                 value={form.data.employment_type}
-                                onChange={(v) => form.setData('employment_type', v)}
+                                onChange={(v) =>
+                                    form.setData('employment_type', v)
+                                }
                                 placeholder="Employment type"
                                 options={typeOptions}
                             />
                         </Field>
-                        <Field label="Position title" error={form.errors.position_title}>
+                        <Field
+                            label="Position title"
+                            error={form.errors.position_title}
+                        >
                             <Input
                                 value={form.data.position_title}
-                                onChange={(e) => form.setData('position_title', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'position_title',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="e.g. Support Worker"
                             />
                         </Field>
@@ -310,18 +379,31 @@ export function RehireWizard({
                         >
                             <Input
                                 value={form.data.position_role}
-                                onChange={(e) => form.setData('position_role', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'position_role',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="support_worker"
                                 className="font-mono"
                             />
                         </Field>
-                        <Field label="Primary site" error={form.errors.primary_site_id}>
+                        <Field
+                            label="Primary site"
+                            error={form.errors.primary_site_id}
+                        >
                             <SelectInput
                                 value={form.data.primary_site_id}
-                                onChange={(v) => form.setData('primary_site_id', v)}
+                                onChange={(v) =>
+                                    form.setData('primary_site_id', v)
+                                }
                                 placeholder="Primary site"
                                 options={[
-                                    { value: NO_SITE, label: 'No primary site' },
+                                    {
+                                        value: NO_SITE,
+                                        label: 'No primary site',
+                                    },
                                     ...sites.map((s) => ({
                                         value: String(s.id),
                                         label: s.name,
@@ -329,14 +411,22 @@ export function RehireWizard({
                                 ]}
                             />
                         </Field>
-                        <Field label="Hours per week" error={form.errors.hours_per_week}>
+                        <Field
+                            label="Hours per week"
+                            error={form.errors.hours_per_week}
+                        >
                             <Input
                                 type="number"
                                 min={0}
                                 max={168}
                                 step="0.5"
                                 value={form.data.hours_per_week}
-                                onChange={(e) => form.setData('hours_per_week', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'hours_per_week',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="40"
                             />
                         </Field>
@@ -358,13 +448,15 @@ export function RehireWizard({
                                     Send login invite
                                 </span>
                                 <span className="block text-xs text-muted-foreground">
-                                    Emails a set-your-password link — their old access was
-                                    revoked when they left.
+                                    Emails a set-your-password link — their old
+                                    access was revoked when they left.
                                 </span>
                             </span>
                             <Switch
                                 checked={form.data.send_invite}
-                                onCheckedChange={(v) => form.setData('send_invite', v)}
+                                onCheckedChange={(v) =>
+                                    form.setData('send_invite', v)
+                                }
                                 aria-label="Send login invite"
                             />
                         </label>
@@ -374,13 +466,16 @@ export function RehireWizard({
                                     Start onboarding
                                 </span>
                                 <span className="block text-xs text-muted-foreground">
-                                    Generates a fresh onboarding checklist for this stint —
-                                    even though they've onboarded before.
+                                    Generates a fresh onboarding checklist for
+                                    this stint — even though they've onboarded
+                                    before.
                                 </span>
                             </span>
                             <Switch
                                 checked={form.data.start_onboarding}
-                                onCheckedChange={(v) => form.setData('start_onboarding', v)}
+                                onCheckedChange={(v) =>
+                                    form.setData('start_onboarding', v)
+                                }
                                 aria-label="Start onboarding"
                             />
                         </label>
@@ -401,8 +496,14 @@ export function RehireWizard({
                             title="New engagement"
                             onEdit={() => wizard.goTo(1)}
                         >
-                            <ReviewRow label="Start date" value={fdate(form.data.start_date)} />
-                            <ReviewRow label="Position" value={form.data.position_title} />
+                            <ReviewRow
+                                label="Start date"
+                                value={fdate(form.data.start_date)}
+                            />
+                            <ReviewRow
+                                label="Position"
+                                value={form.data.position_title}
+                            />
                             <ReviewRow
                                 label="Type"
                                 value={typeLabel(form.data.employment_type)}
@@ -420,7 +521,9 @@ export function RehireWizard({
                         >
                             <ReviewRow
                                 label="Login invite"
-                                value={form.data.send_invite ? 'Send now' : 'Skip'}
+                                value={
+                                    form.data.send_invite ? 'Send now' : 'Skip'
+                                }
                             />
                             <ReviewRow
                                 label="Onboarding"

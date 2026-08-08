@@ -20,9 +20,11 @@ use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Integration\IntegrationSecretManager;
 use App\Services\Integration\UnifiOperationalBridgeService;
 use App\Support\SafeOperationalData;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class UnifiController extends Controller
@@ -634,18 +636,28 @@ class UnifiController extends Controller
             });
         abort_unless(is_array($discoveredSite), 422, 'The selected provider location is no longer available. Sync locations and try again.');
 
-        IntegrationSiteConfig::updateOrCreate(
-            [
-                'site_id' => $site->id,
-                'provider' => self::PROVIDER,
-            ],
-            [
-                'mapped_external_site_id' => (string) $discoveredSite['external_id'],
-                'mapped_external_site_name' => (string) ($discoveredSite['name'] ?? 'Provider location'),
-                'status' => IntegrationSiteConfig::STATUS_HYBRID,
-                'is_active' => true,
-            ],
-        );
+        try {
+            IntegrationSiteConfig::updateOrCreate(
+                [
+                    'site_id' => $site->id,
+                    'provider' => self::PROVIDER,
+                ],
+                [
+                    'mapped_external_site_id' => (string) $discoveredSite['external_id'],
+                    'mapped_external_site_name' => (string) ($discoveredSite['name'] ?? 'Provider location'),
+                    'status' => IntegrationSiteConfig::STATUS_HYBRID,
+                    'is_active' => true,
+                ],
+            );
+        } catch (QueryException $exception) {
+            if (! $this->isExternalSiteIdentityConflict($exception)) {
+                throw $exception;
+            }
+
+            throw ValidationException::withMessages([
+                'mapping_token' => 'This provider location was mapped to another Site. Refresh the mappings and try again.',
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Site mapping saved.');
     }
@@ -657,6 +669,12 @@ class UnifiController extends Controller
         }
 
         return hash_hmac('sha256', self::PROVIDER.'|'.$externalId, (string) config('app.key'));
+    }
+
+    private function isExternalSiteIdentityConflict(QueryException $exception): bool
+    {
+        return (int) ($exception->errorInfo[1] ?? 0) === 1062
+            && str_contains($exception->getMessage(), 'integration_provider_external_site_unique');
     }
 
     /**

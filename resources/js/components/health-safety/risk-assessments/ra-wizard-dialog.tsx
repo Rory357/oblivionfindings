@@ -43,29 +43,99 @@ import {
     TriangleAlert,
 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
-import { cap, FREQ_OPTIONS, levelTone, RA_TONE_CHIP, scoreLevel } from './ra-kit';
+import {
+    cap,
+    FREQ_OPTIONS,
+    levelTone,
+    RA_TONE_CHIP,
+    scoreLevel,
+} from './ra-kit';
 import { RaMatrix } from './ra-matrix';
-import type { AttachType, LockedAssessable, RaDetail, RaModalKind, RaPickers } from './types';
+import type {
+    AttachType,
+    LockedAssessable,
+    RaDetail,
+    RaModalKind,
+    RaPickers,
+} from './types';
 
 /* ------------------------------------------------------------------ */
 /*  Step definitions                                                   */
 /* ------------------------------------------------------------------ */
 
 const MULTI_STEPS: readonly WizardStep[] = [
-    { key: 'context', label: 'Context', blurb: 'Title & what it covers', icon: Pencil },
-    { key: 'inherent', label: 'Inherent risk', blurb: 'Likelihood × consequence', icon: TriangleAlert },
-    { key: 'controls', label: 'Controls', blurb: 'Existing & additional', icon: ShieldCheck },
-    { key: 'residual', label: 'Residual risk', blurb: 'Risk after controls', icon: RefreshCw },
-    { key: 'evidence', label: 'Evidence', blurb: 'Supporting documents', icon: Paperclip },
-    { key: 'ownership', label: 'Review & ownership', blurb: 'Cadence & review date', icon: Clock },
-    { key: 'review', label: 'Review & create', blurb: 'Confirm and save', icon: Check },
+    {
+        key: 'context',
+        label: 'Context',
+        blurb: 'Title & what it covers',
+        icon: Pencil,
+    },
+    {
+        key: 'inherent',
+        label: 'Inherent risk',
+        blurb: 'Likelihood × consequence',
+        icon: TriangleAlert,
+    },
+    {
+        key: 'controls',
+        label: 'Controls',
+        blurb: 'Existing & additional',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'residual',
+        label: 'Residual risk',
+        blurb: 'Risk after controls',
+        icon: RefreshCw,
+    },
+    {
+        key: 'evidence',
+        label: 'Evidence',
+        blurb: 'Supporting documents',
+        icon: Paperclip,
+    },
+    {
+        key: 'ownership',
+        label: 'Review & ownership',
+        blurb: 'Cadence & review date',
+        icon: Clock,
+    },
+    {
+        key: 'review',
+        label: 'Review & create',
+        blurb: 'Confirm and save',
+        icon: Check,
+    },
 ] as const;
 
-const SINGLE_STEP: Record<Exclude<RaModalKind, 'new' | 'edit' | 'supersede'>, WizardStep> = {
-    approve: { key: 'confirm', label: 'Approve & activate', blurb: 'Confirm and put in force', icon: ShieldCheck },
-    review: { key: 'confirm', label: 'Mark for review', blurb: 'Flag for revision', icon: Clock },
-    residual: { key: 'residual', label: 'Record residual', blurb: 'Re-score after controls', icon: RefreshCw },
-    archive: { key: 'confirm', label: 'Archive', blurb: 'Remove from the register', icon: Archive },
+const SINGLE_STEP: Record<
+    Exclude<RaModalKind, 'new' | 'edit' | 'supersede'>,
+    WizardStep
+> = {
+    approve: {
+        key: 'confirm',
+        label: 'Approve & activate',
+        blurb: 'Confirm and put in force',
+        icon: ShieldCheck,
+    },
+    review: {
+        key: 'confirm',
+        label: 'Mark for review',
+        blurb: 'Flag for revision',
+        icon: Clock,
+    },
+    residual: {
+        key: 'residual',
+        label: 'Record residual',
+        blurb: 'Re-score after controls',
+        icon: RefreshCw,
+    },
+    archive: {
+        key: 'confirm',
+        label: 'Archive',
+        blurb: 'Remove from the register',
+        icon: Archive,
+    },
 };
 
 const RAIL_ICON: Record<RaModalKind, IconType> = {
@@ -118,7 +188,11 @@ function initialForm(
     const base: RaForm = {
         title: f?.title ?? '',
         risk_description: f?.risk_description ?? '',
-        attach_type: locked?.type ?? f?.attach_type ?? initialAttach?.type ?? 'standalone',
+        attach_type:
+            locked?.type ??
+            f?.attach_type ??
+            initialAttach?.type ??
+            'standalone',
         attach_id: locked
             ? String(locked.id)
             : f?.attach_id != null
@@ -165,7 +239,17 @@ export function RaWizardDialog({
 }) {
     const isMulti = kind === 'new' || kind === 'edit' || kind === 'supersede';
     const steps = useMemo<readonly WizardStep[]>(
-        () => (isMulti ? MULTI_STEPS : [SINGLE_STEP[kind as Exclude<RaModalKind, 'new' | 'edit' | 'supersede'>]]),
+        () =>
+            isMulti
+                ? MULTI_STEPS
+                : [
+                      SINGLE_STEP[
+                          kind as Exclude<
+                              RaModalKind,
+                              'new' | 'edit' | 'supersede'
+                          >
+                      ],
+                  ],
         [isMulti, kind],
     );
 
@@ -176,19 +260,33 @@ export function RaWizardDialog({
     const [staged, setStaged] = useState<StagedFile[]>([]);
     const [uploading, setUploading] = useState(false);
 
-    const form = useForm<RaForm>(initialForm(kind, detail, lockedAssessable, initialAttach));
+    const form = useForm<RaForm>(
+        initialForm(kind, detail, lockedAssessable, initialAttach),
+    );
     const { data, setData, processing } = form;
     const busy = processing || uploading;
 
     const cur = steps[stepIndex];
-    const err = (name: string) => localErrors[name] ?? (form.errors as Record<string, string>)[name];
+    const err = (name: string) =>
+        localErrors[name] ?? (form.errors as Record<string, string>)[name];
 
     /* -------- staged evidence -------- */
     const addStaged = (files: File[]) =>
-        setStaged((p) => [...p, ...files.map((file) => ({ id: ++stagedUid, file, note: '', kind: '' }))]);
+        setStaged((p) => [
+            ...p,
+            ...files.map((file) => ({
+                id: ++stagedUid,
+                file,
+                note: '',
+                kind: '',
+            })),
+        ]);
     const patchStaged = (id: number, patch: Partial<StagedFile>) =>
-        setStaged((p) => p.map((it) => (it.id === id ? { ...it, ...patch } : it)));
-    const removeStaged = (id: number) => setStaged((p) => p.filter((it) => it.id !== id));
+        setStaged((p) =>
+            p.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+        );
+    const removeStaged = (id: number) =>
+        setStaged((p) => p.filter((it) => it.id !== id));
 
     const uploadStaged = (id: number, finish: () => void) => {
         if (!staged.length) {
@@ -209,11 +307,15 @@ export function RaWizardDialog({
             fd.append('file', it.file);
             if (it.note) fd.append('notes', it.note);
             if (it.kind) fd.append('kind', it.kind);
-            router.post(`/health-safety/risk-assessments/${id}/attachments`, fd, {
-                preserveScroll: true,
-                preserveState: true,
-                onFinish: () => next(i + 1),
-            });
+            router.post(
+                `/health-safety/risk-assessments/${id}/attachments`,
+                fd,
+                {
+                    preserveScroll: true,
+                    preserveState: true,
+                    onFinish: () => next(i + 1),
+                },
+            );
         };
         next(0);
     };
@@ -223,7 +325,8 @@ export function RaWizardDialog({
         const e: Record<string, string> = {};
         if (key === 'context') {
             if (!d.title.trim()) e.title = 'Give the assessment a title.';
-            if (d.attach_type !== 'standalone' && !d.attach_id) e.attach_id = 'Choose what this is attached to.';
+            if (d.attach_type !== 'standalone' && !d.attach_id)
+                e.attach_id = 'Choose what this is attached to.';
         }
         return e;
     };
@@ -232,9 +335,11 @@ export function RaWizardDialog({
         const stepKey =
             firstKey === 'likelihood' || firstKey === 'consequence'
                 ? 'inherent'
-                : firstKey === 'existing_controls' || firstKey === 'additional_controls'
+                : firstKey === 'existing_controls' ||
+                    firstKey === 'additional_controls'
                   ? 'controls'
-                  : firstKey.startsWith('residual') || firstKey === 'risk_acceptable'
+                  : firstKey.startsWith('residual') ||
+                      firstKey === 'risk_acceptable'
                     ? 'residual'
                     : firstKey.startsWith('review')
                       ? 'ownership'
@@ -257,7 +362,9 @@ export function RaWizardDialog({
         return {
             new: { url: '/health-safety/risk-assessments' },
             edit: { url: `/health-safety/risk-assessments/${id}` },
-            supersede: { url: `/health-safety/risk-assessments/${id}/supersede` },
+            supersede: {
+                url: `/health-safety/risk-assessments/${id}/supersede`,
+            },
             approve: { url: `/health-safety/risk-assessments/${id}/activate` },
             review: { url: `/health-safety/risk-assessments/${id}/review` },
             residual: { url: `/health-safety/risk-assessments/${id}/residual` },
@@ -266,7 +373,8 @@ export function RaWizardDialog({
     };
 
     const payload = (d: RaForm): Record<string, unknown> => {
-        if (kind === 'approve') return { approver_note: d.approver_note || null };
+        if (kind === 'approve')
+            return { approver_note: d.approver_note || null };
         if (kind === 'review' || kind === 'archive') return {};
         if (kind === 'residual') {
             return {
@@ -280,7 +388,12 @@ export function RaWizardDialog({
             title: d.title,
             risk_description: d.risk_description || null,
             attach_type: d.attach_type,
-            attach_id: d.attach_type === 'standalone' ? null : d.attach_id ? Number(d.attach_id) : null,
+            attach_id:
+                d.attach_type === 'standalone'
+                    ? null
+                    : d.attach_id
+                      ? Number(d.attach_id)
+                      : null,
             likelihood: Number(d.likelihood),
             consequence: Number(d.consequence),
             existing_controls: d.existing_controls || null,
@@ -308,7 +421,8 @@ export function RaWizardDialog({
     const submit = (addAnother = false) => {
         if (isMulti) {
             const all: Record<string, string> = {};
-            for (const s of steps) Object.assign(all, validateStep(s.key, data));
+            for (const s of steps)
+                Object.assign(all, validateStep(s.key, data));
             if (Object.keys(all).length) {
                 setLocalErrors(all);
                 setStepIndex(stepForError(Object.keys(all)[0]));
@@ -320,9 +434,17 @@ export function RaWizardDialog({
             preserveScroll: true,
             preserveState: true,
             onSuccess: (page) => {
-                const flash = (page.props as { flash?: { error?: string; created_risk_assessment_id?: number } }).flash;
+                const flash = (
+                    page.props as {
+                        flash?: {
+                            error?: string;
+                            created_risk_assessment_id?: number;
+                        };
+                    }
+                ).flash;
                 if (flash?.error) return;
-                const createdId = flash?.created_risk_assessment_id ?? detail?.id ?? null;
+                const createdId =
+                    flash?.created_risk_assessment_id ?? detail?.id ?? null;
                 const finish = () => {
                     if (addAnother && kind === 'new') {
                         resetForAnother();
@@ -351,8 +473,15 @@ export function RaWizardDialog({
     /* -------- completeness -------- */
     const pct = useMemo(() => {
         if (!isMulti) return null;
-        const need = ['title', 'risk_description', 'existing_controls', 'additional_controls'] as const;
-        let filled = need.filter((k) => (data[k] || '').toString().trim()).length;
+        const need = [
+            'title',
+            'risk_description',
+            'existing_controls',
+            'additional_controls',
+        ] as const;
+        let filled = need.filter((k) =>
+            (data[k] || '').toString().trim(),
+        ).length;
         if (data.attach_type === 'standalone' || data.attach_id) filled += 1;
         return Math.round((filled / (need.length + 1)) * 100);
     }, [data, isMulti]);
@@ -360,27 +489,54 @@ export function RaWizardDialog({
     /* -------- titles -------- */
     const TITLES: Record<RaModalKind, [string, string]> = {
         new: ['New risk assessment', 'ISO 31000 / SafePlus 5×5'],
-        edit: ['Edit draft', detail ? `${detail.reference_number} · update fields` : ''],
-        supersede: ['Supersede — new version', detail ? `Successor to ${detail.reference_number}` : ''],
-        approve: ['Approve & activate', detail ? `${detail.reference_number} · draft → active` : ''],
-        review: ['Mark for review', detail ? `${detail.reference_number} · active → under review` : ''],
-        residual: ['Record review / residual', detail ? `${detail.reference_number}` : ''],
-        archive: ['Archive assessment', detail ? `${detail.reference_number}` : ''],
+        edit: [
+            'Edit draft',
+            detail ? `${detail.reference_number} · update fields` : '',
+        ],
+        supersede: [
+            'Supersede — new version',
+            detail ? `Successor to ${detail.reference_number}` : '',
+        ],
+        approve: [
+            'Approve & activate',
+            detail ? `${detail.reference_number} · draft → active` : '',
+        ],
+        review: [
+            'Mark for review',
+            detail ? `${detail.reference_number} · active → under review` : '',
+        ],
+        residual: [
+            'Record review / residual',
+            detail ? `${detail.reference_number}` : '',
+        ],
+        archive: [
+            'Archive assessment',
+            detail ? `${detail.reference_number}` : '',
+        ],
     };
     const [title, subtitle] = TITLES[kind];
 
     /* -------- footer -------- */
     const isReview = cur.key === 'review';
-    const createLabel = kind === 'supersede' ? 'Create successor' : kind === 'edit' ? 'Save draft' : 'Create assessment';
-    const singleLabel = { approve: 'Approve & activate', review: 'Mark for review', residual: 'Save review', archive: 'Archive assessment' }[
-        kind as Exclude<RaModalKind, 'new' | 'edit' | 'supersede'>
-    ];
+    const createLabel =
+        kind === 'supersede'
+            ? 'Create successor'
+            : kind === 'edit'
+              ? 'Save draft'
+              : 'Create assessment';
+    const singleLabel = {
+        approve: 'Approve & activate',
+        review: 'Mark for review',
+        residual: 'Save review',
+        archive: 'Archive assessment',
+    }[kind as Exclude<RaModalKind, 'new' | 'edit' | 'supersede'>];
 
-    const footerStart = isMulti && stepIndex > 0 ? (
-        <Button type="button" variant="ghost" onClick={back}>
-            <ChevronLeft className="h-4 w-4" /> Back
-        </Button>
-    ) : null;
+    const footerStart =
+        isMulti && stepIndex > 0 ? (
+            <Button type="button" variant="ghost" onClick={back}>
+                <ChevronLeft className="h-4 w-4" /> Back
+            </Button>
+        ) : null;
 
     const footerEnd = (
         <>
@@ -391,12 +547,27 @@ export function RaWizardDialog({
                 isReview ? (
                     <>
                         {kind === 'new' ? (
-                            <Button type="button" variant="secondary" onClick={() => submit(true)} disabled={busy}>
-                                <Plus className="h-4 w-4" /> Save &amp; add another
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => submit(true)}
+                                disabled={busy}
+                            >
+                                <Plus className="h-4 w-4" /> Save &amp; add
+                                another
                             </Button>
                         ) : null}
-                        <Button type="button" onClick={() => submit(false)} disabled={busy}>
-                            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {createLabel}
+                        <Button
+                            type="button"
+                            onClick={() => submit(false)}
+                            disabled={busy}
+                        >
+                            {busy ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Check className="h-4 w-4" />
+                            )}{' '}
+                            {createLabel}
                         </Button>
                     </>
                 ) : (
@@ -411,7 +582,8 @@ export function RaWizardDialog({
                     onClick={() => submit(false)}
                     disabled={busy}
                 >
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {singleLabel}
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{' '}
+                    {singleLabel}
                 </Button>
             )}
         </>
@@ -419,10 +591,15 @@ export function RaWizardDialog({
 
     const success = done ? (
         <WizardSuccessPane
-            title={kind === 'supersede' ? 'Successor created' : 'Risk assessment created'}
+            title={
+                kind === 'supersede'
+                    ? 'Successor created'
+                    : 'Risk assessment created'
+            }
             blurb={
                 <>
-                    Created in <strong>draft</strong> — the service forces this status. Approve &amp; activate it to put the assessment in
+                    Created in <strong>draft</strong> — the service forces this
+                    status. Approve &amp; activate it to put the assessment in
                     force.{staged.length === 0 ? '' : ' Evidence uploaded.'}
                 </>
             }
@@ -434,7 +611,11 @@ export function RaWizardDialog({
                         </Button>
                     ) : null}
                     {kind === 'new' ? (
-                        <Button type="button" variant="outline" onClick={resetForAnother}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={resetForAnother}
+                        >
                             <Plus className="h-4 w-4" /> Add another
                         </Button>
                     ) : null}
@@ -474,14 +655,21 @@ export function RaWizardDialog({
                         <Field label="Title" required error={err('title')}>
                             <Input
                                 value={data.title}
-                                onChange={(e) => setData('title', e.target.value)}
+                                onChange={(e) =>
+                                    setData('title', e.target.value)
+                                }
                                 placeholder="e.g. Manual handling — hoist transfers"
                             />
                         </Field>
-                        <Field label="Risk description" hint="(what is the hazard and who could be harmed?)">
+                        <Field
+                            label="Risk description"
+                            hint="(what is the hazard and who could be harmed?)"
+                        >
                             <Textarea
                                 value={data.risk_description}
-                                onChange={(e) => setData('risk_description', e.target.value)}
+                                onChange={(e) =>
+                                    setData('risk_description', e.target.value)
+                                }
                                 rows={3}
                                 placeholder="What is the hazard and who could be harmed?"
                             />
@@ -490,12 +678,16 @@ export function RaWizardDialog({
                             <Field label="Attached to">
                                 <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-medium">
                                     {lockedAssessable.name}
-                                    <span className="text-xs text-muted-foreground">({lockedAssessable.type})</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        ({lockedAssessable.type})
+                                    </span>
                                 </div>
                             </Field>
                         ) : (
                             <div>
-                                <div className="mb-2 text-[13px] font-semibold">Attach to</div>
+                                <div className="mb-2 text-[13px] font-semibold">
+                                    Attach to
+                                </div>
                                 <Segmented<AttachType>
                                     value={data.attach_type}
                                     onChange={(v) => {
@@ -503,7 +695,10 @@ export function RaWizardDialog({
                                         setData('attach_id', '');
                                     }}
                                     options={[
-                                        { value: 'standalone', label: 'Standalone' },
+                                        {
+                                            value: 'standalone',
+                                            label: 'Standalone',
+                                        },
                                         { value: 'site', label: 'Site' },
                                         { value: 'client', label: 'Client' },
                                         { value: 'event', label: 'H&S event' },
@@ -515,7 +710,8 @@ export function RaWizardDialog({
                                             label={
                                                 data.attach_type === 'site'
                                                     ? 'Which site?'
-                                                    : data.attach_type === 'client'
+                                                    : data.attach_type ===
+                                                        'client'
                                                       ? 'Which client?'
                                                       : 'Which H&S event?'
                                             }
@@ -524,14 +720,21 @@ export function RaWizardDialog({
                                         >
                                             <SelectInput
                                                 value={data.attach_id}
-                                                onChange={(v) => setData('attach_id', v)}
+                                                onChange={(v) =>
+                                                    setData('attach_id', v)
+                                                }
                                                 placeholder="Choose…"
-                                                options={(data.attach_type === 'site'
+                                                options={(data.attach_type ===
+                                                'site'
                                                     ? pickers.sites
-                                                    : data.attach_type === 'client'
+                                                    : data.attach_type ===
+                                                        'client'
                                                       ? pickers.clients
                                                       : pickers.events
-                                                ).map((o) => ({ value: String(o.id), label: o.name }))}
+                                                ).map((o) => ({
+                                                    value: String(o.id),
+                                                    label: o.name,
+                                                }))}
                                             />
                                         </Field>
                                     </div>
@@ -560,7 +763,9 @@ export function RaWizardDialog({
                         <Field label="Existing controls">
                             <Textarea
                                 value={data.existing_controls}
-                                onChange={(e) => setData('existing_controls', e.target.value)}
+                                onChange={(e) =>
+                                    setData('existing_controls', e.target.value)
+                                }
                                 rows={4}
                                 placeholder="What is already in place to manage this risk?"
                             />
@@ -568,7 +773,12 @@ export function RaWizardDialog({
                         <Field label="Additional controls">
                             <Textarea
                                 value={data.additional_controls}
-                                onChange={(e) => setData('additional_controls', e.target.value)}
+                                onChange={(e) =>
+                                    setData(
+                                        'additional_controls',
+                                        e.target.value,
+                                    )
+                                }
                                 rows={4}
                                 placeholder="What further controls will reduce the residual risk?"
                             />
@@ -589,7 +799,12 @@ export function RaWizardDialog({
                     >
                         <AcceptableToggle
                             value={data.risk_acceptable}
-                            onToggle={() => setData('risk_acceptable', !data.risk_acceptable)}
+                            onToggle={() =>
+                                setData(
+                                    'risk_acceptable',
+                                    !data.risk_acceptable,
+                                )
+                            }
                         />
                     </MatrixStep>
                 ) : null}
@@ -607,12 +822,19 @@ export function RaWizardDialog({
                     >
                         <AcceptableToggle
                             value={data.risk_acceptable}
-                            onToggle={() => setData('risk_acceptable', !data.risk_acceptable)}
+                            onToggle={() =>
+                                setData(
+                                    'risk_acceptable',
+                                    !data.risk_acceptable,
+                                )
+                            }
                         />
                         <Field label="Review notes">
                             <Textarea
                                 value={data.review_note}
-                                onChange={(e) => setData('review_note', e.target.value)}
+                                onChange={(e) =>
+                                    setData('review_note', e.target.value)
+                                }
                                 rows={3}
                                 placeholder="What changed, what was checked…"
                             />
@@ -624,8 +846,10 @@ export function RaWizardDialog({
                 {cur.key === 'evidence' ? (
                     <div className="flex flex-col gap-3">
                         <p className="text-sm text-muted-foreground">
-                            Attach supporting evidence — SWMS, method statements, hazard photos, safety data sheets or site plans. Files
-                            upload to the assessment when you save.
+                            Attach supporting evidence — SWMS, method
+                            statements, hazard photos, safety data sheets or
+                            site plans. Files upload to the assessment when you
+                            save.
                         </p>
                         <FileDropzone
                             onFiles={addStaged}
@@ -635,18 +859,30 @@ export function RaWizardDialog({
                         {staged.length ? (
                             <div className="flex flex-col gap-2">
                                 {staged.map((it) => (
-                                    <StagedFileCard key={it.id} file={it.file} onRemove={() => removeStaged(it.id)}>
+                                    <StagedFileCard
+                                        key={it.id}
+                                        file={it.file}
+                                        onRemove={() => removeStaged(it.id)}
+                                    >
                                         <div className="flex flex-col gap-2 sm:flex-row">
                                             <Input
                                                 value={it.note}
-                                                onChange={(e) => patchStaged(it.id, { note: e.target.value })}
+                                                onChange={(e) =>
+                                                    patchStaged(it.id, {
+                                                        note: e.target.value,
+                                                    })
+                                                }
                                                 placeholder="Note (optional)"
                                                 className="h-8"
                                             />
                                             <div className="sm:w-48">
                                                 <SelectInput
                                                     value={it.kind}
-                                                    onChange={(v) => patchStaged(it.id, { kind: v })}
+                                                    onChange={(v) =>
+                                                        patchStaged(it.id, {
+                                                            kind: v,
+                                                        })
+                                                    }
                                                     placeholder="Type (optional)"
                                                     options={KIND_OPTIONS}
                                                 />
@@ -663,23 +899,33 @@ export function RaWizardDialog({
                 {cur.key === 'ownership' ? (
                     <div className="flex flex-col gap-5">
                         <div>
-                            <div className="mb-2 text-[13px] font-semibold">Review frequency</div>
+                            <div className="mb-2 text-[13px] font-semibold">
+                                Review frequency
+                            </div>
                             <Segmented<string>
                                 value={String(data.review_frequency_days)}
-                                onChange={(v) => setData('review_frequency_days', Number(v))}
-                                options={FREQ_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))}
+                                onChange={(v) =>
+                                    setData('review_frequency_days', Number(v))
+                                }
+                                options={FREQ_OPTIONS.map((o) => ({
+                                    value: String(o.value),
+                                    label: o.label,
+                                }))}
                             />
                         </div>
                         <Field label="Next review due" hint="(optional)">
                             <Input
                                 type="date"
                                 value={data.review_due_at}
-                                onChange={(e) => setData('review_due_at', e.target.value)}
+                                onChange={(e) =>
+                                    setData('review_due_at', e.target.value)
+                                }
                                 className="w-60"
                             />
                         </Field>
                         <InfoCard icon={Info}>
-                            Left blank, the review date is scheduled from the cadence when you approve &amp; activate. The
+                            Left blank, the review date is scheduled from the
+                            cadence when you approve &amp; activate. The
                             CheckRiskAssessmentReviewsJob flags it when due.
                         </InfoCard>
                     </div>
@@ -687,7 +933,12 @@ export function RaWizardDialog({
 
                 {/* ---- REVIEW ---- */}
                 {cur.key === 'review' ? (
-                    <ReviewStep data={data} pickers={pickers} staged={staged.length} onJump={setStepIndex} />
+                    <ReviewStep
+                        data={data}
+                        pickers={pickers}
+                        staged={staged.length}
+                        onJump={setStepIndex}
+                    />
                 ) : null}
 
                 {/* ---- CONFIRM (approve / review / archive) ---- */}
@@ -704,7 +955,9 @@ export function RaWizardDialog({
                             <Field label="Approver note" hint="(optional)">
                                 <Textarea
                                     value={data.approver_note}
-                                    onChange={(e) => setData('approver_note', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('approver_note', e.target.value)
+                                    }
                                     rows={3}
                                     placeholder="Any conditions or context for the approval…"
                                 />
@@ -712,7 +965,8 @@ export function RaWizardDialog({
                         ) : null}
                         {kind === 'archive' ? (
                             <InfoCard icon={TriangleAlert} tone="crit">
-                                This assessment will be removed from the active register.
+                                This assessment will be removed from the active
+                                register.
                             </InfoCard>
                         ) : null}
                     </div>
@@ -744,30 +998,53 @@ function MatrixStep({
     const tone = levelTone(level);
     return (
         <div className="flex flex-wrap items-start gap-7">
-            <RaMatrix likelihood={likelihood} consequence={consequence} onSelect={onSelect} />
+            <RaMatrix
+                likelihood={likelihood}
+                consequence={consequence}
+                onSelect={onSelect}
+            />
             <div className="flex min-w-[220px] flex-1 flex-col gap-4">
                 <div className="flex items-center gap-3">
-                    <span className={cn('inline-flex h-12 w-12 items-center justify-center rounded-xl text-lg font-bold', RA_TONE_CHIP[tone])}>
+                    <span
+                        className={cn(
+                            'inline-flex h-12 w-12 items-center justify-center rounded-xl text-lg font-bold',
+                            RA_TONE_CHIP[tone],
+                        )}
+                    >
                         {score}
                     </span>
                     <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Calculated level</div>
+                        <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                            Calculated level
+                        </div>
                         <div className="text-lg font-bold">{cap(level)}</div>
                     </div>
                 </div>
-                <p className="text-[13px] leading-relaxed text-muted-foreground">{caption}</p>
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                    {caption}
+                </p>
                 {children}
             </div>
         </div>
     );
 }
 
-function AcceptableToggle({ value, onToggle }: { value: boolean; onToggle: () => void }) {
+function AcceptableToggle({
+    value,
+    onToggle,
+}: {
+    value: boolean;
+    onToggle: () => void;
+}) {
     return (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3.5">
             <div>
-                <div className="text-[13px] font-semibold">Residual risk acceptable?</div>
-                <div className="mt-0.5 text-xs text-muted-foreground">Tolerable with these controls in place?</div>
+                <div className="text-[13px] font-semibold">
+                    Residual risk acceptable?
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                    Tolerable with these controls in place?
+                </div>
             </div>
             <button
                 type="button"
@@ -775,7 +1052,10 @@ function AcceptableToggle({ value, onToggle }: { value: boolean; onToggle: () =>
                 aria-checked={value}
                 aria-label="Residual risk acceptable"
                 onClick={onToggle}
-                className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', value ? 'bg-primary' : 'bg-muted-foreground/50')}
+                className={cn(
+                    'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+                    value ? 'bg-primary' : 'bg-muted-foreground/50',
+                )}
             >
                 <span
                     className={cn(
@@ -806,44 +1086,112 @@ function ReviewStep({
     const attachName =
         data.attach_type === 'standalone'
             ? 'Standalone'
-            : (data.attach_type === 'site' ? pickers.sites : data.attach_type === 'client' ? pickers.clients : pickers.events).find(
-                  (o) => String(o.id) === data.attach_id,
-              )?.name ?? cap(data.attach_type);
-    const freq = FREQ_OPTIONS.find((o) => o.value === Number(data.review_frequency_days))?.label ?? '—';
-    const chip = (lv: string) => <span className={cn('rounded-md px-2 py-0.5 text-xs font-bold', RA_TONE_CHIP[levelTone(lv as never)])}>{cap(lv)}</span>;
+            : ((data.attach_type === 'site'
+                  ? pickers.sites
+                  : data.attach_type === 'client'
+                    ? pickers.clients
+                    : pickers.events
+              ).find((o) => String(o.id) === data.attach_id)?.name ??
+              cap(data.attach_type));
+    const freq =
+        FREQ_OPTIONS.find((o) => o.value === Number(data.review_frequency_days))
+            ?.label ?? '—';
+    const chip = (lv: string) => (
+        <span
+            className={cn(
+                'rounded-md px-2 py-0.5 text-xs font-bold',
+                RA_TONE_CHIP[levelTone(lv as never)],
+            )}
+        >
+            {cap(lv)}
+        </span>
+    );
 
     return (
         <div>
             <div className="grid gap-3.5 sm:grid-cols-2">
-                <ReviewCard icon={Pencil} title="Context" onEdit={() => onJump(0)}>
+                <ReviewCard
+                    icon={Pencil}
+                    title="Context"
+                    onEdit={() => onJump(0)}
+                >
                     <ReviewRow label="Title" value={data.title || '—'} />
-                    <ReviewRow label="Description" value={data.risk_description || '—'} />
+                    <ReviewRow
+                        label="Description"
+                        value={data.risk_description || '—'}
+                    />
                     <ReviewRow label="Attached to" value={attachName} />
                 </ReviewCard>
-                <ReviewCard icon={TriangleAlert} title="Inherent risk" onEdit={() => onJump(1)}>
-                    <ReviewRow label="Likelihood × consequence" value={`${data.likelihood} × ${data.consequence}`} />
+                <ReviewCard
+                    icon={TriangleAlert}
+                    title="Inherent risk"
+                    onEdit={() => onJump(1)}
+                >
+                    <ReviewRow
+                        label="Likelihood × consequence"
+                        value={`${data.likelihood} × ${data.consequence}`}
+                    />
                     <ReviewRow label="Score" value={`${inh} · ${cap(inhLv)}`} />
                     <ReviewRow label="Level" value={chip(inhLv)} />
                 </ReviewCard>
-                <ReviewCard icon={ShieldCheck} title="Controls" onEdit={() => onJump(2)}>
-                    <ReviewRow label="Existing" value={data.existing_controls || '—'} />
-                    <ReviewRow label="Additional" value={data.additional_controls || '—'} />
+                <ReviewCard
+                    icon={ShieldCheck}
+                    title="Controls"
+                    onEdit={() => onJump(2)}
+                >
+                    <ReviewRow
+                        label="Existing"
+                        value={data.existing_controls || '—'}
+                    />
+                    <ReviewRow
+                        label="Additional"
+                        value={data.additional_controls || '—'}
+                    />
                 </ReviewCard>
-                <ReviewCard icon={RefreshCw} title="Residual risk" onEdit={() => onJump(3)}>
-                    <ReviewRow label="Likelihood × consequence" value={`${data.residual_likelihood} × ${data.residual_consequence}`} />
+                <ReviewCard
+                    icon={RefreshCw}
+                    title="Residual risk"
+                    onEdit={() => onJump(3)}
+                >
+                    <ReviewRow
+                        label="Likelihood × consequence"
+                        value={`${data.residual_likelihood} × ${data.residual_consequence}`}
+                    />
                     <ReviewRow label="Score" value={`${res} · ${cap(resLv)}`} />
-                    <ReviewRow label="Acceptable" value={data.risk_acceptable ? 'Yes' : 'No'} />
+                    <ReviewRow
+                        label="Acceptable"
+                        value={data.risk_acceptable ? 'Yes' : 'No'}
+                    />
                 </ReviewCard>
-                <ReviewCard icon={Paperclip} title="Evidence" onEdit={() => onJump(4)}>
-                    <ReviewRow label="Staged documents" value={staged ? `${staged} file${staged === 1 ? '' : 's'}` : 'None'} />
+                <ReviewCard
+                    icon={Paperclip}
+                    title="Evidence"
+                    onEdit={() => onJump(4)}
+                >
+                    <ReviewRow
+                        label="Staged documents"
+                        value={
+                            staged
+                                ? `${staged} file${staged === 1 ? '' : 's'}`
+                                : 'None'
+                        }
+                    />
                 </ReviewCard>
-                <ReviewCard icon={Clock} title="Review & ownership" onEdit={() => onJump(5)}>
+                <ReviewCard
+                    icon={Clock}
+                    title="Review & ownership"
+                    onEdit={() => onJump(5)}
+                >
                     <ReviewRow label="Cadence" value={freq} />
-                    <ReviewRow label="Next review due" value={data.review_due_at || 'Set on approval'} />
+                    <ReviewRow
+                        label="Next review due"
+                        value={data.review_due_at || 'Set on approval'}
+                    />
                 </ReviewCard>
             </div>
             <p className="mt-3.5 px-0.5 text-[12.5px] text-muted-foreground">
-                Validated per step, mirroring the server request — submit jumps to the first failing step. Created in <strong>draft</strong>.
+                Validated per step, mirroring the server request — submit jumps
+                to the first failing step. Created in <strong>draft</strong>.
             </p>
         </div>
     );

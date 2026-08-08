@@ -44,8 +44,8 @@ function reminderAsset(array $o = []): HrAsset
 {
     return HrAsset::query()->create(array_merge([
         'asset_tag' => 'AT-'.fake()->unique()->numberBetween(1000, 999999),
-        'name' => 'Test Laptop',
-        'category' => 'laptop',
+        'name' => 'Test Uniform',
+        'category' => 'uniform',
         'status' => 'available',
     ], $o));
 }

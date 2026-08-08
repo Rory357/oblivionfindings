@@ -7,8 +7,8 @@ import {
     Gift,
     Heart,
     MapPin,
-    MessageCircle,
     Megaphone,
+    MessageCircle,
     MoreHorizontal,
     PartyPopper,
     Pin,
@@ -80,7 +80,12 @@ export type FeedPost = {
     // Non-kudos posts carry polymorphic reactions/replies (null for kudos posts).
     reactions: ReactionSummary | null;
     replies: KudosReply[] | null;
-    attachment: { id: number; name: string; is_image: boolean; url: string } | null;
+    attachment: {
+        id: number;
+        name: string;
+        is_image: boolean;
+        url: string;
+    } | null;
     audience: { scope: string; site_id: number } | null;
     created_at: string | null;
     created_at_date: string | null;
@@ -142,14 +147,20 @@ export function initials(name: string): string {
     );
 }
 
-const REACTION_GLYPH: Record<string, string> = { heart: '❤️', party: '🎉', hands: '👏' };
+const REACTION_GLYPH: Record<string, string> = {
+    heart: '❤️',
+    party: '🎉',
+    hands: '👏',
+};
 const REACTION_ORDER = ['heart', 'party', 'hands'] as const;
 
 const IMPACT_CLASS: Record<string, string> = {
     thank_you: 'border-border bg-muted text-muted-foreground',
     good_job: 'border-status-info/30 bg-status-info-bg text-status-info',
-    impressive: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
-    exceptional: 'border-status-success/30 bg-status-success-bg text-status-success',
+    impressive:
+        'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    exceptional:
+        'border-status-success/30 bg-status-success-bg text-status-success',
 };
 
 const PRIORITY_CLASS: Record<string, string> = {
@@ -162,10 +173,24 @@ const PRIORITY_CLASS: Record<string, string> = {
 // Update / Question / Win / Milestone wall badge (post_type=milestone, else the
 // composer `kind`). All three update kinds share post_type=update.
 const POST_BADGE: Record<string, { label: string; className: string }> = {
-    milestone: { label: 'Milestone', className: 'border-status-warning/30 bg-status-warning-bg text-status-warning' },
-    question: { label: 'Question', className: 'border-status-info/30 bg-status-info-bg text-status-info' },
-    win: { label: 'Win', className: 'border-status-success/30 bg-status-success-bg text-status-success' },
-    update: { label: 'Update', className: 'border-status-info/30 bg-status-info-bg text-status-info' },
+    milestone: {
+        label: 'Milestone',
+        className:
+            'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    },
+    question: {
+        label: 'Question',
+        className: 'border-status-info/30 bg-status-info-bg text-status-info',
+    },
+    win: {
+        label: 'Win',
+        className:
+            'border-status-success/30 bg-status-success-bg text-status-success',
+    },
+    update: {
+        label: 'Update',
+        className: 'border-status-info/30 bg-status-info-bg text-status-info',
+    },
 };
 
 function Avatar({ name, className }: { name: string; className?: string }) {
@@ -183,7 +208,9 @@ function Avatar({ name, className }: { name: string; className?: string }) {
 
 function AuthorMeta({ employee }: { employee?: FeedEmployee }) {
     const bits = [employee?.role, employee?.site].filter(Boolean).join(' · ');
-    return bits ? <span className="text-xs text-muted-foreground">{bits}</span> : null;
+    return bits ? (
+        <span className="text-xs text-muted-foreground">{bits}</span>
+    ) : null;
 }
 
 /**
@@ -259,9 +286,15 @@ function ReactionBar({
                 <ul className="mt-3 space-y-2 border-l-2 border-border pl-3">
                     {replies.map((reply) => (
                         <li key={reply.id} className="text-sm">
-                            <span className="font-semibold">{reply.user_name}</span>{' '}
-                            <span className="text-xs text-muted-foreground">{reply.created_at}</span>
-                            <p className="whitespace-pre-wrap text-muted-foreground">{reply.body}</p>
+                            <span className="font-semibold">
+                                {reply.user_name}
+                            </span>{' '}
+                            <span className="text-xs text-muted-foreground">
+                                {reply.created_at}
+                            </span>
+                            <p className="whitespace-pre-wrap text-muted-foreground">
+                                {reply.body}
+                            </p>
                         </li>
                     ))}
                 </ul>
@@ -283,7 +316,8 @@ function ReactionBar({
                         disabled={posting || !replyBody.trim()}
                         className={cn(
                             'inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground',
-                            (posting || !replyBody.trim()) && 'cursor-not-allowed opacity-50',
+                            (posting || !replyBody.trim()) &&
+                                'cursor-not-allowed opacity-50',
                         )}
                     >
                         <Send className="h-3.5 w-3.5" />
@@ -291,7 +325,9 @@ function ReactionBar({
                     </button>
                 </div>
             ) : showReply && replyDisabledNote ? (
-                <p className="mt-2 text-xs text-muted-foreground">{replyDisabledNote}</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                    {replyDisabledNote}
+                </p>
             ) : null}
         </>
     );
@@ -303,7 +339,13 @@ function ReactionBar({
  * (no dedicated recognition-manage permission exists); `deleteUrl` picks the
  * post- or kudos-keyed endpoint.
  */
-function ModerationMenu({ deleteUrl, only }: { deleteUrl: string; only: string[] }) {
+function ModerationMenu({
+    deleteUrl,
+    only,
+}: {
+    deleteUrl: string;
+    only: string[];
+}) {
     const [confirming, setConfirming] = useState(false);
 
     return (
@@ -335,9 +377,9 @@ function ModerationMenu({ deleteUrl, only }: { deleteUrl: string; only: string[]
                     <AlertDialogHeader>
                         <AlertDialogTitle>Remove this post?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            The post and its reactions and replies will be removed
-                            from the wall for everyone. This can’t be undone (an
-                            audit-log entry records the removal).
+                            The post and its reactions and replies will be
+                            removed from the wall for everyone. This can’t be
+                            undone (an audit-log entry records the removal).
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -386,20 +428,45 @@ export function KudosCard({
                     <Avatar name={author?.name ?? '?'} className="h-10 w-10" />
                     <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="font-semibold">{author?.name ?? 'Unknown'}</span>
-                            {author ? <AuthorMeta employee={employeeById.get(author.id)} /> : null}
-                            <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
+                            <span className="font-semibold">
+                                {author?.name ?? 'Unknown'}
+                            </span>
+                            {author ? (
+                                <AuthorMeta
+                                    employee={employeeById.get(author.id)}
+                                />
+                            ) : null}
+                            <Badge
+                                variant="outline"
+                                className="border-status-critical/30 bg-status-critical-bg text-status-critical"
+                            >
                                 Kudos
                             </Badge>
-                            <Badge variant="outline" className={IMPACT_CLASS[kudos.impact] ?? IMPACT_CLASS.good_job}>
+                            <Badge
+                                variant="outline"
+                                className={
+                                    IMPACT_CLASS[kudos.impact] ??
+                                    IMPACT_CLASS.good_job
+                                }
+                            >
                                 {impactLabel}
                             </Badge>
-                            {post.is_pinned ? <Pin className="h-3.5 w-3.5 text-status-warning" /> : null}
-                            <span className="text-xs text-muted-foreground">{post.created_at}</span>
+                            {post.is_pinned ? (
+                                <Pin className="h-3.5 w-3.5 text-status-warning" />
+                            ) : null}
+                            <span className="text-xs text-muted-foreground">
+                                {post.created_at}
+                            </span>
                             {canModerate ? (
                                 <ModerationMenu
                                     deleteUrl={`/hr/feed/kudos/${kudos.id}`}
-                                    only={['posts', 'metrics', 'leaderboard', 'valueBreakdown', 'kudosTrend']}
+                                    only={[
+                                        'posts',
+                                        'metrics',
+                                        'leaderboard',
+                                        'valueBreakdown',
+                                        'kudosTrend',
+                                    ]}
                                 />
                             ) : null}
                         </div>
@@ -407,11 +474,15 @@ export function KudosCard({
                         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
                             <Heart className="h-4 w-4 text-status-critical" />
                             <span className="text-muted-foreground">to</span>
-                            <span className="font-semibold">{kudos.to_user?.name ?? 'a colleague'}</span>
+                            <span className="font-semibold">
+                                {kudos.to_user?.name ?? 'a colleague'}
+                            </span>
                             <Badge variant="secondary">{categoryLabel}</Badge>
                         </div>
 
-                        <p className="mt-2 text-sm whitespace-pre-wrap">{post.content}</p>
+                        <p className="mt-2 text-sm whitespace-pre-wrap">
+                            {post.content}
+                        </p>
 
                         <ReactionBar
                             reactions={kudos.reactions}
@@ -421,14 +492,23 @@ export function KudosCard({
                                 router.post(
                                     `/hr/feed/kudos/${kudos.id}/react`,
                                     { emoji },
-                                    { preserveScroll: true, preserveState: true, only: ['posts'] },
+                                    {
+                                        preserveScroll: true,
+                                        preserveState: true,
+                                        only: ['posts'],
+                                    },
                                 )
                             }
                             onReply={(body, done) =>
                                 router.post(
                                     `/hr/feed/kudos/${kudos.id}/reply`,
                                     { body },
-                                    { preserveScroll: true, preserveState: true, only: ['posts'], onSuccess: done },
+                                    {
+                                        preserveScroll: true,
+                                        preserveState: true,
+                                        only: ['posts'],
+                                        onSuccess: done,
+                                    },
                                 )
                             }
                             replyDisabledNote={`Only ${kudos.from_user?.name ?? 'the sender'} and ${kudos.to_user?.name ?? 'the recipient'} can reply to this thread.`}
@@ -452,13 +532,20 @@ export function AnnouncementCard({
     employeeById: Map<number, FeedEmployee>;
 }) {
     const a = announcement;
-    const pct = a.audience_count > 0 ? Math.round((a.acknowledged_count / a.audience_count) * 100) : 0;
+    const pct =
+        a.audience_count > 0
+            ? Math.round((a.acknowledged_count / a.audience_count) * 100)
+            : 0;
 
     const acknowledge = () => {
         router.post(
             `/hr/announcements/${a.id}/acknowledge`,
             {},
-            { preserveScroll: true, preserveState: true, only: ['announcements'] },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                only: ['announcements'],
+            },
         );
     };
 
@@ -466,7 +553,7 @@ export function AnnouncementCard({
         <Card className="border-primary/30">
             <CardContent className="pt-6">
                 {a.is_pinned ? (
-                    <div className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-primary">
+                    <div className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-primary uppercase">
                         <Pin className="h-3.5 w-3.5" /> Pinned
                     </div>
                 ) : null}
@@ -476,28 +563,47 @@ export function AnnouncementCard({
                     </span>
                     <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="font-semibold">{a.creator?.name ?? 'HR'}</span>
-                            {a.creator ? <AuthorMeta employee={employeeById.get(a.creator.id)} /> : null}
-                            <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
+                            <span className="font-semibold">
+                                {a.creator?.name ?? 'HR'}
+                            </span>
+                            {a.creator ? (
+                                <AuthorMeta
+                                    employee={employeeById.get(a.creator.id)}
+                                />
+                            ) : null}
+                            <Badge
+                                variant="outline"
+                                className="border-status-success/30 bg-status-success-bg text-status-success"
+                            >
                                 Announcement
                             </Badge>
                             {a.priority !== 'normal' ? (
-                                <Badge variant="outline" className={PRIORITY_CLASS[a.priority] ?? ''}>
+                                <Badge
+                                    variant="outline"
+                                    className={PRIORITY_CLASS[a.priority] ?? ''}
+                                >
                                     {a.priority}
                                 </Badge>
                             ) : null}
-                            <span className="text-xs text-muted-foreground">{a.created_at}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {a.created_at}
+                            </span>
                         </div>
 
-                        <h3 className="mt-1.5 text-base font-bold">{a.title}</h3>
-                        <p className="mt-1 text-sm whitespace-pre-wrap">{a.content}</p>
+                        <h3 className="mt-1.5 text-base font-bold">
+                            {a.title}
+                        </h3>
+                        <p className="mt-1 text-sm whitespace-pre-wrap">
+                            {a.content}
+                        </p>
 
                         {a.requires_acknowledgement ? (
                             <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     {a.viewer_acknowledged ? (
                                         <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-status-success">
-                                            <CheckCircle2 className="h-4 w-4" /> Acknowledged
+                                            <CheckCircle2 className="h-4 w-4" />{' '}
+                                            Acknowledged
                                         </span>
                                     ) : (
                                         <button
@@ -509,11 +615,15 @@ export function AnnouncementCard({
                                         </button>
                                     )}
                                     <span className="text-xs text-muted-foreground">
-                                        {a.acknowledged_count} of {a.audience_count} acknowledged · {pct}%
+                                        {a.acknowledged_count} of{' '}
+                                        {a.audience_count} acknowledged · {pct}%
                                     </span>
                                 </div>
                                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                                    <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${pct}%` }} />
+                                    <div
+                                        className="h-full rounded-full bg-primary transition-[width] duration-500"
+                                        style={{ width: `${pct}%` }}
+                                    />
                                 </div>
                             </div>
                         ) : null}
@@ -525,15 +635,32 @@ export function AnnouncementCard({
                             onReact={(emoji) =>
                                 router.post(
                                     '/hr/feed/react',
-                                    { subject_type: 'announcement', subject_id: a.id, emoji },
-                                    { preserveScroll: true, preserveState: true, only: ['announcements'] },
+                                    {
+                                        subject_type: 'announcement',
+                                        subject_id: a.id,
+                                        emoji,
+                                    },
+                                    {
+                                        preserveScroll: true,
+                                        preserveState: true,
+                                        only: ['announcements'],
+                                    },
                                 )
                             }
                             onReply={(body, done) =>
                                 router.post(
                                     '/hr/feed/reply',
-                                    { subject_type: 'announcement', subject_id: a.id, body },
-                                    { preserveScroll: true, preserveState: true, only: ['announcements'], onSuccess: done },
+                                    {
+                                        subject_type: 'announcement',
+                                        subject_id: a.id,
+                                        body,
+                                    },
+                                    {
+                                        preserveScroll: true,
+                                        preserveState: true,
+                                        only: ['announcements'],
+                                        onSuccess: done,
+                                    },
                                 )
                             }
                         />
@@ -570,22 +697,39 @@ export function UpdateCard({
         <Card>
             <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
-                    <Avatar name={post.user?.name ?? '?'} className="h-10 w-10" />
+                    <Avatar
+                        name={post.user?.name ?? '?'}
+                        className="h-10 w-10"
+                    />
                     <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="font-semibold">{post.user?.name ?? 'Unknown'}</span>
-                            {post.user ? <AuthorMeta employee={employeeById.get(post.user.id)} /> : null}
-                            <Badge variant="outline" className={badge.className}>
+                            <span className="font-semibold">
+                                {post.user?.name ?? 'Unknown'}
+                            </span>
+                            {post.user ? (
+                                <AuthorMeta
+                                    employee={employeeById.get(post.user.id)}
+                                />
+                            ) : null}
+                            <Badge
+                                variant="outline"
+                                className={badge.className}
+                            >
                                 {badge.label}
                             </Badge>
                             {post.audience ? (
                                 <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                                     <MapPin className="h-3 w-3" />
-                                    {siteNameById?.get(post.audience.site_id) ?? 'Site only'}
+                                    {siteNameById?.get(post.audience.site_id) ??
+                                        'Site only'}
                                 </span>
                             ) : null}
-                            {post.is_pinned ? <Pin className="h-3.5 w-3.5 text-status-warning" /> : null}
-                            <span className="text-xs text-muted-foreground">{post.created_at}</span>
+                            {post.is_pinned ? (
+                                <Pin className="h-3.5 w-3.5 text-status-warning" />
+                            ) : null}
+                            <span className="text-xs text-muted-foreground">
+                                {post.created_at}
+                            </span>
                             {canModerate ? (
                                 <ModerationMenu
                                     deleteUrl={`/hr/feed/posts/${post.id}`}
@@ -593,7 +737,9 @@ export function UpdateCard({
                                 />
                             ) : null}
                         </div>
-                        <p className="mt-2 text-sm whitespace-pre-wrap">{post.content}</p>
+                        <p className="mt-2 text-sm whitespace-pre-wrap">
+                            {post.content}
+                        </p>
 
                         {post.attachment?.is_image ? (
                             <a
@@ -626,15 +772,32 @@ export function UpdateCard({
                                 onReact={(emoji) =>
                                     router.post(
                                         '/hr/feed/react',
-                                        { subject_type: 'post', subject_id: post.id, emoji },
-                                        { preserveScroll: true, preserveState: true, only: ['posts'] },
+                                        {
+                                            subject_type: 'post',
+                                            subject_id: post.id,
+                                            emoji,
+                                        },
+                                        {
+                                            preserveScroll: true,
+                                            preserveState: true,
+                                            only: ['posts'],
+                                        },
                                     )
                                 }
                                 onReply={(body, done) =>
                                     router.post(
                                         '/hr/feed/reply',
-                                        { subject_type: 'post', subject_id: post.id, body },
-                                        { preserveScroll: true, preserveState: true, only: ['posts'], onSuccess: done },
+                                        {
+                                            subject_type: 'post',
+                                            subject_id: post.id,
+                                            body,
+                                        },
+                                        {
+                                            preserveScroll: true,
+                                            preserveState: true,
+                                            only: ['posts'],
+                                            onSuccess: done,
+                                        },
                                     )
                                 }
                             />
@@ -650,24 +813,36 @@ export function UpdateCard({
 /*  Right sidebar                                                      */
 /* ------------------------------------------------------------------ */
 
-export function TopRecognised({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
+export function TopRecognised({
+    leaderboard,
+}: {
+    leaderboard: LeaderboardEntry[];
+}) {
     return (
         <Card>
             <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between text-sm">
                     <span className="flex items-center gap-2">
-                        <Trophy className="h-4 w-4 text-status-warning" /> Top recognised
+                        <Trophy className="h-4 w-4 text-status-warning" /> Top
+                        recognised
                     </span>
-                    <span className="text-[11px] font-medium text-muted-foreground">This month</span>
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                        This month
+                    </span>
                 </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
                 {leaderboard.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No kudos yet this month.</p>
+                    <p className="text-sm text-muted-foreground">
+                        No kudos yet this month.
+                    </p>
                 ) : (
                     <ul className="space-y-3">
                         {leaderboard.map((entry, i) => (
-                            <li key={entry.user_id} className="flex items-center gap-3">
+                            <li
+                                key={entry.user_id}
+                                className="flex items-center gap-3"
+                            >
                                 <span
                                     className={cn(
                                         'grid h-6 w-6 flex-none place-items-center rounded-full text-xs font-bold',
@@ -678,8 +853,13 @@ export function TopRecognised({ leaderboard }: { leaderboard: LeaderboardEntry[]
                                 >
                                     {i + 1}
                                 </span>
-                                <Avatar name={entry.user_name} className="h-7 w-7 text-[11px]" />
-                                <span className="min-w-0 flex-1 truncate text-sm font-medium">{entry.user_name}</span>
+                                <Avatar
+                                    name={entry.user_name}
+                                    className="h-7 w-7 text-[11px]"
+                                />
+                                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                                    {entry.user_name}
+                                </span>
                                 <Badge variant="secondary" className="shrink-0">
                                     {entry.kudos_count}
                                 </Badge>
@@ -709,21 +889,33 @@ export function CelebrationsCard({
         <Card>
             <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm">
-                    <PartyPopper className="h-4 w-4 text-primary" /> Celebrations
+                    <PartyPopper className="h-4 w-4 text-primary" />{' '}
+                    Celebrations
                 </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
                 {milestones.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No celebrations coming up.</p>
+                    <p className="text-sm text-muted-foreground">
+                        No celebrations coming up.
+                    </p>
                 ) : (
                     <ul className="space-y-3">
                         {milestones.map((m) => (
-                            <li key={`${m.type}-${m.user_id}-${m.date}`} className="flex items-center gap-3">
-                                <Avatar name={m.user_name} className="h-8 w-8 text-[11px]" />
+                            <li
+                                key={`${m.type}-${m.user_id}-${m.date}`}
+                                className="flex items-center gap-3"
+                            >
+                                <Avatar
+                                    name={m.user_name}
+                                    className="h-8 w-8 text-[11px]"
+                                />
                                 <div className="min-w-0 flex-1">
-                                    <div className="truncate text-sm font-medium">{m.user_name}</div>
+                                    <div className="truncate text-sm font-medium">
+                                        {m.user_name}
+                                    </div>
                                     <div className="truncate text-xs text-muted-foreground">
-                                        {CELEBRATION_GLYPH[m.type] ?? '✨'} {milestoneLabel(m)}
+                                        {CELEBRATION_GLYPH[m.type] ?? '✨'}{' '}
+                                        {milestoneLabel(m)}
                                     </div>
                                 </div>
                                 <button
@@ -745,9 +937,12 @@ export function CelebrationsCard({
 }
 
 export function milestoneLabel(m: Milestone): string {
-    if (m.type === 'anniversary') return `${m.years ?? ''}-year work anniversary`.trim();
-    if (m.type === 'birthday') return m.days_away === 0 ? 'Birthday today' : `Birthday · ${m.date}`;
-    if (m.type === 'new_hire') return m.position ? `New hire · ${m.position}` : 'New hire';
+    if (m.type === 'anniversary')
+        return `${m.years ?? ''}-year work anniversary`.trim();
+    if (m.type === 'birthday')
+        return m.days_away === 0 ? 'Birthday today' : `Birthday · ${m.date}`;
+    if (m.type === 'new_hire')
+        return m.position ? `New hire · ${m.position}` : 'New hire';
     return m.date;
 }
 

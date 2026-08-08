@@ -11,6 +11,7 @@ use App\Domain\Monitoring\Exceptions\TimeSeriesUnavailable;
 use App\Domain\Monitoring\Handlers\EventEnvelopeHandler;
 use App\Domain\Monitoring\Jobs\DownsampleMetrics;
 use App\Domain\Monitoring\Models\MetricCurrentSummary;
+use App\Domain\Monitoring\Models\MetricRollupCoverage;
 use App\Domain\Monitoring\Models\MetricSeries;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
@@ -24,6 +25,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Infrastructure\Monitoring\InfluxDbTimeSeriesStore;
 use App\Models\Site;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -153,7 +155,87 @@ it('creates hourly and daily percentile rollups without a raw sample table', fun
         'max' => 60.0,
         'count' => 6,
     ])->and($dailyPoint?->statistics['count'])->toBe(6)
+        ->and(MetricRollupCoverage::query()->count())->toBe(2)
+        ->and(MetricRollupCoverage::query()
+            ->where('source_series_id', MetricSeries::query()->where('retention_tier', 'raw')->value('id'))
+            ->where('target_tier', 'hourly')
+            ->where('target_series_id', $hourly->id)
+            ->where('covered_from', '2026-07-22 10:00:00.000000')
+            ->where('covered_until', '2026-07-23 12:00:00.000000')
+            ->exists())->toBeTrue()
         ->and(Schema::hasTable('monitor_metric_samples'))->toBeFalse();
+});
+
+it('keeps rollup coverage unique and rejects invalid tier or interval watermarks', function (): void {
+    [, , $monitor] = metricRetentionMonitor();
+    $service = app(MetricIngestService::class);
+    $service->write($monitor, new MetricSample(
+        metric: 'wan.utilisation',
+        value: 42,
+        unit: 'percent',
+        observedAt: CarbonImmutable::parse('2026-07-22T10:05:00Z'),
+    ));
+    app(DownsampleMetrics::class)->handle($this->store, $service);
+
+    $coverage = MetricRollupCoverage::query()
+        ->where('target_tier', 'hourly')
+        ->sole();
+    $base = [
+        'source_series_id' => $coverage->source_series_id,
+        'target_series_id' => $coverage->target_series_id,
+        'covered_from' => '2026-07-22 10:00:00.000000',
+        'covered_until' => '2026-07-23 10:00:00.000000',
+        'completed_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ];
+
+    expect(fn () => DB::table('monitoring_metric_rollup_coverages')->insert([
+        ...$base,
+        'target_tier' => 'hourly',
+    ]))->toThrow(QueryException::class)
+        ->and(fn () => DB::table('monitoring_metric_rollup_coverages')->insert([
+            ...$base,
+            'target_tier' => 'minute',
+        ]))->toThrow(QueryException::class)
+        ->and(fn () => DB::table('monitoring_metric_rollup_coverages')->insert([
+            ...$base,
+            'target_tier' => 'daily',
+            'covered_until' => $base['covered_from'],
+        ]))->toThrow(QueryException::class);
+
+    expect(array_keys($coverage->getAttributes()))
+        ->not->toContain('value', 'statistics', 'dimensions', 'external_key');
+});
+
+it('rewinds a durable watermark before accepting a late source observation', function (): void {
+    [, , $monitor] = metricRetentionMonitor();
+    $service = app(MetricIngestService::class);
+    $service->write($monitor, new MetricSample(
+        metric: 'wan.utilisation',
+        value: 40,
+        unit: 'percent',
+        observedAt: CarbonImmutable::parse('2026-07-20T10:05:00Z'),
+    ));
+    app(DownsampleMetrics::class)->handle($this->store, $service);
+
+    $raw = MetricSeries::query()->where('retention_tier', 'raw')->sole();
+    $coverage = MetricRollupCoverage::query()
+        ->where('source_series_id', $raw->id)
+        ->where('target_tier', 'hourly')
+        ->sole();
+    expect($coverage->covered_until->toIso8601String())->toBe('2026-07-23T12:00:00+00:00');
+
+    $service->write($monitor, new MetricSample(
+        metric: 'wan.utilisation',
+        value: 80,
+        unit: 'percent',
+        observedAt: CarbonImmutable::parse('2026-07-21T09:45:00Z'),
+    ));
+
+    $coverage->refresh();
+    expect($coverage->covered_from->toIso8601String())->toBe('2026-07-20T10:00:00+00:00')
+        ->and($coverage->covered_until->toIso8601String())->toBe('2026-07-21T09:00:00+00:00');
 });
 
 it('applies the most restrictive matching privacy policy and writes value-free tombstones', function (): void {
@@ -198,6 +280,8 @@ it('applies the most restrictive matching privacy policy and writes value-free t
         'is_active' => true,
     ]);
 
+    app(DownsampleMetrics::class)->handle($this->store, $service);
+
     $result = app(RetentionEnforcer::class)->enforce(
         CarbonImmutable::now(),
         actorId: null,
@@ -217,6 +301,126 @@ it('applies the most restrictive matching privacy policy and writes value-free t
         ->and($tombstone->job_reference)->toBe('retention-test-001')
         ->and($encoded)->not->toContain('123456.789')
         ->and($encoded)->not->toContain('value');
+});
+
+it('fails closed without complete downstream coverage and deletes a half-open source interval', function (): void {
+    [, , $monitor] = metricRetentionMonitor();
+    $service = app(MetricIngestService::class);
+    $cutoff = CarbonImmutable::parse('2026-07-21T12:00:00Z');
+    $service->write($monitor, new MetricSample(
+        metric: 'occupancy.count',
+        value: 111111.125,
+        unit: 'count',
+        observedAt: CarbonImmutable::parse('2026-07-18T12:00:00Z'),
+        dataClass: 'operational',
+        privacyClass: 'sensitive',
+    ));
+    $service->write($monitor, new MetricSample(
+        metric: 'occupancy.count',
+        value: 166666.5,
+        unit: 'count',
+        observedAt: CarbonImmutable::parse('2026-07-19T13:00:00Z'),
+        dataClass: 'operational',
+        privacyClass: 'sensitive',
+    ));
+    $service->write($monitor, new MetricSample(
+        metric: 'occupancy.count',
+        value: 222222.25,
+        unit: 'count',
+        observedAt: $cutoff,
+        dataClass: 'operational',
+        privacyClass: 'sensitive',
+    ));
+    MonitoringRetentionPolicy::query()->create([
+        'name' => 'Half-open retention proof',
+        'scope_kind' => 'privacy',
+        'privacy_class' => 'sensitive',
+        'raw_days' => 2,
+        'hourly_days' => 30,
+        'daily_days' => 365,
+        'is_active' => true,
+    ]);
+
+    $blocked = app(RetentionEnforcer::class)->enforce(
+        CarbonImmutable::now(),
+        jobReference: 'retention-coverage-blocked',
+    );
+
+    expect($blocked['metric_payloads_deleted'])->toBe(0)
+        ->and($blocked['rollup_coverage_blocked_series'])->toBe(1)
+        ->and($this->store->deletions)->toBe([])
+        ->and(MonitoringRetentionTombstone::query()->count())->toBe(0);
+
+    app(DownsampleMetrics::class)->handle($this->store, $service);
+    $raw = MetricSeries::query()->where('retention_tier', 'raw')->sole();
+    $coverage = MetricRollupCoverage::query()
+        ->where('source_series_id', $raw->id)
+        ->where('target_tier', 'hourly')
+        ->sole();
+    $coverage->forceFill(['covered_until' => $cutoff->subMicrosecond()])->save();
+    $partial = app(RetentionEnforcer::class)->enforce(
+        CarbonImmutable::now(),
+        jobReference: 'retention-coverage-partial',
+    );
+    expect($partial['metric_payloads_deleted'])->toBe(0)
+        ->and($partial['rollup_coverage_blocked_series'])->toBe(1)
+        ->and($this->store->deletions)->toBe([])
+        ->and(MonitoringRetentionTombstone::query()->count())->toBe(0);
+
+    $coverage->forceFill(['covered_until' => $cutoff])->save();
+
+    $hourly = MetricSeries::query()->findOrFail($coverage->target_series_id);
+    $hourlyPoints = collect($this->store->points)
+        ->filter(fn (TimeSeriesPoint $point): bool => $point->externalKey === $hourly->external_key)
+        ->sortBy(fn (TimeSeriesPoint $point): int => $point->observedAt->getTimestamp())
+        ->values()
+        ->all();
+    $deletionIntervalHourlyPoints = collect($hourlyPoints)
+        ->filter(fn (TimeSeriesPoint $point): bool => $point->observedAt->lessThan($cutoff))
+        ->values();
+    expect($hourlyPoints)->toHaveCount(3)
+        ->and($deletionIntervalHourlyPoints)->toHaveCount(2);
+    /** @var TimeSeriesPoint $missingLaterHourly */
+    $missingLaterHourly = $deletionIntervalHourlyPoints->last();
+    $this->store->points = collect($this->store->points)
+        ->reject(fn (TimeSeriesPoint $point): bool => $point->idempotencyKey === $missingLaterHourly->idempotencyKey)
+        ->values()
+        ->all();
+
+    $missingDownstream = app(RetentionEnforcer::class)->enforce(
+        CarbonImmutable::now(),
+        jobReference: 'retention-downstream-missing',
+    );
+    expect($missingDownstream['metric_payloads_deleted'])->toBe(0)
+        ->and($missingDownstream['rollup_coverage_blocked_series'])->toBe(1)
+        ->and($this->store->deletions)->toBe([])
+        ->and(MonitoringRetentionTombstone::query()->count())->toBe(0);
+
+    $this->store->points[] = $missingLaterHourly;
+
+    $deleted = app(RetentionEnforcer::class)->enforce(
+        CarbonImmutable::now(),
+        jobReference: 'retention-coverage-complete',
+    );
+    $raw->refresh();
+    $tombstone = MonitoringRetentionTombstone::query()->sole();
+    $remainingRaw = collect($this->store->points)
+        ->filter(fn (TimeSeriesPoint $point): bool => $point->externalKey === $raw->external_key)
+        ->values();
+
+    expect($deleted['metric_payloads_deleted'])->toBe(1)
+        ->and($deleted['rollup_coverage_blocked_series'])->toBe(0)
+        ->and($this->store->deletions)->toHaveCount(1)
+        ->and($this->store->deletions[0]['from']->toIso8601String())->toBe('2026-07-18T12:00:00+00:00')
+        ->and($this->store->deletions[0]['to']->equalTo($cutoff))->toBeTrue()
+        ->and($remainingRaw)->toHaveCount(1)
+        ->and($remainingRaw->sole()->observedAt->equalTo($cutoff))->toBeTrue()
+        ->and($raw->first_point_at->equalTo($cutoff))->toBeTrue()
+        ->and($raw->last_point_at->equalTo($cutoff))->toBeTrue()
+        ->and($tombstone->period_start->toIso8601String())->toBe('2026-07-18T12:00:00+00:00')
+        ->and($tombstone->period_end->equalTo($cutoff))->toBeTrue()
+        ->and(json_encode($tombstone->toArray(), JSON_THROW_ON_ERROR))
+        ->not->toContain('111111.125', '166666.5', '222222.25', 'value');
 });
 
 it('preserves payloads under legal hold and identifies missing restored pointers', function (): void {
@@ -302,6 +506,7 @@ it('uses one configured Influx scope, bounded batches, idempotency tags, and red
     ]);
     Http::fake([
         'https://influx.example.test/api/v2/write*' => Http::response('', 204),
+        'https://influx.example.test/api/v2/delete*' => Http::response('', 204),
         'https://influx.example.test/health' => Http::response(['status' => 'pass']),
     ]);
     $store = new InfluxDbTimeSeriesStore;
@@ -321,13 +526,23 @@ it('uses one configured Influx scope, bounded batches, idempotency tags, and red
     );
 
     $store->writePoints([$point]);
+    $deleteFrom = CarbonImmutable::parse('2026-07-20T00:00:00.123456Z');
+    $deleteUntil = CarbonImmutable::parse('2026-07-21T00:00:00.123456Z');
+    $store->deleteRange($point->externalKey, 'raw', $deleteFrom, $deleteUntil);
 
     Http::assertSent(fn ($request): bool => str_contains($request->url(), '/api/v2/write')
         && str_contains($request->url(), 'org=oblivion-findings')
         && str_contains($request->url(), 'bucket=native-monitoring')
         && $request->hasHeader('Authorization', 'Bearer RAW-INFLUX-TOKEN-SENTINEL')
         && str_contains($request->body(), 'idempotency_key="'.str_repeat('b', 64).'"'));
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/api/v2/delete')
+        && data_get($request->data(), 'start') === $deleteFrom->format('Y-m-d\TH:i:s.u\Z')
+        && data_get($request->data(), 'stop') === $deleteUntil->format('Y-m-d\TH:i:s.u\Z')
+        && str_contains((string) data_get($request->data(), 'predicate'), 'tier="raw"'));
     expect($store->healthy())->toBeTrue();
+
+    expect(fn () => $store->deleteRange($point->externalKey, 'raw', $deleteFrom, $deleteFrom))
+        ->toThrow(TimeSeriesUnavailable::class, 'range');
 
     expect(fn () => $store->writePoints([$point, $point]))
         ->toThrow(TimeSeriesUnavailable::class, 'batch');
@@ -460,6 +675,13 @@ final class MetricRetentionFakeTimeSeriesStore implements TimeSeriesStore
                 fn (TimeSeriesPoint $stored): bool => $stored->idempotencyKey === $point->idempotencyKey,
             );
             if (! $duplicate) {
+                // Influx updates fields at one measurement/tag/timestamp key.
+                $this->points = collect($this->points)
+                    ->reject(fn (TimeSeriesPoint $stored): bool => $stored->externalKey === $point->externalKey
+                        && $stored->tier === $point->tier
+                        && $stored->observedAt->equalTo($point->observedAt))
+                    ->values()
+                    ->all();
                 $this->points[] = $point;
             }
         }
@@ -474,7 +696,8 @@ final class MetricRetentionFakeTimeSeriesStore implements TimeSeriesStore
         return collect($this->points)
             ->filter(fn (TimeSeriesPoint $point): bool => $point->externalKey === $externalKey
                 && $point->tier === $tier
-                && $point->observedAt->betweenIncluded($from, $to))
+                && $point->observedAt->greaterThanOrEqualTo($from)
+                && $point->observedAt->lessThan($to))
             ->sortBy(fn (TimeSeriesPoint $point): int => $point->observedAt->getTimestamp())
             ->values()
             ->all();
@@ -494,7 +717,8 @@ final class MetricRetentionFakeTimeSeriesStore implements TimeSeriesStore
         $this->points = collect($this->points)
             ->reject(fn (TimeSeriesPoint $point): bool => $point->externalKey === $externalKey
                 && $point->tier === $tier
-                && $point->observedAt->betweenIncluded($from, $to))
+                && $point->observedAt->greaterThanOrEqualTo($from)
+                && $point->observedAt->lessThan($to))
             ->values()
             ->all();
     }

@@ -351,6 +351,43 @@ it('requires trusted proxy mTLS identity request signature and a fresh unique no
     )->assertUnauthorized()->assertExactJson(['message' => 'Collector authentication failed.']);
 });
 
+it('requires shared Redis replay protection outside the exact local test override', function () {
+    $record = enrolledCollectorRecord();
+    $payload = [
+        'collector_id' => $record['collector']->collector_uuid,
+        'status' => collectorHeartbeatPayload(),
+    ];
+
+    config()->set('monitoring.collector.replay_store', 'file');
+    config()->set('monitoring.collector.allow_local_replay_store_for_tests', true);
+    collectorLifecycleSignedPost(
+        $this,
+        '/api/monitoring/collectors/heartbeat',
+        $payload,
+        $record,
+        'non-shared-file-store-1',
+    )->assertUnauthorized()->assertExactJson(['message' => 'Collector authentication failed.']);
+
+    config()->set('monitoring.collector.replay_store', 'array');
+    config()->set('monitoring.collector.allow_local_replay_store_for_tests', false);
+    collectorLifecycleSignedPost(
+        $this,
+        '/api/monitoring/collectors/heartbeat',
+        $payload,
+        $record,
+        'disabled-local-array-store-1',
+    )->assertUnauthorized()->assertExactJson(['message' => 'Collector authentication failed.']);
+
+    config()->set('monitoring.collector.allow_local_replay_store_for_tests', true);
+    collectorLifecycleSignedPost(
+        $this,
+        '/api/monitoring/collectors/heartbeat',
+        $payload,
+        $record,
+        'explicit-local-array-store-1',
+    )->assertOk();
+});
+
 it('derives the collector fingerprint from the verified proxy certificate without proxy scripting', function () {
     $record = enrolledCollectorRecord();
     $certificatePem = collectorLifecycleCertificatePem();

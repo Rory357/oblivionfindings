@@ -4,6 +4,7 @@ namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
+use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\SecurityDevices\Models\Device;
@@ -18,6 +19,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class NetworkItWorkspaceTest extends TestCase
@@ -70,6 +72,7 @@ class NetworkItWorkspaceTest extends TestCase
             'parent_device_id' => $gateway->id,
             'child_device_id' => $switch->id,
             'relationship_type' => 'uplinks_to',
+            'created_by_user_id' => $this->admin->id,
         ]);
         $ticket = ItTicket::factory()->create([
             'requester_user_id' => $this->admin->id,
@@ -131,11 +134,13 @@ class NetworkItWorkspaceTest extends TestCase
             'relationship_type' => 'uplinks_to',
             'port' => 'WAN1',
             'notes' => 'RAW-TOPOLOGY-NOTES-SENTINEL',
+            'created_by_user_id' => $this->admin->id,
         ]);
         DeviceRelationship::create([
             'parent_device_id' => $gateway->id,
             'child_device_id' => $unrelated->id,
             'relationship_type' => 'connected_to',
+            'created_by_user_id' => $this->admin->id,
         ]);
 
         $this->actingAs($this->admin)
@@ -229,6 +234,7 @@ class NetworkItWorkspaceTest extends TestCase
             'parent_device_id' => $gateway->id,
             'child_device_id' => $dependent->id,
             'relationship_type' => 'connected_to',
+            'created_by_user_id' => $this->admin->id,
         ]);
 
         $this->actingAs($this->admin)
@@ -272,11 +278,96 @@ class NetworkItWorkspaceTest extends TestCase
             'firmware_version' => null,
             'meta' => null,
         ]);
+        $snapshotSite = Site::factory()->create(['is_active' => true]);
+        $this->assignToSite($drifted, $snapshotSite);
+        $baselinePath = 'monitoring/configuration-snapshots/baseline.json.enc';
+        $baseline = ConfigurationSnapshot::query()->create([
+            'snapshot_uuid' => (string) Str::uuid(),
+            'site_id' => $snapshotSite->id,
+            'device_id' => $drifted->id,
+            'source_kind' => 'provider',
+            'source' => 'unifi',
+            'storage_disk' => 'monitoring-snapshots',
+            'storage_path' => $baselinePath,
+            'storage_path_hash' => hash('sha256', $baselinePath),
+            'storage_state' => 'available',
+            'content_hash' => hash('sha256', 'baseline-content'),
+            'configuration_hash' => hash('sha256', 'baseline-configuration'),
+            'content_size' => 16,
+            'mime_type' => 'application/json',
+            'firmware_version' => '1.3.0',
+            'captured_at' => now()->subDays(2),
+            'diff_summary' => ['added' => [], 'removed' => [], 'changed' => [], 'truncated' => false],
+        ]);
+        $inventoryPath = 'monitoring/configuration-snapshots/inventory.json.enc';
+        $inventory = ConfigurationSnapshot::query()->create([
+            'snapshot_uuid' => (string) Str::uuid(),
+            'site_id' => $snapshotSite->id,
+            'device_id' => $drifted->id,
+            'source_kind' => 'ssh',
+            'source' => 'native_read_only_inventory',
+            'storage_disk' => 'monitoring-snapshots',
+            'storage_path' => $inventoryPath,
+            'storage_path_hash' => hash('sha256', $inventoryPath),
+            'storage_state' => 'available',
+            'content_hash' => hash('sha256', 'inventory-content'),
+            'configuration_hash' => hash('sha256', 'inventory-configuration'),
+            'content_size' => 17,
+            'mime_type' => 'application/json',
+            'firmware_version' => '1.3.5',
+            'captured_at' => now()->subDay(),
+            'diff_summary' => ['added' => [], 'removed' => [], 'changed' => [], 'truncated' => false],
+        ]);
+        $otherSite = Site::factory()->create(['is_active' => true]);
+        $otherSitePath = 'monitoring/configuration-snapshots/other-site.json.enc';
+        $otherSiteSnapshot = ConfigurationSnapshot::query()->create([
+            'snapshot_uuid' => (string) Str::uuid(),
+            'site_id' => $otherSite->id,
+            'device_id' => $drifted->id,
+            'source_kind' => 'provider',
+            'source' => 'unifi',
+            'storage_disk' => 'monitoring-snapshots',
+            'storage_path' => $otherSitePath,
+            'storage_path_hash' => hash('sha256', $otherSitePath),
+            'storage_state' => 'available',
+            'content_hash' => hash('sha256', 'other-site-content'),
+            'configuration_hash' => hash('sha256', 'other-site-configuration'),
+            'content_size' => 18,
+            'mime_type' => 'application/json',
+            'firmware_version' => '1.3.8',
+            'captured_at' => now(),
+            'diff_summary' => ['added' => [], 'removed' => [], 'changed' => [], 'truncated' => false],
+        ]);
+        $latestPath = 'monitoring/configuration-snapshots/latest.json.enc';
+        $latest = ConfigurationSnapshot::query()->create([
+            'snapshot_uuid' => (string) Str::uuid(),
+            'site_id' => $snapshotSite->id,
+            'device_id' => $drifted->id,
+            'source_kind' => 'provider',
+            'source' => 'unifi',
+            'storage_disk' => 'monitoring-snapshots',
+            'storage_path' => $latestPath,
+            'storage_path_hash' => hash('sha256', $latestPath),
+            'storage_state' => 'available',
+            'content_hash' => hash('sha256', 'latest-content'),
+            'configuration_hash' => hash('sha256', 'latest-configuration'),
+            'content_size' => 14,
+            'mime_type' => 'application/json',
+            'firmware_version' => '1.4.0',
+            'captured_at' => now()->subHour(),
+            'previous_snapshot_id' => $baseline->id,
+            'diff_summary' => [
+                'added' => ['configuration.services.https'],
+                'removed' => [],
+                'changed' => ['configuration.interfaces.wan.mtu'],
+                'truncated' => false,
+            ],
+        ]);
 
         $this->actingAs($this->admin)
             ->get('/security-devices/network-it?tab=configuration-firmware')
             ->assertOk()
-            ->assertInertia(function ($page) use ($drifted, $unsupported): void {
+            ->assertInertia(function ($page) use ($baseline, $drifted, $inventory, $latest, $latestPath, $otherSiteSnapshot, $unsupported): void {
                 $network = $page->toArray()['props']['networkItWorkspace'];
                 $rows = collect($network['activeTab']['configuration']);
                 $drift = $rows->firstWhere('deviceId', $drifted->id);
@@ -288,10 +379,18 @@ class NetworkItWorkspaceTest extends TestCase
                 $this->assertSame('desired-hash', $drift['configuration']['desiredHash']);
                 $this->assertSame('not_observed', $unknown['configuration']['state']);
                 $this->assertSame('not_observed', $unknown['firmware']['state']);
+                $this->assertSame($latest->id, $drift['latestSnapshot']['id']);
+                $this->assertSame([$latest->id, $inventory->id, $baseline->id], collect($drift['snapshotHistory'])->pluck('id')->all());
+                $this->assertNotContains($otherSiteSnapshot->id, collect($drift['snapshotHistory'])->pluck('id')->all());
+                $this->assertSame(2, $drift['latestSnapshot']['diff']['count']);
+                $this->assertSame('1.3.5', $drift['snapshotHistory'][1]['firmwareVersion']);
+                $this->assertSame('1.3.0', $drift['snapshotHistory'][2]['firmwareVersion']);
+                $this->assertFalse($drift['snapshotHistoryTruncated']);
                 $this->assertStringContainsString('read-only', $network['boundary']['managementNote']);
                 $payload = json_encode($network, JSON_THROW_ON_ERROR);
                 $this->assertStringNotContainsString('RAW-DEVICE-SECRET-SENTINEL', $payload);
                 $this->assertStringNotContainsString('RAW-CONFIG-PAYLOAD-SENTINEL', $payload);
+                $this->assertStringNotContainsString($latestPath, $payload);
             });
     }
 

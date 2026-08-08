@@ -330,6 +330,36 @@ class SiteHardwareRefactorTest extends TestCase
         ]);
     }
 
+    public function test_room_with_released_device_assignment_history_cannot_be_deleted(): void
+    {
+        $room = SiteRoom::create([
+            'site_id' => $this->siteA->id,
+            'name' => 'Historical equipment room',
+            'sort_order' => 1,
+        ]);
+        $device = Device::factory()->itInfrastructure()->create();
+        $assignment = DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_ROOM,
+            'assignable_id' => $room->id,
+            'assigned_at' => now()->subDay(),
+            'released_at' => now()->subHour(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson("/sites/{$this->siteA->id}/hardware/rooms", [
+                'action' => 'delete',
+                'room_id' => $room->id,
+            ])
+            ->assertStatus(409);
+
+        $this->assertDatabaseHas('site_rooms', ['id' => $room->id]);
+        $this->assertDatabaseHas('device_assignments', [
+            'id' => $assignment->id,
+            'released_at' => $assignment->released_at,
+        ]);
+    }
+
     public function test_assign_room_route_updates_canonical_assignment_for_unifi_devices(): void
     {
         $room = SiteRoom::create([

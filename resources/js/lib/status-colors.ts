@@ -19,9 +19,12 @@
  *     → bg-muted text-muted-foreground border-border
  */
 
-const SUCCESS = 'bg-status-success-bg text-status-success border-status-success/30';
-const WARNING = 'bg-status-warning-bg text-status-warning border-status-warning/30';
-const CRITICAL = 'bg-status-critical-bg text-status-critical border-status-critical/30';
+const SUCCESS =
+    'bg-status-success-bg text-status-success border-status-success/30';
+const WARNING =
+    'bg-status-warning-bg text-status-warning border-status-warning/30';
+const CRITICAL =
+    'bg-status-critical-bg text-status-critical border-status-critical/30';
 const INFO = 'bg-status-info-bg text-status-info border-status-info/30';
 const NEUTRAL = 'bg-muted text-muted-foreground border-border';
 
@@ -113,8 +116,10 @@ export function getStatusColor(status: string): string {
  * tokens — matches the rest of the app when branding changes.
  */
 export const riskScoreColor = (score: number): string => {
-    if (score >= 20) return 'bg-status-critical-bg text-status-critical-foreground';
-    if (score >= 15) return 'bg-status-warning-bg text-status-warning-foreground';
+    if (score >= 20)
+        return 'bg-status-critical-bg text-status-critical-foreground';
+    if (score >= 15)
+        return 'bg-status-warning-bg text-status-warning-foreground';
     if (score >= 10) return 'bg-status-warning-bg text-status-warning';
     return 'bg-status-success-bg text-status-success-foreground';
 };

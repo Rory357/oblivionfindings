@@ -2,6 +2,7 @@
 
 namespace App\Services\Queclink\Listener;
 
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkRawFrame;
@@ -9,16 +10,21 @@ use App\Services\Fleet\FleetTelemetryIngestService;
 use App\Services\Queclink\AckBuilder;
 use App\Services\Queclink\AtTrackFrame;
 use App\Services\Queclink\AtTrackProtocolParser;
+use App\Services\Queclink\Exceptions\IntakeRejected;
 use App\Services\Queclink\GovernedCommandLifecycleService;
+use App\Support\SafeOperationalData;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Routes a single parsed inbound frame:
- *   1. Persist raw frame for the debug console.
- *   2. Upsert QueclinkDevice (auto-add unknown IMEIs to pending tray).
- *   3. If paired, forward to FleetTelemetryIngestService for full ingest.
- *   4. Build outbound responses: server SACKs + any queued commands.
+ *   1. Validate its device-originated direction and bounded persisted fields.
+ *   2. Resolve the QueclinkDevice (auto-add unknown IMEIs to pending tray).
+ *   3. Persist the valid frame with immutable frame-time binding lineage.
+ *   4. If paired, forward to FleetTelemetryIngestService for full ingest.
+ *   5. Build outbound responses: server SACKs + any queued commands.
  *
  * Returns a list of raw bytes the caller should write back to the socket.
  */
@@ -29,6 +35,7 @@ class FrameRouter
         protected AckBuilder $acks,
         protected FleetTelemetryIngestService $ingest,
         protected GovernedCommandLifecycleService $governedCommands,
+        protected ListenerLimits $limits,
     ) {}
 
     /**
@@ -43,26 +50,37 @@ class FrameRouter
 
     public function handleInbound(string $rawFrame, ConnectionState $state): array
     {
+        if (strlen($rawFrame) > $this->limits->maxFrameBytes) {
+            throw new IntakeRejected('frame_limit');
+        }
+
+        $receivedAt = now();
+        $frame = $this->parser->parse($rawFrame);
+        if (! $frame->isValid()) {
+            throw new IntakeRejected('invalid_frame');
+        }
+
+        if (! in_array($frame->frameType, ['RESP', 'BUFF', 'ACK'], true)) {
+            throw new IntakeRejected('invalid_direction');
+        }
+
+        // Only a complete, protocol-valid, device-originated frame keeps a
+        // connection alive. Partial bytes and empty delimiters remain bounded
+        // by the connection's accepted-frame idle deadline.
         $state->touch();
         $state->framesIn++;
 
-        $frame = $this->parser->parse($rawFrame);
         $queclinkDevice = $this->resolveDevice($frame, $state);
 
-        // Rejected devices are inert: log the raw frame for debug visibility
-        // (so operators can see the rejection is working), then drop. No
-        // SACK, no ingest, no command dispatch.
+        // Rejected devices are inert. A valid frame remains governed intake
+        // evidence, but no SACK, telemetry ingest, or command is dispatched.
         if ($queclinkDevice && $queclinkDevice->status === QueclinkDevice::STATUS_REJECTED) {
-            $this->logRaw($frame, $state, $queclinkDevice, 'inbound');
+            $this->logRaw($frame, $state, $queclinkDevice, 'inbound', $receivedAt);
 
             return [];
         }
 
-        $storedFrame = $this->logRaw($frame, $state, $queclinkDevice, 'inbound');
-
-        if (! $frame->isValid()) {
-            return [];
-        }
+        $storedFrame = $this->logRaw($frame, $state, $queclinkDevice, 'inbound', $receivedAt);
 
         if ($queclinkDevice && $queclinkDevice->isPaired()) {
             try {
@@ -72,11 +90,12 @@ class FrameRouter
                     $state->sessionId,
                 );
             } catch (\Throwable $e) {
-                Log::warning('queclink: governed reconnection reconciliation intake failed', [
+                Log::warning('Queclink governed reconnection reconciliation failed.', SafeOperationalData::logContext([
+                    'provider' => 'queclink',
                     'device_id' => $queclinkDevice->device_id,
-                    'frame_id' => $storedFrame->id,
-                    'error_type' => $e::class,
-                ]);
+                    'failure_category' => SafeOperationalData::failureCategory($e),
+                    'items_errored' => 1,
+                ]));
             }
         }
 
@@ -86,11 +105,12 @@ class FrameRouter
             try {
                 $this->governedCommands->fulfilFromConfiguration($queclinkDevice, (int) $storedFrame->id);
             } catch (\Throwable $e) {
-                Log::warning('queclink: governed configuration reconciliation intake failed', [
+                Log::warning('Queclink governed configuration reconciliation failed.', SafeOperationalData::logContext([
+                    'provider' => 'queclink',
                     'device_id' => $queclinkDevice->device_id,
-                    'frame_id' => $storedFrame->id,
-                    'error_type' => $e::class,
-                ]);
+                    'failure_category' => SafeOperationalData::failureCategory($e),
+                    'items_errored' => 1,
+                ]));
             }
         }
 
@@ -103,19 +123,26 @@ class FrameRouter
         if ($ack !== null) {
             $outbound[] = $ack;
             if ($queclinkDevice) {
-                $this->logRawOutbound($ack, $state, $queclinkDevice, $frame->isHeartbeat() ? 'GTHBD' : null);
+                $this->logRawOutbound(
+                    $ack,
+                    $state,
+                    $queclinkDevice,
+                    $frame->isHeartbeat() ? 'GTHBD' : null,
+                    $receivedAt,
+                );
             } else {
-                $this->logRaw($this->parser->parse($ack), $state, null, 'outbound');
+                $this->logRaw($this->parser->parse($ack), $state, null, 'outbound', $receivedAt);
             }
         }
 
         // 2. Ingest telemetry into the fleet pipeline (only for paired devices).
         if ($queclinkDevice && $queclinkDevice->isPaired() && $frame->isReport()) {
             if ($queclinkDevice->device_id === null) {
-                Log::warning('queclink: paired provider device has no canonical Device binding', [
-                    'queclink_device_id' => $queclinkDevice->id,
-                    'frame_id' => $storedFrame->id,
-                ]);
+                Log::warning('Queclink provider device has no canonical binding.', SafeOperationalData::logContext([
+                    'provider' => 'queclink',
+                    'status' => 'unbound',
+                    'items_errored' => 1,
+                ]));
             } else {
                 try {
                     $result = $this->ingest->ingest(
@@ -126,20 +153,21 @@ class FrameRouter
                     if (($result['ok'] ?? false) === true && is_numeric($result['id'] ?? null)) {
                         $this->governedCommands->fulfilFromTelemetry($queclinkDevice, (int) $result['id']);
                     } elseif (($result['ok'] ?? false) !== true) {
-                        Log::warning('queclink: canonical telemetry intake rejected', [
-                            'queclink_device_id' => $queclinkDevice->id,
+                        Log::warning('Queclink canonical telemetry intake rejected.', SafeOperationalData::logContext([
+                            'provider' => 'queclink',
                             'device_id' => $queclinkDevice->device_id,
-                            'frame_id' => $storedFrame->id,
                             'status' => $result['status'] ?? null,
-                            'reason' => $result['error'] ?? 'unknown',
-                        ]);
+                            'failure_category' => 'telemetry_rejected',
+                            'items_errored' => 1,
+                        ]));
                     }
                 } catch (\Throwable $e) {
-                    Log::warning('queclink: ingest failed', [
-                        'imei' => $frame->imei,
-                        'command' => $frame->commandWord,
-                        'error' => $e->getMessage(),
-                    ]);
+                    Log::warning('Queclink telemetry ingest failed.', SafeOperationalData::logContext([
+                        'provider' => 'queclink',
+                        'device_id' => $queclinkDevice->device_id,
+                        'failure_category' => SafeOperationalData::failureCategory($e),
+                        'items_errored' => 1,
+                    ]));
                 }
             }
         }
@@ -154,7 +182,13 @@ class FrameRouter
             foreach ($this->popQueuedCommands($queclinkDevice) as $command) {
                 $sent = $this->governedCommands->markSent($command, $state->sessionId);
                 $outbound[] = $sent->raw_command;
-                $this->logRawOutbound($sent->raw_command, $state, $queclinkDevice, $sent->command_word);
+                $this->logRawOutbound(
+                    $sent->raw_command,
+                    $state,
+                    $queclinkDevice,
+                    $sent->command_word,
+                    $receivedAt,
+                );
             }
         }
 
@@ -219,6 +253,11 @@ class FrameRouter
         if ($frame->protocolVersion !== null) {
             $device->protocol_version = $frame->protocolVersion;
         }
+        if ($device->isPaired()
+            && is_numeric($device->device_id)
+            && (! is_string($device->binding_uuid) || $device->binding_uuid === '')) {
+            $device->binding_uuid = (string) Str::uuid();
+        }
         $device->save();
 
         $state->bind($frame->imei, $device->id);
@@ -226,8 +265,13 @@ class FrameRouter
         return $device;
     }
 
-    protected function logRaw(AtTrackFrame $frame, ConnectionState $state, ?QueclinkDevice $device, string $direction): QueclinkRawFrame
-    {
+    protected function logRaw(
+        AtTrackFrame $frame,
+        ConnectionState $state,
+        ?QueclinkDevice $device,
+        string $direction,
+        ?Carbon $receivedAt = null,
+    ): QueclinkRawFrame {
         $payload = $frame->isValid() ? $frame->payload : null;
         $protectedPayload = null;
         $sensitive = $frame->commandWord === 'GTALM';
@@ -240,9 +284,13 @@ class FrameRouter
             $payload['configuration_payload_protected'] = true;
         }
         $stored = $this->frameStorage($frame->rawFrame, $sensitive);
+        $lineage = $this->frameLineage($device, $receivedAt ?? now());
 
         return QueclinkRawFrame::create([
             'queclink_device_id' => $device?->id,
+            'canonical_device_id' => $lineage['canonical_device_id'],
+            'device_assignment_id' => $lineage['device_assignment_id'],
+            'binding_uuid' => $lineage['binding_uuid'],
             'imei' => $frame->imei,
             'direction' => $direction,
             'frame_type' => $frame->frameType,
@@ -257,12 +305,21 @@ class FrameRouter
         ]);
     }
 
-    protected function logRawOutbound(string $raw, ConnectionState $state, QueclinkDevice $device, ?string $commandWord = null): void
-    {
+    protected function logRawOutbound(
+        string $raw,
+        ConnectionState $state,
+        QueclinkDevice $device,
+        ?string $commandWord = null,
+        ?Carbon $receivedAt = null,
+    ): void {
         $isCommand = ! str_starts_with($raw, '+SACK');
+        $lineage = $this->frameLineage($device, $receivedAt ?? now());
 
         QueclinkRawFrame::create([
             'queclink_device_id' => $device->id,
+            'canonical_device_id' => $lineage['canonical_device_id'],
+            'device_assignment_id' => $lineage['device_assignment_id'],
+            'binding_uuid' => $lineage['binding_uuid'],
             'imei' => $device->imei,
             'direction' => 'outbound',
             'frame_type' => str_starts_with($raw, '+SACK') ? 'SACK' : 'AT',
@@ -273,6 +330,36 @@ class FrameRouter
             'session_id' => $state->sessionId,
             'remote_address' => $state->remoteAddress,
         ]);
+    }
+
+    /** @return array{canonical_device_id: ?int, device_assignment_id: ?int, binding_uuid: ?string} */
+    private function frameLineage(?QueclinkDevice $device, Carbon $receivedAt): array
+    {
+        $canonicalDeviceId = is_numeric($device?->device_id)
+            ? (int) $device->device_id
+            : null;
+        $assignmentId = null;
+
+        if ($canonicalDeviceId !== null) {
+            $assignmentId = DeviceAssignment::query()
+                ->where('device_id', $canonicalDeviceId)
+                ->where('assigned_at', '<=', $receivedAt)
+                ->where(function ($query) use ($receivedAt): void {
+                    $query->whereNull('released_at')
+                        ->orWhere('released_at', '>=', $receivedAt);
+                })
+                ->orderByDesc('assigned_at')
+                ->orderByDesc('id')
+                ->value('id');
+        }
+
+        return [
+            'canonical_device_id' => $canonicalDeviceId,
+            'device_assignment_id' => is_numeric($assignmentId) ? (int) $assignmentId : null,
+            'binding_uuid' => is_string($device?->binding_uuid) && $device->binding_uuid !== ''
+                ? $device->binding_uuid
+                : null,
+        ];
     }
 
     protected function rawFrameForStorage(string $raw): string

@@ -1,3 +1,5 @@
+import { SettingsTabs } from '@/components/hr';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import {
     AlertDialog,
@@ -38,8 +40,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero } from '@/components/page';
-import { SettingsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Pencil, Plus, Settings, Settings2, Trash2 } from 'lucide-react';
@@ -164,7 +164,8 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Custom Fields - HR Settings" />
             <PageShell>
-                <PageHero category="hr"
+                <PageHero
+                    category="hr"
                     icon={Settings}
                     title="Custom Fields"
                     description="Define custom fields for employee profiles."
@@ -172,11 +173,13 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                         { label: 'Total', value: definitions.length },
                         {
                             label: 'Active',
-                            value: definitions.filter((d) => d.is_active).length,
+                            value: definitions.filter((d) => d.is_active)
+                                .length,
                         },
                         {
                             label: 'Required',
-                            value: definitions.filter((d) => d.is_required).length,
+                            value: definitions.filter((d) => d.is_required)
+                                .length,
                         },
                     ]}
                     actions={
@@ -188,157 +191,170 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-lg">
-                            <DialogHeader>
-                                <DialogTitle>
-                                    {editingId ? 'Edit Field' : 'Create Field'}
-                                </DialogTitle>
-                            </DialogHeader>
-                            <form onSubmit={submit} className="space-y-4">
-                                <div>
-                                    <Label htmlFor="name">Field Name</Label>
-                                    <Input
-                                        id="name"
-                                        value={form.data.name}
-                                        onChange={(e) =>
-                                            form.setData('name', e.target.value)
-                                        }
-                                        placeholder="e.g. T-Shirt Size"
-                                        required
-                                    />
-                                    {form.errors.name && (
-                                        <p className="mt-1 text-sm text-status-critical">
-                                            {form.errors.name}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <Label>Field Type</Label>
-                                    <Select
-                                        value={form.data.field_type}
-                                        onValueChange={(v) =>
-                                            form.setData('field_type', v)
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {fieldTypes.map((type) => (
-                                                <SelectItem
-                                                    key={type}
-                                                    value={type}
-                                                >
-                                                    {fieldTypeLabels[type] ??
-                                                        type}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {form.data.field_type === 'select' && (
+                                <DialogHeader>
+                                    <DialogTitle>
+                                        {editingId
+                                            ? 'Edit Field'
+                                            : 'Create Field'}
+                                    </DialogTitle>
+                                </DialogHeader>
+                                <form onSubmit={submit} className="space-y-4">
                                     <div>
-                                        <Label>Options</Label>
-                                        <div className="mt-1 flex gap-2">
-                                            <Input
-                                                value={optionInput}
-                                                onChange={(e) =>
-                                                    setOptionInput(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="Add an option"
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        e.preventDefault();
-                                                        addOption();
-                                                    }
-                                                }}
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={addOption}
-                                            >
-                                                Add
-                                            </Button>
-                                        </div>
-                                        <div className="mt-2 flex flex-wrap gap-1">
-                                            {form.data.options.map((opt, i) => (
-                                                <Badge
-                                                    key={i}
-                                                    variant="secondary"
-                                                    className="cursor-pointer"
-                                                    onClick={() =>
-                                                        removeOption(i)
-                                                    }
-                                                >
-                                                    {opt} &times;
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="flex items-center gap-4">
-                                    <label className="flex items-center gap-2 text-sm">
-                                        <Checkbox
-                                            checked={form.data.is_required}
-                                            onCheckedChange={(checked) =>
+                                        <Label htmlFor="name">Field Name</Label>
+                                        <Input
+                                            id="name"
+                                            value={form.data.name}
+                                            onChange={(e) =>
                                                 form.setData(
-                                                    'is_required',
-                                                    !!checked,
+                                                    'name',
+                                                    e.target.value,
                                                 )
                                             }
+                                            placeholder="e.g. T-Shirt Size"
+                                            required
                                         />
-                                        Required
-                                    </label>
-                                    {editingId && (
+                                        {form.errors.name && (
+                                            <p className="mt-1 text-sm text-status-critical">
+                                                {form.errors.name}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <Label>Field Type</Label>
+                                        <Select
+                                            value={form.data.field_type}
+                                            onValueChange={(v) =>
+                                                form.setData('field_type', v)
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {fieldTypes.map((type) => (
+                                                    <SelectItem
+                                                        key={type}
+                                                        value={type}
+                                                    >
+                                                        {fieldTypeLabels[
+                                                            type
+                                                        ] ?? type}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {form.data.field_type === 'select' && (
+                                        <div>
+                                            <Label>Options</Label>
+                                            <div className="mt-1 flex gap-2">
+                                                <Input
+                                                    value={optionInput}
+                                                    onChange={(e) =>
+                                                        setOptionInput(
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="Add an option"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            addOption();
+                                                        }
+                                                    }}
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={addOption}
+                                                >
+                                                    Add
+                                                </Button>
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap gap-1">
+                                                {form.data.options.map(
+                                                    (opt, i) => (
+                                                        <Badge
+                                                            key={i}
+                                                            variant="secondary"
+                                                            className="cursor-pointer"
+                                                            onClick={() =>
+                                                                removeOption(i)
+                                                            }
+                                                        >
+                                                            {opt} &times;
+                                                        </Badge>
+                                                    ),
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center gap-4">
                                         <label className="flex items-center gap-2 text-sm">
                                             <Checkbox
-                                                checked={form.data.is_active}
+                                                checked={form.data.is_required}
                                                 onCheckedChange={(checked) =>
                                                     form.setData(
-                                                        'is_active',
+                                                        'is_required',
                                                         !!checked,
                                                     )
                                                 }
                                             />
-                                            Active
+                                            Required
                                         </label>
-                                    )}
-                                </div>
+                                        {editingId && (
+                                            <label className="flex items-center gap-2 text-sm">
+                                                <Checkbox
+                                                    checked={
+                                                        form.data.is_active
+                                                    }
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        form.setData(
+                                                            'is_active',
+                                                            !!checked,
+                                                        )
+                                                    }
+                                                />
+                                                Active
+                                            </label>
+                                        )}
+                                    </div>
 
-                                <div>
-                                    <Label htmlFor="sort_order">
-                                        Sort Order
-                                    </Label>
-                                    <Input
-                                        id="sort_order"
-                                        type="number"
-                                        min={0}
-                                        value={form.data.sort_order}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'sort_order',
-                                                parseInt(e.target.value) || 0,
-                                            )
-                                        }
-                                    />
-                                </div>
+                                    <div>
+                                        <Label htmlFor="sort_order">
+                                            Sort Order
+                                        </Label>
+                                        <Input
+                                            id="sort_order"
+                                            type="number"
+                                            min={0}
+                                            value={form.data.sort_order}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'sort_order',
+                                                    parseInt(e.target.value) ||
+                                                        0,
+                                                )
+                                            }
+                                        />
+                                    </div>
 
-                                <DialogFooter>
-                                    <Button
-                                        type="submit"
-                                        disabled={form.processing}
-                                    >
-                                        {editingId ? 'Update' : 'Create'}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
+                                    <DialogFooter>
+                                        <Button
+                                            type="submit"
+                                            disabled={form.processing}
+                                        >
+                                            {editingId ? 'Update' : 'Create'}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
                     }
                 />
 
@@ -430,7 +446,9 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() =>
-                                                            setDeletingId(def.id)
+                                                            setDeletingId(
+                                                                def.id,
+                                                            )
                                                         }
                                                         title="Delete"
                                                     >
@@ -463,7 +481,9 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={confirmDeleteDefinition}>
+                            <AlertDialogAction
+                                onClick={confirmDeleteDefinition}
+                            >
                                 Delete field
                             </AlertDialogAction>
                         </AlertDialogFooter>

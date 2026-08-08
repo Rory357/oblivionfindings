@@ -14,19 +14,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Link, usePage, router } from '@inertiajs/react';
-import {
-    ArrowRight,
-    Bell,
-    BellOff,
-    Building2,
-    ClipboardList,
-    Megaphone,
-    ShieldAlert,
-    TriangleAlert,
-    Users,
-    Wrench,
-} from 'lucide-react';
+import { Link, router, usePage } from '@inertiajs/react';
+import { ArrowRight, Bell, BellOff, Megaphone } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type InboxPayload = {
@@ -58,7 +47,7 @@ type InboxPayload = {
 function UnreadBadge({ count }: { count: number }) {
     if (!count) return null;
     return (
-        <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-bold leading-[18px] text-white shadow-sm">
+        <span className="absolute -top-1 -right-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-[18px] font-bold text-white shadow-sm">
             {count > 99 ? '99+' : count}
         </span>
     );
@@ -76,11 +65,15 @@ function notificationBody(n: { data: any }) {
     return typeof msg === 'string' ? msg : null;
 }
 
-function notificationContext(n: { data: any }): Array<{ label: string; value: string }> {
+function notificationContext(n: {
+    data: any;
+}): Array<{ label: string; value: string }> {
     const ctx = n?.data?.context;
     if (!ctx || typeof ctx !== 'object') return [];
     return Object.entries(ctx)
-        .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')
+        .filter(
+            ([, v]) => v !== null && v !== undefined && String(v).trim() !== '',
+        )
         .map(([k, v]) => ({ label: k, value: String(v) }));
 }
 
@@ -112,28 +105,42 @@ function relativeTime(dateStr: string | null): string {
     if (hours < 24) return `${hours}h`;
     const days = Math.floor(hours / 24);
     if (days < 7) return `${days}d`;
-    return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return new Date(dateStr).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+    });
 }
 
 function isToday(dateStr: string | null): boolean {
     if (!dateStr) return false;
     const d = new Date(dateStr);
     const now = new Date();
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+    );
 }
 
 export default function InboxMenus() {
     const inbox = (usePage().props as any).inbox as InboxPayload | null;
 
     const [openNotifId, setOpenNotifId] = useState<string | null>(null);
-    const [openAnnouncementId, setOpenAnnouncementId] = useState<number | null>(null);
+    const [openAnnouncementId, setOpenAnnouncementId] = useState<number | null>(
+        null,
+    );
 
     const openNotification = useMemo(
-        () => inbox?.notifications?.items?.find((n) => n.id === openNotifId) ?? null,
+        () =>
+            inbox?.notifications?.items?.find((n) => n.id === openNotifId) ??
+            null,
         [inbox?.notifications?.items, openNotifId],
     );
     const openAnnouncement = useMemo(
-        () => inbox?.announcements?.items?.find((a) => a.id === openAnnouncementId) ?? null,
+        () =>
+            inbox?.announcements?.items?.find(
+                (a) => a.id === openAnnouncementId,
+            ) ?? null,
         [inbox?.announcements?.items, openAnnouncementId],
     );
 
@@ -142,22 +149,37 @@ export default function InboxMenus() {
     // treat any unexpected shape as "no inbox" rather than crashing the whole layout.
     if (!inbox || !inbox.notifications || !inbox.announcements) return null;
 
-    const mustAckBeforeClose = !!openNotification?.data?.must_ack_before_close && !!openNotification?.data?.ack_required && !openNotification?.acknowledged_at;
+    const mustAckBeforeClose =
+        !!openNotification?.data?.must_ack_before_close &&
+        !!openNotification?.data?.ack_required &&
+        !openNotification?.acknowledged_at;
 
     const reloadInbox = () => {
         router.reload({ only: ['inbox'] });
     };
 
     const markNotificationRead = (id: string) => {
-        router.post(`/inbox/notifications/${id}/read`, {}, { preserveScroll: true, onSuccess: reloadInbox });
+        router.post(
+            `/inbox/notifications/${id}/read`,
+            {},
+            { preserveScroll: true, onSuccess: reloadInbox },
+        );
     };
 
     const acknowledgeNotification = (id: string) => {
-        router.post(`/inbox/notifications/${id}/acknowledge`, {}, { preserveScroll: true, onSuccess: reloadInbox });
+        router.post(
+            `/inbox/notifications/${id}/acknowledge`,
+            {},
+            { preserveScroll: true, onSuccess: reloadInbox },
+        );
     };
 
     const markAnnouncementRead = (id: number) => {
-        router.post(`/inbox/announcements/${id}/read`, {}, { preserveScroll: true, onSuccess: reloadInbox });
+        router.post(
+            `/inbox/announcements/${id}/read`,
+            {},
+            { preserveScroll: true, onSuccess: reloadInbox },
+        );
     };
 
     const unreadNotifications = inbox.notifications?.unread_count ?? 0;
@@ -180,7 +202,9 @@ export default function InboxMenus() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-96">
                     <div className="flex items-center justify-between px-1">
-                        <DropdownMenuLabel className="text-sm font-semibold">Notifications</DropdownMenuLabel>
+                        <DropdownMenuLabel className="text-sm font-semibold">
+                            Notifications
+                        </DropdownMenuLabel>
                         <Button
                             variant="ghost"
                             size="sm"
@@ -191,7 +215,10 @@ export default function InboxMenus() {
                                 router.post(
                                     '/inbox/notifications/read-all',
                                     {},
-                                    { preserveScroll: true, onSuccess: reloadInbox },
+                                    {
+                                        preserveScroll: true,
+                                        onSuccess: reloadInbox,
+                                    },
                                 )
                             }
                         >
@@ -205,19 +232,32 @@ export default function InboxMenus() {
                             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
                                 <BellOff className="h-7 w-7 text-muted-foreground/50" />
                             </div>
-                            <p className="text-sm font-medium text-muted-foreground">No notifications yet</p>
-                            <p className="mt-1 text-xs text-muted-foreground/70">You're all caught up</p>
+                            <p className="text-sm font-medium text-muted-foreground">
+                                No notifications yet
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground/70">
+                                You're all caught up
+                            </p>
                         </div>
                     ) : (
                         (() => {
-                            const visible = inbox.notifications.items.slice(0, 10);
-                            const todayItems = visible.filter((n) => isToday(n.created_at));
-                            const earlierItems = visible.filter((n) => !isToday(n.created_at));
+                            const visible = inbox.notifications.items.slice(
+                                0,
+                                10,
+                            );
+                            const todayItems = visible.filter((n) =>
+                                isToday(n.created_at),
+                            );
+                            const earlierItems = visible.filter(
+                                (n) => !isToday(n.created_at),
+                            );
 
                             const renderItem = (n: (typeof visible)[0]) => {
                                 const title = notificationTitle(n);
                                 const isUnread = !n.read_at;
-                                const dotClass = getModuleDotClass(n.data?.module);
+                                const dotClass = getModuleDotClass(
+                                    n.data?.module,
+                                );
                                 return (
                                     <DropdownMenuItem
                                         key={n.id}
@@ -226,15 +266,20 @@ export default function InboxMenus() {
                                             e.preventDefault();
                                             setOpenAnnouncementId(null);
                                             setOpenNotifId(n.id);
-                                            if (isUnread) markNotificationRead(n.id);
+                                            if (isUnread)
+                                                markNotificationRead(n.id);
                                         }}
                                     >
                                         <div className="flex w-full items-center gap-2.5">
-                                            <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
-                                            <span className={`min-w-0 flex-1 truncate text-sm ${isUnread ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground'}`}>
+                                            <span
+                                                className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotClass}`}
+                                            />
+                                            <span
+                                                className={`min-w-0 flex-1 truncate text-sm ${isUnread ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground'}`}
+                                            >
                                                 {title}
                                             </span>
-                                            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
+                                            <span className="shrink-0 text-[11px] text-muted-foreground/70 tabular-nums">
                                                 {relativeTime(n.created_at)}
                                             </span>
                                             {isUnread && (
@@ -249,14 +294,20 @@ export default function InboxMenus() {
                                 <div className="max-h-[400px] overflow-y-auto">
                                     {todayItems.length > 0 && (
                                         <>
-                                            <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">Today</div>
+                                            <div className="px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
+                                                Today
+                                            </div>
                                             {todayItems.map(renderItem)}
                                         </>
                                     )}
                                     {earlierItems.length > 0 && (
                                         <>
-                                            {todayItems.length > 0 && <DropdownMenuSeparator className="my-1" />}
-                                            <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">Earlier</div>
+                                            {todayItems.length > 0 && (
+                                                <DropdownMenuSeparator className="my-1" />
+                                            )}
+                                            <div className="px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
+                                                Earlier
+                                            </div>
                                             {earlierItems.map(renderItem)}
                                         </>
                                     )}
@@ -294,7 +345,9 @@ export default function InboxMenus() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-96">
                     <div className="flex items-center justify-between px-1">
-                        <DropdownMenuLabel className="text-sm font-semibold">Announcements</DropdownMenuLabel>
+                        <DropdownMenuLabel className="text-sm font-semibold">
+                            Announcements
+                        </DropdownMenuLabel>
                         <Button
                             variant="ghost"
                             size="sm"
@@ -304,7 +357,10 @@ export default function InboxMenus() {
                                 router.post(
                                     '/inbox/announcements/read-all',
                                     {},
-                                    { preserveScroll: true, onSuccess: reloadInbox },
+                                    {
+                                        preserveScroll: true,
+                                        onSuccess: reloadInbox,
+                                    },
                                 )
                             }
                         >
@@ -318,8 +374,12 @@ export default function InboxMenus() {
                             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
                                 <Megaphone className="h-7 w-7 text-muted-foreground/50" />
                             </div>
-                            <p className="text-sm font-medium text-muted-foreground">No announcements yet</p>
-                            <p className="mt-1 text-xs text-muted-foreground/70">Check back later</p>
+                            <p className="text-sm font-medium text-muted-foreground">
+                                No announcements yet
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground/70">
+                                Check back later
+                            </p>
                         </div>
                     ) : (
                         <div className="max-h-[400px] overflow-y-auto">
@@ -333,12 +393,15 @@ export default function InboxMenus() {
                                             e.preventDefault();
                                             setOpenNotifId(null);
                                             setOpenAnnouncementId(a.id);
-                                            if (isUnread) markAnnouncementRead(a.id);
+                                            if (isUnread)
+                                                markAnnouncementRead(a.id);
                                         }}
                                     >
                                         <div className="flex w-full flex-col gap-1">
                                             <div className="flex items-center justify-between gap-2">
-                                                <span className={`min-w-0 flex-1 truncate text-sm ${isUnread ? 'font-semibold' : 'font-medium text-muted-foreground'}`}>
+                                                <span
+                                                    className={`min-w-0 flex-1 truncate text-sm ${isUnread ? 'font-semibold' : 'font-medium text-muted-foreground'}`}
+                                                >
                                                     {a.title}
                                                 </span>
                                                 {isUnread && (
@@ -357,8 +420,10 @@ export default function InboxMenus() {
                                                     </span>
                                                 )}
                                                 {a.created_at && (
-                                                    <span className="text-[11px] tabular-nums text-muted-foreground/60">
-                                                        {relativeTime(a.created_at)}
+                                                    <span className="text-[11px] text-muted-foreground/60 tabular-nums">
+                                                        {relativeTime(
+                                                            a.created_at,
+                                                        )}
                                                     </span>
                                                 )}
                                             </div>
@@ -372,12 +437,15 @@ export default function InboxMenus() {
             </DropdownMenu>
 
             {/* Notification modal */}
-            <Dialog open={!!openNotification} onOpenChange={(v) => {
-                if (!v) {
-                    if (mustAckBeforeClose) return;
-                    setOpenNotifId(null);
-                }
-            }}>
+            <Dialog
+                open={!!openNotification}
+                onOpenChange={(v) => {
+                    if (!v) {
+                        if (mustAckBeforeClose) return;
+                        setOpenNotifId(null);
+                    }
+                }}
+            >
                 <DialogContent
                     className="sm:max-w-lg"
                     onEscapeKeyDown={(e) => {
@@ -389,7 +457,9 @@ export default function InboxMenus() {
                 >
                     <DialogHeader>
                         <DialogTitle>
-                            {openNotification ? notificationTitle(openNotification) : 'Notification'}
+                            {openNotification
+                                ? notificationTitle(openNotification)
+                                : 'Notification'}
                         </DialogTitle>
                     </DialogHeader>
 
@@ -397,11 +467,13 @@ export default function InboxMenus() {
                         <div className="space-y-3">
                             {openNotification.created_at && (
                                 <div className="text-xs text-muted-foreground">
-                                    {new Date(openNotification.created_at).toLocaleString()}
+                                    {new Date(
+                                        openNotification.created_at,
+                                    ).toLocaleString()}
                                 </div>
                             )}
                             {notificationBody(openNotification) ? (
-                                <div className="whitespace-pre-wrap text-sm">
+                                <div className="text-sm whitespace-pre-wrap">
                                     {notificationBody(openNotification)}
                                 </div>
                             ) : (
@@ -410,13 +482,16 @@ export default function InboxMenus() {
                                 </div>
                             )}
 
-                            {notificationContext(openNotification).length > 0 && (
+                            {notificationContext(openNotification).length >
+                                0 && (
                                 <div className="rounded-md border bg-muted/20 p-3">
                                     <div className="mb-2 text-xs font-semibold text-muted-foreground">
                                         Details
                                     </div>
                                     <div className="space-y-1">
-                                        {notificationContext(openNotification).map((row) => (
+                                        {notificationContext(
+                                            openNotification,
+                                        ).map((row) => (
                                             <div
                                                 key={row.label}
                                                 className="grid grid-cols-3 gap-2 text-sm"
@@ -436,24 +511,30 @@ export default function InboxMenus() {
                     )}
 
                     <DialogFooter>
-                        {openNotification?.data?.ack_required && !openNotification?.acknowledged_at && (
+                        {openNotification?.data?.ack_required &&
+                            !openNotification?.acknowledged_at && (
+                                <Button
+                                    type="button"
+                                    variant="default"
+                                    onClick={() => {
+                                        if (openNotification?.id) {
+                                            acknowledgeNotification(
+                                                openNotification.id,
+                                            );
+                                        }
+                                    }}
+                                >
+                                    Acknowledge
+                                </Button>
+                            )}
+                        {(openNotification?.data?.url ||
+                            openNotification?.data?.action_url) && (
                             <Button
                                 type="button"
-                                variant="default"
                                 onClick={() => {
-                                    if (openNotification?.id) {
-                                        acknowledgeNotification(openNotification.id);
-                                    }
-                                }}
-                            >
-                                Acknowledge
-                            </Button>
-                        )}
-                        {(openNotification?.data?.url || openNotification?.data?.action_url) && (
-                            <Button
-                                type="button"
-                                onClick={() => {
-                                    const url = openNotification?.data?.url || openNotification?.data?.action_url;
+                                    const url =
+                                        openNotification?.data?.url ||
+                                        openNotification?.data?.action_url;
                                     if (typeof url === 'string' && url) {
                                         router.visit(url);
                                     }
@@ -462,15 +543,21 @@ export default function InboxMenus() {
                                 Open
                             </Button>
                         )}
-                        <Button type="button" variant="outline" disabled={mustAckBeforeClose} onClick={() => {
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={mustAckBeforeClose}
+                            onClick={() => {
                                 if (mustAckBeforeClose) return;
                                 setOpenNotifId(null);
-                            }}>
+                            }}
+                        >
                             Close
                         </Button>
                         {mustAckBeforeClose && (
                             <div className="w-full text-xs text-muted-foreground">
-                                This notification requires acknowledgement before you can close it.
+                                This notification requires acknowledgement
+                                before you can close it.
                             </div>
                         )}
                     </DialogFooter>
@@ -478,10 +565,17 @@ export default function InboxMenus() {
             </Dialog>
 
             {/* Announcement modal */}
-            <Dialog open={!!openAnnouncement} onOpenChange={(v) => !v && setOpenAnnouncementId(null)}>
+            <Dialog
+                open={!!openAnnouncement}
+                onOpenChange={(v) => !v && setOpenAnnouncementId(null)}
+            >
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>{openAnnouncement ? openAnnouncement.title : 'Announcement'}</DialogTitle>
+                        <DialogTitle>
+                            {openAnnouncement
+                                ? openAnnouncement.title
+                                : 'Announcement'}
+                        </DialogTitle>
                     </DialogHeader>
 
                     {openAnnouncement && (
@@ -496,21 +590,31 @@ export default function InboxMenus() {
                                 )}
                                 {openAnnouncement.created_at && (
                                     <div className="text-xs text-muted-foreground">
-                                        {new Date(openAnnouncement.created_at).toLocaleString()}
+                                        {new Date(
+                                            openAnnouncement.created_at,
+                                        ).toLocaleString()}
                                     </div>
                                 )}
                             </div>
 
                             {openAnnouncement.body ? (
-                                <div className="whitespace-pre-wrap text-sm">{openAnnouncement.body}</div>
+                                <div className="text-sm whitespace-pre-wrap">
+                                    {openAnnouncement.body}
+                                </div>
                             ) : (
-                                <div className="text-sm text-muted-foreground">No content.</div>
+                                <div className="text-sm text-muted-foreground">
+                                    No content.
+                                </div>
                             )}
                         </div>
                     )}
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpenAnnouncementId(null)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpenAnnouncementId(null)}
+                        >
                             Close
                         </Button>
                     </DialogFooter>

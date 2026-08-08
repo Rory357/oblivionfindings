@@ -15,8 +15,18 @@ uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->seed(RbacSeeder::class);
-    $this->visibleSite = Site::factory()->create(['name' => 'Visible Site', 'is_active' => true]);
-    $this->hiddenSite = Site::factory()->create(['name' => 'Hidden Site', 'is_active' => true]);
+    $this->visibleSite = Site::factory()->create([
+        'name' => 'Visible Site',
+        'is_active' => true,
+        'archived' => false,
+        'archived_at' => null,
+    ]);
+    $this->hiddenSite = Site::factory()->create([
+        'name' => 'Hidden Site',
+        'is_active' => true,
+        'archived' => false,
+        'archived_at' => null,
+    ]);
 });
 
 function siteProfileCurrentStaff(
@@ -240,11 +250,14 @@ test('client linking candidates and mutations require explicit Client permission
     ]);
 
     $scopedResponse = $this->actingAs($scopedManager)
-        ->get(route('sites.show', $this->visibleSite))
+        ->get(
+            route('sites.show', $this->visibleSite),
+            $this->inertiaPartialHeaders('sites/show', 'clientsData'),
+        )
         ->assertOk();
-    expect($scopedResponse->inertiaProps('availableClients'))->toBeEmpty()
-        ->and($scopedResponse->inertiaProps('can.linkClient'))->toBeFalse()
-        ->and($scopedResponse->inertiaProps('can.createClient'))->toBeFalse();
+    expect($scopedResponse->json('props.clientsData.available'))->toBeEmpty()
+        ->and($scopedResponse->json('props.clientsData.can_place_existing'))->toBeFalse()
+        ->and($scopedResponse->json('props.clientsData.can_create'))->toBeFalse();
 
     $this->actingAs($scopedManager)
         ->post(route('sites.clients.link', $this->visibleSite), ['client_id' => $unassigned->id])
@@ -252,13 +265,16 @@ test('client linking candidates and mutations require explicit Client permission
     expect($unassigned->fresh()->site_id)->toBeNull();
 
     $providerResponse = $this->actingAs($provider)
-        ->get(route('sites.show', $this->visibleSite))
+        ->get(
+            route('sites.show', $this->visibleSite),
+            $this->inertiaPartialHeaders('sites/show', 'clientsData'),
+        )
         ->assertOk();
-    expect(collect($providerResponse->inertiaProps('availableClients'))->pluck('id'))
+    expect(collect($providerResponse->json('props.clientsData.available'))->pluck('id'))
         ->toContain($unassigned->id)
         ->not->toContain($assigned->id)
-        ->and($providerResponse->inertiaProps('can.linkClient'))->toBeTrue()
-        ->and($providerResponse->inertiaProps('can.createClient'))->toBeTrue();
+        ->and($providerResponse->json('props.clientsData.can_place_existing'))->toBeTrue()
+        ->and($providerResponse->json('props.clientsData.can_create'))->toBeTrue();
 
     $this->actingAs($provider)
         ->post(route('sites.clients.link', $this->visibleSite), ['client_id' => $assigned->id])
@@ -291,7 +307,9 @@ test('Site quick-create accepts only active service contexts valid for that Site
     );
 
     $this->actingAs($provider)
-        ->post(route('sites.clients.store', $this->visibleSite), [
+        ->post(route('clients.store'), [
+            '_modal' => true,
+            'site_id' => $this->visibleSite->id,
             'first_name' => 'Canonical',
             'last_name' => 'Client',
             'status' => 'onboarding',
@@ -305,7 +323,9 @@ test('Site quick-create accepts only active service contexts valid for that Site
     ]);
 
     $this->actingAs($provider)
-        ->post(route('sites.clients.store', $this->visibleSite), [
+        ->post(route('clients.store'), [
+            '_modal' => true,
+            'site_id' => $this->visibleSite->id,
             'first_name' => 'Rejected',
             'last_name' => 'Context',
             'status' => 'onboarding',

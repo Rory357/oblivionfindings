@@ -174,10 +174,30 @@ const STEPS: WizardStep[] = [
 ];
 
 const CATEGORY_OPTIONS = [
-    { key: 'vehicle', label: 'Vehicle', icon: Car, description: 'Cars, vans & fleet vehicles' },
-    { key: 'equipment', label: 'Equipment', icon: Wrench, description: 'Tools, devices & appliances' },
-    { key: 'property', label: 'Property', icon: Home, description: 'Buildings & fixed property' },
-    { key: 'other', label: 'Other', icon: Package, description: 'Everything else' },
+    {
+        key: 'vehicle',
+        label: 'Vehicle',
+        icon: Car,
+        description: 'Cars, vans & fleet vehicles',
+    },
+    {
+        key: 'equipment',
+        label: 'Equipment',
+        icon: Wrench,
+        description: 'Tools, devices & appliances',
+    },
+    {
+        key: 'property',
+        label: 'Property',
+        icon: Home,
+        description: 'Buildings & fixed property',
+    },
+    {
+        key: 'other',
+        label: 'Other',
+        icon: Package,
+        description: 'Everything else',
+    },
 ];
 
 const FUEL_TYPES = [
@@ -213,7 +233,8 @@ function initialState(
             wof_expires_at: asset.wof_expires_at ?? '',
             cof_expires_at: asset.cof_expires_at ?? '',
             fuel_type: asset.fuel_type ?? '',
-            odometer_km: asset.odometer_km != null ? String(asset.odometer_km) : '',
+            odometer_km:
+                asset.odometer_km != null ? String(asset.odometer_km) : '',
             purchase_date: asset.purchase_date ?? '',
             warranty_expires_at: asset.warranty_expires_at ?? '',
             requires_inspection: asset.requires_inspection ?? false,
@@ -257,10 +278,7 @@ function initialState(
 /*  Client-side validation (mirrors AssetController@store rules)       */
 /* ------------------------------------------------------------------ */
 
-function validateStep(
-    key: StepKey,
-    d: WizardState,
-): Record<string, string> {
+function validateStep(key: StepKey, d: WizardState): Record<string, string> {
     const e: Record<string, string> = {};
     if (key === 'basic') {
         if (!d.name.trim()) e.name = 'Name is required';
@@ -510,8 +528,8 @@ export function AssetWizardDialog({
                     </>
                 ) : (
                     <>
-                        <span className="font-semibold">{data.name}</span> is now
-                        on the asset register. Add documents, trackers,
+                        <span className="font-semibold">{data.name}</span> is
+                        now on the asset register. Add documents, trackers,
                         inspections and assignments from its detail page.
                     </>
                 )
@@ -526,7 +544,9 @@ export function AssetWizardDialog({
                         </Button>
                         {createdId != null ? (
                             <Button asChild>
-                                <Link href={`/fleet-assets/assets/${createdId}`}>
+                                <Link
+                                    href={`/fleet-assets/assets/${createdId}`}
+                                >
                                     View asset
                                 </Link>
                             </Button>
@@ -581,7 +601,9 @@ export function AssetWizardDialog({
             description="A guided wizard to record an asset on the Fleet & Assets register."
             railIcon={isEdit ? Pencil : Package}
             railTitle={isEdit ? 'Edit asset' : 'New asset'}
-            railSub={isEdit ? (asset?.name ?? 'Update details') : 'Asset register'}
+            railSub={
+                isEdit ? (asset?.name ?? 'Update details') : 'Asset register'
+            }
             steps={STEPS}
             stepIndex={stepIndex}
             onStepClick={(i) => {
@@ -672,7 +694,10 @@ function StepBasic({ data, set, errors }: StepProps) {
                         onChange={(v) => set('status', v)}
                         options={[
                             { value: 'active', label: 'Active' },
-                            { value: 'out_of_service', label: 'Out of service' },
+                            {
+                                value: 'out_of_service',
+                                label: 'Out of service',
+                            },
                             { value: 'retired', label: 'Retired' },
                         ]}
                     />
@@ -715,7 +740,9 @@ function StepDetails({ data, set, errors }: StepProps) {
                     <Field label="Manufacturer" error={errors.manufacturer}>
                         <Input
                             value={data.manufacturer}
-                            onChange={(e) => set('manufacturer', e.target.value)}
+                            onChange={(e) =>
+                                set('manufacturer', e.target.value)
+                            }
                             placeholder="e.g. Toyota"
                         />
                     </Field>
@@ -729,7 +756,9 @@ function StepDetails({ data, set, errors }: StepProps) {
                     <Field label="Serial number" error={errors.serial_number}>
                         <Input
                             value={data.serial_number}
-                            onChange={(e) => set('serial_number', e.target.value)}
+                            onChange={(e) =>
+                                set('serial_number', e.target.value)
+                            }
                             placeholder="Serial / VIN"
                         />
                     </Field>
@@ -887,10 +916,7 @@ function StepLocation({
                         ]}
                     />
                 </Field>
-                <Field
-                    label="Location description"
-                    error={errors.location}
-                >
+                <Field label="Location description" error={errors.location}>
                     <Input
                         value={data.location}
                         onChange={(e) => set('location', e.target.value)}

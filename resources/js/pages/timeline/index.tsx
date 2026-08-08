@@ -71,7 +71,10 @@ type Props = {
 // Worker-facing category filter options. Raw backend types are still
 // preserved on each event and shown as secondary detail; the primary
 // row label uses the collapsed category set from `timeline-vocab`.
-const CATEGORY_FILTER_OPTIONS: { value: TimelineCategory | 'all'; label: string }[] = [
+const CATEGORY_FILTER_OPTIONS: {
+    value: TimelineCategory | 'all';
+    label: string;
+}[] = [
     { value: 'all', label: 'All activity' },
     ...TIMELINE_CATEGORY_ORDER.map((c) => ({
         value: c,
@@ -169,113 +172,137 @@ export default function TimelineIndex(props: Props) {
 
             <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
                 {/* Hero Header */}
-                {isClient && c && (() => {
-                    const badges: PageHeroBadge[] = [
-                        { label: c.status, tone: c.status === 'active' ? 'success' : 'default' },
-                    ];
-                    if (c.funding_type) badges.push({ label: c.funding_type });
-                    if (c.service_context) badges.push({ label: c.service_context.name });
-                    if (c.site) badges.push({ label: c.site.name, icon: Home });
-                    return (
-                        <PageHero
-                            avatar={{
-                                src: c.avatar ?? c.profile_photo_url ?? undefined,
-                                fallback: getInitials(name),
-                            }}
-                            title={name}
-                            description={
-                                [
-                                    c.preferred_name && c.preferred_name !== name ? `Preferred: ${c.preferred_name}` : null,
-                                    c.nhi_number ? `NHI: ${c.nhi_number}` : null,
-                                ].filter(Boolean).join(' · ')
-                            }
-                            badges={badges}
-                            actions={
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    asChild
-                                >
-                                    <Link href={`/operations/clients/${c.id}`}>
-                                        <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                                        Back
-                                    </Link>
-                                </Button>
-                            }
-                        />
-                    );
-                })()}
+                {isClient &&
+                    c &&
+                    (() => {
+                        const badges: PageHeroBadge[] = [
+                            {
+                                label: c.status,
+                                tone:
+                                    c.status === 'active'
+                                        ? 'success'
+                                        : 'default',
+                            },
+                        ];
+                        if (c.funding_type)
+                            badges.push({ label: c.funding_type });
+                        if (c.service_context)
+                            badges.push({ label: c.service_context.name });
+                        if (c.site)
+                            badges.push({ label: c.site.name, icon: Home });
+                        return (
+                            <PageHero
+                                avatar={{
+                                    src:
+                                        c.avatar ??
+                                        c.profile_photo_url ??
+                                        undefined,
+                                    fallback: getInitials(name),
+                                }}
+                                title={name}
+                                description={[
+                                    c.preferred_name &&
+                                    c.preferred_name !== name
+                                        ? `Preferred: ${c.preferred_name}`
+                                        : null,
+                                    c.nhi_number
+                                        ? `NHI: ${c.nhi_number}`
+                                        : null,
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                badges={badges}
+                                actions={
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                        asChild
+                                    >
+                                        <Link
+                                            href={`/operations/clients/${c.id}`}
+                                        >
+                                            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                                            Back
+                                        </Link>
+                                    </Button>
+                                }
+                            />
+                        );
+                    })()}
 
                 {/* Filters */}
                 <Card className="shadow-sm">
                     <CardContent className="space-y-2 p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative flex-1">
-                            <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                            <Input
-                                placeholder="Search events..."
-                                className="h-9 pl-8 text-sm"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
-                        </div>
-                        <Select
-                            value={category}
-                            onValueChange={(v) =>
-                                setCategory(v as TimelineCategory | 'all')
-                            }
-                        >
-                            <SelectTrigger className="h-9 w-[160px] text-xs">
-                                <SelectValue placeholder="All activity" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {CATEGORY_FILTER_OPTIONS.map((o) => (
-                                    <SelectItem key={o.value} value={o.value}>
-                                        {o.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        {isClient && canCreate && (
-                            <Button
-                                size="sm"
-                                className="gap-1.5"
-                                onClick={() => setShowAddNote(!showAddNote)}
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="relative flex-1">
+                                <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search events..."
+                                    className="h-9 pl-8 text-sm"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                />
+                            </div>
+                            <Select
+                                value={category}
+                                onValueChange={(v) =>
+                                    setCategory(v as TimelineCategory | 'all')
+                                }
                             >
-                                {showAddNote ? 'Cancel' : 'Add Note'}
-                            </Button>
-                        )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">
-                            Date range:
-                        </span>
-                        <Input
-                            type="date"
-                            className="h-8 w-[140px] text-xs"
-                            value={props.filters?.from ?? ''}
-                            onChange={(e) =>
-                                updateFilter('from', e.target.value || null)
-                            }
-                        />
-                        <span className="text-xs text-muted-foreground">
-                            to
-                        </span>
-                        <Input
-                            type="date"
-                            className="h-8 w-[140px] text-xs"
-                            value={props.filters?.to ?? ''}
-                            onChange={(e) =>
-                                updateFilter('to', e.target.value || null)
-                            }
-                        />
-                        <span className="ml-2 text-xs text-muted-foreground">
-                            {filteredEvents.length} event
-                            {filteredEvents.length !== 1 ? 's' : ''}
-                        </span>
-                    </div>
+                                <SelectTrigger className="h-9 w-[160px] text-xs">
+                                    <SelectValue placeholder="All activity" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {CATEGORY_FILTER_OPTIONS.map((o) => (
+                                        <SelectItem
+                                            key={o.value}
+                                            value={o.value}
+                                        >
+                                            {o.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {isClient && canCreate && (
+                                <Button
+                                    size="sm"
+                                    className="gap-1.5"
+                                    onClick={() => setShowAddNote(!showAddNote)}
+                                >
+                                    {showAddNote ? 'Cancel' : 'Add Note'}
+                                </Button>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                                Date range:
+                            </span>
+                            <Input
+                                type="date"
+                                className="h-8 w-[140px] text-xs"
+                                value={props.filters?.from ?? ''}
+                                onChange={(e) =>
+                                    updateFilter('from', e.target.value || null)
+                                }
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                to
+                            </span>
+                            <Input
+                                type="date"
+                                className="h-8 w-[140px] text-xs"
+                                value={props.filters?.to ?? ''}
+                                onChange={(e) =>
+                                    updateFilter('to', e.target.value || null)
+                                }
+                            />
+                            <span className="ml-2 text-xs text-muted-foreground">
+                                {filteredEvents.length} event
+                                {filteredEvents.length !== 1 ? 's' : ''}
+                            </span>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -328,9 +355,8 @@ export default function TimelineIndex(props: Props) {
                                         const cat = categorizeTimelineType(
                                             e.type,
                                         );
-                                        const style = getTimelineCategoryEntry(
-                                            cat,
-                                        );
+                                        const style =
+                                            getTimelineCategoryEntry(cat);
                                         const detailLabel = getEventDetailLabel(
                                             e.type,
                                         );
@@ -369,7 +395,9 @@ export default function TimelineIndex(props: Props) {
                                                             </Badge>
                                                             {showDetailChip && (
                                                                 <span className="text-[10px] text-muted-foreground">
-                                                                    {detailLabel}
+                                                                    {
+                                                                        detailLabel
+                                                                    }
                                                                 </span>
                                                             )}
                                                             {e.visibility ===

@@ -191,6 +191,36 @@ it('rejects a change-governed decision when the reviewer lacks IT change access'
         ->and($command->approvals()->count())->toBe(0);
 });
 
+it('omits a participant-visible command change unless the viewer also has the IT destination permission', function () {
+    $site = Site::factory()->create();
+    $requester = commandApprovalActor('it_manager', $site);
+    $participant = commandApprovalActor('coordinator', $site);
+    commandApprovalGrant($participant, 'securityDevices.commands.observe');
+    $command = pendingFirmwareCommand($site, $requester);
+    $command->change->ticket()->update([
+        'requester_user_id' => $participant->id,
+    ]);
+
+    $this->actingAs($participant)
+        ->get("/security-devices/devices/{$command->device_id}")
+        ->assertOk()
+        ->assertInertia(function ($page): void {
+            $history = $page->toArray()['props']['profile']['management']['history'];
+
+            expect($history)->toHaveCount(1)
+                ->and($history[0]['change'])->toBeNull();
+        });
+
+    $this->actingAs($requester)
+        ->get("/security-devices/devices/{$command->device_id}")
+        ->assertOk()
+        ->assertInertia(function ($page) use ($command): void {
+            $change = $page->toArray()['props']['profile']['management']['history'][0]['change'];
+
+            expect($change['id'])->toBe($command->it_change_id);
+        });
+});
+
 it('prevents self approval and a second decision', function () {
     $site = Site::factory()->create();
     $requester = commandApprovalActor('it_manager');

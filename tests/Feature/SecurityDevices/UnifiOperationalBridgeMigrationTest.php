@@ -91,6 +91,76 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         $this->assertSame(0, LocationHardware::query()->count());
     }
 
+    public function test_unifi_sync_discards_inventory_when_the_exact_connection_is_disabled_in_flight(): void
+    {
+        $site = Site::factory()->create(['name' => 'Retiring Site']);
+        $siteConfig = $this->makeSiteConfig($site);
+        $providerConnection = $this->makeProviderConnection();
+        $existing = Device::factory()->itInfrastructure()->create([
+            'name' => 'Existing protected device',
+            'provider' => 'unifi',
+            'status' => DeviceStatus::Active,
+            'external_ref' => [
+                'provider' => 'unifi',
+                'provider_entity_id' => 'existing-unifi-device',
+            ],
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $existing->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now()->subDay(),
+        ]);
+
+        Http::fake(function ($request) use ($providerConnection) {
+            if ($request->url() === 'https://api.ui.com/v1/sites') {
+                return Http::response(['data' => [[
+                    'siteId' => 'site-ext-1',
+                    'hostId' => 'host-1',
+                ]]]);
+            }
+
+            if ($request->url() === 'https://api.ui.com/v1/devices') {
+                $providerConnection->update([
+                    'status' => IntegrationProviderConnection::STATUS_DISABLED,
+                    'requires_credential_replacement' => true,
+                ]);
+
+                return Http::response(['data' => [[
+                    'hostId' => 'host-1',
+                    'devices' => [[
+                        'id' => 'existing-unifi-device',
+                        'name' => 'Provider attempted overwrite',
+                        'productLine' => 'network',
+                        'shortname' => 'uap',
+                        'status' => 'offline',
+                    ], [
+                        'id' => 'new-unifi-device',
+                        'name' => 'Provider attempted insert',
+                        'productLine' => 'network',
+                        'shortname' => 'uap',
+                        'status' => 'online',
+                    ]],
+                ]]]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $result = app(UnifiAdapter::class)->syncDevices($siteConfig, $providerConnection);
+
+        $this->assertFalse($result->isSuccess());
+        $this->assertSame('Existing protected device', $existing->refresh()->name);
+        $this->assertSame(DeviceStatus::Active, $existing->status);
+        $this->assertSame(1, Device::query()->where('provider', 'unifi')->count());
+        $this->assertSame(1, DeviceAssignment::query()->where('device_id', $existing->id)->count());
+        $this->assertDatabaseMissing('devices', [
+            'provider' => 'unifi',
+            'name' => 'Provider attempted insert',
+        ]);
+    }
+
     public function test_unifi_access_events_use_exact_site_credentials(): void
     {
         CarbonImmutable::setTestNow('2026-08-03T10:15:00Z');

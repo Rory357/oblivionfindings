@@ -31,9 +31,19 @@ export interface OfferRole {
 }
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'comp', label: 'Role & pay', blurb: 'Position & rate', icon: HandCoins },
+    {
+        key: 'comp',
+        label: 'Role & pay',
+        blurb: 'Position & rate',
+        icon: HandCoins,
+    },
     { key: 'terms', label: 'Terms', blurb: 'Dates & site', icon: Banknote },
-    { key: 'letter', label: 'Letter', blurb: 'Attach offer doc', icon: FileText },
+    {
+        key: 'letter',
+        label: 'Letter',
+        blurb: 'Attach offer doc',
+        icon: FileText,
+    },
     {
         key: 'review',
         label: 'Review',
@@ -157,8 +167,8 @@ export function OfferWizardDialog({
     const roleLabel =
         roles.find((r) => r.value === form.data.position_role)?.label ?? '—';
     const typeLabel =
-        TYPE_OPTIONS.find((t) => t.value === form.data.employment_type)?.label ??
-        '—';
+        TYPE_OPTIONS.find((t) => t.value === form.data.employment_type)
+            ?.label ?? '—';
 
     return (
         <WizardShell
@@ -235,7 +245,10 @@ export function OfferWizardDialog({
                             <Input
                                 value={form.data.position_title}
                                 onChange={(e) =>
-                                    form.setData('position_title', e.target.value)
+                                    form.setData(
+                                        'position_title',
+                                        e.target.value,
+                                    )
                                 }
                                 placeholder="e.g. Senior Support Worker"
                             />
@@ -247,7 +260,9 @@ export function OfferWizardDialog({
                         >
                             <SelectInput
                                 value={form.data.position_role}
-                                onChange={(v) => form.setData('position_role', v)}
+                                onChange={(v) =>
+                                    form.setData('position_role', v)
+                                }
                                 placeholder="Select a role"
                                 options={roles}
                             />
@@ -281,7 +296,10 @@ export function OfferWizardDialog({
                                 step="0.5"
                                 value={form.data.hours_per_week}
                                 onChange={(e) =>
-                                    form.setData('hours_per_week', e.target.value)
+                                    form.setData(
+                                        'hours_per_week',
+                                        e.target.value,
+                                    )
                                 }
                             />
                         </Field>
@@ -382,7 +400,11 @@ export function OfferWizardDialog({
                         title="Offer letter"
                         blurb="Optionally attach a signed/prepared offer letter (PDF or Word)."
                     />
-                    <Field label="Offer letter" hint="optional · PDF/DOC, max 20MB" error={form.errors.offer_letter}>
+                    <Field
+                        label="Offer letter"
+                        hint="optional · PDF/DOC, max 20MB"
+                        error={form.errors.offer_letter}
+                    >
                         <input
                             type="file"
                             accept=".pdf,.doc,.docx"
@@ -505,7 +527,9 @@ export function OfferRespondDialog({
             <DialogContent className="sm:max-w-md">
                 <form onSubmit={submit} className="space-y-4">
                     <div>
-                        <h2 className="text-lg font-bold">Record offer response</h2>
+                        <h2 className="text-lg font-bold">
+                            Record offer response
+                        </h2>
                         <p className="text-sm text-muted-foreground">
                             Capture how the candidate responded to the offer.
                         </p>
@@ -521,7 +545,11 @@ export function OfferRespondDialog({
                             ]}
                         />
                     </Field>
-                    <Field label="Notes" hint="optional" error={form.errors.response_notes}>
+                    <Field
+                        label="Notes"
+                        hint="optional"
+                        error={form.errors.response_notes}
+                    >
                         <Textarea
                             rows={3}
                             value={form.data.response_notes}

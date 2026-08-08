@@ -174,6 +174,7 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     Route::get('/it/changes/{change}', [ItChangeController::class, 'show'])->middleware('permission:it.view')->name('it.changes.show');
     Route::get('/it/major-incidents', [ItMajorIncidentController::class, 'index'])->middleware('permission:it.view')->name('it.major-incidents.index');
     Route::get('/it/major-incidents/{majorIncident}', [ItMajorIncidentController::class, 'show'])->middleware('permission:it.view')->name('it.major-incidents.show');
+    Route::get('/it/major-incidents/{majorIncident}/status.json', [ItMajorIncidentController::class, 'statusJson'])->name('it.major-incidents.status.json');
     Route::get('/it/major-incidents/{majorIncident}/status', [ItMajorIncidentController::class, 'status'])->name('it.major-incidents.status');
     Route::get('/it/problems', [ItProblemController::class, 'index'])->middleware('permission:it.view')->name('it.problems.index');
     Route::get('/it/problems/{problem}', [ItProblemController::class, 'show'])->middleware('permission:it.view')->name('it.problems.show');

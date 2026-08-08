@@ -33,12 +33,7 @@ export function MicroStats({
     className?: string;
 }) {
     return (
-        <div
-            className={cn(
-                'grid grid-cols-2 gap-3 md:grid-cols-4',
-                className,
-            )}
-        >
+        <div className={cn('grid grid-cols-2 gap-3 md:grid-cols-4', className)}>
             {stats.map((s, i) => (
                 <div
                     key={i}
@@ -53,14 +48,14 @@ export function MicroStats({
                     />
                     <div
                         className={cn(
-                            'text-2xl font-bold tabular-nums tracking-tight',
+                            'text-2xl font-bold tracking-tight tabular-nums',
                             TONE_VALUE[s.tone],
                         )}
                     >
                         {s.value}
                         {s.suffix ?? ''}
                     </div>
-                    <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="mt-0.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                         {s.label}
                     </div>
                 </div>

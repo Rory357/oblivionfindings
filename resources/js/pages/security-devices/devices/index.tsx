@@ -56,6 +56,7 @@ type Props = {
         bulk_select: boolean;
     };
     exportHref: string;
+    scopeLabel?: string | null;
 };
 
 export default function DevicesIndex({
@@ -66,6 +67,7 @@ export default function DevicesIndex({
     filterOptions,
     can,
     exportHref,
+    scopeLabel,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -133,7 +135,11 @@ export default function DevicesIndex({
                 <PageHero
                     icon={Cctv}
                     title="All devices"
-                    description="Canonical inventory with ownership context, monitoring coverage, stable filters and governed export."
+                    description={
+                        scopeLabel
+                            ? `Canonical inventory assigned to ${scopeLabel}, with ownership context, monitoring coverage, stable filters and governed export.`
+                            : 'Canonical inventory with ownership context, monitoring coverage, stable filters and governed export.'
+                    }
                     stats={[
                         { label: 'Total', value: stats.total },
                         { label: 'Active', value: stats.active },
@@ -149,7 +155,9 @@ export default function DevicesIndex({
                                             className="mr-2 h-4 w-4"
                                             aria-hidden="true"
                                         />
-                                        Export inventory
+                                        {scopeLabel
+                                            ? 'Export full authorised inventory'
+                                            : 'Export inventory'}
                                     </a>
                                 </Button>
                             ) : null}

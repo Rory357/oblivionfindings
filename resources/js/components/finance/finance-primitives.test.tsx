@@ -1,9 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { useFinanceTab } from './finance-tabs';
 import { formatMoney, formatMoneyCompact } from './money';
 import { journalBalance } from './posting-preview';
-import { useFinanceTab } from './finance-tabs';
 import { useWizard } from './wizard';
 
 describe('formatMoney (en-NZ, NZD)', () => {

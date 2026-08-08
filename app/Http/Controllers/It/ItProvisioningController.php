@@ -1071,12 +1071,13 @@ class ItProvisioningController extends Controller
                      SUM(status IN ('open', 'in_progress', 'waiting') AND assigned_to_user_id = ?) AS mine,
                      SUM(status IN ('resolved', 'closed') AND resolved_at >= ?) AS resolved_30d,
                      SUM(status IN ('resolved', 'closed') AND resolved_at >= ?) AS recently_resolved,
+                     SUM(status IN ('resolved', 'closed') AND resolved_at >= ? AND sla_state IN ('met', 'breached')) AS measured_30d,
                      SUM(status = 'open') AS status_open,
                      SUM(status = 'in_progress') AS status_in_progress,
                      SUM(status = 'resolved') AS status_resolved,
                      SUM(status = 'closed') AS status_closed,
                      SUM(status IN ('resolved', 'closed') AND resolved_at >= ? AND sla_state = 'met') AS met_30d",
-                    [(int) $user->id, now()->subDays(30), now()->subDays(7), now()->subDays(30)],
+                    [(int) $user->id, now()->subDays(30), now()->subDays(7), now()->subDays(30), now()->subDays(30)],
                 )
                 ->first()
             : null;
@@ -1120,6 +1121,7 @@ class ItProvisioningController extends Controller
             'awaiting_reply' => (int) ($tickets->awaiting_reply ?? 0),
             'waiting' => (int) ($tickets->waiting ?? 0),
             'resolved_30d' => (int) ($tickets->resolved_30d ?? 0),
+            'measured_30d' => (int) ($tickets->measured_30d ?? 0),
             // Of tickets settled in the last 30d, how many met their SLA target
             // (feeds the hero's compliance ring — 10b).
             'met_30d' => (int) ($tickets->met_30d ?? 0),

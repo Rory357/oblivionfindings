@@ -10,6 +10,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -29,7 +30,7 @@ class TimesheetSafetyGuardsTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
@@ -55,7 +56,6 @@ class TimesheetSafetyGuardsTest extends TestCase
         $this->site = Site::factory()->create(['name' => 'Safety Guard House']);
 
         HrEmployeeProfile::query()->create([
-            'tenant_id' => 1,
             'user_id' => $this->staff->id,
             'employee_number' => 'EMP-TS-'.$this->staff->id,
             'work_email' => $this->staff->email,

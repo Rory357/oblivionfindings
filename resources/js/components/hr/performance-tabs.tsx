@@ -42,11 +42,26 @@ const TAB_URLS: Record<PerformanceTab, string> = {
 // reads identically on the hub and its satellite pages.
 const ITEMS: HrTabItem[] = [
     { id: 'reviews', label: 'Reviews', icon: Award, tone: 'info' },
-    { id: 'supervision', label: 'Supervision', icon: UserCheck, tone: 'primary' },
+    {
+        id: 'supervision',
+        label: 'Supervision',
+        icon: UserCheck,
+        tone: 'primary',
+    },
     { id: 'goals', label: 'Goals & OKRs', icon: Target, tone: 'success' },
     { id: 'development', label: 'Development', icon: Sprout, tone: 'info' },
-    { id: 'competencies', label: 'Competencies & Skills', icon: Gauge, tone: 'violet' },
-    { id: 'feedback', label: '360 Feedback', icon: MessageSquare, tone: 'warning' },
+    {
+        id: 'competencies',
+        label: 'Competencies & Skills',
+        icon: Gauge,
+        tone: 'violet',
+    },
+    {
+        id: 'feedback',
+        label: '360 Feedback',
+        icon: MessageSquare,
+        tone: 'warning',
+    },
     { id: 'pips', label: 'PIPs', icon: TrendingUp, tone: 'critical' },
     { id: 'succession', label: 'Succession', icon: GitBranch, tone: 'info' },
 ];

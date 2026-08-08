@@ -1,9 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import RespiteSubnav from '@/components/respite-subnav';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import RespiteSubnav from '@/components/respite-subnav';
+import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
@@ -30,9 +30,22 @@ const typeColors: Record<string, string> = {
     communication: 'bg-status-info-bg text-status-info',
 };
 
-export default function RiskPlanActivationsForStay({ stay, activations, planTypes }: Props) {
+export default function RiskPlanActivationsForStay({
+    stay,
+    activations,
+    planTypes,
+}: Props) {
     return (
-        <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Risk Plan Activations', href: '/respite/risk-plan-activations' }, { title: 'For Stay', href: '#' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                {
+                    title: 'Risk Plan Activations',
+                    href: '/respite/risk-plan-activations',
+                },
+                { title: 'For Stay', href: '#' },
+            ]}
+        >
             <Head title="Risk Plans for Stay" />
 
             <PageLayout
@@ -43,7 +56,9 @@ export default function RiskPlanActivationsForStay({ stay, activations, planType
                         title={`Risk Plans for ${stay.client?.first_name ?? ''} ${stay.client?.last_name ?? ''}`.trim()}
                         description={`Stay #${stay.id} — ${formatDateTimeLong(stay.check_in)} to ${formatDateTimeLong(stay.check_out)}`}
                         actions={
-                            <Link href={`/respite/risk-plan-activations/create?stay_id=${stay.id}`}>
+                            <Link
+                                href={`/respite/risk-plan-activations/create?stay_id=${stay.id}`}
+                            >
                                 <Button size="sm" variant="outline">
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     New Activation
@@ -62,14 +77,45 @@ export default function RiskPlanActivationsForStay({ stay, activations, planType
                                 <CardTitle className="text-base">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
-                                            <div className="font-semibold">{a.plan_name}</div>
-                                            <div className="mt-2 flex flex-wrap gap-2">
-                                                <Badge className={typeColors[a.plan_type] || ''}>{a.plan_type?.replace(/_/g, ' ')}</Badge>
-                                                <Badge className={statusColors[a.status] || ''}>{a.status?.replace(/_/g, ' ')}</Badge>
+                                            <div className="font-semibold">
+                                                {a.plan_name}
                                             </div>
-                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTimeLong(a.created_at)}</div>
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                <Badge
+                                                    className={
+                                                        typeColors[
+                                                            a.plan_type
+                                                        ] || ''
+                                                    }
+                                                >
+                                                    {a.plan_type?.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </Badge>
+                                                <Badge
+                                                    className={
+                                                        statusColors[
+                                                            a.status
+                                                        ] || ''
+                                                    }
+                                                >
+                                                    {a.status?.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </Badge>
+                                            </div>
+                                            <div className="mt-1 text-xs text-muted-foreground">
+                                                {formatDateTimeLong(
+                                                    a.created_at,
+                                                )}
+                                            </div>
                                         </div>
-                                        <Link href={`/respite/risk-plan-activations/${a.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                                        <Link
+                                            href={`/respite/risk-plan-activations/${a.id}`}
+                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                        >
                                             View
                                         </Link>
                                     </div>
@@ -78,7 +124,9 @@ export default function RiskPlanActivationsForStay({ stay, activations, planType
                         </Card>
                     ))}
                     {!activations.length && (
-                        <div className="py-8 text-center text-sm text-muted-foreground">No risk plan activations for this stay.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                            No risk plan activations for this stay.
+                        </div>
                     )}
                 </div>
             </PageLayout>

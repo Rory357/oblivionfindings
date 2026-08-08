@@ -56,7 +56,8 @@ class QueclinkIntegrationAccessService
     public function assertPreset(User $user, QueclinkPreset $preset): void
     {
         abort_unless(
-            $preset->is_system || $user->canDo('securityDevices.integrations.manage'),
+            ! $preset->isRetired()
+                && ($preset->is_system || $user->canDo('securityDevices.integrations.manage')),
             404,
         );
     }

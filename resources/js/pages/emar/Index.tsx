@@ -2,20 +2,20 @@
  * with the Dashboard clinical-watch / ops widgets. Replaces the old /emar
  * dashboard AND the retired /emar/daily page. Data comes from
  * MedicationOverviewService via EmarController::dashboard(). */
+import { ClientAvatar } from '@/components/meds/board-bits';
 import { DonutChart, OPS_COLORS } from '@/components/ops-stat-card';
 import { PageHero } from '@/components/page';
 import type { PageHeroBadge } from '@/components/page/page-hero-badges';
 import type { PageHeroMetaItem } from '@/components/page/page-hero-meta';
 import type { PageHeroStat } from '@/components/page/page-hero-stats';
-import { ClientAvatar } from '@/components/meds/board-bits';
 import { EntityFilter } from '@/components/rostering/entity-filter';
 import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -35,7 +35,6 @@ import {
     Package,
     Pill,
     Printer,
-    RefreshCw,
     Search,
     Shield,
     Syringe,
@@ -76,7 +75,10 @@ import {
 } from './components/cd-register-modal';
 import { GenerateRoundsModal } from './components/generate-rounds-modal';
 import { MedicationReviewModal } from './components/medication-review-modal';
-import { ReportErrorModal, type ClientOption } from './components/report-error-modal';
+import {
+    ReportErrorModal,
+    type ClientOption,
+} from './components/report-error-modal';
 import { ReportsModal } from './components/reports-modal';
 import { StockMovementModal } from './components/stock-movement-modal';
 
@@ -126,8 +128,18 @@ type Stats = {
     givenTrend: number[];
 };
 
-type ComplianceDay = { day: string; rate: number; given: number; total: number };
-type OutcomeSegment = { key: string; label: string; count: number; tone: string };
+type ComplianceDay = {
+    day: string;
+    rate: number;
+    given: number;
+    total: number;
+};
+type OutcomeSegment = {
+    key: string;
+    label: string;
+    count: number;
+    tone: string;
+};
 type OutcomeBreakdown = {
     total: number;
     givenPct: number;
@@ -230,8 +242,10 @@ const SEVERITY_CHIP: Record<Severity, string> = {
 };
 
 const SEVERITY_PILL: Record<Severity, string> = {
-    critical: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
-    warning: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    critical:
+        'border-status-critical/30 bg-status-critical-bg text-status-critical',
+    warning:
+        'border-status-warning/30 bg-status-warning-bg text-status-warning',
     info: 'border-status-info/30 bg-status-info-bg text-status-info',
 };
 
@@ -267,7 +281,9 @@ function actionHref(it: ActionItem): string {
         case 'review':
             // The INR / chart-review surface is the resident's MAR clinical rail
             // (the standalone /emar/clients/{id}/inr endpoint is retired).
-            return it.client_id ? `/emar/mar?client_id=${it.client_id}` : '/emar/reviews';
+            return it.client_id
+                ? `/emar/mar?client_id=${it.client_id}`
+                : '/emar/reviews';
         case 'complete_review':
             return '/emar/reviews';
         case 'stock':
@@ -299,7 +315,13 @@ const KPI_TONE: Record<KpiTone, string> = {
 };
 
 /** Responsive sparkline that inherits its colour from `currentColor`. */
-function MiniSparkline({ data, className }: { data: number[]; className?: string }) {
+function MiniSparkline({
+    data,
+    className,
+}: {
+    data: number[];
+    className?: string;
+}) {
     if (!data || data.length < 2) return null;
     const max = Math.max(...data);
     const min = Math.min(...data);
@@ -348,16 +370,28 @@ function KpiCard({
     return (
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div className="mb-2.5 flex items-center justify-between gap-2">
-                <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-lg', KPI_TONE[tone])}>
+                <span
+                    className={cn(
+                        'grid h-8 w-8 shrink-0 place-items-center rounded-lg',
+                        KPI_TONE[tone],
+                    )}
+                >
                     <Icon className="h-4 w-4" />
                 </span>
                 {pill ? (
-                    <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold', KPI_TONE[pill.tone])}>
+                    <span
+                        className={cn(
+                            'shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold',
+                            KPI_TONE[pill.tone],
+                        )}
+                    >
                         {pill.label}
                     </span>
                 ) : null}
             </div>
-            <div className="text-2xl font-bold tracking-tight tabular-nums">{value}</div>
+            <div className="text-2xl font-bold tracking-tight tabular-nums">
+                {value}
+            </div>
             <div className="text-xs text-muted-foreground">{label}</div>
             {footer ? (
                 <div className="mt-2">{footer}</div>
@@ -394,7 +428,8 @@ export default function EmarHome(props: Props) {
     } = props;
 
     const page = usePage<SharedData>();
-    const firstName = (page.props.auth?.user?.name ?? '').split(' ')[0] || 'there';
+    const firstName =
+        (page.props.auth?.user?.name ?? '').split(' ')[0] || 'there';
     const currentUserId = page.props.auth?.user?.id ?? 0;
 
     const [acFilter, setAcFilter] = useState<'all' | AcCategory>('all');
@@ -450,7 +485,9 @@ export default function EmarHome(props: Props) {
     const segHeights = ['h-5', 'h-4', 'h-5', 'h-3', 'h-4', 'h-2.5'];
 
     // First overdue dose — named in the critical ribbon, like the design.
-    const firstOverdue = actionCentre.find((i) => i.type === 'overdue_dose' && i.record);
+    const firstOverdue = actionCentre.find(
+        (i) => i.type === 'overdue_dose' && i.record,
+    );
     const overdueDetail = (() => {
         if (!firstOverdue?.record) return '';
         const row = firstOverdue.record.row;
@@ -458,24 +495,33 @@ export default function EmarHome(props: Props) {
         const mins = firstOverdue.opened_at
             ? Math.max(
                   0,
-                  Math.round((Date.now() - new Date(firstOverdue.opened_at).getTime()) / 60000),
+                  Math.round(
+                      (Date.now() -
+                          new Date(firstOverdue.opened_at).getTime()) /
+                          60000,
+                  ),
               )
             : null;
         return ` — ${firstOverdue.client}'s ${med} was scheduled for ${row.time}${mins != null ? ` (${mins} min ago)` : ''}.`;
     })();
 
     const goDate = (ymd: string) =>
-        router.get(
-            '/emar',
-            ymd === localYmdToday() ? {} : { date: ymd },
-            { preserveScroll: true, preserveState: true },
-        );
+        router.get('/emar', ymd === localYmdToday() ? {} : { date: ymd }, {
+            preserveScroll: true,
+            preserveState: true,
+        });
     const stepLabel = (ymd: string) =>
-        parseYmd(ymd).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric' });
+        parseYmd(ymd).toLocaleDateString('en-NZ', {
+            weekday: 'short',
+            day: 'numeric',
+        });
 
     /* Site options derived from the client board (board carries site names). */
     const siteNames = useMemo(
-        () => [...new Set(clientBoard.map((c) => c.site).filter(Boolean))] as string[],
+        () =>
+            [
+                ...new Set(clientBoard.map((c) => c.site).filter(Boolean)),
+            ] as string[],
         [clientBoard],
     );
     const siteOptions = siteNames.map((name, i) => ({ id: i, name }));
@@ -544,7 +590,11 @@ export default function EmarHome(props: Props) {
 
     const heroStats: PageHeroStat[] = [
         { label: 'Admin rate', value: `${stats.adminRate}%` },
-        { label: 'Due now', value: stats.dueNow, tone: stats.overdue > 0 ? 'critical' : undefined },
+        {
+            label: 'Due now',
+            value: stats.dueNow,
+            tone: stats.overdue > 0 ? 'critical' : undefined,
+        },
         { label: 'CD due', value: stats.cdDue },
         { label: 'Reviews', value: stats.reviewsDue },
     ];
@@ -606,11 +656,41 @@ export default function EmarHome(props: Props) {
     );
 
     const acTabs: RosterTabItem[] = [
-        { id: 'all', label: 'All', icon: LayoutGrid, tone: 'primary', badge: acCounts.all },
-        { id: 'doses', label: 'Doses', icon: Pill, tone: 'critical', badge: acCounts.doses },
-        { id: 'controlled', label: 'Controlled', icon: Lock, tone: 'primary', badge: acCounts.controlled },
-        { id: 'clinical', label: 'Clinical', icon: Activity, tone: 'warning', badge: acCounts.clinical },
-        { id: 'stock', label: 'Stock', icon: Package, tone: 'warning', badge: acCounts.stock },
+        {
+            id: 'all',
+            label: 'All',
+            icon: LayoutGrid,
+            tone: 'primary',
+            badge: acCounts.all,
+        },
+        {
+            id: 'doses',
+            label: 'Doses',
+            icon: Pill,
+            tone: 'critical',
+            badge: acCounts.doses,
+        },
+        {
+            id: 'controlled',
+            label: 'Controlled',
+            icon: Lock,
+            tone: 'primary',
+            badge: acCounts.controlled,
+        },
+        {
+            id: 'clinical',
+            label: 'Clinical',
+            icon: Activity,
+            tone: 'warning',
+            badge: acCounts.clinical,
+        },
+        {
+            id: 'stock',
+            label: 'Stock',
+            icon: Package,
+            tone: 'warning',
+            badge: acCounts.stock,
+        },
     ];
 
     const donutSegments = outcomeBreakdown.segments
@@ -622,7 +702,10 @@ export default function EmarHome(props: Props) {
         }));
 
     const maxReason = Math.max(1, ...codedNotGivenReasons.map((r) => r.count));
-    const maxErrTrend = Math.max(1, ...medicationErrors.trend.map((t) => t.count));
+    const maxErrTrend = Math.max(
+        1,
+        ...medicationErrors.trend.map((t) => t.count),
+    );
 
     return (
         <AppLayout>
@@ -636,7 +719,10 @@ export default function EmarHome(props: Props) {
                         <span>
                             <span className="mb-2 flex items-center justify-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase md:justify-start">
                                 {isToday ? (
-                                    <span aria-hidden="true" className="relative inline-flex h-2 w-2">
+                                    <span
+                                        aria-hidden="true"
+                                        className="relative inline-flex h-2 w-2"
+                                    >
                                         <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
                                         <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
                                     </span>
@@ -649,7 +735,8 @@ export default function EmarHome(props: Props) {
                             </span>
                             <span className="block">
                                 <span className="font-normal text-primary-foreground/80">
-                                    Kia ora {firstName}, the medication picture for{' '}
+                                    Kia ora {firstName}, the medication picture
+                                    for{' '}
                                 </span>
                                 <span className="border-b-2 border-primary-foreground/40 pb-0.5">
                                     {dateTitle}
@@ -659,11 +746,19 @@ export default function EmarHome(props: Props) {
                     }
                     description={
                         <span>
-                            {stats.totalToday} dose{stats.totalToday === 1 ? '' : 's'} scheduled across{' '}
-                            {siteNames.length || 1} site{siteNames.length === 1 ? '' : 's'}. {stats.dueNow} due now
-                            {stats.overdue > 0 ? ` (${stats.overdue} overdue)` : ''} and {stats.adminRate}% recorded
-                            so far. {stats.activeDiscrepancies} controlled-drug discrepancy and {stats.overdueReviews}{' '}
-                            review{stats.overdueReviews === 1 ? '' : 's'} need a clinician.
+                            {stats.totalToday} dose
+                            {stats.totalToday === 1 ? '' : 's'} scheduled across{' '}
+                            {siteNames.length || 1} site
+                            {siteNames.length === 1 ? '' : 's'}. {stats.dueNow}{' '}
+                            due now
+                            {stats.overdue > 0
+                                ? ` (${stats.overdue} overdue)`
+                                : ''}{' '}
+                            and {stats.adminRate}% recorded so far.{' '}
+                            {stats.activeDiscrepancies} controlled-drug
+                            discrepancy and {stats.overdueReviews} review
+                            {stats.overdueReviews === 1 ? '' : 's'} need a
+                            clinician.
                         </span>
                     }
                     meta={heroMeta}
@@ -726,15 +821,20 @@ export default function EmarHome(props: Props) {
                         <AlertTriangle className="h-5 w-5 shrink-0 text-status-critical" />
                         <div className="min-w-0 flex-1">
                             <p className="text-sm font-bold text-status-critical">
-                                {stats.overdue} dose{stats.overdue === 1 ? '' : 's'} past due
+                                {stats.overdue} dose
+                                {stats.overdue === 1 ? '' : 's'} past due
                                 {overdueDetail}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                                Record now if given, or escalate. A missed dose must be recorded with a
-                                reason — don&rsquo;t leave a hole in the MAR.
+                                Record now if given, or escalate. A missed dose
+                                must be recorded with a reason — don&rsquo;t
+                                leave a hole in the MAR.
                             </p>
                         </div>
-                        <Button asChild className="bg-status-critical text-white hover:bg-status-critical/90">
+                        <Button
+                            asChild
+                            className="bg-status-critical text-white hover:bg-status-critical/90"
+                        >
                             <Link href="/emar/mar">Open MAR</Link>
                         </Button>
                     </div>
@@ -747,11 +847,18 @@ export default function EmarHome(props: Props) {
                         tone="success"
                         value={`${stats.adminRate}%`}
                         label="Admin rate · target 95%"
-                        pill={{ label: deltaLabel, tone: deltaUp ? 'success' : 'critical' }}
+                        pill={{
+                            label: deltaLabel,
+                            tone: deltaUp ? 'success' : 'critical',
+                        }}
                         footer={
                             <MiniSparkline
                                 data={stats.givenTrend}
-                                className={deltaUp ? 'text-status-success' : 'text-status-critical'}
+                                className={
+                                    deltaUp
+                                        ? 'text-status-success'
+                                        : 'text-status-critical'
+                                }
                             />
                         }
                     />
@@ -760,11 +867,25 @@ export default function EmarHome(props: Props) {
                         tone="critical"
                         value={stats.dueNow}
                         label="Doses due now"
-                        pill={stats.overdue > 0 ? { label: `${stats.overdue} overdue`, tone: 'critical' } : null}
+                        pill={
+                            stats.overdue > 0
+                                ? {
+                                      label: `${stats.overdue} overdue`,
+                                      tone: 'critical',
+                                  }
+                                : null
+                        }
                         footer={
                             <div className="flex h-[22px] items-end gap-[3px]">
                                 {dueSegments.map((c, i) => (
-                                    <span key={i} className={cn('flex-1 rounded-sm', c, segHeights[i])} />
+                                    <span
+                                        key={i}
+                                        className={cn(
+                                            'flex-1 rounded-sm',
+                                            c,
+                                            segHeights[i],
+                                        )}
+                                    />
                                 ))}
                             </div>
                         }
@@ -774,7 +895,14 @@ export default function EmarHome(props: Props) {
                         tone="primary"
                         value={stats.controlledCount}
                         label="Controlled drugs active"
-                        pill={stats.activeDiscrepancies > 0 ? { label: `${stats.activeDiscrepancies} discrepancy`, tone: 'critical' } : null}
+                        pill={
+                            stats.activeDiscrepancies > 0
+                                ? {
+                                      label: `${stats.activeDiscrepancies} discrepancy`,
+                                      tone: 'critical',
+                                  }
+                                : null
+                        }
                         sub={`${stats.activeDiscrepancies} discrepancy open`}
                     />
                     <KpiCard
@@ -782,7 +910,14 @@ export default function EmarHome(props: Props) {
                         tone="warning"
                         value={stats.reviewsDue}
                         label="Chart reviews due"
-                        pill={stats.overdueReviews > 0 ? { label: `${stats.overdueReviews} overdue`, tone: 'warning' } : null}
+                        pill={
+                            stats.overdueReviews > 0
+                                ? {
+                                      label: `${stats.overdueReviews} overdue`,
+                                      tone: 'warning',
+                                  }
+                                : null
+                        }
                         sub="next 7 days"
                     />
                     <KpiCard
@@ -798,7 +933,14 @@ export default function EmarHome(props: Props) {
                         tone="warning"
                         value={stats.stockAlerts}
                         label="Stock alerts"
-                        pill={stats.expiredStock > 0 ? { label: `${stats.expiredStock} expired`, tone: 'critical' } : null}
+                        pill={
+                            stats.expiredStock > 0
+                                ? {
+                                      label: `${stats.expiredStock} expired`,
+                                      tone: 'critical',
+                                  }
+                                : null
+                        }
                         sub={`${stats.lowStock} low · ${stats.expiringStock} expiring`}
                     />
                 </div>
@@ -814,9 +956,12 @@ export default function EmarHome(props: Props) {
                                         <Zap className="h-5 w-5" />
                                     </span>
                                     <div>
-                                        <CardTitle className="text-base">Action centre</CardTitle>
+                                        <CardTitle className="text-base">
+                                            Action centre
+                                        </CardTitle>
                                         <p className="text-xs text-muted-foreground">
-                                            Everything that needs a clinician right now, most urgent first.
+                                            Everything that needs a clinician
+                                            right now, most urgent first.
                                         </p>
                                     </div>
                                 </div>
@@ -838,7 +983,9 @@ export default function EmarHome(props: Props) {
                             <TabStrip
                                 ariaLabel="Action centre filter"
                                 value={acFilter}
-                                onChange={(id) => setAcFilter(id as 'all' | AcCategory)}
+                                onChange={(id) =>
+                                    setAcFilter(id as 'all' | AcCategory)
+                                }
                                 items={acTabs}
                             />
                         </CardHeader>
@@ -846,15 +993,19 @@ export default function EmarHome(props: Props) {
                             {visibleActions.length === 0 ? (
                                 <div className="flex flex-col items-center gap-2 py-12 text-center">
                                     <CheckCircle2 className="h-8 w-8 text-status-success" />
-                                    <p className="text-sm font-medium">All clear in this view</p>
-                                    <p className="text-xs text-muted-foreground">No outstanding actions for this filter.</p>
+                                    <p className="text-sm font-medium">
+                                        All clear in this view
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        No outstanding actions for this filter.
+                                    </p>
                                 </div>
                             ) : (
                                 visibleActions.map((it) => (
                                     <div
                                         key={it.id}
                                         className={cn(
-                                            'flex items-center gap-3 border-b border-border/60 border-l-[3px] py-3 pl-3 last:border-b-0',
+                                            'flex items-center gap-3 border-b border-l-[3px] border-border/60 py-3 pl-3 last:border-b-0',
                                             SEVERITY_ACCENT[it.severity],
                                         )}
                                     >
@@ -868,37 +1019,68 @@ export default function EmarHome(props: Props) {
                                         </span>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="truncate text-[13.5px] font-bold">{it.title}</span>
+                                                <span className="truncate text-[13.5px] font-bold">
+                                                    {it.title}
+                                                </span>
                                                 <span
                                                     className={cn(
                                                         'shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold',
-                                                        SEVERITY_PILL[it.severity],
+                                                        SEVERITY_PILL[
+                                                            it.severity
+                                                        ],
                                                     )}
                                                 >
                                                     {it.status}
                                                 </span>
                                             </div>
-                                            <p className="truncate text-xs text-muted-foreground">{it.summary}</p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                                {it.summary}
+                                            </p>
                                         </div>
                                         {it.action_type === 'cd_balance' ? (
                                             <Button
                                                 size="sm"
-                                                className={cn('shrink-0', SEVERITY_BTN[it.severity])}
-                                                onClick={() => openModal('cd-register', it.client_id)}
+                                                className={cn(
+                                                    'shrink-0',
+                                                    SEVERITY_BTN[it.severity],
+                                                )}
+                                                onClick={() =>
+                                                    openModal(
+                                                        'cd-register',
+                                                        it.client_id,
+                                                    )
+                                                }
                                             >
                                                 {it.action}
                                             </Button>
-                                        ) : it.action_type === 'record' && it.record ? (
+                                        ) : it.action_type === 'record' &&
+                                          it.record ? (
                                             <Button
                                                 size="sm"
-                                                className={cn('shrink-0', SEVERITY_BTN[it.severity])}
-                                                onClick={() => setRecordWizard(it.record ?? null)}
+                                                className={cn(
+                                                    'shrink-0',
+                                                    SEVERITY_BTN[it.severity],
+                                                )}
+                                                onClick={() =>
+                                                    setRecordWizard(
+                                                        it.record ?? null,
+                                                    )
+                                                }
                                             >
                                                 {it.action}
                                             </Button>
                                         ) : (
-                                            <Button asChild size="sm" className={cn('shrink-0', SEVERITY_BTN[it.severity])}>
-                                                <Link href={actionHref(it)}>{it.action}</Link>
+                                            <Button
+                                                asChild
+                                                size="sm"
+                                                className={cn(
+                                                    'shrink-0',
+                                                    SEVERITY_BTN[it.severity],
+                                                )}
+                                            >
+                                                <Link href={actionHref(it)}>
+                                                    {it.action}
+                                                </Link>
                                             </Button>
                                         )}
                                         <Button
@@ -907,7 +1089,9 @@ export default function EmarHome(props: Props) {
                                             className="h-8 w-8 shrink-0 text-muted-foreground"
                                             aria-label="Dismiss"
                                             onClick={() =>
-                                                setDismissed((prev) => new Set(prev).add(it.id))
+                                                setDismissed((prev) =>
+                                                    new Set(prev).add(it.id),
+                                                )
                                             }
                                         >
                                             <X className="h-4 w-4" />
@@ -932,51 +1116,128 @@ export default function EmarHome(props: Props) {
                         {/* Administration compliance */}
                         <Card className="rounded-[18px]">
                             <CardHeader className="flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm">Administration compliance</CardTitle>
-                                <span className="text-[11px] text-muted-foreground">7 days</span>
+                                <CardTitle className="text-sm">
+                                    Administration compliance
+                                </CardTitle>
+                                <span className="text-[11px] text-muted-foreground">
+                                    7 days
+                                </span>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-end gap-2">
-                                    <span className="text-3xl font-bold tracking-tight">{stats.adminRate}%</span>
+                                    <span className="text-3xl font-bold tracking-tight">
+                                        {stats.adminRate}%
+                                    </span>
                                     <span
                                         className={cn(
                                             'mb-1 text-xs font-semibold',
-                                            deltaUp ? 'text-status-success' : 'text-status-critical',
+                                            deltaUp
+                                                ? 'text-status-success'
+                                                : 'text-status-critical',
                                         )}
                                     >
                                         {deltaLabel} vs last week
                                     </span>
                                 </div>
                                 <div className="mt-2 h-[140px]">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={complianceTrend} margin={{ top: 6, right: 6, left: -22, bottom: 0 }}>
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height="100%"
+                                    >
+                                        <AreaChart
+                                            data={complianceTrend}
+                                            margin={{
+                                                top: 6,
+                                                right: 6,
+                                                left: -22,
+                                                bottom: 0,
+                                            }}
+                                        >
                                             <defs>
-                                                <linearGradient id="gradRate" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor={OPS_COLORS.primary} stopOpacity={0.2} />
-                                                    <stop offset="95%" stopColor={OPS_COLORS.primary} stopOpacity={0} />
+                                                <linearGradient
+                                                    id="gradRate"
+                                                    x1="0"
+                                                    y1="0"
+                                                    x2="0"
+                                                    y2="1"
+                                                >
+                                                    <stop
+                                                        offset="5%"
+                                                        stopColor={
+                                                            OPS_COLORS.primary
+                                                        }
+                                                        stopOpacity={0.2}
+                                                    />
+                                                    <stop
+                                                        offset="95%"
+                                                        stopColor={
+                                                            OPS_COLORS.primary
+                                                        }
+                                                        stopOpacity={0}
+                                                    />
                                                 </linearGradient>
                                             </defs>
-                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
-                                            <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-                                            <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                                            <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-                                            <ReferenceLine y={95} stroke={OPS_COLORS.success} strokeDasharray="4 4" strokeOpacity={0.6} />
-                                            <Area type="monotone" dataKey="rate" stroke={OPS_COLORS.primary} fill="url(#gradRate)" strokeWidth={2} name="Admin rate" />
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                className="stroke-muted/30"
+                                            />
+                                            <XAxis
+                                                dataKey="day"
+                                                tick={{ fontSize: 10 }}
+                                            />
+                                            <YAxis
+                                                domain={[0, 100]}
+                                                tick={{ fontSize: 10 }}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    borderRadius: 8,
+                                                    fontSize: 12,
+                                                }}
+                                            />
+                                            <ReferenceLine
+                                                y={95}
+                                                stroke={OPS_COLORS.success}
+                                                strokeDasharray="4 4"
+                                                strokeOpacity={0.6}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="rate"
+                                                stroke={OPS_COLORS.primary}
+                                                fill="url(#gradRate)"
+                                                strokeWidth={2}
+                                                name="Admin rate"
+                                            />
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 </div>
-                                <p className="text-[11px] text-muted-foreground">95% target line</p>
+                                <p className="text-[11px] text-muted-foreground">
+                                    95% target line
+                                </p>
                             </CardContent>
                         </Card>
 
                         {/* Today's med-pass outcomes */}
                         <Card className="rounded-[18px]">
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">Today&rsquo;s med-pass outcomes</CardTitle>
+                                <CardTitle className="text-sm">
+                                    Today&rsquo;s med-pass outcomes
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="flex items-center gap-4">
                                 <DonutChart
-                                    segments={donutSegments.length ? donutSegments : [{ label: 'No doses', value: 1, color: OPS_COLORS.muted }]}
+                                    segments={
+                                        donutSegments.length
+                                            ? donutSegments
+                                            : [
+                                                  {
+                                                      label: 'No doses',
+                                                      value: 1,
+                                                      color: OPS_COLORS.muted,
+                                                  },
+                                              ]
+                                    }
                                     size={130}
                                     strokeWidth={18}
                                     centerValue={`${outcomeBreakdown.givenPct}%`}
@@ -984,13 +1245,24 @@ export default function EmarHome(props: Props) {
                                 />
                                 <ul className="flex-1 space-y-1.5">
                                     {outcomeBreakdown.segments.map((s) => (
-                                        <li key={s.key} className="flex items-center gap-2 text-xs">
+                                        <li
+                                            key={s.key}
+                                            className="flex items-center gap-2 text-xs"
+                                        >
                                             <span
                                                 className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                                style={{ backgroundColor: OUTCOME_COLOR[s.tone] ?? OPS_COLORS.muted }}
+                                                style={{
+                                                    backgroundColor:
+                                                        OUTCOME_COLOR[s.tone] ??
+                                                        OPS_COLORS.muted,
+                                                }}
                                             />
-                                            <span className="flex-1 text-muted-foreground">{s.label}</span>
-                                            <span className="font-semibold tabular-nums">{s.count}</span>
+                                            <span className="flex-1 text-muted-foreground">
+                                                {s.label}
+                                            </span>
+                                            <span className="font-semibold tabular-nums">
+                                                {s.count}
+                                            </span>
                                         </li>
                                     ))}
                                 </ul>
@@ -1000,25 +1272,39 @@ export default function EmarHome(props: Props) {
                         {/* Reason not given */}
                         <Card className="rounded-[18px]">
                             <CardHeader className="flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm">Reason not given</CardTitle>
-                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary uppercase">New</span>
+                                <CardTitle className="text-sm">
+                                    Reason not given
+                                </CardTitle>
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary uppercase">
+                                    New
+                                </span>
                             </CardHeader>
                             <CardContent>
-                                <p className="mb-2 text-[11px] text-muted-foreground">Standardised codes — last 7 days</p>
+                                <p className="mb-2 text-[11px] text-muted-foreground">
+                                    Standardised codes — last 7 days
+                                </p>
                                 {codedNotGivenReasons.length === 0 ? (
-                                    <p className="py-4 text-center text-xs text-muted-foreground">No coded omissions recorded.</p>
+                                    <p className="py-4 text-center text-xs text-muted-foreground">
+                                        No coded omissions recorded.
+                                    </p>
                                 ) : (
                                     <ul className="space-y-2">
                                         {codedNotGivenReasons.map((r) => (
                                             <li key={r.code}>
                                                 <div className="mb-0.5 flex items-center justify-between text-xs">
-                                                    <span className="text-foreground">{r.label}</span>
-                                                    <span className="font-semibold tabular-nums">{r.count}</span>
+                                                    <span className="text-foreground">
+                                                        {r.label}
+                                                    </span>
+                                                    <span className="font-semibold tabular-nums">
+                                                        {r.count}
+                                                    </span>
                                                 </div>
                                                 <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                                                     <div
                                                         className="h-full rounded-full bg-status-warning"
-                                                        style={{ width: `${(r.count / maxReason) * 100}%` }}
+                                                        style={{
+                                                            width: `${(r.count / maxReason) * 100}%`,
+                                                        }}
                                                     />
                                                 </div>
                                             </li>
@@ -1038,23 +1324,35 @@ export default function EmarHome(props: Props) {
                                 <Users className="h-5 w-5" />
                             </span>
                             <div>
-                                <CardTitle className="text-base">Client board — today</CardTitle>
-                                <p className="text-xs text-muted-foreground">Med-pass progress per client.</p>
+                                <CardTitle className="text-base">
+                                    Client board — today
+                                </CardTitle>
+                                <p className="text-xs text-muted-foreground">
+                                    Med-pass progress per client.
+                                </p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <Button size="sm" onClick={() => setModal('add-medication')}>
+                            <Button
+                                size="sm"
+                                onClick={() => setModal('add-medication')}
+                            >
                                 <Pill className="h-4 w-4" />
                                 Add medication
                             </Button>
-                            <Link href="/emar/mar" className="text-xs font-medium text-primary hover:underline">
+                            <Link
+                                href="/emar/mar"
+                                className="text-xs font-medium text-primary hover:underline"
+                            >
                                 All clients →
                             </Link>
                         </div>
                     </CardHeader>
                     <CardContent>
                         {filteredBoard.length === 0 ? (
-                            <p className="py-8 text-center text-sm text-muted-foreground">No clients match this view.</p>
+                            <p className="py-8 text-center text-sm text-muted-foreground">
+                                No clients match this view.
+                            </p>
                         ) : (
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                 {filteredBoard.map((c) => (
@@ -1071,30 +1369,60 @@ export default function EmarHome(props: Props) {
                                         )}
                                     >
                                         <div className="flex items-center gap-2.5">
-                                            <ClientAvatar name={c.name} clientId={c.id} />
+                                            <ClientAvatar
+                                                name={c.name}
+                                                clientId={c.id}
+                                            />
                                             <div className="min-w-0 flex-1">
-                                                <p className="truncate text-sm font-semibold">{c.name}</p>
+                                                <p className="truncate text-sm font-semibold">
+                                                    {c.name}
+                                                </p>
                                                 <p className="truncate text-[11px] text-muted-foreground">
-                                                    {c.site ?? 'No site'} · {c.meds} med{c.meds === 1 ? '' : 's'}
+                                                    {c.site ?? 'No site'} ·{' '}
+                                                    {c.meds} med
+                                                    {c.meds === 1 ? '' : 's'}
                                                 </p>
                                             </div>
                                             <span
                                                 className={cn(
                                                     'shrink-0 text-xs font-bold tabular-nums',
-                                                    c.total > 0 && c.done === c.total ? 'text-status-success' : 'text-foreground',
+                                                    c.total > 0 &&
+                                                        c.done === c.total
+                                                        ? 'text-status-success'
+                                                        : 'text-foreground',
                                                 )}
                                             >
                                                 {c.done}/{c.total}
                                             </span>
                                         </div>
                                         <div className="flex h-1.5 overflow-hidden rounded-full bg-muted">
-                                            <div className="h-full bg-status-success" style={{ width: `${c.total ? (c.given / c.total) * 100 : 0}%` }} />
-                                            <div className="h-full bg-status-critical" style={{ width: `${c.total ? (c.missed / c.total) * 100 : 0}%` }} />
+                                            <div
+                                                className="h-full bg-status-success"
+                                                style={{
+                                                    width: `${c.total ? (c.given / c.total) * 100 : 0}%`,
+                                                }}
+                                            />
+                                            <div
+                                                className="h-full bg-status-critical"
+                                                style={{
+                                                    width: `${c.total ? (c.missed / c.total) * 100 : 0}%`,
+                                                }}
+                                            />
                                         </div>
                                         <div className="flex flex-wrap gap-1.5 text-[10.5px]">
-                                            <span className="rounded-full bg-status-success-bg px-1.5 py-0.5 font-semibold text-status-success">{c.given} given</span>
-                                            {c.pending > 0 ? <span className="rounded-full bg-muted px-1.5 py-0.5 font-semibold text-muted-foreground">{c.pending} pending</span> : null}
-                                            {c.missed > 0 ? <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 font-semibold text-status-critical">{c.missed} missed</span> : null}
+                                            <span className="rounded-full bg-status-success-bg px-1.5 py-0.5 font-semibold text-status-success">
+                                                {c.given} given
+                                            </span>
+                                            {c.pending > 0 ? (
+                                                <span className="rounded-full bg-muted px-1.5 py-0.5 font-semibold text-muted-foreground">
+                                                    {c.pending} pending
+                                                </span>
+                                            ) : null}
+                                            {c.missed > 0 ? (
+                                                <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 font-semibold text-status-critical">
+                                                    {c.missed} missed
+                                                </span>
+                                            ) : null}
                                         </div>
                                     </Link>
                                 ))}
@@ -1105,7 +1433,9 @@ export default function EmarHome(props: Props) {
 
                 {/* ── Clinical watch ── */}
                 <div>
-                    <h2 className="mb-2 text-sm font-bold tracking-tight">Clinical watch</h2>
+                    <h2 className="mb-2 text-sm font-bold tracking-tight">
+                        Clinical watch
+                    </h2>
                     <div className="grid gap-3.5 lg:grid-cols-3">
                         {/* INR */}
                         <Card className="rounded-[18px]">
@@ -1114,26 +1444,47 @@ export default function EmarHome(props: Props) {
                                     <span className="grid h-8 w-8 place-items-center rounded-lg bg-status-critical-bg text-status-critical">
                                         <HeartPulse className="h-4 w-4" />
                                     </span>
-                                    <CardTitle className="text-sm">Warfarin / INR watch</CardTitle>
+                                    <CardTitle className="text-sm">
+                                        Warfarin / INR watch
+                                    </CardTitle>
                                 </div>
-                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary uppercase">New</span>
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary uppercase">
+                                    New
+                                </span>
                             </CardHeader>
                             <CardContent className="space-y-2">
                                 {inrWatch.length === 0 ? (
-                                    <p className="py-3 text-center text-xs text-muted-foreground">No INR records.</p>
+                                    <p className="py-3 text-center text-xs text-muted-foreground">
+                                        No INR records.
+                                    </p>
                                 ) : (
                                     inrWatch.map((r) => (
-                                        <div key={r.id} className="flex items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0">
+                                        <div
+                                            key={r.id}
+                                            className="flex items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0"
+                                        >
                                             <div className="min-w-0">
-                                                <p className="truncate text-[13px] font-semibold">{r.client}</p>
-                                                <p className="text-[11px] text-muted-foreground">Target {r.target} · tested {r.tested_on ?? '—'}</p>
+                                                <p className="truncate text-[13px] font-semibold">
+                                                    {r.client}
+                                                </p>
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    Target {r.target} · tested{' '}
+                                                    {r.tested_on ?? '—'}
+                                                </p>
                                             </div>
                                             <div className="shrink-0 text-right">
-                                                <p className="text-lg font-bold tabular-nums">{r.value}</p>
+                                                <p className="text-lg font-bold tabular-nums">
+                                                    {r.value}
+                                                </p>
                                                 <p
                                                     className={cn(
                                                         'text-[10.5px] font-semibold',
-                                                        r.status === 'above' ? 'text-status-critical' : r.status === 'below' ? 'text-status-warning' : 'text-status-success',
+                                                        r.status === 'above'
+                                                            ? 'text-status-critical'
+                                                            : r.status ===
+                                                                'below'
+                                                              ? 'text-status-warning'
+                                                              : 'text-status-success',
                                                     )}
                                                 >
                                                     {r.status_label}
@@ -1151,22 +1502,48 @@ export default function EmarHome(props: Props) {
                                 <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
                                     <Syringe className="h-4 w-4" />
                                 </span>
-                                <CardTitle className="text-sm">Syringe drivers</CardTitle>
+                                <CardTitle className="text-sm">
+                                    Syringe drivers
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2">
                                 {syringeDrivers.length === 0 ? (
-                                    <p className="py-3 text-center text-xs text-muted-foreground">No running drivers.</p>
+                                    <p className="py-3 text-center text-xs text-muted-foreground">
+                                        No running drivers.
+                                    </p>
                                 ) : (
                                     syringeDrivers.map((d) => (
-                                        <div key={d.id} className={cn('rounded-lg border-l-[3px] bg-muted/30 py-2 pl-2.5', d.overdue ? 'border-l-status-critical' : 'border-l-status-success')}>
+                                        <div
+                                            key={d.id}
+                                            className={cn(
+                                                'rounded-lg border-l-[3px] bg-muted/30 py-2 pl-2.5',
+                                                d.overdue
+                                                    ? 'border-l-status-critical'
+                                                    : 'border-l-status-success',
+                                            )}
+                                        >
                                             <div className="flex items-center justify-between gap-2">
-                                                <p className="truncate text-[13px] font-semibold">{d.client}</p>
-                                                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold', d.overdue ? 'bg-status-critical-bg text-status-critical' : 'bg-status-success-bg text-status-success')}>
+                                                <p className="truncate text-[13px] font-semibold">
+                                                    {d.client}
+                                                </p>
+                                                <span
+                                                    className={cn(
+                                                        'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                                                        d.overdue
+                                                            ? 'bg-status-critical-bg text-status-critical'
+                                                            : 'bg-status-success-bg text-status-success',
+                                                    )}
+                                                >
                                                     {d.status_label}
                                                 </span>
                                             </div>
-                                            <p className="truncate text-[11px] text-muted-foreground">{d.contents}</p>
-                                            <p className="text-[11px] text-muted-foreground">{d.site ?? 'No site'} · started {d.commenced_at ?? '—'}</p>
+                                            <p className="truncate text-[11px] text-muted-foreground">
+                                                {d.contents}
+                                            </p>
+                                            <p className="text-[11px] text-muted-foreground">
+                                                {d.site ?? 'No site'} · started{' '}
+                                                {d.commenced_at ?? '—'}
+                                            </p>
                                         </div>
                                     ))
                                 )}
@@ -1180,31 +1557,49 @@ export default function EmarHome(props: Props) {
                                     <span className="grid h-8 w-8 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
                                         <CalendarCheck className="h-4 w-4" />
                                     </span>
-                                    <CardTitle className="text-sm">Chart reviews due</CardTitle>
+                                    <CardTitle className="text-sm">
+                                        Chart reviews due
+                                    </CardTitle>
                                 </div>
                                 <Button
                                     variant="outline"
                                     size="sm"
                                     className="h-7 px-2.5 text-xs"
-                                    onClick={() => setModal('medication-review')}
+                                    onClick={() =>
+                                        setModal('medication-review')
+                                    }
                                 >
                                     Schedule
                                 </Button>
                             </CardHeader>
                             <CardContent className="space-y-2">
                                 {reviewsDue.length === 0 ? (
-                                    <p className="py-3 text-center text-xs text-muted-foreground">No reviews scheduled.</p>
+                                    <p className="py-3 text-center text-xs text-muted-foreground">
+                                        No reviews scheduled.
+                                    </p>
                                 ) : (
                                     reviewsDue.map((r) => (
-                                        <div key={r.id} className="flex items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0">
+                                        <div
+                                            key={r.id}
+                                            className="flex items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0"
+                                        >
                                             <div className="min-w-0">
-                                                <p className="truncate text-[13px] font-semibold">{r.client}</p>
-                                                <p className="text-[11px] text-muted-foreground">{r.cadence} · due {r.scheduled_date ?? '—'}</p>
+                                                <p className="truncate text-[13px] font-semibold">
+                                                    {r.client}
+                                                </p>
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    {r.cadence} · due{' '}
+                                                    {r.scheduled_date ?? '—'}
+                                                </p>
                                             </div>
                                             <span
                                                 className={cn(
                                                     'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                                                    r.status === 'overdue' ? 'bg-status-critical-bg text-status-critical' : r.status === 'today' ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground',
+                                                    r.status === 'overdue'
+                                                        ? 'bg-status-critical-bg text-status-critical'
+                                                        : r.status === 'today'
+                                                          ? 'bg-status-warning-bg text-status-warning'
+                                                          : 'bg-muted text-muted-foreground',
                                                 )}
                                             >
                                                 {r.status_label}
@@ -1212,7 +1607,10 @@ export default function EmarHome(props: Props) {
                                         </div>
                                     ))
                                 )}
-                                <Link href="/emar/reviews" className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline">
+                                <Link
+                                    href="/emar/reviews"
+                                    className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline"
+                                >
                                     Open review schedule →
                                 </Link>
                             </CardContent>
@@ -1229,7 +1627,9 @@ export default function EmarHome(props: Props) {
                                 <span className="grid h-8 w-8 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
                                     <Package className="h-4 w-4" />
                                 </span>
-                                <CardTitle className="text-sm">Stock &amp; pharmacy</CardTitle>
+                                <CardTitle className="text-sm">
+                                    Stock &amp; pharmacy
+                                </CardTitle>
                             </div>
                             <Button
                                 variant="outline"
@@ -1242,18 +1642,33 @@ export default function EmarHome(props: Props) {
                         </CardHeader>
                         <CardContent className="space-y-1.5 text-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Low stock</span>
-                                <span className="font-semibold">{stats.lowStock}</span>
+                                <span className="text-muted-foreground">
+                                    Low stock
+                                </span>
+                                <span className="font-semibold">
+                                    {stats.lowStock}
+                                </span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Expiring soon</span>
-                                <span className="font-semibold text-status-warning">{stats.expiringStock}</span>
+                                <span className="text-muted-foreground">
+                                    Expiring soon
+                                </span>
+                                <span className="font-semibold text-status-warning">
+                                    {stats.expiringStock}
+                                </span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Expired</span>
-                                <span className="font-semibold text-status-critical">{stats.expiredStock}</span>
+                                <span className="text-muted-foreground">
+                                    Expired
+                                </span>
+                                <span className="font-semibold text-status-critical">
+                                    {stats.expiredStock}
+                                </span>
                             </div>
-                            <Link href="/emar/stock" className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline">
+                            <Link
+                                href="/emar/stock"
+                                className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline"
+                            >
                                 Manage stock &amp; reorders →
                             </Link>
                         </CardContent>
@@ -1266,27 +1681,47 @@ export default function EmarHome(props: Props) {
                                 <span className="grid h-8 w-8 place-items-center rounded-lg bg-status-critical-bg text-status-critical">
                                     <AlertTriangle className="h-4 w-4" />
                                 </span>
-                                <CardTitle className="text-sm">Medication errors</CardTitle>
+                                <CardTitle className="text-sm">
+                                    Medication errors
+                                </CardTitle>
                             </div>
-                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary uppercase">New</span>
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary uppercase">
+                                New
+                            </span>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-end gap-2">
-                                <span className="text-3xl font-bold tracking-tight text-status-critical">{medicationErrors.open}</span>
-                                <span className="mb-1 text-[11px] text-muted-foreground">open</span>
+                                <span className="text-3xl font-bold tracking-tight text-status-critical">
+                                    {medicationErrors.open}
+                                </span>
+                                <span className="mb-1 text-[11px] text-muted-foreground">
+                                    open
+                                </span>
                             </div>
                             <div className="mt-2 flex h-10 items-end gap-0.5">
                                 {medicationErrors.trend.map((t, i) => (
                                     <div
                                         key={i}
-                                        className={cn('flex-1 rounded-sm', t.count > 0 ? 'bg-status-warning' : 'bg-muted')}
-                                        style={{ height: `${Math.max(8, (t.count / maxErrTrend) * 100)}%` }}
+                                        className={cn(
+                                            'flex-1 rounded-sm',
+                                            t.count > 0
+                                                ? 'bg-status-warning'
+                                                : 'bg-muted',
+                                        )}
+                                        style={{
+                                            height: `${Math.max(8, (t.count / maxErrTrend) * 100)}%`,
+                                        }}
                                         title={`${t.date}: ${t.count}`}
                                     />
                                 ))}
                             </div>
-                            <p className="mt-1 text-[11px] text-muted-foreground">30-day trend</p>
-                            <Link href="/emar/errors" className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline">
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                                30-day trend
+                            </p>
+                            <Link
+                                href="/emar/errors"
+                                className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline"
+                            >
                                 Error register →
                             </Link>
                         </CardContent>
@@ -1298,30 +1733,54 @@ export default function EmarHome(props: Props) {
                             <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
                                 <Activity className="h-4 w-4" />
                             </span>
-                            <CardTitle className="text-sm">Recent activity</CardTitle>
+                            <CardTitle className="text-sm">
+                                Recent activity
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {recentActivity.length === 0 ? (
-                                <p className="py-3 text-center text-xs text-muted-foreground">No recent administrations.</p>
+                                <p className="py-3 text-center text-xs text-muted-foreground">
+                                    No recent administrations.
+                                </p>
                             ) : (
                                 recentActivity.slice(0, 6).map((a) => (
-                                    <div key={a.id} className="flex items-center gap-2 text-xs">
+                                    <div
+                                        key={a.id}
+                                        className="flex items-center gap-2 text-xs"
+                                    >
                                         <span
                                             className={cn(
                                                 'grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold',
-                                                a.status === 'given' ? 'bg-status-success-bg text-status-success' : a.status === 'refused' ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground',
+                                                a.status === 'given'
+                                                    ? 'bg-status-success-bg text-status-success'
+                                                    : a.status === 'refused'
+                                                      ? 'bg-status-warning-bg text-status-warning'
+                                                      : 'bg-muted text-muted-foreground',
                                             )}
                                         >
-                                            {a.status === 'given' ? '✓' : a.status === 'refused' ? '✕' : '•'}
+                                            {a.status === 'given'
+                                                ? '✓'
+                                                : a.status === 'refused'
+                                                  ? '✕'
+                                                  : '•'}
                                         </span>
                                         <span className="min-w-0 flex-1 truncate">
-                                            {a.client ? `${a.client.first_name} ${a.client.last_name}` : 'Client'} · {a.medication?.name ?? 'Medication'}
+                                            {a.client
+                                                ? `${a.client.first_name} ${a.client.last_name}`
+                                                : 'Client'}{' '}
+                                            ·{' '}
+                                            {a.medication?.name ?? 'Medication'}
                                         </span>
-                                        <span className="shrink-0 text-[10.5px] text-muted-foreground">{a.administered_by?.name ?? ''}</span>
+                                        <span className="shrink-0 text-[10.5px] text-muted-foreground">
+                                            {a.administered_by?.name ?? ''}
+                                        </span>
                                     </div>
                                 ))
                             )}
-                            <Link href="/emar/audit" className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline">
+                            <Link
+                                href="/emar/audit"
+                                className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline"
+                            >
                                 Full audit trail →
                             </Link>
                         </CardContent>
@@ -1336,13 +1795,45 @@ export default function EmarHome(props: Props) {
                     <CardContent>
                         <div className="grid gap-[10px] sm:grid-cols-2 lg:grid-cols-6">
                             {[
-                                { title: 'MAR charts', href: '/emar/mar', icon: Pill, tone: 'primary' as KpiTone },
-                                { title: 'CD register', href: '/emar/controlled', icon: Lock, tone: 'critical' as KpiTone },
-                                { title: 'Reviews', href: '/emar/reviews', icon: ClipboardCheck, tone: 'warning' as KpiTone },
-                                { title: 'Reports', href: '/emar/reports', icon: Printer, tone: 'primary' as KpiTone },
-                                { title: 'Handovers', href: '/emar/handovers', icon: FileText, tone: 'success' as KpiTone },
+                                {
+                                    title: 'MAR charts',
+                                    href: '/emar/mar',
+                                    icon: Pill,
+                                    tone: 'primary' as KpiTone,
+                                },
+                                {
+                                    title: 'CD register',
+                                    href: '/emar/controlled',
+                                    icon: Lock,
+                                    tone: 'critical' as KpiTone,
+                                },
+                                {
+                                    title: 'Reviews',
+                                    href: '/emar/reviews',
+                                    icon: ClipboardCheck,
+                                    tone: 'warning' as KpiTone,
+                                },
+                                {
+                                    title: 'Reports',
+                                    href: '/emar/reports',
+                                    icon: Printer,
+                                    tone: 'primary' as KpiTone,
+                                },
+                                {
+                                    title: 'Handovers',
+                                    href: '/emar/handovers',
+                                    icon: FileText,
+                                    tone: 'success' as KpiTone,
+                                },
                                 ...(canManageSettings
-                                    ? [{ title: 'Admin rules', href: '/emar/settings', icon: Shield, tone: 'neutral' as KpiTone }]
+                                    ? [
+                                          {
+                                              title: 'Admin rules',
+                                              href: '/emar/settings',
+                                              icon: Shield,
+                                              tone: 'neutral' as KpiTone,
+                                          },
+                                      ]
                                     : []),
                             ].map((item) => {
                                 const Icon = item.icon;
@@ -1352,10 +1843,17 @@ export default function EmarHome(props: Props) {
                                         href={item.href}
                                         className="flex items-center gap-[10px] rounded-xl border border-border p-3 transition-colors hover:bg-muted"
                                     >
-                                        <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-[9px]', KPI_TONE[item.tone])}>
+                                        <span
+                                            className={cn(
+                                                'grid h-8 w-8 shrink-0 place-items-center rounded-[9px]',
+                                                KPI_TONE[item.tone],
+                                            )}
+                                        >
                                             <Icon className="h-4 w-4" />
                                         </span>
-                                        <span className="text-[12.5px] font-semibold">{item.title}</span>
+                                        <span className="text-[12.5px] font-semibold">
+                                            {item.title}
+                                        </span>
                                     </Link>
                                 );
                             })}

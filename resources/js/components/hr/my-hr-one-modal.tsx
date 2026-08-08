@@ -1,7 +1,14 @@
 /* eslint-disable no-restricted-syntax -- The rail section-nav and the footer
  * Acknowledge action are bespoke controls matching the wizard-shell chrome from
  * the design handoff; shadcn <Button> can't express the rail layout. */
-import { CheckCircle2, FileText, ListChecks, MessagesSquare, Repeat, X } from 'lucide-react';
+import {
+    CheckCircle2,
+    FileText,
+    ListChecks,
+    MessagesSquare,
+    Repeat,
+    X,
+} from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import {
@@ -11,8 +18,10 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { WIZARD_FOOTER_CLASS, WIZARD_RAIL_CLASS } from '@/components/wizard/primitives';
-import { cn } from '@/lib/utils';
+import {
+    WIZARD_FOOTER_CLASS,
+    WIZARD_RAIL_CLASS,
+} from '@/components/wizard/primitives';
 
 export interface OneSession {
     id: number;
@@ -68,14 +77,33 @@ export function MyHrOneOnOneModal({
     const acknowledged = session.employee_acknowledged;
 
     const nav = [
-        { key: 'agenda' as const, label: 'Talking points', count: topics.length, icon: MessagesSquare },
-        { key: 'actions' as const, label: 'Action items', count: session.actions_agreed.length, icon: ListChecks },
-        { key: 'notes' as const, label: 'Notes', count: session.employee_comments ? 1 : 0, icon: FileText },
+        {
+            key: 'agenda' as const,
+            label: 'Talking points',
+            count: topics.length,
+            icon: MessagesSquare,
+        },
+        {
+            key: 'actions' as const,
+            label: 'Action items',
+            count: session.actions_agreed.length,
+            icon: ListChecks,
+        },
+        {
+            key: 'notes' as const,
+            label: 'Notes',
+            count: session.employee_comments ? 1 : 0,
+            icon: FileText,
+        },
     ];
 
     function scrollTo(key: 'agenda' | 'actions' | 'notes') {
         const ref =
-            key === 'agenda' ? agendaRef : key === 'actions' ? actionsRef : notesRef;
+            key === 'agenda'
+                ? agendaRef
+                : key === 'actions'
+                  ? actionsRef
+                  : notesRef;
         ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -83,9 +111,14 @@ export function MyHrOneOnOneModal({
         <Dialog open={!!session} onOpenChange={(next) => !next && onClose()}>
             <DialogContent
                 className="overflow-hidden p-0 [&>button]:hidden"
-                style={{ maxWidth: 'min(94vw, 1020px)', width: 'min(94vw, 1020px)' }}
+                style={{
+                    maxWidth: 'min(94vw, 1020px)',
+                    width: 'min(94vw, 1020px)',
+                }}
             >
-                <DialogTitle className="sr-only">1:1 review with {who}</DialogTitle>
+                <DialogTitle className="sr-only">
+                    1:1 review with {who}
+                </DialogTitle>
                 <DialogDescription className="sr-only">
                     Review the talking points, actions and notes from this 1:1.
                 </DialogDescription>
@@ -149,7 +182,8 @@ export function MyHrOneOnOneModal({
                         })}
 
                         <p className="mt-auto pt-3 text-[11px] leading-relaxed text-muted-foreground">
-                            Acknowledging lets your manager know you’ve reviewed this 1:1.
+                            Acknowledging lets your manager know you’ve reviewed
+                            this 1:1.
                         </p>
                     </aside>
 
@@ -172,10 +206,7 @@ export function MyHrOneOnOneModal({
                             </button>
                         </header>
 
-                        <div
-                            
-                            className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-5"
-                        >
+                        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-5">
                             {/* Talking points */}
                             <section ref={agendaRef}>
                                 <div className="mb-2.5 flex items-center gap-2">
@@ -196,7 +227,9 @@ export function MyHrOneOnOneModal({
                                                 className="flex items-center gap-2.5 rounded-[11px] border border-border px-3 py-2.5"
                                             >
                                                 <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
-                                                <span className="text-[13.5px]">{t}</span>
+                                                <span className="text-[13.5px]">
+                                                    {t}
+                                                </span>
                                             </div>
                                         ))}
                                     </div>
@@ -223,7 +256,9 @@ export function MyHrOneOnOneModal({
                                                 className="flex items-center gap-2.5 rounded-[11px] border border-border px-3 py-2.5"
                                             >
                                                 <span className="h-4 w-4 shrink-0 rounded-md border-2 border-border" />
-                                                <span className="text-[13px]">{a}</span>
+                                                <span className="text-[13px]">
+                                                    {a}
+                                                </span>
                                             </div>
                                         ))}
                                     </div>
@@ -234,7 +269,9 @@ export function MyHrOneOnOneModal({
                             <section ref={notesRef}>
                                 <div className="mb-2 flex items-center gap-2">
                                     <FileText className="h-3.5 w-3.5 text-status-info" />
-                                    <h3 className="text-[13.5px] font-bold">Your notes</h3>
+                                    <h3 className="text-[13.5px] font-bold">
+                                        Your notes
+                                    </h3>
                                     <span className="text-[10.5px] text-muted-foreground">
                                         shared with {who}
                                     </span>
@@ -266,13 +303,17 @@ export function MyHrOneOnOneModal({
                                 <>
                                     <input
                                         value={comment}
-                                        onChange={(e) => setComment(e.target.value)}
+                                        onChange={(e) =>
+                                            setComment(e.target.value)
+                                        }
                                         placeholder={`Add a comment for ${who.split(' ')[0]}…`}
                                         className="flex-1 rounded-[9px] border border-border bg-card px-3 py-2.5 text-[12.5px] outline-none focus:border-primary"
                                     />
                                     <button
                                         type="button"
-                                        onClick={() => onAcknowledge(session.id, comment)}
+                                        onClick={() =>
+                                            onAcknowledge(session.id, comment)
+                                        }
                                         className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-primary px-4 py-2.5 text-[13px] font-bold text-primary-foreground transition-colors hover:bg-primary/90"
                                     >
                                         <CheckCircle2 className="h-4 w-4" />

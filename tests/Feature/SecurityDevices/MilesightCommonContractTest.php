@@ -21,11 +21,19 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class MilesightCommonContractTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('integration-capabilities.milesight.allowed_hosts', ['milesight.example.test']);
+    }
 
     public function test_oauth_connection_and_bounded_paginated_application_discovery_use_common_contracts(): void
     {
@@ -163,6 +171,71 @@ class MilesightCommonContractTest extends TestCase
         $this->assertDatabaseMissing('devices', ['provider' => 'milesight', 'name' => 'other-app-device']);
     }
 
+    public function test_device_sync_discards_inventory_when_the_canonical_site_is_retired_in_flight(): void
+    {
+        $site = Site::factory()->create(['name' => 'Retiring Care Site']);
+        $siteConfig = $this->siteConfig($site, 'application-a');
+        $connection = $this->connection();
+        $existing = Device::factory()->iotHealthcare()->create([
+            'name' => 'Existing healthcare sensor',
+            'provider' => 'milesight',
+            'status' => DeviceStatus::Active,
+            'external_ref' => [
+                'provider' => 'milesight',
+                'provider_entity_id' => 'existing-milesight-device',
+                'application_id' => 'application-a',
+            ],
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $existing->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now()->subDay(),
+        ]);
+
+        Http::fake(function (Request $request) use ($site) {
+            if ($request->url() === 'https://milesight.example.test/oauth/token') {
+                return Http::response(['data' => ['access_token' => 'access-token']]);
+            }
+
+            if ($request->url() === 'https://milesight.example.test/device/openapi/v1/devices/search') {
+                $site->update(['archived' => true, 'archived_at' => now()]);
+
+                return Http::response(['data' => [
+                    'pageSize' => 100,
+                    'pageNumber' => 1,
+                    'total' => 2,
+                    'content' => [
+                        array_merge($this->inventoryDevice(
+                            'existing-milesight-device',
+                            'application-a',
+                            'Retired care sensors',
+                        ), [
+                            'name' => 'Provider attempted overwrite',
+                            'connectStatus' => 'OFFLINE',
+                        ]),
+                        $this->inventoryDevice('new-milesight-device', 'application-a', 'Retired care sensors'),
+                    ],
+                ]]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $result = app(MilesightAdapter::class)->syncDevices($siteConfig, $connection);
+
+        $this->assertFalse($result->isSuccess());
+        $this->assertSame('Existing healthcare sensor', $existing->refresh()->name);
+        $this->assertSame(DeviceStatus::Active, $existing->status);
+        $this->assertSame(1, Device::query()->where('provider', 'milesight')->count());
+        $this->assertSame(1, DeviceAssignment::query()->where('device_id', $existing->id)->count());
+        $this->assertDatabaseMissing('devices', [
+            'provider' => 'milesight',
+            'name' => 'new-milesight-device',
+        ]);
+    }
+
     public function test_sync_fails_closed_for_identity_owned_by_another_site(): void
     {
         $sourceSite = Site::factory()->create();
@@ -269,6 +342,69 @@ class MilesightCommonContractTest extends TestCase
         $this->assertSame(0, Device::query()->where('provider', 'milesight')->count());
         $this->assertSame('Provider operation failed. Review the bounded diagnostic state and retry.', $result->error);
         $this->assertStringNotContainsString('access-token', $result->error ?? '');
+    }
+
+    #[DataProvider('unsafeBaseUrlProvider')]
+    public function test_credentials_are_never_sent_to_an_unapproved_or_malformed_endpoint(string $baseUrl): void
+    {
+        Http::preventStrayRequests();
+        $connection = $this->connection();
+        $connection->forceFill(['config' => [
+            'client_id' => 'client-123',
+            'base_url' => $baseUrl,
+        ]])->save();
+
+        $this->assertFalse(app(MilesightAdapter::class)->testConnection($connection->refresh()));
+
+        Http::assertNothingSent();
+    }
+
+    /** @return array<string, array{string}> */
+    public static function unsafeBaseUrlProvider(): array
+    {
+        return [
+            'unapproved public host' => ['https://attacker.example.test'],
+            'private address' => ['https://127.0.0.1'],
+            'embedded credentials' => ['https://user:pass@milesight.example.test'],
+            'non-default port' => ['https://milesight.example.test:8443'],
+            'query credentials' => ['https://milesight.example.test?redirect=attacker'],
+            'nested path' => ['https://milesight.example.test/proxy'],
+        ];
+    }
+
+    #[DataProvider('redirectStatusProvider')]
+    public function test_oauth_credentials_are_not_forwarded_to_provider_redirects(int $status): void
+    {
+        $connection = $this->connection();
+
+        Http::fake(function (Request $request) use ($status) {
+            if ($request->url() === 'https://milesight.example.test/oauth/token') {
+                return Http::response([], $status, [
+                    'Location' => 'https://attacker.example.test/collect',
+                ]);
+            }
+
+            return Http::response(['data' => ['access_token' => 'redirected-token']]);
+        });
+
+        $this->assertFalse(app(MilesightAdapter::class)->testConnection($connection));
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://milesight.example.test/oauth/token'
+            && $request['client_secret'] === 'secret-9876');
+        Http::assertNotSent(fn (Request $request): bool => str_starts_with(
+            $request->url(),
+            'https://attacker.example.test/',
+        ));
+    }
+
+    /** @return array<string, array{int}> */
+    public static function redirectStatusProvider(): array
+    {
+        return [
+            'temporary redirect' => [307],
+            'permanent redirect' => [308],
+        ];
     }
 
     private function connection(): IntegrationProviderConnection

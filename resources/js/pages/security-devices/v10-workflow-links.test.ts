@@ -25,10 +25,28 @@ describe('Security & Devices canonical workflow links', () => {
         );
         const ticket = source('resources/js/pages/it/tickets/show.tsx');
 
-        expect(siteTechnology).toContain('href={`/sites/${site.id}`}');
-        expect(siteTechnology).toContain('Open Site profile');
+        expect(siteTechnology).toContain('<SiteProfileDestination');
+        expect(siteTechnology).toContain('canView={can.view_site_profile}');
         expect(ticket).toContain('href={ticket.site.href}');
         expect(ticket).toContain('Open {ticket.site.name} profile');
+    });
+
+    it('keeps Healthcare Site context visible without emitting inaccessible profile links', () => {
+        const presenter = source(
+            'app/Domain/SecurityDevices/Presenters/HealthcareWorkspacePresenter.php',
+        );
+        const healthcare = source(
+            'resources/js/components/security-devices/healthcare-workspace.tsx',
+        );
+
+        expect(presenter).toContain(
+            "Gate::forUser($viewer)->allows('view', $site)",
+        );
+        expect(presenter).toContain(
+            '\'href\' => $canViewSiteProfile ? "/sites/{$site->id}" : null',
+        );
+        expect(healthcare).toContain('device.location.site.href &&');
+        expect(healthcare).toContain('<SiteProfileAccessRequired');
     });
 
     it('keeps operational Site and Device context navigable', () => {
@@ -92,6 +110,33 @@ describe('Security & Devices canonical workflow links', () => {
         expect(itWorkspace).toContain("setModal({ type: 'sla' })");
     });
 
+    it('keeps IT catalogue navigation permission-aware and normalises unsupported tabs', () => {
+        const navigation = source('app/Domain/It/ItModuleNavigation.php');
+        const itWorkspace = source('resources/js/pages/it/index.tsx');
+
+        expect(navigation).toContain('$canRequest');
+        expect(navigation).toContain(
+            "? self::item('Service catalogue', '/it?tab=catalog'",
+        );
+        expect(itWorkspace).toContain('const VIEW_TABS = new Set([');
+        expect(itWorkspace).toContain(
+            "const REQUEST_TABS = new Set(['catalog', 'my-tickets', 'knowledge']);",
+        );
+        expect(itWorkspace).toContain(
+            'if (VIEW_TABS.has(id)) return can.view;',
+        );
+        expect(itWorkspace).toContain(
+            'if (REQUEST_TABS.has(id)) return can.request;',
+        );
+        expect(itWorkspace).toContain(
+            'const [requestedTab, setTab] = useHrTab(',
+        );
+        expect(itWorkspace).toContain('if (requestedTab !== tab) setTab(tab);');
+        expect(itWorkspace).not.toContain(
+            'return can.view; // overview / tickets / provisioning / reports',
+        );
+    });
+
     it('keeps estate actions permission-aware and points open IT work at the supported queue', () => {
         const presenter = source(
             'app/Domain/SecurityDevices/Presenters/EstateOperationsPresenter.php',
@@ -123,5 +168,38 @@ describe('Security & Devices canonical workflow links', () => {
         expect(commandBatch).toContain('id="batch-decision-comment-help"');
         expect(commandBatch).toContain('Minimum 10 characters.');
         expect(commandBatch).toContain('comment.trim().length < 10');
+    });
+
+    it('requires a reason and preserves history when a Device relationship is removed', () => {
+        const deviceProfile = source(
+            'resources/js/pages/security-devices/devices/show.tsx',
+        );
+
+        expect(deviceProfile).toContain(
+            'Reason for removing this relationship',
+        );
+        expect(deviceProfile).toContain('data: { reason }');
+        expect(deviceProfile).toContain(
+            'the relationship is retained as history',
+        );
+        expect(deviceProfile).toContain('Relationship history (');
+        expect(deviceProfile).toContain('relationshipHistory.parents.map');
+        expect(deviceProfile).toContain('relationshipHistory.children.map');
+        expect(deviceProfile).toContain('relationship.unlink_reason');
+        expect(deviceProfile).toContain('this device');
+    });
+
+    it('renders nested command evidence in plain language instead of raw JSON', () => {
+        const batch = source(
+            'resources/js/pages/security-devices/command-batches/show.tsx',
+        );
+        const profile = source(
+            'resources/js/pages/security-devices/devices/device-profile-sections.tsx',
+        );
+
+        expect(batch).toContain('formatReadableOperationalValue(entry)');
+        expect(profile).toContain('formatReadableOperationalState(state)');
+        expect(batch).not.toContain('JSON.stringify(entry)');
+        expect(profile).not.toContain('JSON.stringify(value)');
     });
 });

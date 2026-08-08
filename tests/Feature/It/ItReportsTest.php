@@ -1,8 +1,11 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItTicket;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -32,6 +35,49 @@ function reportsProfile(Site $site, ?User $user = null): HrEmployeeProfile
         'primary_site_id' => $site->id,
         'start_date' => now()->subDays(10)->toDateString(),
         'is_active' => true,
+    ]);
+}
+
+/** @param list<string> $permissionKeys */
+function scopedItReportsUser(Site $site, array $permissionKeys): User
+{
+    $user = User::factory()->create(['approved_at' => now()]);
+    $role = Role::query()->create([
+        'name' => 'it-reports-'.str()->uuid(),
+        'label' => 'IT reports scoped viewer',
+        'level' => 40,
+        'type' => 'custom',
+    ]);
+    $role->permissions()->sync(collect($permissionKeys)->map(
+        fn (string $key): int => Permission::query()->firstOrCreate(
+            ['key' => $key],
+            ['description' => $key, 'group' => 'it', 'module' => 'Operations'],
+        )->id,
+    ));
+    $user->roles()->attach($role);
+    reportsProfile($site, $user);
+
+    return $user;
+}
+
+function assignReportsDevice(Device $device, Site $site, User $actor): void
+{
+    DeviceAssignment::query()->create([
+        'device_id' => $device->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $site->id,
+        'assignment_type' => 'permanent',
+        'assigned_at' => now(),
+        'assigned_by_user_id' => $actor->id,
+    ]);
+}
+
+function linkReportsDevice(ItTicket $ticket, Device $device): void
+{
+    $ticket->links()->create([
+        'relationship' => 'affected_device',
+        'linkable_type' => $device->getMorphClass(),
+        'linkable_id' => $device->id,
     ]);
 }
 
@@ -131,6 +177,90 @@ test('the report aggregates tickets and provisioning across the range', function
     expect($json['provisioning']['raised'])->toBe(3);
     expect($json['provisioning']['fulfilled'])->toBe(1);
     expect($json['provisioning']['avg_days'])->toEqual(2.0);
+});
+
+test('report source projections require their exact permissions and canonical Site visibility', function () {
+    $visibleSite = Site::factory()->create();
+    $hiddenSite = Site::factory()->create();
+    $viewer = scopedItReportsUser($visibleSite, [
+        'it.view',
+        'securityDevices.devices.view',
+    ]);
+    $requester = User::factory()->create();
+
+    $visibleDevices = Device::factory()->itInfrastructure()->count(2)->create();
+    $hiddenDevice = Device::factory()->itInfrastructure()->create();
+    foreach ($visibleDevices as $device) {
+        assignReportsDevice($device, $visibleSite, $viewer);
+    }
+    assignReportsDevice($hiddenDevice, $hiddenSite, $viewer);
+
+    $openIncident = ItTicket::factory()->create([
+        'site_id' => $visibleSite->id,
+        'requester_user_id' => $requester->id,
+        'work_type' => 'incident',
+        'status' => 'open',
+    ]);
+    foreach ($visibleDevices as $device) {
+        linkReportsDevice($openIncident, $device);
+    }
+
+    $recoveredIncident = ItTicket::factory()->create([
+        'site_id' => $visibleSite->id,
+        'requester_user_id' => $requester->id,
+        'work_type' => 'incident',
+        'status' => 'resolved',
+        'monitoring_recovered_at' => now(),
+    ]);
+    foreach ($visibleDevices as $device) {
+        linkReportsDevice($recoveredIncident, $device);
+    }
+
+    $nonIncident = ItTicket::factory()->create([
+        'site_id' => $visibleSite->id,
+        'requester_user_id' => $requester->id,
+        'work_type' => 'service_request',
+        'status' => 'open',
+        'monitoring_recovered_at' => now(),
+    ]);
+    linkReportsDevice($nonIncident, $visibleDevices->first());
+
+    $hiddenIncident = ItTicket::factory()->create([
+        'site_id' => $hiddenSite->id,
+        'requester_user_id' => $requester->id,
+        'work_type' => 'incident',
+        'status' => 'open',
+    ]);
+    linkReportsDevice($hiddenIncident, $hiddenDevice);
+
+    $report = $this->actingAs($viewer)->getJson('/it/reports/data')->assertOk()->json();
+
+    expect($report['automation_outcomes'])->toMatchArray([
+        'access' => 'restricted',
+        'succeeded' => null,
+        'failed' => null,
+        'skipped' => null,
+        'href' => null,
+    ])->and($report['device_reliability'])->toMatchArray([
+        'access' => 'allowed',
+        'affected_devices' => 2,
+        'open_incidents' => 1,
+        'recovered' => 1,
+    ]);
+
+    $withoutDevicePermission = scopedItReportsUser($visibleSite, ['it.view']);
+    $restricted = $this->actingAs($withoutDevicePermission)
+        ->getJson('/it/reports/data')
+        ->assertOk()
+        ->json('device_reliability');
+
+    expect($restricted)->toBe([
+        'access' => 'restricted',
+        'affected_devices' => null,
+        'open_incidents' => null,
+        'recovered' => null,
+        'href' => null,
+    ]);
 });
 
 test('per-card CSV export is agent-only, correct and injection-guarded', function () {

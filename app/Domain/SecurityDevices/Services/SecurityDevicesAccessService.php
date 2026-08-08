@@ -258,6 +258,31 @@ class SecurityDevicesAccessService
                 : null;
     }
 
+    /**
+     * Canonical Asset register scope for application modules that need a
+     * pageable query rather than a bounded assignment picker.
+     */
+    public function accessibleAssets(User $user, bool $vehiclesOnly = false): Builder
+    {
+        $query = $this->assetCandidateQuery($user, $vehiclesOnly);
+
+        if ($user->canDo('assets.viewAny')) {
+            return $query;
+        }
+
+        return $this->applyAssignedAssetPolicyScope($query, $user);
+    }
+
+    /** Canonical operational Sites available to the current actor. */
+    public function accessibleSites(User $user): Builder
+    {
+        $siteIds = $this->accessibleSiteIds($user);
+
+        return $this->operationalSites()
+            ->when($siteIds === [], fn (Builder $query): Builder => $query->whereRaw('1 = 0'))
+            ->when($siteIds !== [], fn (Builder $query): Builder => $query->whereKey($siteIds));
+    }
+
     /** @return Collection<int, Asset> */
     public function assignableAssets(User $user, ?string $search = null): Collection
     {
@@ -376,6 +401,75 @@ class SecurityDevicesAccessService
         }
 
         return $query;
+    }
+
+    /**
+     * Narrow the canonical visible register to every active provenance path
+     * owned by one operational Site. The base visibility query remains the
+     * privacy and direct-object boundary; this method only narrows it further.
+     */
+    public function visibleDevicesForSite(User $user, int $siteId): Builder
+    {
+        $query = $this->visibleDevices($user);
+        if (! $this->siteIsAccessible($user, $siteId)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $roomIds = SiteRoom::query()
+            ->where('site_id', $siteId)
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+        $clientIds = Client::query()
+            ->where('site_id', $siteId)
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+        $staffIds = $this->applyCurrentStaffSiteScope(HrEmployeeProfile::query(), [$siteId])
+            ->pluck('user_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+        $assetIds = $this->applyAssetSiteScope(Asset::query(), [$siteId])
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        return $query->where(function (Builder $siteScope) use (
+            $siteId,
+            $roomIds,
+            $clientIds,
+            $staffIds,
+            $assetIds,
+        ): void {
+            $siteScope->whereHas('assignments', function (Builder $assignment) use (
+                $siteId,
+                $roomIds,
+                $clientIds,
+                $staffIds,
+                $assetIds,
+            ): void {
+                $assignment->active()->where(function (Builder $target) use (
+                    $siteId,
+                    $roomIds,
+                    $clientIds,
+                    $staffIds,
+                    $assetIds,
+                ): void {
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_SITE, [$siteId], false);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_ROOM, $roomIds);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_CLIENT, $clientIds);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_STAFF, $staffIds);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_VEHICLE, $assetIds);
+                });
+            });
+
+            if ($assetIds !== []) {
+                $siteScope->orWhereHas(
+                    'activeAssetLinks',
+                    fn (Builder $link): Builder => $link->whereIn('asset_id', $assetIds),
+                );
+            }
+        });
     }
 
     /**
@@ -751,16 +845,84 @@ class SecurityDevicesAccessService
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where(function (Builder $site) use ($siteIds): void {
-            $site->where(function (Builder $direct) use ($siteIds): void {
-                $direct->whereIn('site_id', $siteIds)
-                    ->whereHas('site', fn (Builder $canonical): Builder => $this->applyOperationalSiteScope($canonical));
-            })->orWhere(function (Builder $home) use ($siteIds): void {
-                $home->whereIn('home_site_id', $siteIds)
-                    ->whereHas('homeSite', fn (Builder $canonical): Builder => $this->applyOperationalSiteScope($canonical));
-            })->orWhereHas('client', fn (Builder $client): Builder => $client
-                ->whereIn('site_id', $siteIds)
-                ->whereHas('site', fn (Builder $canonical): Builder => $this->applyOperationalSiteScope($canonical)));
+        $siteColumn = $query->qualifyColumn('site_id');
+        $homeSiteColumn = $query->qualifyColumn('home_site_id');
+        $clientColumn = $query->qualifyColumn('client_id');
+
+        return $query->where(function (Builder $provenance) use (
+            $siteIds,
+            $siteColumn,
+            $homeSiteColumn,
+            $clientColumn,
+        ): void {
+            $provenance->where(function (Builder $directSite) use (
+                $siteIds,
+                $siteColumn,
+                $clientColumn,
+            ): void {
+                $directSite->whereIn($siteColumn, $siteIds)
+                    ->whereHas('site', fn (Builder $canonical): Builder => $this->applyOperationalSiteScope($canonical))
+                    ->where(function (Builder $clientAgreement) use ($siteColumn, $clientColumn): void {
+                        $clientAgreement->whereNull($clientColumn)
+                            ->orWhereHas('client', fn (Builder $client): Builder => $client->whereColumn(
+                                $client->qualifyColumn('site_id'),
+                                $siteColumn,
+                            ));
+                    });
+            })->orWhere(function (Builder $homeSite) use (
+                $siteIds,
+                $siteColumn,
+                $homeSiteColumn,
+                $clientColumn,
+            ): void {
+                $homeSite->whereNull($siteColumn)
+                    ->whereIn($homeSiteColumn, $siteIds)
+                    ->whereHas('homeSite', fn (Builder $canonical): Builder => $this->applyOperationalSiteScope($canonical))
+                    ->where(function (Builder $clientAgreement) use ($homeSiteColumn, $clientColumn): void {
+                        $clientAgreement->whereNull($clientColumn)
+                            ->orWhereHas('client', fn (Builder $client): Builder => $client->whereColumn(
+                                $client->qualifyColumn('site_id'),
+                                $homeSiteColumn,
+                            ));
+                    });
+            })->orWhere(function (Builder $clientSite) use (
+                $siteIds,
+                $siteColumn,
+                $homeSiteColumn,
+                $clientColumn,
+            ): void {
+                $clientSite->whereNull($siteColumn)
+                    ->whereNull($homeSiteColumn)
+                    ->whereNotNull($clientColumn)
+                    ->whereHas('client', fn (Builder $client): Builder => $client
+                        ->whereIn($client->qualifyColumn('site_id'), $siteIds)
+                        ->whereHas('site', fn (Builder $canonical): Builder => $this->applyOperationalSiteScope($canonical)));
+            });
+        });
+    }
+
+    /**
+     * Mirror AssetPolicy's assigned-only support-worker boundary in SQL so
+     * pagination, exports and aggregate counts cannot enumerate Site inventory
+     * that the same actor cannot open directly.
+     */
+    private function applyAssignedAssetPolicyScope(Builder $query, User $user): Builder
+    {
+        if (! $user->canDo('assets.viewAssigned') || ! $user->hasRole('support_worker')) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $assignedClientIds = Client::query()
+            ->select('clients.id')
+            ->whereHas('supportWorkers', fn (Builder $workers): Builder => $workers->whereKey($user->id));
+        $assignedClientSiteIds = Client::query()
+            ->select('clients.site_id')
+            ->whereNotNull('clients.site_id')
+            ->whereHas('supportWorkers', fn (Builder $workers): Builder => $workers->whereKey($user->id));
+
+        return $query->where(function (Builder $assigned) use ($assignedClientIds, $assignedClientSiteIds): void {
+            $assigned->whereIn($assigned->qualifyColumn('client_id'), $assignedClientIds)
+                ->orWhereIn($assigned->qualifyColumn('site_id'), $assignedClientSiteIds);
         });
     }
 

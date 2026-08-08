@@ -23,6 +23,7 @@ function PreferenceHarness({ initial = [] }: { initial?: string[] }) {
     return (
         <div>
             <output>{preference.value.join(',')}</output>
+            {/* eslint-disable-next-line no-restricted-syntax -- native test-harness control isolates hook persistence behavior from shared Button styling */}
             <button
                 type="button"
                 onClick={() =>

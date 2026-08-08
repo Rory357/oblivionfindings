@@ -1,25 +1,6 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
-import {
-    Users,
-    Search,
-    Plus,
-    Eye,
-    Pencil,
-    Trash2,
-    UserCheck,
-    UserX,
-    MoreHorizontal,
-    Filter,
-    X,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
@@ -27,20 +8,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
     Dialog,
     DialogContent,
@@ -50,12 +17,44 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    Eye,
+    Filter,
+    MoreHorizontal,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
+    UserCheck,
+    Users,
+    UserX,
+    X,
+} from 'lucide-react';
+import { useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'System', href: '/system/access' },
@@ -126,7 +125,7 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                 role: roleFilter,
                 type: typeFilter,
             },
-            { preserveState: true }
+            { preserveState: true },
         );
     };
 
@@ -161,9 +160,12 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
 
     const getRoleBadgeColor = (level: number): string => {
         if (level >= 90) return 'bg-primary/10 text-primary border-primary';
-        if (level >= 70) return 'bg-status-info-bg text-status-info border-status-info/30';
-        if (level >= 50) return 'bg-status-success-bg text-status-success border-status-success/30';
-        if (level >= 30) return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        if (level >= 70)
+            return 'bg-status-info-bg text-status-info border-status-info/30';
+        if (level >= 50)
+            return 'bg-status-success-bg text-status-success border-status-success/30';
+        if (level >= 30)
+            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         return 'bg-muted text-foreground border-border';
     };
 
@@ -171,7 +173,8 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
         const variants: Record<string, string> = {
             staff: 'bg-status-info-bg text-status-info border-status-info/30',
             client: 'bg-status-success-bg text-status-success border-status-success/30',
-            next_of_kin: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+            next_of_kin:
+                'bg-status-warning-bg text-status-warning border-status-warning/30',
             board: 'bg-primary/10 text-primary border-primary',
             user: 'bg-muted text-foreground border-border',
         };
@@ -183,7 +186,10 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
             user: 'User',
         };
         return (
-            <Badge variant="outline" className={variants[type] || variants.user}>
+            <Badge
+                variant="outline"
+                className={variants[type] || variants.user}
+            >
                 {labels[type] || type}
             </Badge>
         );
@@ -208,7 +214,7 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                         actions={
                             <Link href="/system/users/create">
                                 <Button size="sm">
-                                    <Plus className="h-4 w-4 mr-2" />
+                                    <Plus className="mr-2 h-4 w-4" />
                                     Create User
                                 </Button>
                             </Link>
@@ -229,12 +235,16 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                         <div className="space-y-3">
                             {/* Search Row */}
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search by name or email..."
                                     value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    onChange={(e) =>
+                                        setSearchQuery(e.target.value)
+                                    }
+                                    onKeyDown={(e) =>
+                                        e.key === 'Enter' && applyFilters()
+                                    }
                                     className="pl-9"
                                 />
                             </div>
@@ -243,62 +253,113 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="flex items-center gap-2">
                                     <Filter className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm font-medium">Filters:</span>
+                                    <span className="text-sm font-medium">
+                                        Filters:
+                                    </span>
                                 </div>
 
                                 {/* Status Filter */}
-                                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                    <SelectTrigger className="w-[130px] h-8">
+                                <Select
+                                    value={statusFilter}
+                                    onValueChange={setStatusFilter}
+                                >
+                                    <SelectTrigger className="h-8 w-[130px]">
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All Status</SelectItem>
-                                        <SelectItem value="active">Active</SelectItem>
-                                        <SelectItem value="pending">Pending</SelectItem>
+                                        <SelectItem value="all">
+                                            All Status
+                                        </SelectItem>
+                                        <SelectItem value="active">
+                                            Active
+                                        </SelectItem>
+                                        <SelectItem value="pending">
+                                            Pending
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
 
                                 {/* Type Filter */}
-                                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                                    <SelectTrigger className="w-[140px] h-8">
+                                <Select
+                                    value={typeFilter}
+                                    onValueChange={setTypeFilter}
+                                >
+                                    <SelectTrigger className="h-8 w-[140px]">
                                         <SelectValue placeholder="User Type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All Types</SelectItem>
-                                        <SelectItem value="staff">Staff</SelectItem>
-                                        <SelectItem value="client">Client</SelectItem>
-                                        <SelectItem value="next_of_kin">Next of Kin</SelectItem>
-                                        <SelectItem value="board">Board</SelectItem>
+                                        <SelectItem value="all">
+                                            All Types
+                                        </SelectItem>
+                                        <SelectItem value="staff">
+                                            Staff
+                                        </SelectItem>
+                                        <SelectItem value="client">
+                                            Client
+                                        </SelectItem>
+                                        <SelectItem value="next_of_kin">
+                                            Next of Kin
+                                        </SelectItem>
+                                        <SelectItem value="board">
+                                            Board
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
 
                                 {/* Role Filter */}
-                                <Select value={roleFilter} onValueChange={setRoleFilter}>
-                                    <SelectTrigger className="w-[160px] h-8">
+                                <Select
+                                    value={roleFilter}
+                                    onValueChange={setRoleFilter}
+                                >
+                                    <SelectTrigger className="h-8 w-[160px]">
                                         <SelectValue placeholder="Role" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All Roles</SelectItem>
-                                        <SelectItem disabled value="system-header" className="font-semibold text-muted-foreground">
+                                        <SelectItem value="all">
+                                            All Roles
+                                        </SelectItem>
+                                        <SelectItem
+                                            disabled
+                                            value="system-header"
+                                            className="font-semibold text-muted-foreground"
+                                        >
                                             System Roles
                                         </SelectItem>
                                         {roles
                                             .filter((r) => r.type === 'system')
                                             .map((role) => (
-                                                <SelectItem key={role.id} value={String(role.id)}>
+                                                <SelectItem
+                                                    key={role.id}
+                                                    value={String(role.id)}
+                                                >
                                                     {role.label} (L{role.level})
                                                 </SelectItem>
                                             ))}
-                                        {roles.some((r) => r.type === 'custom') && (
+                                        {roles.some(
+                                            (r) => r.type === 'custom',
+                                        ) && (
                                             <>
-                                                <SelectItem disabled value="custom-header" className="font-semibold text-muted-foreground">
+                                                <SelectItem
+                                                    disabled
+                                                    value="custom-header"
+                                                    className="font-semibold text-muted-foreground"
+                                                >
                                                     Custom Roles
                                                 </SelectItem>
                                                 {roles
-                                                    .filter((r) => r.type === 'custom')
+                                                    .filter(
+                                                        (r) =>
+                                                            r.type === 'custom',
+                                                    )
                                                     .map((role) => (
-                                                        <SelectItem key={role.id} value={String(role.id)}>
-                                                            {role.label} (L{role.level})
+                                                        <SelectItem
+                                                            key={role.id}
+                                                            value={String(
+                                                                role.id,
+                                                            )}
+                                                        >
+                                                            {role.label} (L
+                                                            {role.level})
                                                         </SelectItem>
                                                     ))}
                                             </>
@@ -313,8 +374,12 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
 
                                 {/* Clear Button */}
                                 {hasActiveFilters && (
-                                    <Button variant="ghost" size="sm" onClick={clearFilters}>
-                                        <X className="h-4 w-4 mr-1" />
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={clearFilters}
+                                    >
+                                        <X className="mr-1 h-4 w-4" />
                                         Clear
                                     </Button>
                                 )}
@@ -324,25 +389,65 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                             {hasActiveFilters && (
                                 <div className="flex flex-wrap gap-2 pt-1">
                                     {statusFilter !== 'all' && (
-                                        <Badge variant="secondary" className="gap-1">
+                                        <Badge
+                                            variant="secondary"
+                                            className="gap-1"
+                                        >
                                             Status: {statusFilter}
-                                            <Button variant="ghost" size="icon" className="size-5" onClick={() => { setStatusFilter('all'); applyFilters(); }}>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="size-5"
+                                                onClick={() => {
+                                                    setStatusFilter('all');
+                                                    applyFilters();
+                                                }}
+                                            >
                                                 <X className="h-3 w-3" />
                                             </Button>
                                         </Badge>
                                     )}
                                     {typeFilter !== 'all' && (
-                                        <Badge variant="secondary" className="gap-1">
+                                        <Badge
+                                            variant="secondary"
+                                            className="gap-1"
+                                        >
                                             Type: {typeFilter}
-                                            <Button variant="ghost" size="icon" className="size-5" onClick={() => { setTypeFilter('all'); applyFilters(); }}>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="size-5"
+                                                onClick={() => {
+                                                    setTypeFilter('all');
+                                                    applyFilters();
+                                                }}
+                                            >
                                                 <X className="h-3 w-3" />
                                             </Button>
                                         </Badge>
                                     )}
                                     {roleFilter !== 'all' && (
-                                        <Badge variant="secondary" className="gap-1">
-                                            Role: {roles.find((r) => String(r.id) === roleFilter)?.label}
-                                            <Button variant="ghost" size="icon" className="size-5" onClick={() => { setRoleFilter('all'); applyFilters(); }}>
+                                        <Badge
+                                            variant="secondary"
+                                            className="gap-1"
+                                        >
+                                            Role:{' '}
+                                            {
+                                                roles.find(
+                                                    (r) =>
+                                                        String(r.id) ===
+                                                        roleFilter,
+                                                )?.label
+                                            }
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="size-5"
+                                                onClick={() => {
+                                                    setRoleFilter('all');
+                                                    applyFilters();
+                                                }}
+                                            >
                                                 <X className="h-3 w-3" />
                                             </Button>
                                         </Badge>
@@ -352,7 +457,7 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                         </div>
 
                         {/* Table */}
-                        <div className="border rounded-md">
+                        <div className="rounded-md border">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -361,7 +466,9 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                                         <TableHead>Type</TableHead>
                                         <TableHead>Roles</TableHead>
                                         <TableHead>Status</TableHead>
-                                        <TableHead className="w-[100px]">Actions</TableHead>
+                                        <TableHead className="w-[100px]">
+                                            Actions
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -373,18 +480,27 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                                                         <img
                                                             src={user.avatar}
                                                             alt={user.name}
-                                                            className="w-8 h-8 rounded-full object-cover"
+                                                            className="h-8 w-8 rounded-full object-cover"
                                                         />
                                                     ) : (
-                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                                                            {user.name.charAt(0).toUpperCase()}
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium">
+                                                            {user.name
+                                                                .charAt(0)
+                                                                .toUpperCase()}
                                                         </div>
                                                     )}
                                                     <div>
-                                                        <div className="font-medium">{user.name}</div>
-                                                        {user.staff_profile?.job_title && (
+                                                        <div className="font-medium">
+                                                            {user.name}
+                                                        </div>
+                                                        {user.staff_profile
+                                                            ?.job_title && (
                                                             <div className="text-xs text-muted-foreground">
-                                                                {user.staff_profile.job_title}
+                                                                {
+                                                                    user
+                                                                        .staff_profile
+                                                                        .job_title
+                                                                }
                                                             </div>
                                                         )}
                                                     </div>
@@ -393,30 +509,44 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                                             <TableCell className="text-muted-foreground">
                                                 {user.email}
                                             </TableCell>
-                                            <TableCell>{getUserTypeBadge(user.user_type)}</TableCell>
+                                            <TableCell>
+                                                {getUserTypeBadge(
+                                                    user.user_type,
+                                                )}
+                                            </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1">
                                                     {user.roles.length > 0 ? (
                                                         user.roles
-                                                            .sort((a, b) => b.level - a.level)
+                                                            .sort(
+                                                                (a, b) =>
+                                                                    b.level -
+                                                                    a.level,
+                                                            )
                                                             .slice(0, 2)
                                                             .map((role) => (
                                                                 <Badge
-                                                                    key={role.id}
+                                                                    key={
+                                                                        role.id
+                                                                    }
                                                                     variant="outline"
-                                                                    className={getRoleBadgeColor(role.level)}
+                                                                    className={getRoleBadgeColor(
+                                                                        role.level,
+                                                                    )}
                                                                 >
                                                                     {role.label}
                                                                 </Badge>
                                                             ))
                                                     ) : (
-                                                        <span className="text-muted-foreground text-sm">
+                                                        <span className="text-sm text-muted-foreground">
                                                             No roles
                                                         </span>
                                                     )}
                                                     {user.roles.length > 2 && (
                                                         <Badge variant="outline">
-                                                            +{user.roles.length - 2}
+                                                            +
+                                                            {user.roles.length -
+                                                                2}
                                                         </Badge>
                                                     )}
                                                 </div>
@@ -427,53 +557,72 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                                                         Active
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="secondary">Pending</Badge>
+                                                    <Badge variant="secondary">
+                                                        Pending
+                                                    </Badge>
                                                 )}
                                             </TableCell>
                                             <TableCell>
                                                 <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="sm">
+                                                    <DropdownMenuTrigger
+                                                        asChild
+                                                    >
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                        >
                                                             <MoreHorizontal className="h-4 w-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem asChild>
-                                                            <Link 
+                                                        <DropdownMenuItem
+                                                            asChild
+                                                        >
+                                                            <Link
                                                                 href={`/system/users/${user.id}`}
-                                                                className="cursor-pointer flex items-center"
+                                                                className="flex cursor-pointer items-center"
                                                             >
-                                                                <Eye className="h-4 w-4 mr-2" />
+                                                                <Eye className="mr-2 h-4 w-4" />
                                                                 View
                                                             </Link>
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem asChild>
-                                                            <Link 
+                                                        <DropdownMenuItem
+                                                            asChild
+                                                        >
+                                                            <Link
                                                                 href={`/system/users/${user.id}/edit`}
-                                                                className="cursor-pointer flex items-center"
+                                                                className="flex cursor-pointer items-center"
                                                             >
-                                                                <Pencil className="h-4 w-4 mr-2" />
+                                                                <Pencil className="mr-2 h-4 w-4" />
                                                                 Edit
                                                             </Link>
                                                         </DropdownMenuItem>
                                                         {!user.is_active ? (
                                                             <DropdownMenuItem
-                                                                onSelect={(e) => {
+                                                                onSelect={(
+                                                                    e,
+                                                                ) => {
                                                                     e.preventDefault();
-                                                                    handleApprove(user.id);
+                                                                    handleApprove(
+                                                                        user.id,
+                                                                    );
                                                                 }}
                                                             >
-                                                                <UserCheck className="h-4 w-4 mr-2" />
+                                                                <UserCheck className="mr-2 h-4 w-4" />
                                                                 Approve
                                                             </DropdownMenuItem>
                                                         ) : (
                                                             <DropdownMenuItem
-                                                                onSelect={(e) => {
+                                                                onSelect={(
+                                                                    e,
+                                                                ) => {
                                                                     e.preventDefault();
-                                                                    handleSuspend(user.id);
+                                                                    handleSuspend(
+                                                                        user.id,
+                                                                    );
                                                                 }}
                                                             >
-                                                                <UserX className="h-4 w-4 mr-2" />
+                                                                <UserX className="mr-2 h-4 w-4" />
                                                                 Suspend
                                                             </DropdownMenuItem>
                                                         )}
@@ -481,10 +630,12 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                                                             className="text-destructive"
                                                             onSelect={(e) => {
                                                                 e.preventDefault();
-                                                                setDeletingUser(user);
+                                                                setDeletingUser(
+                                                                    user,
+                                                                );
                                                             }}
                                                         >
-                                                            <Trash2 className="h-4 w-4 mr-2" />
+                                                            <Trash2 className="mr-2 h-4 w-4" />
                                                             Delete
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
@@ -496,9 +647,10 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                                         <TableRow>
                                             <TableCell
                                                 colSpan={6}
-                                                className="text-center py-8 text-muted-foreground"
+                                                className="py-8 text-center text-muted-foreground"
                                             >
-                                                No users found matching your filters.
+                                                No users found matching your
+                                                filters.
                                             </TableCell>
                                         </TableRow>
                                     )}
@@ -510,7 +662,8 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                         {users.last_page > 1 && (
                             <div className="flex items-center justify-between">
                                 <p className="text-sm text-muted-foreground">
-                                    Showing page {users.current_page} of {users.last_page}
+                                    Showing page {users.current_page} of{' '}
+                                    {users.last_page}
                                 </p>
                                 <div className="flex gap-2">
                                     <Button
@@ -532,7 +685,10 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        disabled={users.current_page === users.last_page}
+                                        disabled={
+                                            users.current_page ===
+                                            users.last_page
+                                        }
                                         onClick={() =>
                                             router.get('/system/users', {
                                                 page: users.current_page + 1,
@@ -553,16 +709,24 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
             </PageLayout>
 
             {/* Delete Dialog */}
-            <Dialog open={!!deletingUser} onOpenChange={() => setDeletingUser(null)}>
+            <Dialog
+                open={!!deletingUser}
+                onOpenChange={() => setDeletingUser(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Delete User</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to delete &quot;{deletingUser?.name}&quot;? This action cannot be undone.
+                            Are you sure you want to delete &quot;
+                            {deletingUser?.name}&quot;? This action cannot be
+                            undone.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeletingUser(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeletingUser(null)}
+                        >
                             Cancel
                         </Button>
                         <Button variant="destructive" onClick={handleDelete}>

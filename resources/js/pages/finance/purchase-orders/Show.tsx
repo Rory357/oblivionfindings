@@ -1,19 +1,32 @@
+import { ConfirmDialog, formatMoney } from '@/components/finance';
+import { PageHero, PageLayout } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ConfirmDialog, formatMoney } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
 
 type Account = { id: number; code: string; name: string };
 type Vendor = { id: number; name: string };
 type CostCentre = { id: number; code: string; name: string };
 type FundingStream = { id: number; code: string; name: string };
 type ApprovedBy = { id: number; name: string };
-type Bill = { id: number; bill_number: string; status: string; total_amount: string; bill_date: string };
+type Bill = {
+    id: number;
+    bill_number: string;
+    status: string;
+    total_amount: string;
+    bill_date: string;
+};
 
 type Line = {
     id: number;
@@ -47,37 +60,58 @@ type PurchaseOrder = {
 };
 
 export default function PurchaseOrderShow() {
-    const { purchaseOrder } = usePage().props as unknown as { purchaseOrder: PurchaseOrder };
+    const { purchaseOrder } = usePage().props as unknown as {
+        purchaseOrder: PurchaseOrder;
+    };
     const po = purchaseOrder;
     const approver = po.approved_by ?? po.approved_by_user;
     const canApprove = po.status === 'draft';
     const canEdit = po.status === 'draft';
-    const canConvert = ['approved', 'partially_received', 'received'].includes(po.status);
-    const [confirmAction, setConfirmAction] = useState<'approve' | 'convert' | null>(null);
+    const canConvert = ['approved', 'partially_received', 'received'].includes(
+        po.status,
+    );
+    const [confirmAction, setConfirmAction] = useState<
+        'approve' | 'convert' | null
+    >(null);
     const [processing, setProcessing] = useState(false);
 
     function handleApprove() {
-        router.post(`/finance/purchase-orders/${po.id}/approve`, {}, {
-            onStart: () => setProcessing(true),
-            onFinish: () => setProcessing(false),
-            onSuccess: () => setConfirmAction(null),
-        });
+        router.post(
+            `/finance/purchase-orders/${po.id}/approve`,
+            {},
+            {
+                onStart: () => setProcessing(true),
+                onFinish: () => setProcessing(false),
+                onSuccess: () => setConfirmAction(null),
+            },
+        );
     }
 
     function handleConvertToBill() {
-        router.post(`/finance/purchase-orders/${po.id}/convert-to-bill`, {}, {
-            onStart: () => setProcessing(true),
-            onFinish: () => setProcessing(false),
-            onSuccess: () => setConfirmAction(null),
-        });
+        router.post(
+            `/finance/purchase-orders/${po.id}/convert-to-bill`,
+            {},
+            {
+                onStart: () => setProcessing(true),
+                onFinish: () => setProcessing(false),
+                onSuccess: () => setConfirmAction(null),
+            },
+        );
     }
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: po.po_number, href: '#' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Finance', href: '/finance' },
+                { title: 'Purchase Orders', href: '/finance/purchase-orders' },
+                { title: po.po_number, href: '#' },
+            ]}
+        >
             <Head title={`PO ${po.po_number}`} />
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/purchase-orders"
                         title={
@@ -90,15 +124,30 @@ export default function PurchaseOrderShow() {
                         actions={
                             <>
                                 {canEdit && (
-                                    <Link href={`/finance/purchase-orders/${po.id}/edit`}>
+                                    <Link
+                                        href={`/finance/purchase-orders/${po.id}/edit`}
+                                    >
                                         <Button variant="outline">Edit</Button>
                                     </Link>
                                 )}
                                 {canApprove && (
-                                    <Button onClick={() => setConfirmAction('approve')}>Approve</Button>
+                                    <Button
+                                        onClick={() =>
+                                            setConfirmAction('approve')
+                                        }
+                                    >
+                                        Approve
+                                    </Button>
                                 )}
                                 {canConvert && (
-                                    <Button variant="outline" onClick={() => setConfirmAction('convert')}>Convert to Bill</Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                            setConfirmAction('convert')
+                                        }
+                                    >
+                                        Convert to Bill
+                                    </Button>
                                 )}
                             </>
                         }
@@ -107,36 +156,69 @@ export default function PurchaseOrderShow() {
             >
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Order Details</CardTitle>
+                        <CardTitle className="text-base">
+                            Order Details
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                             <div>
-                                <dt className="text-xs font-medium text-muted-foreground">Order Date</dt>
-                                <dd className="mt-1 text-sm">{po.order_date}</dd>
+                                <dt className="text-xs font-medium text-muted-foreground">
+                                    Order Date
+                                </dt>
+                                <dd className="mt-1 text-sm">
+                                    {po.order_date}
+                                </dd>
                             </div>
                             <div>
-                                <dt className="text-xs font-medium text-muted-foreground">Expected Date</dt>
-                                <dd className="mt-1 text-sm">{po.expected_date ?? '—'}</dd>
+                                <dt className="text-xs font-medium text-muted-foreground">
+                                    Expected Date
+                                </dt>
+                                <dd className="mt-1 text-sm">
+                                    {po.expected_date ?? '—'}
+                                </dd>
                             </div>
                             <div>
-                                <dt className="text-xs font-medium text-muted-foreground">Cost Centre</dt>
-                                <dd className="mt-1 text-sm">{po.cost_centre ? `${po.cost_centre.code} - ${po.cost_centre.name}` : '—'}</dd>
+                                <dt className="text-xs font-medium text-muted-foreground">
+                                    Cost Centre
+                                </dt>
+                                <dd className="mt-1 text-sm">
+                                    {po.cost_centre
+                                        ? `${po.cost_centre.code} - ${po.cost_centre.name}`
+                                        : '—'}
+                                </dd>
                             </div>
                             <div>
-                                <dt className="text-xs font-medium text-muted-foreground">Funding Stream</dt>
-                                <dd className="mt-1 text-sm">{po.funding_stream ? `${po.funding_stream.code} - ${po.funding_stream.name}` : '—'}</dd>
+                                <dt className="text-xs font-medium text-muted-foreground">
+                                    Funding Stream
+                                </dt>
+                                <dd className="mt-1 text-sm">
+                                    {po.funding_stream
+                                        ? `${po.funding_stream.code} - ${po.funding_stream.name}`
+                                        : '—'}
+                                </dd>
                             </div>
                             {approver && (
                                 <div>
-                                    <dt className="text-xs font-medium text-muted-foreground">Approved By</dt>
-                                    <dd className="mt-1 text-sm">{approver.name}{po.approved_at ? ` on ${po.approved_at}` : ''}</dd>
+                                    <dt className="text-xs font-medium text-muted-foreground">
+                                        Approved By
+                                    </dt>
+                                    <dd className="mt-1 text-sm">
+                                        {approver.name}
+                                        {po.approved_at
+                                            ? ` on ${po.approved_at}`
+                                            : ''}
+                                    </dd>
                                 </div>
                             )}
                             {po.notes && (
                                 <div className="sm:col-span-2 lg:col-span-4">
-                                    <dt className="text-xs font-medium text-muted-foreground">Notes</dt>
-                                    <dd className="mt-1 whitespace-pre-wrap text-sm">{po.notes}</dd>
+                                    <dt className="text-xs font-medium text-muted-foreground">
+                                        Notes
+                                    </dt>
+                                    <dd className="mt-1 text-sm whitespace-pre-wrap">
+                                        {po.notes}
+                                    </dd>
                                 </div>
                             )}
                         </dl>
@@ -152,24 +234,53 @@ export default function PurchaseOrderShow() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">Qty</TableHead>
-                                    <TableHead className="text-right">Unit Price</TableHead>
-                                    <TableHead className="text-right">GST Rate</TableHead>
-                                    <TableHead className="text-right">GST</TableHead>
-                                    <TableHead className="text-right">Line Total</TableHead>
+                                    <TableHead className="text-right">
+                                        Qty
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Unit Price
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        GST Rate
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        GST
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Line Total
+                                    </TableHead>
                                     <TableHead>Account</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {po.lines.map((line) => (
                                     <TableRow key={line.id}>
-                                        <TableCell>{line.description}</TableCell>
-                                        <TableCell className="text-right">{Number(line.quantity).toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">{formatMoney(line.unit_price)}</TableCell>
-                                        <TableCell className="text-right">{(Number(line.gst_rate) * 100).toFixed(0)}%</TableCell>
-                                        <TableCell className="text-right">{formatMoney(line.gst_amount)}</TableCell>
-                                        <TableCell className="text-right">{formatMoney(line.line_total)}</TableCell>
-                                        <TableCell>{line.account ? `${line.account.code} - ${line.account.name}` : '—'}</TableCell>
+                                        <TableCell>
+                                            {line.description}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {Number(line.quantity).toFixed(2)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {formatMoney(line.unit_price)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {(
+                                                Number(line.gst_rate) * 100
+                                            ).toFixed(0)}
+                                            %
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {formatMoney(line.gst_amount)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {formatMoney(line.line_total)}
+                                        </TableCell>
+                                        <TableCell>
+                                            {line.account
+                                                ? `${line.account.code} - ${line.account.name}`
+                                                : '—'}
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -179,16 +290,24 @@ export default function PurchaseOrderShow() {
                             <div className="flex justify-end">
                                 <div className="w-64 space-y-1 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Subtotal</span>
+                                        <span className="text-muted-foreground">
+                                            Subtotal
+                                        </span>
                                         <span>{formatMoney(po.subtotal)}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">GST</span>
-                                        <span>{formatMoney(po.gst_amount)}</span>
+                                        <span className="text-muted-foreground">
+                                            GST
+                                        </span>
+                                        <span>
+                                            {formatMoney(po.gst_amount)}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between border-t pt-1 font-semibold">
                                         <span>Total</span>
-                                        <span>{formatMoney(po.total_amount)}</span>
+                                        <span>
+                                            {formatMoney(po.total_amount)}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -199,7 +318,9 @@ export default function PurchaseOrderShow() {
                 {po.bills && po.bills.length > 0 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Linked Bills</CardTitle>
+                            <CardTitle className="text-base">
+                                Linked Bills
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
                             <Table>
@@ -207,7 +328,9 @@ export default function PurchaseOrderShow() {
                                     <TableRow>
                                         <TableHead>Bill Number</TableHead>
                                         <TableHead>Date</TableHead>
-                                        <TableHead className="text-right">Total</TableHead>
+                                        <TableHead className="text-right">
+                                            Total
+                                        </TableHead>
                                         <TableHead>Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -222,10 +345,16 @@ export default function PurchaseOrderShow() {
                                                     {bill.bill_number}
                                                 </Link>
                                             </TableCell>
-                                            <TableCell>{bill.bill_date}</TableCell>
-                                            <TableCell className="text-right">{formatMoney(bill.total_amount)}</TableCell>
                                             <TableCell>
-                                                <StatusBadge status={bill.status} />
+                                                {bill.bill_date}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {formatMoney(bill.total_amount)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <StatusBadge
+                                                    status={bill.status}
+                                                />
                                             </TableCell>
                                         </TableRow>
                                     ))}

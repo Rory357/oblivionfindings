@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
 use App\Domain\SecurityDevices\Presenters\MaintenanceOperationsPresenter;
+use App\Domain\SecurityDevices\Services\DeviceMaintenanceLifecycleService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -16,6 +17,7 @@ class MaintenanceHealthController extends Controller
 {
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
+        private readonly DeviceMaintenanceLifecycleService $lifecycle,
     ) {}
 
     /**
@@ -174,23 +176,13 @@ class MaintenanceHealthController extends Controller
             'status' => ['nullable', 'string', 'in:scheduled,in_progress,completed,cancelled'],
             'description' => ['required', 'string', 'max:2000'],
             'scheduled_for' => ['nullable', 'date'],
-            'completed_at' => ['nullable', 'date'],
+            'completed_at' => ['nullable', 'date', 'before_or_equal:now'],
             'vendor_reference' => ['nullable', 'string', 'max:255'],
             'cost' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $validated['device_id'] = $device->id;
-        $validated['status'] = $validated['status'] ?? 'scheduled';
-
-        if (($validated['status'] ?? '') === 'completed' && empty($validated['completed_at'])) {
-            $validated['completed_at'] = now();
-        }
-        if (($validated['status'] ?? '') === 'completed') {
-            $validated['performed_by_user_id'] = $user->id;
-        }
-
-        DeviceMaintenanceRecord::create($validated);
+        $this->lifecycle->create($user, $device, $validated);
 
         return back()->with('success', 'Maintenance record created.');
     }
@@ -211,20 +203,13 @@ class MaintenanceHealthController extends Controller
             'status' => ['sometimes', 'string', 'in:scheduled,in_progress,completed,cancelled'],
             'description' => ['sometimes', 'string', 'max:2000'],
             'scheduled_for' => ['nullable', 'date'],
-            'completed_at' => ['nullable', 'date'],
+            'completed_at' => ['nullable', 'date', 'before_or_equal:now'],
             'vendor_reference' => ['nullable', 'string', 'max:255'],
             'cost' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        if (($validated['status'] ?? '') === 'completed' && empty($validated['completed_at'])) {
-            $validated['completed_at'] = now();
-        }
-        if (($validated['status'] ?? '') === 'completed' && ! $record->performed_by_user_id) {
-            $validated['performed_by_user_id'] = $user->id;
-        }
-
-        $record->update($validated);
+        $this->lifecycle->update($user, $record, $validated);
 
         return back()->with('success', 'Maintenance record updated.');
     }
@@ -240,11 +225,7 @@ class MaintenanceHealthController extends Controller
         abort_unless($record->device, 404);
         $this->access->assertCanViewDevice($user, $record->device);
 
-        $record->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-            'performed_by_user_id' => $user->id,
-        ]);
+        $this->lifecycle->complete($user, $record);
 
         return back()->with('success', 'Maintenance marked as complete.');
     }

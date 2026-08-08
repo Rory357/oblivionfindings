@@ -1,10 +1,7 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
-import { type BreadcrumbItem } from '@/types';
-import { PageHero, PageLayout } from '@/components/page';
 import { formatMoney, ReceivablesTabsFooter } from '@/components/finance';
+import { PageHero, PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
     Select,
     SelectContent,
@@ -12,8 +9,18 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Wallet, ArrowLeftRight } from 'lucide-react';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { ArrowLeftRight, Wallet } from 'lucide-react';
 
 type Allocation = {
     id: number;
@@ -48,10 +55,20 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(date).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 
-export default function PaymentAllocationsIndex({ allocations, filters }: Props) {
-    const totalAllocated = allocations.data.reduce((total, allocation) => total + allocation.amount, 0);
+export default function PaymentAllocationsIndex({
+    allocations,
+    filters,
+}: Props) {
+    const totalAllocated = allocations.data.reduce(
+        (total, allocation) => total + allocation.amount,
+        0,
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -59,13 +76,17 @@ export default function PaymentAllocationsIndex({ allocations, filters }: Props)
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={ArrowLeftRight}
                         title="Payment Allocations"
                         description="Track how incoming payments have been allocated across invoices and bills."
                         stats={[
                             { label: 'Allocations', value: allocations.total },
-                            { label: 'Total (this page)', value: formatMoney(totalAllocated) },
+                            {
+                                label: 'Total (this page)',
+                                value: formatMoney(totalAllocated),
+                            },
                         ]}
                         actions={
                             <div className="w-44">
@@ -74,8 +95,14 @@ export default function PaymentAllocationsIndex({ allocations, filters }: Props)
                                     onValueChange={(value) =>
                                         router.get(
                                             '/finance/payment-allocations',
-                                            { type: value === ANY ? '' : value },
-                                            { preserveState: true, preserveScroll: true },
+                                            {
+                                                type:
+                                                    value === ANY ? '' : value,
+                                            },
+                                            {
+                                                preserveState: true,
+                                                preserveScroll: true,
+                                            },
                                         )
                                     }
                                 >
@@ -83,9 +110,15 @@ export default function PaymentAllocationsIndex({ allocations, filters }: Props)
                                         <SelectValue placeholder="All types" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value={ANY}>All types</SelectItem>
-                                        <SelectItem value="payable">Payable</SelectItem>
-                                        <SelectItem value="receivable">Receivable</SelectItem>
+                                        <SelectItem value={ANY}>
+                                            All types
+                                        </SelectItem>
+                                        <SelectItem value="payable">
+                                            Payable
+                                        </SelectItem>
+                                        <SelectItem value="receivable">
+                                            Receivable
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -101,17 +134,27 @@ export default function PaymentAllocationsIndex({ allocations, filters }: Props)
                                 <Wallet className="h-5 w-5 text-primary" />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Allocations</p>
-                                <p className="text-2xl font-bold">{allocations.total}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Allocations
+                                </p>
+                                <p className="text-2xl font-bold">
+                                    {allocations.total}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-6">
-                            <p className="text-sm text-muted-foreground">Total allocated</p>
+                            <p className="text-sm text-muted-foreground">
+                                Total allocated
+                            </p>
                             <p className="text-2xl font-bold">
                                 {formatMoney(
-                                    allocations.data.reduce((total, allocation) => total + allocation.amount, 0),
+                                    allocations.data.reduce(
+                                        (total, allocation) =>
+                                            total + allocation.amount,
+                                        0,
+                                    ),
                                 )}
                             </p>
                         </CardContent>
@@ -130,32 +173,50 @@ export default function PaymentAllocationsIndex({ allocations, filters }: Props)
                                         <TableHead>Date</TableHead>
                                         <TableHead>Type</TableHead>
                                         <TableHead>Target</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead className="text-right">
+                                            Amount
+                                        </TableHead>
                                         <TableHead>Notes</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {allocations.data.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                                                No payment allocations found for the selected filter.
+                                            <TableCell
+                                                colSpan={5}
+                                                className="py-8 text-center text-muted-foreground"
+                                            >
+                                                No payment allocations found for
+                                                the selected filter.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
                                         allocations.data.map((allocation) => (
                                             <TableRow key={allocation.id}>
-                                                <TableCell>{formatDate(allocation.payment_date)}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant="outline" className="capitalize">
+                                                    {formatDate(
+                                                        allocation.payment_date,
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="capitalize"
+                                                    >
                                                         {allocation.type}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    {allocation.allocatable_type || 'Unlinked'}
-                                                    {allocation.allocatable_id ? ` #${allocation.allocatable_id}` : ''}
+                                                    {allocation.allocatable_type ||
+                                                        'Unlinked'}
+                                                    {allocation.allocatable_id
+                                                        ? ` #${allocation.allocatable_id}`
+                                                        : ''}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums">
-                                                    {formatMoney(allocation.amount)}
+                                                    {formatMoney(
+                                                        allocation.amount,
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="max-w-sm truncate text-muted-foreground">
                                                     {allocation.notes || '-'}

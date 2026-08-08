@@ -33,7 +33,7 @@ class TrackingWorkspacePresenter
         private readonly UserSiteAccessService $siteAccess,
     ) {}
 
-    public function present(User $viewer, Builder $trackingScope, array $activeTab): array
+    public function present(User $viewer, Builder $trackingScope, array $activeTab, array $filters = []): array
     {
         $permissions = $this->permissions($viewer);
         $restricted = $this->restricted($viewer, $activeTab, $permissions);
@@ -61,7 +61,8 @@ class TrackingWorkspacePresenter
             ->map(fn (Device $device) => $this->mapDevice($viewer, $device, $context, $permissions))
             ->filter()
             ->values();
-        $overview = $this->overview($mapped);
+        $overview = $this->overview($mapped, ! $inventoryTruncated);
+        $attentionFilter = $this->attentionFilter($filters['attention'] ?? null);
 
         $activeDevices = match ($activeTab['key']) {
             'personal-safety' => $mapped->where('group', 'personal-safety')->values(),
@@ -70,6 +71,9 @@ class TrackingWorkspacePresenter
             'geofences', 'history' => collect(),
             default => $mapped,
         };
+        if ($attentionFilter !== null) {
+            $activeDevices = $this->filterAttention($activeDevices, $attentionFilter);
+        }
         $geofences = ! $restricted && $activeTab['key'] === 'geofences'
             ? $this->geofences($viewer, $mapped, $context['assets'], $permissions)
             : collect();
@@ -105,6 +109,10 @@ class TrackingWorkspacePresenter
                 'inventoryTotal' => $inventoryTotal,
                 'inventoryShown' => $activeDevices->count(),
                 'inventoryTruncated' => $inventoryTruncated,
+                'attentionFilter' => $attentionFilter === null ? null : [
+                    'key' => $attentionFilter,
+                    'label' => $this->attentionLabel($attentionFilter),
+                ],
                 'devices' => $activeDevices,
                 'markers' => $restricted ? [] : $this->markers($activeDevices, $history),
                 'geofences' => $geofences,
@@ -658,7 +666,7 @@ class TrackingWorkspacePresenter
                 || $asset->categoryRef?->slug === 'vehicle');
     }
 
-    private function overview(Collection $devices): array
+    private function overview(Collection $devices, bool $countsComplete): array
     {
         $personal = $devices->where('group', 'personal-safety')->count();
         $fleet = $devices->where('group', 'fleet')->count();
@@ -676,6 +684,7 @@ class TrackingWorkspacePresenter
             || now()->diffInHours($device['lastSeenAt']) >= 24)->count();
 
         return [
+            'countsComplete' => $countsComplete,
             'inventory' => [
                 'total' => $devices->count(),
                 'personal_safety' => $personal,
@@ -698,7 +707,7 @@ class TrackingWorkspacePresenter
                 $this->overviewAction('offline', 'Offline tracking devices', $offline, 'Investigate devices whose canonical state is offline.', 'overview'),
                 $this->overviewAction('low-battery', 'Low tracker battery', $lowBattery, 'Replace or charge tracker batteries before coverage is lost.', 'overview'),
                 $this->overviewAction('consent-blocked', 'Location access blocked', $consentBlocked, 'Review purpose or consent in the owning Client or H&S workflow.', 'personal-safety'),
-                $this->overviewAction('unassigned', 'Unassigned trackers', $unassigned, 'Reconcile trackers to their canonical person, vehicle, or asset record.', 'assets'),
+                $this->overviewAction('unassigned', 'Unassigned trackers', $unassigned, 'Reconcile trackers to their canonical person, vehicle, or asset record.', 'overview'),
                 $this->overviewAction('stale', 'Stale tracker check-in', $stale, 'Review trackers that have not checked in during the last 24 hours.', 'overview'),
             ])->filter(fn (array $action): bool => $action['count'] > 0)->values(),
         ];
@@ -729,6 +738,44 @@ class TrackingWorkspacePresenter
             'description' => $description,
             'href' => "/security-devices/tracking?tab={$tab}&attention={$key}",
         ];
+    }
+
+    private function attentionFilter(mixed $value): ?string
+    {
+        return is_string($value) && in_array($value, [
+            'offline',
+            'low-battery',
+            'consent-blocked',
+            'unassigned',
+            'stale',
+        ], true) ? $value : null;
+    }
+
+    /** @param Collection<int, array<string, mixed>> $devices */
+    private function filterAttention(Collection $devices, string $filter): Collection
+    {
+        return $devices->filter(fn (array $device): bool => match ($filter) {
+            'offline' => $device['status'] === DeviceStatus::Offline->value,
+            'low-battery' => $device['battery'] !== null && $device['battery'] <= 20,
+            'consent-blocked' => $device['group'] === 'personal-safety'
+                && $device['privacy']['locationAllowed'] === false,
+            'unassigned' => $device['person'] === null && $device['asset'] === null,
+            'stale' => ! $device['lastSeenAt']
+                || now()->diffInHours($device['lastSeenAt']) >= 24,
+            default => false,
+        })->values();
+    }
+
+    private function attentionLabel(string $filter): string
+    {
+        return match ($filter) {
+            'offline' => 'Offline tracking devices',
+            'low-battery' => 'Low tracker battery',
+            'consent-blocked' => 'Location access blocked',
+            'unassigned' => 'Unassigned trackers',
+            'stale' => 'Stale tracker check-in',
+            default => 'Needs action',
+        };
     }
 
     private function markers(Collection $devices, Collection $history): Collection

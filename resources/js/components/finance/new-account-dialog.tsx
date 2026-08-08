@@ -1,10 +1,10 @@
 import { useForm } from '@inertiajs/react';
 import { ListChecks, Tag, Wallet } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
 import {
     Field,
     Segmented,
@@ -66,8 +66,18 @@ const SUB_TYPES: Record<string, { value: string; label: string }[]> = {
 };
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'account', label: 'Account', blurb: 'Code, name & type', icon: Wallet },
-    { key: 'options', label: 'Options', blurb: 'Tax, funding & flags', icon: Tag },
+    {
+        key: 'account',
+        label: 'Account',
+        blurb: 'Code, name & type',
+        icon: Wallet,
+    },
+    {
+        key: 'options',
+        label: 'Options',
+        blurb: 'Tax, funding & flags',
+        icon: Tag,
+    },
 ];
 
 /**
@@ -120,19 +130,28 @@ export function NewAccountDialog({
         });
     };
 
-    const detailsReady = data.code.trim() !== '' && data.name.trim() !== '' && data.type !== '';
+    const detailsReady =
+        data.code.trim() !== '' && data.name.trim() !== '' && data.type !== '';
 
-    const subTypeOptions = (data.type ? SUB_TYPES[data.type] ?? [] : []).map((s) => ({
-        value: s.value,
-        label: s.label,
-    }));
+    const subTypeOptions = (data.type ? (SUB_TYPES[data.type] ?? []) : []).map(
+        (s) => ({
+            value: s.value,
+            label: s.label,
+        }),
+    );
     // No empty-string option values — Radix Select forbids them. The placeholder
     // ("None") conveys the unselected state for these optional fields.
     const parentOptions = parentAccounts
         .filter((p) => !data.type || p.type === data.type)
         .map((p) => ({ value: String(p.id), label: `${p.code} - ${p.name}` }));
-    const taxOptions = taxRates.map((t) => ({ value: String(t.id), label: `${t.name} (${t.rate}%)` }));
-    const fsOptions = fundingStreams.map((f) => ({ value: String(f.id), label: `${f.code} - ${f.name}` }));
+    const taxOptions = taxRates.map((t) => ({
+        value: String(t.id),
+        label: `${t.name} (${t.rate}%)`,
+    }));
+    const fsOptions = fundingStreams.map((f) => ({
+        value: String(f.id),
+        label: `${f.code} - ${f.name}`,
+    }));
 
     return (
         <WizardShell
@@ -149,17 +168,30 @@ export function NewAccountDialog({
             footerEnd={
                 <>
                     {!isFirst && (
-                        <Button type="button" variant="outline" onClick={back} disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={back}
+                            disabled={processing}
+                        >
                             Back
                         </Button>
                     )}
                     {!isLast && (
-                        <Button type="button" onClick={next} disabled={!detailsReady}>
+                        <Button
+                            type="button"
+                            onClick={next}
+                            disabled={!detailsReady}
+                        >
                             Continue
                         </Button>
                     )}
                     {isLast && (
-                        <Button type="button" onClick={submit} disabled={processing || !detailsReady}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={processing || !detailsReady}
+                        >
                             {processing ? 'Creating…' : 'Create account'}
                         </Button>
                     )}
@@ -168,20 +200,36 @@ export function NewAccountDialog({
         >
             {index === 0 && (
                 <div>
-                    <StepHead icon={Wallet} title="Account details" blurb="A unique code, a name, and what kind of account it is." />
+                    <StepHead
+                        icon={Wallet}
+                        title="Account details"
+                        blurb="A unique code, a name, and what kind of account it is."
+                    />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Account code" required error={errors.code}>
+                        <Field
+                            label="Account code"
+                            required
+                            error={errors.code}
+                        >
                             <Input
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
+                                onChange={(e) =>
+                                    setData('code', e.target.value)
+                                }
                                 placeholder="e.g. 1000"
                                 maxLength={20}
                             />
                         </Field>
-                        <Field label="Account name" required error={errors.name}>
+                        <Field
+                            label="Account name"
+                            required
+                            error={errors.name}
+                        >
                             <Input
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                                 placeholder="e.g. Cash at Bank"
                                 maxLength={255}
                             />
@@ -190,7 +238,12 @@ export function NewAccountDialog({
                             <Segmented
                                 value={data.type}
                                 onChange={(v) =>
-                                    setData((prev) => ({ ...prev, type: v, sub_type: '', parent_id: '' }))
+                                    setData((prev) => ({
+                                        ...prev,
+                                        type: v,
+                                        sub_type: '',
+                                        parent_id: '',
+                                    }))
                                 }
                                 options={ACCOUNT_TYPES}
                             />
@@ -199,11 +252,19 @@ export function NewAccountDialog({
                             <SelectInput
                                 value={data.sub_type}
                                 onChange={(v) => setData('sub_type', v)}
-                                placeholder={data.type ? 'Select sub type' : 'Choose a type first'}
+                                placeholder={
+                                    data.type
+                                        ? 'Select sub type'
+                                        : 'Choose a type first'
+                                }
                                 options={subTypeOptions}
                             />
                         </Field>
-                        <Field label="Parent account" hint="optional" error={errors.parent_id}>
+                        <Field
+                            label="Parent account"
+                            hint="optional"
+                            error={errors.parent_id}
+                        >
                             <SelectInput
                                 value={data.parent_id}
                                 onChange={(v) => setData('parent_id', v)}
@@ -217,29 +278,49 @@ export function NewAccountDialog({
 
             {index === 1 && (
                 <div>
-                    <StepHead icon={ListChecks} title="Options" blurb="Default tax, funding attribution, and flags." />
+                    <StepHead
+                        icon={ListChecks}
+                        title="Options"
+                        blurb="Default tax, funding attribution, and flags."
+                    />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Default tax rate" error={errors.default_tax_rate_id}>
+                        <Field
+                            label="Default tax rate"
+                            error={errors.default_tax_rate_id}
+                        >
                             <SelectInput
                                 value={data.default_tax_rate_id}
-                                onChange={(v) => setData('default_tax_rate_id', v)}
+                                onChange={(v) =>
+                                    setData('default_tax_rate_id', v)
+                                }
                                 placeholder="None"
                                 options={taxOptions}
                             />
                         </Field>
-                        <Field label="Funding stream" error={errors.funding_stream_id}>
+                        <Field
+                            label="Funding stream"
+                            error={errors.funding_stream_id}
+                        >
                             <SelectInput
                                 value={data.funding_stream_id}
-                                onChange={(v) => setData('funding_stream_id', v)}
+                                onChange={(v) =>
+                                    setData('funding_stream_id', v)
+                                }
                                 placeholder="None"
                                 options={fsOptions}
                             />
                         </Field>
-                        <Field label="Description" span error={errors.description}>
+                        <Field
+                            label="Description"
+                            span
+                            error={errors.description}
+                        >
                             <Textarea
                                 rows={2}
                                 value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    setData('description', e.target.value)
+                                }
                                 placeholder="Optional description for this account"
                             />
                         </Field>
@@ -247,21 +328,28 @@ export function NewAccountDialog({
                             <label className="flex items-center gap-2 text-sm">
                                 <Checkbox
                                     checked={data.gst_applicable}
-                                    onCheckedChange={(c) => setData('gst_applicable', c === true)}
+                                    onCheckedChange={(c) =>
+                                        setData('gst_applicable', c === true)
+                                    }
                                 />
                                 GST applicable
                             </label>
                             <label className="flex items-center gap-2 text-sm">
                                 <Checkbox
                                     checked={data.is_active}
-                                    onCheckedChange={(c) => setData('is_active', c === true)}
+                                    onCheckedChange={(c) =>
+                                        setData('is_active', c === true)
+                                    }
                                 />
                                 Active
                             </label>
                         </div>
                     </div>
                     <p className="mt-4 text-[13px] text-muted-foreground">
-                        Creating <span className="font-semibold text-foreground">{data.code || '—'}</span>
+                        Creating{' '}
+                        <span className="font-semibold text-foreground">
+                            {data.code || '—'}
+                        </span>
                         {data.name ? ` · ${data.name}` : ''}
                     </p>
                 </div>

@@ -4,24 +4,40 @@ import { useForm } from '@inertiajs/react';
 import { ClipboardCheck, MessageSquare } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     Segmented,
     StepHead,
     useWizard,
     WizardShell,
-    WizardStepPane,
     type WizardStep,
+    WizardStepPane,
 } from '@/components/hr/wizard';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
-import { barColor, type Confidence, krProgress, type Objective, ProgressBar, rollup } from './okr-shared';
+import {
+    type Confidence,
+    krProgress,
+    type Objective,
+    ProgressBar,
+    rollup,
+} from './okr-shared';
 
 const STEPS: WizardStep[] = [
-    { key: 'update', label: 'Update', blurb: 'Latest values', icon: ClipboardCheck },
-    { key: 'summary', label: 'Summary', blurb: 'Confidence & note', icon: MessageSquare },
+    {
+        key: 'update',
+        label: 'Update',
+        blurb: 'Latest values',
+        icon: ClipboardCheck,
+    },
+    {
+        key: 'summary',
+        label: 'Summary',
+        blurb: 'Confidence & note',
+        icon: MessageSquare,
+    },
 ];
 
 const CONF_OPTIONS = [
@@ -109,7 +125,9 @@ export function CheckinWizard({
                 ? {
                       key_results: objective.key_results.map((k) => ({
                           id: k.id,
-                          current_value: Number(krValues[k.id] ?? k.current_value),
+                          current_value: Number(
+                              krValues[k.id] ?? k.current_value,
+                          ),
                           confidence: krConf[k.id] ?? data.confidence,
                       })),
                   }
@@ -179,19 +197,30 @@ export function CheckinWizard({
         >
             {!objective ? null : stepKey === 'update' ? (
                 <WizardStepPane>
-                    <StepHead icon={ClipboardCheck} title="Update progress" blurb="Enter the latest value and confidence for each key result." />
+                    <StepHead
+                        icon={ClipboardCheck}
+                        title="Update progress"
+                        blurb="Enter the latest value and confidence for each key result."
+                    />
                     {hasKrs ? (
                         <div className="flex flex-col gap-3">
                             {objective.key_results.map((k) => {
                                 const prog = krProgress({
                                     start_value: k.start_value,
-                                    current_value: Number(krValues[k.id] ?? k.current_value),
+                                    current_value: Number(
+                                        krValues[k.id] ?? k.current_value,
+                                    ),
                                     target_value: k.target_value,
                                 });
                                 return (
-                                    <div key={k.id} className="rounded-xl border border-border bg-sidebar p-3.5">
+                                    <div
+                                        key={k.id}
+                                        className="rounded-xl border border-border bg-sidebar p-3.5"
+                                    >
                                         <div className="mb-2.5 flex items-center justify-between gap-2.5">
-                                            <span className="text-[13px] font-semibold">{k.title}</span>
+                                            <span className="text-[13px] font-semibold">
+                                                {k.title}
+                                            </span>
                                             <span className="text-[11.5px] text-muted-foreground">
                                                 {k.start_value}
                                                 {k.unit} → {k.target_value}
@@ -200,23 +229,44 @@ export function CheckinWizard({
                                         </div>
                                         <div className="flex items-center gap-3">
                                             <div className="flex items-center gap-2">
-                                                <label className="text-[11.5px] text-muted-foreground">Current</label>
+                                                <label className="text-[11.5px] text-muted-foreground">
+                                                    Current
+                                                </label>
                                                 <Input
                                                     value={krValues[k.id] ?? ''}
-                                                    onChange={(e) => setKrValues((p) => ({ ...p, [k.id]: e.target.value }))}
+                                                    onChange={(e) =>
+                                                        setKrValues((p) => ({
+                                                            ...p,
+                                                            [k.id]: e.target
+                                                                .value,
+                                                        }))
+                                                    }
                                                     className="h-8 w-24"
                                                 />
-                                                {k.unit && <span className="text-xs text-muted-foreground">{k.unit}</span>}
+                                                {k.unit && (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {k.unit}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="flex flex-1 items-center gap-2">
                                                 <ProgressBar pct={prog} />
-                                                <span className="w-9 text-right text-xs font-bold tabular-nums">{prog}%</span>
+                                                <span className="w-9 text-right text-xs font-bold tabular-nums">
+                                                    {prog}%
+                                                </span>
                                             </div>
                                         </div>
                                         <div className="mt-2.5">
                                             <Segmented
-                                                value={krConf[k.id] ?? k.confidence}
-                                                onChange={(v) => setKrConf((p) => ({ ...p, [k.id]: v as Confidence }))}
+                                                value={
+                                                    krConf[k.id] ?? k.confidence
+                                                }
+                                                onChange={(v) =>
+                                                    setKrConf((p) => ({
+                                                        ...p,
+                                                        [k.id]: v as Confidence,
+                                                    }))
+                                                }
                                                 options={CONF_OPTIONS}
                                             />
                                         </div>
@@ -233,37 +283,67 @@ export function CheckinWizard({
                                         min={0}
                                         max={100}
                                         value={form.data.manual_progress}
-                                        onChange={(e) => form.setData('manual_progress', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'manual_progress',
+                                                e.target.value,
+                                            )
+                                        }
                                         className="h-10 w-28 text-base font-bold"
                                     />
-                                    <span className="text-sm text-muted-foreground">%</span>
+                                    <span className="text-sm text-muted-foreground">
+                                        %
+                                    </span>
                                 </div>
                             </Field>
-                            <p className="mt-2.5 text-[11.5px] text-muted-foreground">No key results — progress is updated manually for this objective.</p>
+                            <p className="mt-2.5 text-[11.5px] text-muted-foreground">
+                                No key results — progress is updated manually
+                                for this objective.
+                            </p>
                         </div>
                     )}
                 </WizardStepPane>
             ) : (
                 <WizardStepPane>
-                    <StepHead icon={MessageSquare} title="Summary & comment" blurb="Confirm the new roll-up, overall confidence and add a note." />
+                    <StepHead
+                        icon={MessageSquare}
+                        title="Summary & comment"
+                        blurb="Confirm the new roll-up, overall confidence and add a note."
+                    />
                     <div className="flex flex-wrap gap-5">
                         <div className="min-w-[300px] flex-1">
                             <div className="mb-3.5 rounded-xl border border-border bg-sidebar p-4">
                                 <div className="mb-2.5 flex items-center justify-between">
-                                    <span className="text-xs text-muted-foreground">Previous</span>
-                                    <span className="text-sm font-bold tabular-nums">{objective.progress_percentage}%</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Previous
+                                    </span>
+                                    <span className="text-sm font-bold tabular-nums">
+                                        {objective.progress_percentage}%
+                                    </span>
                                 </div>
-                                <ProgressBar pct={objective.progress_percentage} className="mb-3.5 h-2" />
+                                <ProgressBar
+                                    pct={objective.progress_percentage}
+                                    className="mb-3.5 h-2"
+                                />
                                 <div className="mb-2.5 flex items-center justify-between">
-                                    <span className="text-xs font-semibold text-primary">New roll-up</span>
-                                    <span className="text-xl font-extrabold tabular-nums text-primary">{projected}%</span>
+                                    <span className="text-xs font-semibold text-primary">
+                                        New roll-up
+                                    </span>
+                                    <span className="text-xl font-extrabold text-primary tabular-nums">
+                                        {projected}%
+                                    </span>
                                 </div>
-                                <ProgressBar pct={projected} className="h-2.5" />
+                                <ProgressBar
+                                    pct={projected}
+                                    className="h-2.5"
+                                />
                             </div>
                             <Field label="Overall confidence">
                                 <Segmented
                                     value={form.data.confidence}
-                                    onChange={(v) => form.setData('confidence', v)}
+                                    onChange={(v) =>
+                                        form.setData('confidence', v)
+                                    }
                                     options={CONF_OPTIONS}
                                 />
                             </Field>
@@ -271,17 +351,25 @@ export function CheckinWizard({
                                 <Textarea
                                     rows={3}
                                     value={form.data.comment}
-                                    onChange={(e) => form.setData('comment', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('comment', e.target.value)
+                                    }
                                     placeholder="What changed since the last check-in?"
                                 />
                             </Field>
                         </div>
                         {willComplete && (
-                            <div className={cn('h-fit w-[200px] shrink-0 rounded-xl border border-status-success/35 bg-status-success-bg p-4 text-center')}>
+                            <div
+                                className={cn(
+                                    'h-fit w-[200px] shrink-0 rounded-xl border border-status-success/35 bg-status-success-bg p-4 text-center',
+                                )}
+                            >
                                 <div className="mx-auto mb-2.5 grid h-11 w-11 place-items-center rounded-full bg-status-success text-white">
                                     <ClipboardCheck className="h-6 w-6" />
                                 </div>
-                                <p className="text-[13px] font-bold text-status-success">This completes the objective 🎉</p>
+                                <p className="text-[13px] font-bold text-status-success">
+                                    This completes the objective 🎉
+                                </p>
                             </div>
                         )}
                     </div>

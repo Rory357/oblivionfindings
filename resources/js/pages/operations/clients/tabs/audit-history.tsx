@@ -68,7 +68,9 @@ function actionTone(action: string): string {
 function modelLabel(auditableType?: string | null): string {
     if (!auditableType) return 'system';
     const parts = auditableType.split('\\');
-    return (parts[parts.length - 1] ?? auditableType).replace(/([A-Z])/g, ' $1').trim();
+    return (parts[parts.length - 1] ?? auditableType)
+        .replace(/([A-Z])/g, ' $1')
+        .trim();
 }
 
 function dateLabel(value?: string | null) {
@@ -187,9 +189,7 @@ export function AuditHistoryTab({
                             Permission-gated to managers.
                         </p>
                     </div>
-                    <Badge variant="outline">
-                        Last 200 entries
-                    </Badge>
+                    <Badge variant="outline">Last 200 entries</Badge>
                 </div>
             </div>
 
@@ -258,7 +258,10 @@ export function AuditHistoryTab({
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
                                             <span className="font-medium capitalize">
-                                                {entry.action.replace(/_/g, ' ')}
+                                                {entry.action.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                )}
                                             </span>
                                             {entry.auditable_type ? (
                                                 <Badge variant="outline">
@@ -282,7 +285,8 @@ export function AuditHistoryTab({
                                                   )}`
                                                 : ''}
                                         </p>
-                                        {entry.meta && Object.keys(entry.meta).length > 0 ? (
+                                        {entry.meta &&
+                                        Object.keys(entry.meta).length > 0 ? (
                                             <details className="mt-2 text-xs text-muted-foreground">
                                                 <summary className="cursor-pointer">
                                                     Show meta

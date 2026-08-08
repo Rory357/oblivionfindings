@@ -27,17 +27,33 @@ export function ConfirmDialog({
     variant?: 'destructive' | 'default';
 }) {
     return (
-        <AlertDialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
+        <AlertDialog
+            open={open}
+            onOpenChange={(isOpen) => {
+                if (!isOpen) onClose();
+            }}
+        >
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>{title}</AlertDialogTitle>
-                    <AlertDialogDescription>{description}</AlertDialogDescription>
+                    <AlertDialogDescription>
+                        {description}
+                    </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel onClick={onClose}>
+                        Cancel
+                    </AlertDialogCancel>
                     <AlertDialogAction
-                        onClick={() => { onConfirm(); onClose(); }}
-                        className={variant === 'destructive' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+                        onClick={() => {
+                            onConfirm();
+                            onClose();
+                        }}
+                        className={
+                            variant === 'destructive'
+                                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                                : ''
+                        }
                     >
                         {confirmText}
                     </AlertDialogAction>

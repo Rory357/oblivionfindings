@@ -32,6 +32,25 @@ class DeviceMaintenanceRecord extends Model
         'cost' => 'decimal:2',
     ];
 
+    protected static function booted(): void
+    {
+        static::updating(function (self $record): void {
+            $originalStatus = (string) $record->getRawOriginal('status');
+            if (in_array($originalStatus, ['completed', 'cancelled'], true) && $record->isDirty()) {
+                throw new \UnexpectedValueException('Completed and cancelled Device maintenance evidence is immutable.');
+            }
+
+            if ($record->status === 'completed'
+                && ($record->completed_at === null || ! is_numeric($record->performed_by_user_id))) {
+                throw new \UnexpectedValueException('Completed Device maintenance requires time and performer evidence.');
+            }
+            if ($record->status !== 'completed'
+                && ($record->completed_at !== null || $record->performed_by_user_id !== null)) {
+                throw new \UnexpectedValueException('Non-completed Device maintenance cannot retain completion evidence.');
+            }
+        });
+    }
+
     // ── Relationships ─────────────────────────────────────────────
 
     public function device(): BelongsTo

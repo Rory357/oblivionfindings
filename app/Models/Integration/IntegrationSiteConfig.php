@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Site;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -39,6 +40,23 @@ class IntegrationSiteConfig extends Model
         'overrides' => 'array',
         'is_active' => 'boolean',
     ];
+
+    protected $hidden = [
+        'mapped_external_site_identity_guard',
+    ];
+
+    protected function mappedExternalSiteId(): Attribute
+    {
+        return Attribute::set(static function (mixed $value): ?string {
+            if ($value === null) {
+                return null;
+            }
+
+            $normalized = trim((string) $value);
+
+            return $normalized === '' ? null : $normalized;
+        });
+    }
 
     /* ---------------------------------------------------------------
      * Relationships

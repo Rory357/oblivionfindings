@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
 import { ItModuleShell } from '@/components/it/it-module-shell';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -110,190 +110,196 @@ export default function ItProblemsIndex({ problems, filters, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Problems & known errors" />
             <ItModuleShell>
-            <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
-                <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                        <div>
-                            <div className="flex items-center gap-2 text-primary">
-                                <BookOpenCheck
-                                    className="h-5 w-5"
-                                    aria-hidden="true"
-                                />
-                                <span className="text-xs font-bold tracking-wide uppercase">
-                                    IT & Support
-                                </span>
+                <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
+                    <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                            <div>
+                                <div className="flex items-center gap-2 text-primary">
+                                    <BookOpenCheck
+                                        className="h-5 w-5"
+                                        aria-hidden="true"
+                                    />
+                                    <span className="text-xs font-bold tracking-wide uppercase">
+                                        IT & Support
+                                    </span>
+                                </div>
+                                <h1 className="mt-2 text-2xl font-bold tracking-tight">
+                                    Problems & known errors
+                                </h1>
+                                <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                                    Investigate recurring incidents once,
+                                    publish a safe workaround, and govern the
+                                    permanent fix.
+                                </p>
                             </div>
-                            <h1 className="mt-2 text-2xl font-bold tracking-tight">
-                                Problems & known errors
-                            </h1>
-                            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                                Investigate recurring incidents once, publish a
-                                safe workaround, and govern the permanent fix.
-                            </p>
+                            {can.manage ? (
+                                <Button
+                                    onClick={() => setCreating(true)}
+                                    className="min-h-11"
+                                >
+                                    <Plus
+                                        className="h-4 w-4"
+                                        aria-hidden="true"
+                                    />{' '}
+                                    New problem
+                                </Button>
+                            ) : null}
                         </div>
-                        {can.manage ? (
-                            <Button
-                                onClick={() => setCreating(true)}
-                                className="min-h-11"
-                            >
-                                <Plus className="h-4 w-4" aria-hidden="true" />{' '}
-                                New problem
-                            </Button>
-                        ) : null}
-                    </div>
-                </header>
+                    </header>
 
-                <form
-                    onSubmit={search}
-                    className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 sm:flex-row"
-                >
-                    <label className="relative flex-1">
-                        <span className="sr-only">Search problems</span>
-                        <Search
-                            className="pointer-events-none absolute top-3 left-3 h-4 w-4 text-muted-foreground"
-                            aria-hidden="true"
-                        />
-                        <Input
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            className="min-h-11 pl-9"
-                            placeholder="Search reference, title, root cause, or workaround"
-                        />
-                    </label>
-                    <Select value={state} onValueChange={setState}>
-                        <SelectTrigger
-                            className="min-h-11 w-full sm:w-52"
-                            aria-label="Problem state"
-                        >
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All states</SelectItem>
-                            {[
-                                'investigating',
-                                'known_error',
-                                'resolved',
-                                'closed',
-                            ].map((value) => (
-                                <SelectItem key={value} value={value}>
-                                    {problemLabel(value)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button
-                        type="submit"
-                        variant="secondary"
-                        className="min-h-11"
+                    <form
+                        onSubmit={search}
+                        className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 sm:flex-row"
                     >
-                        Apply filters
-                    </Button>
-                </form>
-
-                <section
-                    aria-label="Problem records"
-                    className="overflow-hidden rounded-2xl border border-border bg-card"
-                >
-                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                        <h2 className="font-semibold">Problem register</h2>
-                        <span className="text-sm text-muted-foreground">
-                            {problems.total} records
-                        </span>
-                    </div>
-                    {problems.data.length === 0 ? (
-                        <div className="px-6 py-16 text-center">
-                            <AlertTriangle
-                                className="mx-auto h-6 w-6 text-muted-foreground"
+                        <label className="relative flex-1">
+                            <span className="sr-only">Search problems</span>
+                            <Search
+                                className="pointer-events-none absolute top-3 left-3 h-4 w-4 text-muted-foreground"
                                 aria-hidden="true"
                             />
-                            <p className="mt-3 font-medium">
-                                No problems match these filters.
-                            </p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Recurring incidents can be promoted here when a
-                                shared cause needs investigation.
-                            </p>
-                        </div>
-                    ) : (
-                        <ul className="divide-y divide-border">
-                            {problems.data.map((problem) => (
-                                <li key={problem.problem_id}>
-                                    <Link
-                                        href={`/it/problems/${problem.problem_id}`}
-                                        className="frontline-focus flex min-h-20 items-center gap-4 px-4 py-4 hover:bg-muted/50"
-                                    >
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span className="font-mono text-xs font-bold text-primary">
-                                                    {problem.reference}
-                                                </span>
-                                                <StatusBadge
-                                                    variant={
-                                                        problemStateVariant[
-                                                            problem
-                                                                .workflow_state
-                                                        ] ?? 'neutral'
-                                                    }
-                                                    size="sm"
-                                                >
-                                                    {problemLabel(
-                                                        problem.workflow_state,
-                                                    )}
-                                                </StatusBadge>
-                                                <StatusBadge
-                                                    variant={
-                                                        problem.priority ===
-                                                            'urgent' ||
-                                                        problem.priority ===
-                                                            'high'
-                                                            ? 'critical'
-                                                            : 'neutral'
-                                                    }
-                                                    size="sm"
-                                                >
-                                                    {problemLabel(
-                                                        problem.priority,
-                                                    )}
-                                                </StatusBadge>
-                                            </div>
-                                            <h3 className="mt-1 truncate font-semibold">
-                                                {problem.title}
-                                            </h3>
-                                            <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
-                                                {problem.impact_summary ||
-                                                    'Impact is still being assessed.'}
-                                            </p>
-                                        </div>
-                                        <ArrowRight
-                                            className="h-4 w-4 flex-none text-muted-foreground"
-                                            aria-hidden="true"
-                                        />
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                    {problems.links.length > 3 ? (
-                        <nav
-                            aria-label="Problem pages"
-                            className="flex flex-wrap gap-1 border-t border-border px-4 py-3"
+                            <Input
+                                value={query}
+                                onChange={(event) =>
+                                    setQuery(event.target.value)
+                                }
+                                className="min-h-11 pl-9"
+                                placeholder="Search reference, title, root cause, or workaround"
+                            />
+                        </label>
+                        <Select value={state} onValueChange={setState}>
+                            <SelectTrigger
+                                className="min-h-11 w-full sm:w-52"
+                                aria-label="Problem state"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All states</SelectItem>
+                                {[
+                                    'investigating',
+                                    'known_error',
+                                    'resolved',
+                                    'closed',
+                                ].map((value) => (
+                                    <SelectItem key={value} value={value}>
+                                        {problemLabel(value)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Button
+                            type="submit"
+                            variant="secondary"
+                            className="min-h-11"
                         >
-                            {problems.links.map((link, index) =>
-                                link.url ? (
-                                    <Link
-                                        key={`${link.label}-${index}`}
-                                        href={link.url}
-                                        className={`frontline-focus rounded-md px-3 py-2 text-sm ${link.active ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
-                                        }}
-                                    />
-                                ) : null,
-                            )}
-                        </nav>
-                    ) : null}
-                </section>
-            </main>
+                            Apply filters
+                        </Button>
+                    </form>
+
+                    <section
+                        aria-label="Problem records"
+                        className="overflow-hidden rounded-2xl border border-border bg-card"
+                    >
+                        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                            <h2 className="font-semibold">Problem register</h2>
+                            <span className="text-sm text-muted-foreground">
+                                {problems.total} records
+                            </span>
+                        </div>
+                        {problems.data.length === 0 ? (
+                            <div className="px-6 py-16 text-center">
+                                <AlertTriangle
+                                    className="mx-auto h-6 w-6 text-muted-foreground"
+                                    aria-hidden="true"
+                                />
+                                <p className="mt-3 font-medium">
+                                    No problems match these filters.
+                                </p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Recurring incidents can be promoted here
+                                    when a shared cause needs investigation.
+                                </p>
+                            </div>
+                        ) : (
+                            <ul className="divide-y divide-border">
+                                {problems.data.map((problem) => (
+                                    <li key={problem.problem_id}>
+                                        <Link
+                                            href={`/it/problems/${problem.problem_id}`}
+                                            className="frontline-focus flex min-h-20 items-center gap-4 px-4 py-4 hover:bg-muted/50"
+                                        >
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="font-mono text-xs font-bold text-primary">
+                                                        {problem.reference}
+                                                    </span>
+                                                    <StatusBadge
+                                                        variant={
+                                                            problemStateVariant[
+                                                                problem
+                                                                    .workflow_state
+                                                            ] ?? 'neutral'
+                                                        }
+                                                        size="sm"
+                                                    >
+                                                        {problemLabel(
+                                                            problem.workflow_state,
+                                                        )}
+                                                    </StatusBadge>
+                                                    <StatusBadge
+                                                        variant={
+                                                            problem.priority ===
+                                                                'urgent' ||
+                                                            problem.priority ===
+                                                                'high'
+                                                                ? 'critical'
+                                                                : 'neutral'
+                                                        }
+                                                        size="sm"
+                                                    >
+                                                        {problemLabel(
+                                                            problem.priority,
+                                                        )}
+                                                    </StatusBadge>
+                                                </div>
+                                                <h3 className="mt-1 truncate font-semibold">
+                                                    {problem.title}
+                                                </h3>
+                                                <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
+                                                    {problem.impact_summary ||
+                                                        'Impact is still being assessed.'}
+                                                </p>
+                                            </div>
+                                            <ArrowRight
+                                                className="h-4 w-4 flex-none text-muted-foreground"
+                                                aria-hidden="true"
+                                            />
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                        {problems.links.length > 3 ? (
+                            <nav
+                                aria-label="Problem pages"
+                                className="flex flex-wrap gap-1 border-t border-border px-4 py-3"
+                            >
+                                {problems.links.map((link, index) =>
+                                    link.url ? (
+                                        <Link
+                                            key={`${link.label}-${index}`}
+                                            href={link.url}
+                                            className={`frontline-focus rounded-md px-3 py-2 text-sm ${link.active ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                                            dangerouslySetInnerHTML={{
+                                                __html: link.label,
+                                            }}
+                                        />
+                                    ) : null,
+                                )}
+                            </nav>
+                        ) : null}
+                    </section>
+                </main>
             </ItModuleShell>
 
             <Dialog open={creating} onOpenChange={setCreating}>

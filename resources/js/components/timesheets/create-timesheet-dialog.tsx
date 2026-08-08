@@ -16,12 +16,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { StepHead } from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
-import { router, useForm } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import {
     ArrowLeftRight,
     BookOpen,
-    Calendar as CalendarIcon,
     CalendarDays,
+    Calendar as CalendarIcon,
     Car,
     Check,
     CheckCircle2,
@@ -32,8 +32,8 @@ import {
     ClipboardList,
     Clock,
     Coffee,
-    FileText,
     FilePlus2,
+    FileText,
     GraduationCap,
     Loader2,
     MapPin,
@@ -75,7 +75,11 @@ export type ShiftOption = {
         minutes: number;
     }>;
 };
-export type ClientOption = { id: number; first_name: string; last_name: string };
+export type ClientOption = {
+    id: number;
+    first_name: string;
+    last_name: string;
+};
 export type SiteOption = { id: number; name: string };
 
 export type CreateTimesheetDialogProps = {
@@ -105,23 +109,70 @@ const ACTIVITY_TYPES: Array<{
     desc: string;
     Icon: typeof GraduationCap;
 }> = [
-    { key: 'training', label: 'Training', desc: 'Mandatory training or CPD', Icon: GraduationCap },
-    { key: 'meeting', label: 'Team meeting', desc: 'Internal or external meeting', Icon: Users },
-    { key: 'admin', label: 'Admin / paperwork', desc: 'Notes, reports, planning', Icon: FileText },
-    { key: 'travel', label: 'Travel time', desc: 'Between shifts or sites', Icon: Car },
-    { key: 'handover', label: 'Handover', desc: 'Inter-shift handover', Icon: ArrowLeftRight },
-    { key: 'supervision', label: 'Supervision', desc: '1:1 or group supervision', Icon: UserCheck },
-    { key: 'standby', label: 'Standby / on-call', desc: 'Available but not active', Icon: Phone },
-    { key: 'other', label: 'Other', desc: 'Anything else billable', Icon: CircleEllipsis },
+    {
+        key: 'training',
+        label: 'Training',
+        desc: 'Mandatory training or CPD',
+        Icon: GraduationCap,
+    },
+    {
+        key: 'meeting',
+        label: 'Team meeting',
+        desc: 'Internal or external meeting',
+        Icon: Users,
+    },
+    {
+        key: 'admin',
+        label: 'Admin / paperwork',
+        desc: 'Notes, reports, planning',
+        Icon: FileText,
+    },
+    {
+        key: 'travel',
+        label: 'Travel time',
+        desc: 'Between shifts or sites',
+        Icon: Car,
+    },
+    {
+        key: 'handover',
+        label: 'Handover',
+        desc: 'Inter-shift handover',
+        Icon: ArrowLeftRight,
+    },
+    {
+        key: 'supervision',
+        label: 'Supervision',
+        desc: '1:1 or group supervision',
+        Icon: UserCheck,
+    },
+    {
+        key: 'standby',
+        label: 'Standby / on-call',
+        desc: 'Available but not active',
+        Icon: Phone,
+    },
+    {
+        key: 'other',
+        label: 'Other',
+        desc: 'Anything else billable',
+        Icon: CircleEllipsis,
+    },
 ];
 
 function fmtTime(iso: string) {
     if (!iso) return '';
-    return new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString('en-NZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 function fmtDate(iso: string) {
     if (!iso) return '';
-    return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(iso).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -156,7 +207,10 @@ function SearchableSelect({
     useEffect(() => {
         if (!open) return;
         const onAway = (e: MouseEvent) => {
-            if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+            if (
+                wrapRef.current &&
+                !wrapRef.current.contains(e.target as Node)
+            ) {
                 setOpen(false);
                 setQuery('');
             }
@@ -214,9 +268,18 @@ function SearchableSelect({
                 aria-expanded={open}
                 className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-sm shadow-sm hover:bg-accent/30"
             >
-                <span className={cn('flex min-w-0 items-center gap-1.5', selected ? 'text-foreground' : 'text-muted-foreground')}>
-                    {Icon ? <Icon className="h-3.5 w-3.5 text-muted-foreground" /> : null}
-                    <span className="truncate">{selected ? selected.label : placeholder}</span>
+                <span
+                    className={cn(
+                        'flex min-w-0 items-center gap-1.5',
+                        selected ? 'text-foreground' : 'text-muted-foreground',
+                    )}
+                >
+                    {Icon ? (
+                        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                    ) : null}
+                    <span className="truncate">
+                        {selected ? selected.label : placeholder}
+                    </span>
                 </span>
                 <div className="flex items-center gap-1 text-muted-foreground">
                     {selected ? (
@@ -233,12 +296,17 @@ function SearchableSelect({
                             <X className="h-3 w-3" />
                         </span>
                     ) : null}
-                    <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
+                    <ChevronDown
+                        className={cn(
+                            'h-3.5 w-3.5 transition-transform',
+                            open && 'rotate-180',
+                        )}
+                    />
                 </div>
             </button>
 
             {open ? (
-                <div className="absolute left-0 right-0 z-50 mt-1 overflow-hidden rounded-lg border border-border bg-popover shadow-xl ring-1 ring-black/5">
+                <div className="absolute right-0 left-0 z-50 mt-1 overflow-hidden rounded-lg border border-border bg-popover shadow-xl ring-1 ring-black/5">
                     <div className="border-b border-border/60 p-1.5">
                         <input
                             ref={inputRef}
@@ -246,28 +314,34 @@ function SearchableSelect({
                             onChange={(e) => setQuery(e.target.value)}
                             onKeyDown={onKeyDown}
                             placeholder="Search…"
-                            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
+                            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus:border-primary focus:ring-2 focus:ring-ring/30 focus:outline-none"
                         />
                     </div>
-                    <ul role="listbox" className="max-h-56 overflow-y-auto py-1 text-xs">
+                    <ul
+                        role="listbox"
+                        className="max-h-56 overflow-y-auto py-1 text-xs"
+                    >
                         <li
                             role="option"
                             aria-selected={!value}
                             onMouseEnter={() => setHi(0)}
                             onClick={() => pick(null)}
                             className={cn(
-                                'flex cursor-pointer items-center gap-2 px-3 py-1.5 italic text-muted-foreground',
+                                'flex cursor-pointer items-center gap-2 px-3 py-1.5 text-muted-foreground italic',
                                 hi === 0 && 'bg-accent/40',
                             )}
                         >
                             {emptyLabel}
                         </li>
                         {filtered.length === 0 ? (
-                            <li className="px-3 py-2 text-[11.5px] text-muted-foreground/70">No matches for "{query}"</li>
+                            <li className="px-3 py-2 text-[11.5px] text-muted-foreground/70">
+                                No matches for "{query}"
+                            </li>
                         ) : (
                             filtered.map((o, idx) => {
                                 const active = hi === idx + 1;
-                                const selectedHere = String(o.id) === String(value);
+                                const selectedHere =
+                                    String(o.id) === String(value);
                                 return (
                                     <li
                                         key={o.id}
@@ -277,14 +351,22 @@ function SearchableSelect({
                                         onClick={() => pick(o)}
                                         className={cn(
                                             'flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5',
-                                            active ? 'bg-status-info-bg text-foreground' : 'text-foreground/80',
+                                            active
+                                                ? 'bg-status-info-bg text-foreground'
+                                                : 'text-foreground/80',
                                         )}
                                     >
                                         <span className="min-w-0 truncate">
                                             {o.label}
-                                            {o.sub ? <span className="ml-1.5 text-[11px] text-muted-foreground">{o.sub}</span> : null}
+                                            {o.sub ? (
+                                                <span className="ml-1.5 text-[11px] text-muted-foreground">
+                                                    {o.sub}
+                                                </span>
+                                            ) : null}
                                         </span>
-                                        {selectedHere ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+                                        {selectedHere ? (
+                                            <Check className="h-3.5 w-3.5 text-primary" />
+                                        ) : null}
                                     </li>
                                 );
                             })
@@ -314,14 +396,17 @@ function ShiftTile({
             onClick={() => onSelect(shift)}
             className={cn(
                 'rounded-xl border bg-card p-3 text-left transition hover:border-primary/40 hover:bg-status-info-bg/40',
-                active && 'border-primary bg-status-info-bg shadow-sm ring-1 ring-primary/30',
+                active &&
+                    'border-primary bg-status-info-bg shadow-sm ring-1 ring-primary/30',
             )}
         >
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold">
-                            {shift.client ? `${shift.client.first_name} ${shift.client.last_name}` : 'Unassigned'}
+                            {shift.client
+                                ? `${shift.client.first_name} ${shift.client.last_name}`
+                                : 'Unassigned'}
                         </span>
                         {shift.shift_type === 'sleepover' ? (
                             <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-indigo-700">
@@ -348,13 +433,23 @@ function ShiftTile({
                         {shift.location}
                     </span>
                 ) : null}
-                <span className="tabular-nums">{shift.tasks.length} tasks scheduled</span>
+                <span className="tabular-nums">
+                    {shift.tasks.length} tasks scheduled
+                </span>
             </div>
         </button>
     );
 }
 
-function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+    label,
+    value,
+    onChange,
+}: {
+    label: string;
+    value: boolean;
+    onChange: (v: boolean) => void;
+}) {
     return (
         <button
             type="button"
@@ -367,7 +462,12 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
                     : 'border-input bg-background text-muted-foreground hover:border-border',
             )}
         >
-            <span className={cn('h-1.5 w-1.5 rounded-full', value ? 'bg-primary' : 'bg-border')} />
+            <span
+                className={cn(
+                    'h-1.5 w-1.5 rounded-full',
+                    value ? 'bg-primary' : 'bg-border',
+                )}
+            />
             {label}
         </button>
     );
@@ -392,11 +492,20 @@ export default function CreateTimesheetDialog({
     const [search, setSearch] = useState('');
     const [shift, setShift] = useState<ShiftOption | null>(null);
     const [activityType, setActivityType] = useState<ActivityKey | null>(null);
-    const [workDate, setWorkDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [workDate, setWorkDate] = useState(() =>
+        new Date().toISOString().slice(0, 10),
+    );
     const [clientId, setClientId] = useState<number | string | ''>('');
     const [siteId, setSiteId] = useState<number | string | ''>('');
     const [tasks, setTasks] = useState<
-        Array<{ id: number; label: string; completed: boolean; included: boolean; time?: string | null; minutes: number }>
+        Array<{
+            id: number;
+            label: string;
+            completed: boolean;
+            included: boolean;
+            time?: string | null;
+            minutes: number;
+        }>
     >([]);
     const [activityItems, setActivityItems] = useState<string[]>([]);
     const [newActivityItem, setNewActivityItem] = useState('');
@@ -433,7 +542,16 @@ export default function CreateTimesheetDialog({
         setDone(false);
         setErrors({});
         setSearch('');
-        setForm({ start: '', end: '', breakMin: 0, mileageKm: 0, sleepover: false, onCall: false, publicHoliday: false, notes: '' });
+        setForm({
+            start: '',
+            end: '',
+            breakMin: 0,
+            mileageKm: 0,
+            sleepover: false,
+            onCall: false,
+            publicHoliday: false,
+            notes: '',
+        });
 
         if (initialShiftId) {
             const preselected = shifts.find((s) => s.id === initialShiftId);
@@ -448,7 +566,9 @@ export default function CreateTimesheetDialog({
         if (!search) return shifts;
         const q = search.toLowerCase();
         return shifts.filter((s) => {
-            const name = s.client ? `${s.client.first_name} ${s.client.last_name}` : '';
+            const name = s.client
+                ? `${s.client.first_name} ${s.client.last_name}`
+                : '';
             return (
                 name.toLowerCase().includes(q) ||
                 (s.location ?? '').toLowerCase().includes(q) ||
@@ -495,7 +615,9 @@ export default function CreateTimesheetDialog({
     const taskCompleted = tasks.filter((t) => t.included && t.completed).length;
 
     const canAdvanceFromStep1 = mode === 'shift' ? !!shift : !!activityType;
-    const activityMeta = activityType ? ACTIVITY_TYPES.find((a) => a.key === activityType) : null;
+    const activityMeta = activityType
+        ? ACTIVITY_TYPES.find((a) => a.key === activityType)
+        : null;
     const ActivityIcon = activityMeta?.Icon ?? CircleEllipsis;
 
     function submit(asDraft: boolean) {
@@ -506,7 +628,8 @@ export default function CreateTimesheetDialog({
         // Build the work_date + starts_at + ends_at ISO strings the controller
         // expects. Manual mode uses workDate; shift mode pulls the date from
         // the linked shift.
-        const baseDate = mode === 'shift' ? shift!.starts_at.slice(0, 10) : workDate;
+        const baseDate =
+            mode === 'shift' ? shift!.starts_at.slice(0, 10) : workDate;
         const startsAt = `${baseDate}T${form.start || '09:00'}:00`;
         const endsAtBase = `${baseDate}T${form.end || '17:00'}:00`;
 
@@ -539,7 +662,14 @@ export default function CreateTimesheetDialog({
             public_holiday: !!form.publicHoliday,
             notes: form.notes || null,
             submit: !asDraft,
-            tasks: mode === 'shift' ? tasks.map((t) => ({ id: t.id, included: t.included, completed: t.completed })) : [],
+            tasks:
+                mode === 'shift'
+                    ? tasks.map((t) => ({
+                          id: t.id,
+                          included: t.included,
+                          completed: t.completed,
+                      }))
+                    : [],
         };
 
         router.post('/operations/timesheets', payload, {
@@ -560,7 +690,7 @@ export default function CreateTimesheetDialog({
             ? shift?.client
                 ? `${shift.client.first_name} ${shift.client.last_name}`
                 : ''
-            : activityMeta?.label ?? '';
+            : (activityMeta?.label ?? '');
 
     const stepLabel = done
         ? 'Saved'
@@ -576,7 +706,10 @@ export default function CreateTimesheetDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 [&>button]:hidden"
-                style={{ maxWidth: 'min(94vw, 920px)', width: 'min(94vw, 920px)' }}
+                style={{
+                    maxWidth: 'min(94vw, 920px)',
+                    width: 'min(94vw, 920px)',
+                }}
             >
                 <DialogTitle className="sr-only">Create timesheet</DialogTitle>
                 <DialogDescription className="sr-only">
@@ -604,7 +737,9 @@ export default function CreateTimesheetDialog({
                     <div className="h-[3px] shrink-0 bg-muted">
                         <div
                             className="h-full bg-primary transition-[width] duration-300"
-                            style={{ width: done ? '100%' : `${(step / 2) * 100}%` }}
+                            style={{
+                                width: done ? '100%' : `${(step / 2) * 100}%`,
+                            }}
                         />
                     </div>
                 </DialogHeader>
@@ -638,12 +773,16 @@ export default function CreateTimesheetDialog({
                             <div className="grid h-14 w-14 place-items-center rounded-full bg-status-success-bg">
                                 <CheckCircle2 className="h-7 w-7 text-status-success" />
                             </div>
-                            <div className="mt-3 text-base font-semibold">Timesheet created</div>
+                            <div className="mt-3 text-base font-semibold">
+                                Timesheet created
+                            </div>
                             <p className="mt-1 max-w-md text-[12.5px] text-muted-foreground">
                                 {mode === 'shift' && shift
                                     ? `${taskTotal} task${taskTotal === 1 ? '' : 's'} pulled through from shift #${shift.id}. ${form.notes ? '' : 'You can edit it any time before payroll closes.'}`
                                     : `Logged as "${activityMeta?.label}" on ${fmtDate(workDate)}${
-                                          activityItems.length ? ` with ${activityItems.length} activity item${activityItems.length === 1 ? '' : 's'}` : ''
+                                          activityItems.length
+                                              ? ` with ${activityItems.length} activity item${activityItems.length === 1 ? '' : 's'}`
+                                              : ''
                                       }. Goes to your manager once submitted.`}
                             </p>
                         </div>
@@ -656,11 +795,14 @@ export default function CreateTimesheetDialog({
                                     onClick={() => setMode('shift')}
                                     className={cn(
                                         'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-semibold transition',
-                                        mode === 'shift' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground/70 hover:bg-muted',
+                                        mode === 'shift'
+                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                            : 'text-foreground/70 hover:bg-muted',
                                     )}
                                     aria-pressed={mode === 'shift'}
                                 >
-                                    <CalendarDays className="h-3.5 w-3.5" /> From a shift
+                                    <CalendarDays className="h-3.5 w-3.5" />{' '}
+                                    From a shift
                                 </button>
                                 <button
                                     type="button"
@@ -670,11 +812,14 @@ export default function CreateTimesheetDialog({
                                     }}
                                     className={cn(
                                         'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-semibold transition',
-                                        mode === 'manual' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground/70 hover:bg-muted',
+                                        mode === 'manual'
+                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                            : 'text-foreground/70 hover:bg-muted',
                                     )}
                                     aria-pressed={mode === 'manual'}
                                 >
-                                    <BookOpen className="h-3.5 w-3.5" /> No shift — manual entry
+                                    <BookOpen className="h-3.5 w-3.5" /> No
+                                    shift — manual entry
                                 </button>
                             </div>
 
@@ -682,27 +827,39 @@ export default function CreateTimesheetDialog({
                                 <>
                                     <div className="mb-3">
                                         <div className="relative">
-                                            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                            <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                                             <Input
                                                 value={search}
-                                                onChange={(e) => setSearch(e.target.value)}
+                                                onChange={(e) =>
+                                                    setSearch(e.target.value)
+                                                }
                                                 placeholder="Search by client, location, or shift #"
                                                 className="pl-8"
                                             />
                                         </div>
                                     </div>
-                                    <div className="text-[11.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                    <div className="text-[11.5px] font-semibold tracking-wider text-muted-foreground uppercase">
                                         Today &amp; recent shifts
                                     </div>
                                     {filteredShifts.length === 0 ? (
                                         <div className="mt-2 rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                                            No upcoming shifts to log against. Switch to <span className="font-semibold">manual entry</span> to log
-                                            training, meetings or other non-shift time.
+                                            No upcoming shifts to log against.
+                                            Switch to{' '}
+                                            <span className="font-semibold">
+                                                manual entry
+                                            </span>{' '}
+                                            to log training, meetings or other
+                                            non-shift time.
                                         </div>
                                     ) : (
                                         <div className="mt-2 grid gap-2 md:grid-cols-2">
                                             {filteredShifts.map((s) => (
-                                                <ShiftTile key={s.id} shift={s} active={shift?.id === s.id} onSelect={handleShiftSelect} />
+                                                <ShiftTile
+                                                    key={s.id}
+                                                    shift={s}
+                                                    active={shift?.id === s.id}
+                                                    onSelect={handleShiftSelect}
+                                                />
                                             ))}
                                         </div>
                                     )}
@@ -710,21 +867,33 @@ export default function CreateTimesheetDialog({
                             ) : (
                                 <>
                                     <div className="mb-3 rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2.5 text-[12px] text-status-warning">
-                                        <strong>Manual entry.</strong> Use this for time worked that isn't tied to a rostered shift — training,
-                                        meetings, travel between sites, etc. Approval still flows through your manager and lands in payroll the same
-                                        way.
+                                        <strong>Manual entry.</strong> Use this
+                                        for time worked that isn't tied to a
+                                        rostered shift — training, meetings,
+                                        travel between sites, etc. Approval
+                                        still flows through your manager and
+                                        lands in payroll the same way.
                                     </div>
 
                                     <div className="mb-3 grid gap-3 sm:grid-cols-3">
                                         <div className="space-y-1">
                                             <Label className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                                                <CalendarIcon className="h-3 w-3" /> Date worked
+                                                <CalendarIcon className="h-3 w-3" />{' '}
+                                                Date worked
                                             </Label>
-                                            <Input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} className="h-9" />
+                                            <Input
+                                                type="date"
+                                                value={workDate}
+                                                onChange={(e) =>
+                                                    setWorkDate(e.target.value)
+                                                }
+                                                className="h-9"
+                                            />
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                                                <User className="h-3 w-3" /> Linked client (optional)
+                                                <User className="h-3 w-3" />{' '}
+                                                Linked client (optional)
                                             </Label>
                                             <SearchableSelect
                                                 value={clientId}
@@ -741,12 +910,16 @@ export default function CreateTimesheetDialog({
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                                                <MapPin className="h-3 w-3" /> Linked site (optional)
+                                                <MapPin className="h-3 w-3" />{' '}
+                                                Linked site (optional)
                                             </Label>
                                             <SearchableSelect
                                                 value={siteId}
                                                 onChange={setSiteId}
-                                                options={sites.map((s) => ({ id: s.id, label: s.name }))}
+                                                options={sites.map((s) => ({
+                                                    id: s.id,
+                                                    label: s.name,
+                                                }))}
                                                 placeholder="Search sites…"
                                                 emptyLabel="— No site —"
                                                 icon={MapPin}
@@ -754,35 +927,45 @@ export default function CreateTimesheetDialog({
                                         </div>
                                     </div>
 
-                                    <div className="text-[11.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                    <div className="text-[11.5px] font-semibold tracking-wider text-muted-foreground uppercase">
                                         What kind of time is this?
                                     </div>
                                     <div className="mt-2 grid gap-2 sm:grid-cols-2 md:grid-cols-4">
                                         {ACTIVITY_TYPES.map((a) => {
                                             const Ic = a.Icon;
-                                            const active = activityType === a.key;
+                                            const active =
+                                                activityType === a.key;
                                             return (
                                                 <button
                                                     key={a.key}
                                                     type="button"
-                                                    onClick={() => setActivityType(a.key)}
+                                                    onClick={() =>
+                                                        setActivityType(a.key)
+                                                    }
                                                     aria-pressed={active}
                                                     className={cn(
                                                         'flex items-start gap-2 rounded-xl border bg-card p-3 text-left transition hover:border-primary/40 hover:bg-status-info-bg/30',
-                                                        active && 'border-primary bg-status-info-bg shadow-sm ring-1 ring-primary/30',
+                                                        active &&
+                                                            'border-primary bg-status-info-bg shadow-sm ring-1 ring-primary/30',
                                                     )}
                                                 >
                                                     <span
                                                         className={cn(
                                                             'mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg',
-                                                            active ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground/60',
+                                                            active
+                                                                ? 'bg-primary text-primary-foreground'
+                                                                : 'bg-muted text-foreground/60',
                                                         )}
                                                     >
                                                         <Ic className="h-3.5 w-3.5" />
                                                     </span>
                                                     <span className="min-w-0">
-                                                        <span className="block text-[12.5px] font-semibold">{a.label}</span>
-                                                        <span className="block text-[11px] text-muted-foreground">{a.desc}</span>
+                                                        <span className="block text-[12.5px] font-semibold">
+                                                            {a.label}
+                                                        </span>
+                                                        <span className="block text-[11px] text-muted-foreground">
+                                                            {a.desc}
+                                                        </span>
                                                     </span>
                                                 </button>
                                             );
@@ -795,62 +978,136 @@ export default function CreateTimesheetDialog({
                         <div className="grid gap-4 p-5 md:grid-cols-[1fr_320px]">
                             <div className="space-y-4">
                                 <div className="rounded-xl border border-border bg-card p-4">
-                                    <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                    <div className="mb-3 text-[11.5px] font-semibold tracking-wider text-muted-foreground uppercase">
                                         Actual times worked
                                     </div>
                                     <div className="grid gap-3 sm:grid-cols-2">
                                         <div className="space-y-1">
-                                            <Label className="text-[11.5px] text-muted-foreground">Start</Label>
-                                            <Input type="time" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} className="h-9" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-[11.5px] text-muted-foreground">End</Label>
-                                            <Input type="time" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} className="h-9" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                                                <Coffee className="h-3 w-3" /> Break (minutes)
+                                            <Label className="text-[11.5px] text-muted-foreground">
+                                                Start
                                             </Label>
                                             <Input
-                                                type="number"
-                                                min={0}
-                                                value={form.breakMin}
-                                                onChange={(e) => setForm({ ...form, breakMin: Number(e.target.value) })}
+                                                type="time"
+                                                value={form.start}
+                                                onChange={(e) =>
+                                                    setForm({
+                                                        ...form,
+                                                        start: e.target.value,
+                                                    })
+                                                }
+                                                className="h-9"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[11.5px] text-muted-foreground">
+                                                End
+                                            </Label>
+                                            <Input
+                                                type="time"
+                                                value={form.end}
+                                                onChange={(e) =>
+                                                    setForm({
+                                                        ...form,
+                                                        end: e.target.value,
+                                                    })
+                                                }
                                                 className="h-9"
                                             />
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                                                <Car className="h-3 w-3" /> Mileage (km)
+                                                <Coffee className="h-3 w-3" />{' '}
+                                                Break (minutes)
+                                            </Label>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                value={form.breakMin}
+                                                onChange={(e) =>
+                                                    setForm({
+                                                        ...form,
+                                                        breakMin: Number(
+                                                            e.target.value,
+                                                        ),
+                                                    })
+                                                }
+                                                className="h-9"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                                                <Car className="h-3 w-3" />{' '}
+                                                Mileage (km)
                                             </Label>
                                             <Input
                                                 type="number"
                                                 min={0}
                                                 value={form.mileageKm}
-                                                onChange={(e) => setForm({ ...form, mileageKm: Number(e.target.value) })}
+                                                onChange={(e) =>
+                                                    setForm({
+                                                        ...form,
+                                                        mileageKm: Number(
+                                                            e.target.value,
+                                                        ),
+                                                    })
+                                                }
                                                 className="h-9"
                                             />
                                         </div>
                                     </div>
                                     <div className="mt-3 flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12.5px]">
                                         <span className="inline-flex items-center gap-2 text-muted-foreground">
-                                            <Clock className="h-4 w-4" /> Estimated billable hours
+                                            <Clock className="h-4 w-4" />{' '}
+                                            Estimated billable hours
                                         </span>
-                                        <span className="text-base font-semibold tabular-nums text-primary">{liveHours ?? '—'}h</span>
+                                        <span className="text-base font-semibold text-primary tabular-nums">
+                                            {liveHours ?? '—'}h
+                                        </span>
                                     </div>
                                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                                        <Toggle label="Sleepover" value={form.sleepover} onChange={(v) => setForm({ ...form, sleepover: v })} />
-                                        <Toggle label="On-call" value={form.onCall} onChange={(v) => setForm({ ...form, onCall: v })} />
-                                        <Toggle label="Public holiday" value={form.publicHoliday} onChange={(v) => setForm({ ...form, publicHoliday: v })} />
+                                        <Toggle
+                                            label="Sleepover"
+                                            value={form.sleepover}
+                                            onChange={(v) =>
+                                                setForm({
+                                                    ...form,
+                                                    sleepover: v,
+                                                })
+                                            }
+                                        />
+                                        <Toggle
+                                            label="On-call"
+                                            value={form.onCall}
+                                            onChange={(v) =>
+                                                setForm({ ...form, onCall: v })
+                                            }
+                                        />
+                                        <Toggle
+                                            label="Public holiday"
+                                            value={form.publicHoliday}
+                                            onChange={(v) =>
+                                                setForm({
+                                                    ...form,
+                                                    publicHoliday: v,
+                                                })
+                                            }
+                                        />
                                     </div>
                                 </div>
 
                                 <div className="rounded-xl border border-border bg-card p-4">
-                                    <Label className="text-[11.5px] text-muted-foreground">Notes (optional)</Label>
+                                    <Label className="text-[11.5px] text-muted-foreground">
+                                        Notes (optional)
+                                    </Label>
                                     <Textarea
                                         rows={3}
                                         value={form.notes}
-                                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                                        onChange={(e) =>
+                                            setForm({
+                                                ...form,
+                                                notes: e.target.value,
+                                            })
+                                        }
                                         placeholder="Anything payroll or your manager should know — overtime reason, missed break, mileage detail…"
                                         className="mt-1 min-h-[80px] resize-y"
                                     />
@@ -862,14 +1119,18 @@ export default function CreateTimesheetDialog({
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <ClipboardList className="h-4 w-4 text-primary" />
-                                            <span className="text-[12.5px] font-semibold">Tasks pulled from shift</span>
+                                            <span className="text-[12.5px] font-semibold">
+                                                Tasks pulled from shift
+                                            </span>
                                         </div>
-                                        <span className="text-[11.5px] font-medium tabular-nums text-muted-foreground">
+                                        <span className="text-[11.5px] font-medium text-muted-foreground tabular-nums">
                                             {taskCompleted}/{taskTotal}
                                         </span>
                                     </div>
                                     <p className="mt-1 text-[11.5px] text-muted-foreground">
-                                        All scheduled tasks from shift <strong>#{shift?.id}</strong> are attached. Untick any that didn't occur.
+                                        All scheduled tasks from shift{' '}
+                                        <strong>#{shift?.id}</strong> are
+                                        attached. Untick any that didn't occur.
                                     </p>
                                 </div>
                                 <ul className="space-y-1.5">
@@ -888,26 +1149,57 @@ export default function CreateTimesheetDialog({
                                             >
                                                 <input
                                                     type="checkbox"
-                                                    checked={t.included && t.completed}
+                                                    checked={
+                                                        t.included &&
+                                                        t.completed
+                                                    }
                                                     onChange={(e) =>
-                                                        setTasks(tasks.map((x, i) => (i === idx ? { ...x, completed: e.target.checked } : x)))
+                                                        setTasks(
+                                                            tasks.map((x, i) =>
+                                                                i === idx
+                                                                    ? {
+                                                                          ...x,
+                                                                          completed:
+                                                                              e
+                                                                                  .target
+                                                                                  .checked,
+                                                                      }
+                                                                    : x,
+                                                            ),
+                                                        )
                                                     }
                                                     className="mt-0.5"
                                                 />
                                                 <div className="min-w-0 flex-1">
-                                                    <div className="text-[12.5px] font-medium leading-tight">{t.label}</div>
-                                                    <div className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">
-                                                        {t.time ?? ''} {t.time ? '·' : ''} {t.minutes}m
+                                                    <div className="text-[12.5px] leading-tight font-medium">
+                                                        {t.label}
+                                                    </div>
+                                                    <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
+                                                        {t.time ?? ''}{' '}
+                                                        {t.time ? '·' : ''}{' '}
+                                                        {t.minutes}m
                                                     </div>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     onClick={() =>
-                                                        setTasks(tasks.map((x, i) => (i === idx ? { ...x, included: !x.included } : x)))
+                                                        setTasks(
+                                                            tasks.map((x, i) =>
+                                                                i === idx
+                                                                    ? {
+                                                                          ...x,
+                                                                          included:
+                                                                              !x.included,
+                                                                      }
+                                                                    : x,
+                                                            ),
+                                                        )
                                                     }
                                                     className="text-[11px] font-medium text-muted-foreground hover:text-status-critical"
                                                 >
-                                                    {t.included ? 'exclude' : 'include'}
+                                                    {t.included
+                                                        ? 'exclude'
+                                                        : 'include'}
                                                 </button>
                                             </li>
                                         ))
@@ -923,15 +1215,28 @@ export default function CreateTimesheetDialog({
                                     <div className="flex items-center gap-2">
                                         <ActivityIcon className="h-4 w-4 text-primary" />
                                         <div className="min-w-0 flex-1">
-                                            <div className="text-[12.5px] font-semibold">{activityMeta?.label}</div>
+                                            <div className="text-[12.5px] font-semibold">
+                                                {activityMeta?.label}
+                                            </div>
                                             <div className="text-[11.5px] text-muted-foreground">
-                                                {activityMeta?.desc} · {fmtDate(workDate)}
+                                                {activityMeta?.desc} ·{' '}
+                                                {fmtDate(workDate)}
                                                 {clientId
                                                     ? ` · for ${clients.find((c) => String(c.id) === String(clientId))?.first_name ?? ''} ${
-                                                          clients.find((c) => String(c.id) === String(clientId))?.last_name ?? ''
+                                                          clients.find(
+                                                              (c) =>
+                                                                  String(
+                                                                      c.id,
+                                                                  ) ===
+                                                                  String(
+                                                                      clientId,
+                                                                  ),
+                                                          )?.last_name ?? ''
                                                       }`
                                                     : ''}
-                                                {siteId ? ` · ${sites.find((s) => String(s.id) === String(siteId))?.name ?? ''}` : ''}
+                                                {siteId
+                                                    ? ` · ${sites.find((s) => String(s.id) === String(siteId))?.name ?? ''}`
+                                                    : ''}
                                             </div>
                                         </div>
                                         <button
@@ -945,67 +1250,133 @@ export default function CreateTimesheetDialog({
                                 </div>
 
                                 <div className="rounded-xl border border-border bg-card p-4">
-                                    <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                    <div className="mb-3 text-[11.5px] font-semibold tracking-wider text-muted-foreground uppercase">
                                         Actual times worked
                                     </div>
                                     <div className="grid gap-3 sm:grid-cols-2">
                                         <div className="space-y-1">
-                                            <Label className="text-[11.5px] text-muted-foreground">Start</Label>
-                                            <Input type="time" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} className="h-9" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-[11.5px] text-muted-foreground">End</Label>
-                                            <Input type="time" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} className="h-9" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                                                <Coffee className="h-3 w-3" /> Break (minutes)
+                                            <Label className="text-[11.5px] text-muted-foreground">
+                                                Start
                                             </Label>
                                             <Input
-                                                type="number"
-                                                min={0}
-                                                value={form.breakMin}
-                                                onChange={(e) => setForm({ ...form, breakMin: Number(e.target.value) })}
+                                                type="time"
+                                                value={form.start}
+                                                onChange={(e) =>
+                                                    setForm({
+                                                        ...form,
+                                                        start: e.target.value,
+                                                    })
+                                                }
+                                                className="h-9"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[11.5px] text-muted-foreground">
+                                                End
+                                            </Label>
+                                            <Input
+                                                type="time"
+                                                value={form.end}
+                                                onChange={(e) =>
+                                                    setForm({
+                                                        ...form,
+                                                        end: e.target.value,
+                                                    })
+                                                }
                                                 className="h-9"
                                             />
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                                                <Car className="h-3 w-3" /> Mileage (km)
+                                                <Coffee className="h-3 w-3" />{' '}
+                                                Break (minutes)
+                                            </Label>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                value={form.breakMin}
+                                                onChange={(e) =>
+                                                    setForm({
+                                                        ...form,
+                                                        breakMin: Number(
+                                                            e.target.value,
+                                                        ),
+                                                    })
+                                                }
+                                                className="h-9"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                                                <Car className="h-3 w-3" />{' '}
+                                                Mileage (km)
                                             </Label>
                                             <Input
                                                 type="number"
                                                 min={0}
                                                 value={form.mileageKm}
-                                                onChange={(e) => setForm({ ...form, mileageKm: Number(e.target.value) })}
+                                                onChange={(e) =>
+                                                    setForm({
+                                                        ...form,
+                                                        mileageKm: Number(
+                                                            e.target.value,
+                                                        ),
+                                                    })
+                                                }
                                                 className="h-9"
                                             />
                                         </div>
                                     </div>
                                     <div className="mt-3 flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12.5px]">
                                         <span className="inline-flex items-center gap-2 text-muted-foreground">
-                                            <Clock className="h-4 w-4" /> Estimated billable hours
+                                            <Clock className="h-4 w-4" />{' '}
+                                            Estimated billable hours
                                         </span>
-                                        <span className="text-base font-semibold tabular-nums text-primary">{liveHours ?? '—'}h</span>
+                                        <span className="text-base font-semibold text-primary tabular-nums">
+                                            {liveHours ?? '—'}h
+                                        </span>
                                     </div>
                                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                                        <Toggle label="On-call" value={form.onCall} onChange={(v) => setForm({ ...form, onCall: v })} />
-                                        <Toggle label="Public holiday" value={form.publicHoliday} onChange={(v) => setForm({ ...form, publicHoliday: v })} />
+                                        <Toggle
+                                            label="On-call"
+                                            value={form.onCall}
+                                            onChange={(v) =>
+                                                setForm({ ...form, onCall: v })
+                                            }
+                                        />
+                                        <Toggle
+                                            label="Public holiday"
+                                            value={form.publicHoliday}
+                                            onChange={(v) =>
+                                                setForm({
+                                                    ...form,
+                                                    publicHoliday: v,
+                                                })
+                                            }
+                                        />
                                     </div>
                                 </div>
 
                                 <div className="rounded-xl border border-border bg-card p-4">
-                                    <Label className="text-[11.5px] text-muted-foreground">Notes (recommended for manual entries)</Label>
+                                    <Label className="text-[11.5px] text-muted-foreground">
+                                        Notes (recommended for manual entries)
+                                    </Label>
                                     <Textarea
                                         rows={3}
                                         value={form.notes}
-                                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                                        onChange={(e) =>
+                                            setForm({
+                                                ...form,
+                                                notes: e.target.value,
+                                            })
+                                        }
                                         placeholder={`Briefly describe — e.g. "${
                                             activityType === 'training'
                                                 ? 'Manual handling refresher, room 2, with B. Stone'
                                                 : activityType === 'meeting'
-                                                    ? 'Monthly site huddle, Karori'
-                                                    : (activityMeta?.label ?? '') + ' …'
+                                                  ? 'Monthly site huddle, Karori'
+                                                  : (activityMeta?.label ??
+                                                        '') + ' …'
                                         }"`}
                                         className="mt-1 min-h-[80px] resize-y"
                                     />
@@ -1017,11 +1388,16 @@ export default function CreateTimesheetDialog({
                                     <div className="flex items-center gap-2">
                                         <ClipboardList className="h-4 w-4 text-primary" />
                                         <span className="text-[12.5px] font-semibold">
-                                            Activity items <span className="font-normal text-muted-foreground">(optional)</span>
+                                            Activity items{' '}
+                                            <span className="font-normal text-muted-foreground">
+                                                (optional)
+                                            </span>
                                         </span>
                                     </div>
                                     <p className="mt-1 text-[11.5px] text-muted-foreground">
-                                        Without a shift, add the items that made up your time so the approver can see what was done.
+                                        Without a shift, add the items that made
+                                        up your time so the approver can see
+                                        what was done.
                                     </p>
                                     <ul className="mt-3 space-y-1.5">
                                         {activityItems.length === 0 ? (
@@ -1030,14 +1406,27 @@ export default function CreateTimesheetDialog({
                                             </li>
                                         ) : (
                                             activityItems.map((it, idx) => (
-                                                <li key={idx} className="flex items-center gap-2 rounded-lg border border-border bg-card p-2">
+                                                <li
+                                                    key={idx}
+                                                    className="flex items-center gap-2 rounded-lg border border-border bg-card p-2"
+                                                >
                                                     <span className="grid h-5 w-5 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
                                                         {idx + 1}
                                                     </span>
-                                                    <span className="min-w-0 flex-1 truncate text-[12.5px]">{it}</span>
+                                                    <span className="min-w-0 flex-1 truncate text-[12.5px]">
+                                                        {it}
+                                                    </span>
                                                     <button
                                                         type="button"
-                                                        onClick={() => setActivityItems(activityItems.filter((_, i) => i !== idx))}
+                                                        onClick={() =>
+                                                            setActivityItems(
+                                                                activityItems.filter(
+                                                                    (_, i) =>
+                                                                        i !==
+                                                                        idx,
+                                                                ),
+                                                            )
+                                                        }
                                                         aria-label="Remove item"
                                                         className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical"
                                                     >
@@ -1051,11 +1440,21 @@ export default function CreateTimesheetDialog({
                                         <Input
                                             type="text"
                                             value={newActivityItem}
-                                            onChange={(e) => setNewActivityItem(e.target.value)}
+                                            onChange={(e) =>
+                                                setNewActivityItem(
+                                                    e.target.value,
+                                                )
+                                            }
                                             onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && newActivityItem.trim()) {
+                                                if (
+                                                    e.key === 'Enter' &&
+                                                    newActivityItem.trim()
+                                                ) {
                                                     e.preventDefault();
-                                                    setActivityItems([...activityItems, newActivityItem.trim()]);
+                                                    setActivityItems([
+                                                        ...activityItems,
+                                                        newActivityItem.trim(),
+                                                    ]);
                                                     setNewActivityItem('');
                                                 }
                                             }}
@@ -1066,7 +1465,10 @@ export default function CreateTimesheetDialog({
                                             type="button"
                                             onClick={() => {
                                                 if (newActivityItem.trim()) {
-                                                    setActivityItems([...activityItems, newActivityItem.trim()]);
+                                                    setActivityItems([
+                                                        ...activityItems,
+                                                        newActivityItem.trim(),
+                                                    ]);
                                                     setNewActivityItem('');
                                                 }
                                             }}
@@ -1104,27 +1506,55 @@ export default function CreateTimesheetDialog({
                                     className="gap-1.5"
                                 >
                                     <ChevronLeft className="h-4 w-4" />
-                                    {mode === 'shift' ? 'Back to shifts' : 'Back to activity type'}
+                                    {mode === 'shift'
+                                        ? 'Back to shifts'
+                                        : 'Back to activity type'}
                                 </Button>
                             ) : null}
                         </div>
                         <div className="flex items-center gap-2.5">
-                            <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            <Button
+                                variant="outline"
+                                onClick={() => onOpenChange(false)}
+                            >
                                 Cancel
                             </Button>
                             {step === 1 ? (
-                                <Button disabled={!canAdvanceFromStep1} onClick={() => setStep(2)} className="gap-1.5">
-                                    {mode === 'shift' ? 'Pull tasks & continue' : 'Continue to hours'}
+                                <Button
+                                    disabled={!canAdvanceFromStep1}
+                                    onClick={() => setStep(2)}
+                                    className="gap-1.5"
+                                >
+                                    {mode === 'shift'
+                                        ? 'Pull tasks & continue'
+                                        : 'Continue to hours'}
                                     <ChevronRight className="h-4 w-4" />
                                 </Button>
                             ) : (
                                 <>
-                                    <Button variant="secondary" onClick={() => submit(true)} disabled={submitting} className="gap-1.5">
-                                        {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => submit(true)}
+                                        disabled={submitting}
+                                        className="gap-1.5"
+                                    >
+                                        {submitting ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <Save className="h-3.5 w-3.5" />
+                                        )}
                                         Save as draft
                                     </Button>
-                                    <Button onClick={() => submit(false)} disabled={submitting} className="gap-1.5">
-                                        {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                                    <Button
+                                        onClick={() => submit(false)}
+                                        disabled={submitting}
+                                        className="gap-1.5"
+                                    >
+                                        {submitting ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <Send className="h-3.5 w-3.5" />
+                                        )}
                                         Submit for approval
                                     </Button>
                                 </>
@@ -1133,7 +1563,9 @@ export default function CreateTimesheetDialog({
                     </footer>
                 ) : (
                     <footer className="shrink-0 border-t border-border bg-muted/30 px-5 py-3.5 text-right">
-                        <Button onClick={() => onOpenChange(false)}>Done</Button>
+                        <Button onClick={() => onOpenChange(false)}>
+                            Done
+                        </Button>
                     </footer>
                 )}
             </DialogContent>

@@ -21,6 +21,7 @@ use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Support\SafeOperationalData;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -31,7 +32,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-final class PullProviderCapability implements ShouldQueue
+final class PullProviderCapability implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -41,6 +42,9 @@ final class PullProviderCapability implements ShouldQueue
     public array $backoff = [60, 300, 900];
 
     public int $timeout = 120;
+
+    /** Keep one delayed cadence/retry job per provider, Site and capability. */
+    public int $uniqueFor = 90_000;
 
     /** @param class-string $capability */
     public function __construct(
@@ -100,7 +104,12 @@ final class PullProviderCapability implements ShouldQueue
             ->forProvider($this->provider)
             ->active()
             ->where('site_id', $this->siteId)
-            ->whereHas('site')
+            ->whereNotNull('mapped_external_site_id')
+            ->where('mapped_external_site_id', '<>', '')
+            ->whereHas('site', fn ($site) => $site
+                ->where('is_active', true)
+                ->where(fn ($operational) => $operational->whereNull('archived')->orWhere('archived', false))
+                ->whereNull('archived_at'))
             ->first();
         $connection = IntegrationProviderConnection::query()
             ->forProvider($this->provider)
@@ -150,8 +159,8 @@ final class PullProviderCapability implements ShouldQueue
                     $cursor->cursor,
                     min($manifest->pageLimit, $manifest->backfillLimit),
                 );
-                if (! $this->connectionStillUsable((int) $connection->id)) {
-                    $this->recordDisabledDuringCollection();
+                if (! $this->collectionScopeStillUsable((int) $connection->id, (int) $siteConfig->id)) {
+                    $this->recordUnavailableDuringCollection();
 
                     return;
                 }
@@ -165,8 +174,8 @@ final class PullProviderCapability implements ShouldQueue
                     $cursor->cursor,
                     min($manifest->pageLimit, $manifest->backfillLimit),
                 );
-                if (! $this->connectionStillUsable((int) $connection->id)) {
-                    $this->recordDisabledDuringCollection();
+                if (! $this->collectionScopeStillUsable((int) $connection->id, (int) $siteConfig->id)) {
+                    $this->recordUnavailableDuringCollection();
 
                     return;
                 }
@@ -180,8 +189,8 @@ final class PullProviderCapability implements ShouldQueue
                     $cursor->cursor,
                     min($manifest->pageLimit, $manifest->backfillLimit),
                 );
-                if (! $this->connectionStillUsable((int) $connection->id)) {
-                    $this->recordDisabledDuringCollection();
+                if (! $this->collectionScopeStillUsable((int) $connection->id, (int) $siteConfig->id)) {
+                    $this->recordUnavailableDuringCollection();
 
                     return;
                 }
@@ -244,18 +253,32 @@ final class PullProviderCapability implements ShouldQueue
         }
     }
 
-    private function connectionStillUsable(int $connectionId): bool
+    private function collectionScopeStillUsable(int $connectionId, int $siteConfigId): bool
     {
-        return IntegrationProviderConnection::query()
+        $connectionUsable = IntegrationProviderConnection::query()
             ->whereKey($connectionId)
             ->forProvider($this->provider)
             ->connected()
             ->exists();
+
+        return $connectionUsable
+            && IntegrationSiteConfig::query()
+                ->whereKey($siteConfigId)
+                ->forProvider($this->provider)
+                ->active()
+                ->where('site_id', $this->siteId)
+                ->whereNotNull('mapped_external_site_id')
+                ->where('mapped_external_site_id', '<>', '')
+                ->whereHas('site', fn ($site) => $site
+                    ->where('is_active', true)
+                    ->where(fn ($operational) => $operational->whereNull('archived')->orWhere('archived', false))
+                    ->whereNull('archived_at'))
+                ->exists();
     }
 
-    private function recordDisabledDuringCollection(): void
+    private function recordUnavailableDuringCollection(): void
     {
-        Log::info('Provider capability result was discarded after the connection was disabled.', [
+        Log::info('Provider capability result was discarded after its collection scope became unavailable.', [
             'provider' => $this->provider,
             'site_id' => $this->siteId,
             'capability' => $this->capability,
@@ -469,5 +492,10 @@ final class PullProviderCapability implements ShouldQueue
     private function scopeKey(): string
     {
         return hash('sha256', $this->provider.':'.$this->siteId.':'.$this->capability);
+    }
+
+    public function uniqueId(): string
+    {
+        return $this->scopeKey();
     }
 }

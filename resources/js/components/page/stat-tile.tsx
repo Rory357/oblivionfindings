@@ -42,73 +42,74 @@ export interface StatTileProps {
     valueClassName?: string;
 }
 
-const TONE: Record<StatTileTone, { bg: string; text: string; iconBg: string }> = {
-    primary: {
-        bg: 'bg-primary/10 dark:bg-primary/30',
-        text: 'text-primary dark:text-primary/80',
-        iconBg: 'bg-primary/10 dark:bg-primary/40',
-    },
-    success: {
-        bg: 'bg-status-success-bg',
-        text: 'text-status-success',
-        iconBg: 'bg-status-success-bg',
-    },
-    warning: {
-        bg: 'bg-status-warning-bg',
-        text: 'text-status-warning',
-        iconBg: 'bg-status-warning-bg',
-    },
-    critical: {
-        bg: 'bg-status-critical-bg',
-        text: 'text-status-critical',
-        iconBg: 'bg-status-critical-bg',
-    },
-    info: {
-        bg: 'bg-status-info-bg',
-        text: 'text-status-info',
-        iconBg: 'bg-status-info-bg',
-    },
-    neutral: {
-        bg: 'bg-muted dark:bg-muted/30',
-        text: 'text-foreground dark:text-muted-foreground',
-        iconBg: 'bg-muted dark:bg-muted/40',
-    },
-    ops: {
-        bg: 'bg-category-ops-bg',
-        text: 'text-category-ops',
-        iconBg: 'bg-category-ops-bg',
-    },
-    hr: {
-        bg: 'bg-category-hr-bg',
-        text: 'text-category-hr',
-        iconBg: 'bg-category-hr-bg',
-    },
-    compliance: {
-        bg: 'bg-category-compliance-bg',
-        text: 'text-category-compliance',
-        iconBg: 'bg-category-compliance-bg',
-    },
-    incidents: {
-        bg: 'bg-category-incidents-bg',
-        text: 'text-category-incidents',
-        iconBg: 'bg-category-incidents-bg',
-    },
-    governance: {
-        bg: 'bg-category-governance-bg',
-        text: 'text-category-governance',
-        iconBg: 'bg-category-governance-bg',
-    },
-    sites: {
-        bg: 'bg-category-sites-bg',
-        text: 'text-category-sites',
-        iconBg: 'bg-category-sites-bg',
-    },
-    fleet: {
-        bg: 'bg-category-fleet-bg',
-        text: 'text-category-fleet',
-        iconBg: 'bg-category-fleet-bg',
-    },
-};
+const TONE: Record<StatTileTone, { bg: string; text: string; iconBg: string }> =
+    {
+        primary: {
+            bg: 'bg-primary/10 dark:bg-primary/30',
+            text: 'text-primary dark:text-primary/80',
+            iconBg: 'bg-primary/10 dark:bg-primary/40',
+        },
+        success: {
+            bg: 'bg-status-success-bg',
+            text: 'text-status-success',
+            iconBg: 'bg-status-success-bg',
+        },
+        warning: {
+            bg: 'bg-status-warning-bg',
+            text: 'text-status-warning',
+            iconBg: 'bg-status-warning-bg',
+        },
+        critical: {
+            bg: 'bg-status-critical-bg',
+            text: 'text-status-critical',
+            iconBg: 'bg-status-critical-bg',
+        },
+        info: {
+            bg: 'bg-status-info-bg',
+            text: 'text-status-info',
+            iconBg: 'bg-status-info-bg',
+        },
+        neutral: {
+            bg: 'bg-muted dark:bg-muted/30',
+            text: 'text-foreground dark:text-muted-foreground',
+            iconBg: 'bg-muted dark:bg-muted/40',
+        },
+        ops: {
+            bg: 'bg-category-ops-bg',
+            text: 'text-category-ops',
+            iconBg: 'bg-category-ops-bg',
+        },
+        hr: {
+            bg: 'bg-category-hr-bg',
+            text: 'text-category-hr',
+            iconBg: 'bg-category-hr-bg',
+        },
+        compliance: {
+            bg: 'bg-category-compliance-bg',
+            text: 'text-category-compliance',
+            iconBg: 'bg-category-compliance-bg',
+        },
+        incidents: {
+            bg: 'bg-category-incidents-bg',
+            text: 'text-category-incidents',
+            iconBg: 'bg-category-incidents-bg',
+        },
+        governance: {
+            bg: 'bg-category-governance-bg',
+            text: 'text-category-governance',
+            iconBg: 'bg-category-governance-bg',
+        },
+        sites: {
+            bg: 'bg-category-sites-bg',
+            text: 'text-category-sites',
+            iconBg: 'bg-category-sites-bg',
+        },
+        fleet: {
+            bg: 'bg-category-fleet-bg',
+            text: 'text-category-fleet',
+            iconBg: 'bg-category-fleet-bg',
+        },
+    };
 
 function useCountUp(target: number | null, enabled: boolean): number {
     const [displayValue, setDisplayValue] = useState(target ?? 0);
@@ -136,7 +137,13 @@ function useCountUp(target: number | null, enabled: boolean): number {
     return displayValue;
 }
 
-function MiniSparkline({ data, className }: { data: number[]; className?: string }) {
+function MiniSparkline({
+    data,
+    className,
+}: {
+    data: number[];
+    className?: string;
+}) {
     if (!data || data.length < 2) return null;
     const max = Math.max(...data);
     const min = Math.min(...data);
@@ -181,13 +188,19 @@ export function StatTile({
 }: StatTileProps) {
     const numericValue = typeof value === 'number' ? value : null;
     const animated = useCountUp(numericValue, !staticValue);
-    const renderedValue = numericValue !== null && !staticValue ? animated : value;
+    const renderedValue =
+        numericValue !== null && !staticValue ? animated : value;
     const palette = TONE[tone];
 
     if (placement === 'hero') {
         const content = (
             <div className="min-w-0 text-center">
-                <p className={cn('text-2xl font-bold tabular-nums text-primary-foreground', valueClassName)}>
+                <p
+                    className={cn(
+                        'text-2xl font-bold text-primary-foreground tabular-nums',
+                        valueClassName,
+                    )}
+                >
                     {renderedValue}
                 </p>
                 <p className="text-xs text-primary-foreground/60">{label}</p>
@@ -197,19 +210,36 @@ export function StatTile({
     }
 
     const content = (
-        <Card className={cn('border py-0 transition-shadow hover:shadow-md', palette.bg, className)}>
+        <Card
+            className={cn(
+                'border py-0 transition-shadow hover:shadow-md',
+                palette.bg,
+                className,
+            )}
+        >
             <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
                             {label}
                         </p>
-                        <p className={cn('mt-0.5 text-2xl font-bold tabular-nums', palette.text, valueClassName)}>
+                        <p
+                            className={cn(
+                                'mt-0.5 text-2xl font-bold tabular-nums',
+                                palette.text,
+                                valueClassName,
+                            )}
+                        >
                             {renderedValue}
                         </p>
                     </div>
                     {Icon ? (
-                        <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', palette.iconBg)}>
+                        <div
+                            className={cn(
+                                'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+                                palette.iconBg,
+                            )}
+                        >
                             <Icon className={cn('h-4 w-4', palette.text)} />
                         </div>
                     ) : null}
@@ -217,12 +247,17 @@ export function StatTile({
                 {(subtitle || (trend && trend.length > 1)) && (
                     <div className="mt-2 flex items-center justify-between gap-2">
                         {subtitle ? (
-                            <span className="truncate text-[10px] text-muted-foreground">{subtitle}</span>
+                            <span className="truncate text-[10px] text-muted-foreground">
+                                {subtitle}
+                            </span>
                         ) : (
                             <span />
                         )}
                         {trend && trend.length > 1 ? (
-                            <MiniSparkline data={trend} className={palette.text} />
+                            <MiniSparkline
+                                data={trend}
+                                className={palette.text}
+                            />
                         ) : null}
                     </div>
                 )}

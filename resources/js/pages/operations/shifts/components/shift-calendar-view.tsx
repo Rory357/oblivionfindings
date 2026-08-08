@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
 import { MoreVertical, Plus, UserPlus } from 'lucide-react';
+import { useMemo } from 'react';
 
-import { StaffAvatar } from './staff-avatar';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     clientFullName,
     isOpenShift,
@@ -10,8 +11,7 @@ import {
     shiftStartTime,
     type ShiftRow,
 } from './shift-row-types';
-import { Button as GuardrailButton } from '@/components/ui/button';
-import { Card as GuardrailCard } from '@/components/ui/card';
+import { StaffAvatar } from './staff-avatar';
 
 type Props = {
     shifts: ShiftRow[];
@@ -50,7 +50,10 @@ export function ShiftCalendarView({
     }
 
     return (
-        <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card">
+        <GuardrailCard
+            unstyled
+            className="overflow-hidden rounded-xl border border-border bg-card"
+        >
             <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
                 <span>
                     Week of{' '}
@@ -74,7 +77,7 @@ export function ShiftCalendarView({
                             className={`border-r border-border px-3 py-2 text-center last:border-r-0 ${isToday ? 'bg-primary/10' : ''}`}
                         >
                             <div
-                                className={`text-[11px] font-semibold uppercase tracking-wider ${isToday ? 'text-primary' : 'text-muted-foreground'}`}
+                                className={`text-[11px] font-semibold tracking-wider uppercase ${isToday ? 'text-primary' : 'text-muted-foreground'}`}
                             >
                                 {date.toLocaleDateString('en-NZ', {
                                     weekday: 'short',
@@ -107,10 +110,11 @@ export function ShiftCalendarView({
                                 />
                             ))}
                             {list.length === 0 && onCreateOnDay ? (
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={() => onCreateOnDay(d)}
-                                    className="flex h-full min-h-[80px] w-full items-center justify-center gap-1 rounded-md border border-dashed border-transparent text-center text-[11px] text-muted-foreground opacity-0 transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring group-hover/col:opacity-100"
+                                    className="flex h-full min-h-[80px] w-full items-center justify-center gap-1 rounded-md border border-dashed border-transparent text-center text-[11px] text-muted-foreground opacity-0 transition group-hover/col:opacity-100 hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                 >
                                     <Plus className="h-3 w-3" /> Add shift
                                 </GuardrailButton>
@@ -136,28 +140,24 @@ function CalendarShiftBlock({
     const tone = open
         ? {
               bg: 'var(--status-critical-bg)',
-              border:
-                  'color-mix(in oklch, var(--status-critical) 40%, transparent)',
+              border: 'color-mix(in oklch, var(--status-critical) 40%, transparent)',
               text: 'var(--status-critical)',
           }
         : shift.status === 'in_progress'
           ? {
                 bg: 'var(--status-warning-bg)',
-                border:
-                    'color-mix(in oklch, var(--status-warning) 40%, transparent)',
+                border: 'color-mix(in oklch, var(--status-warning) 40%, transparent)',
                 text: 'var(--status-warning)',
             }
           : shift.status === 'completed'
             ? {
                   bg: 'var(--status-success-bg)',
-                  border:
-                      'color-mix(in oklch, var(--status-success) 40%, transparent)',
+                  border: 'color-mix(in oklch, var(--status-success) 40%, transparent)',
                   text: 'var(--status-success)',
               }
             : {
                   bg: 'var(--accent)',
-                  border:
-                      'color-mix(in oklch, var(--primary) 35%, transparent)',
+                  border: 'color-mix(in oklch, var(--primary) 35%, transparent)',
                   text: 'var(--primary)',
               };
 
@@ -178,7 +178,8 @@ function CalendarShiftBlock({
             }}
         >
             <div className="pr-5 font-semibold tabular-nums">
-                {shiftStartTime(shift.starts_at)} – {shiftEndTime(shift.ends_at)}
+                {shiftStartTime(shift.starts_at)} –{' '}
+                {shiftEndTime(shift.ends_at)}
             </div>
             <div className="truncate font-medium text-foreground">
                 {clientFullName(shift.client)}
@@ -198,7 +199,8 @@ function CalendarShiftBlock({
                     </span>
                 )}
             </div>
-            <GuardrailButton unstyled
+            <GuardrailButton
+                unstyled
                 type="button"
                 aria-label="Shift actions"
                 onClick={(e) => {
@@ -206,7 +208,7 @@ function CalendarShiftBlock({
                     e.stopPropagation();
                     onContextMenu(shift, e);
                 }}
-                className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded border border-border bg-background/80 text-foreground opacity-0 shadow-sm transition hover:bg-background group-hover/blk:opacity-100"
+                className="absolute top-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded border border-border bg-background/80 text-foreground opacity-0 shadow-sm transition group-hover/blk:opacity-100 hover:bg-background"
             >
                 <MoreVertical className="h-3 w-3" />
             </GuardrailButton>

@@ -1,10 +1,10 @@
 import { PageHero, PageLayout } from '@/components/page';
-import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { LockOpen, Scale } from 'lucide-react';
 
@@ -74,11 +74,16 @@ export default function EditLegalHold({ hold }: Props) {
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Privacy', href: '/privacy/dashboard' },
-            { title: 'Legal Holds', href: '/privacy/legal-holds' },
-            { title: hold.hold_reference, href: `/privacy/legal-holds/${hold.id}/edit` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Privacy', href: '/privacy/dashboard' },
+                { title: 'Legal Holds', href: '/privacy/legal-holds' },
+                {
+                    title: hold.hold_reference,
+                    href: `/privacy/legal-holds/${hold.id}/edit`,
+                },
+            ]}
+        >
             <Head title={`Legal Hold ${hold.hold_reference}`} />
 
             <PageLayout
@@ -101,15 +106,21 @@ export default function EditLegalHold({ hold }: Props) {
                     </CardHeader>
                     <CardContent className="grid gap-3 sm:grid-cols-3">
                         <div className="text-sm">
-                            <div className="text-xs text-muted-foreground">Imposed</div>
+                            <div className="text-xs text-muted-foreground">
+                                Imposed
+                            </div>
                             <div>{formatDate(hold.imposed_at)}</div>
                         </div>
                         <div className="text-sm">
-                            <div className="text-xs text-muted-foreground">Review Date</div>
+                            <div className="text-xs text-muted-foreground">
+                                Review Date
+                            </div>
                             <div>{formatDate(hold.review_date)}</div>
                         </div>
                         <div className="text-sm">
-                            <div className="text-xs text-muted-foreground">Released</div>
+                            <div className="text-xs text-muted-foreground">
+                                Released
+                            </div>
                             <div>{formatDate(hold.released_at)}</div>
                         </div>
                     </CardContent>
@@ -118,17 +129,25 @@ export default function EditLegalHold({ hold }: Props) {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Update Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Update Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
                                 <Label>Reason</Label>
                                 <Textarea
                                     value={data.reason}
-                                    onChange={(e) => setData('reason', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('reason', e.target.value)
+                                    }
                                     rows={4}
                                 />
-                                {errors.reason && <p className="text-xs text-status-critical">{errors.reason}</p>}
+                                {errors.reason && (
+                                    <p className="text-xs text-status-critical">
+                                        {errors.reason}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -136,18 +155,36 @@ export default function EditLegalHold({ hold }: Props) {
                                     <Label>Legal Authority</Label>
                                     <Input
                                         value={data.legal_authority}
-                                        onChange={(e) => setData('legal_authority', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'legal_authority',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {errors.legal_authority && <p className="text-xs text-status-critical">{errors.legal_authority}</p>}
+                                    {errors.legal_authority && (
+                                        <p className="text-xs text-status-critical">
+                                            {errors.legal_authority}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Review Date</Label>
                                     <Input
                                         type="date"
                                         value={data.review_date}
-                                        onChange={(e) => setData('review_date', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'review_date',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {errors.review_date && <p className="text-xs text-status-critical">{errors.review_date}</p>}
+                                    {errors.review_date && (
+                                        <p className="text-xs text-status-critical">
+                                            {errors.review_date}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
@@ -155,15 +192,28 @@ export default function EditLegalHold({ hold }: Props) {
                                 <Label>Related Records</Label>
                                 <Textarea
                                     value={data.related_records}
-                                    onChange={(e) => setData('related_records', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'related_records',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                     placeholder="Record IDs or references (comma or newline separated)"
                                 />
-                                {errors.related_records && <p className="text-xs text-status-critical">{errors.related_records}</p>}
+                                {errors.related_records && (
+                                    <p className="text-xs text-status-critical">
+                                        {errors.related_records}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="flex justify-end gap-2">
-                                <Button type="button" variant="outline" onClick={() => window.history.back()}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => window.history.back()}
+                                >
                                     Cancel
                                 </Button>
                                 <Button type="submit" disabled={processing}>
@@ -188,17 +238,30 @@ export default function EditLegalHold({ hold }: Props) {
                                     <Label>Release Reason *</Label>
                                     <Textarea
                                         value={releaseForm.data.release_reason}
-                                        onChange={(e) => releaseForm.setData('release_reason', e.target.value)}
+                                        onChange={(e) =>
+                                            releaseForm.setData(
+                                                'release_reason',
+                                                e.target.value,
+                                            )
+                                        }
                                         rows={3}
                                         placeholder="Why is this hold being released?"
                                     />
                                     {releaseForm.errors.release_reason && (
-                                        <p className="text-xs text-status-critical">{releaseForm.errors.release_reason}</p>
+                                        <p className="text-xs text-status-critical">
+                                            {releaseForm.errors.release_reason}
+                                        </p>
                                     )}
                                 </div>
                                 <div className="flex justify-end">
-                                    <Button type="submit" variant="destructive" disabled={releaseForm.processing}>
-                                        {releaseForm.processing ? 'Releasing...' : 'Release Hold'}
+                                    <Button
+                                        type="submit"
+                                        variant="destructive"
+                                        disabled={releaseForm.processing}
+                                    >
+                                        {releaseForm.processing
+                                            ? 'Releasing...'
+                                            : 'Release Hold'}
                                     </Button>
                                 </div>
                             </CardContent>
@@ -207,10 +270,13 @@ export default function EditLegalHold({ hold }: Props) {
                 ) : (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Release Notes</CardTitle>
+                            <CardTitle className="text-base">
+                                Release Notes
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="text-sm text-muted-foreground">
-                            {hold.release_reason || 'No release reason recorded.'}
+                            {hold.release_reason ||
+                                'No release reason recorded.'}
                         </CardContent>
                     </Card>
                 )}

@@ -1,12 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import {
     Select,
     SelectContent,
@@ -14,7 +11,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero, PageLayout } from '@/components/page';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { AlertTriangle } from 'lucide-react';
 import { FormEvent } from 'react';
 
@@ -107,7 +106,13 @@ const subTypes: Record<string, { value: string; label: string }[]> = {
     ],
 };
 
-export default function AccountEdit({ account, parentAccounts, taxRates, fundingStreams, hasJournalLines }: PageProps) {
+export default function AccountEdit({
+    account,
+    parentAccounts,
+    taxRates,
+    fundingStreams,
+    hasJournalLines,
+}: PageProps) {
     const { data, setData, put, processing, errors } = useForm({
         code: account.code,
         name: account.name,
@@ -117,14 +122,21 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
         description: account.description || '',
         gst_applicable: account.gst_applicable,
         is_active: account.is_active,
-        default_tax_rate_id: account.default_tax_rate_id ? String(account.default_tax_rate_id) : '',
-        funding_stream_id: account.funding_stream_id ? String(account.funding_stream_id) : '',
+        default_tax_rate_id: account.default_tax_rate_id
+            ? String(account.default_tax_rate_id)
+            : '',
+        funding_stream_id: account.funding_stream_id
+            ? String(account.funding_stream_id)
+            : '',
     });
 
     const breadcrumbs = [
         { title: 'Finance', href: '/finance' },
         { title: 'Chart of Accounts', href: '/finance/accounts' },
-        { title: `Edit ${account.code}`, href: `/finance/accounts/${account.id}/edit` },
+        {
+            title: `Edit ${account.code}`,
+            href: `/finance/accounts/${account.id}/edit`,
+        },
     ];
 
     function handleSubmit(e: FormEvent) {
@@ -136,7 +148,7 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
         ? parentAccounts.filter((a) => a.type === data.type)
         : parentAccounts;
 
-    const currentSubTypes = data.type ? (subTypes[data.type] || []) : [];
+    const currentSubTypes = data.type ? subTypes[data.type] || [] : [];
 
     const isCodeDisabled = account.is_system;
     const isTypeDisabled = account.is_system || hasJournalLines;
@@ -147,7 +159,8 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/accounts"
                         title="Edit Account"
@@ -157,11 +170,14 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
             >
                 {account.is_system && (
                     <div className="flex items-center gap-3 rounded-lg border border-status-warning/30 bg-status-warning p-4">
-                        <AlertTriangle className="h-5 w-5 text-status-warning shrink-0" />
+                        <AlertTriangle className="h-5 w-5 shrink-0 text-status-warning" />
                         <div>
-                            <p className="text-sm font-medium text-status-warning">System Account</p>
+                            <p className="text-sm font-medium text-status-warning">
+                                System Account
+                            </p>
                             <p className="text-sm text-muted-foreground">
-                                This is a system account. The account code and type cannot be changed.
+                                This is a system account. The account code and
+                                type cannot be changed.
                             </p>
                         </div>
                     </div>
@@ -169,11 +185,14 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
 
                 {hasJournalLines && !account.is_system && (
                     <div className="flex items-center gap-3 rounded-lg border border-status-info/30 bg-status-info p-4">
-                        <AlertTriangle className="h-5 w-5 text-status-info shrink-0" />
+                        <AlertTriangle className="h-5 w-5 shrink-0 text-status-info" />
                         <div>
-                            <p className="text-sm font-medium text-status-info">Has Journal Entries</p>
+                            <p className="text-sm font-medium text-status-info">
+                                Has Journal Entries
+                            </p>
                             <p className="text-sm text-muted-foreground">
-                                This account has journal entries. The account type cannot be changed.
+                                This account has journal entries. The account
+                                type cannot be changed.
                             </p>
                         </div>
                     </div>
@@ -191,13 +210,17 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                                     <Input
                                         id="code"
                                         value={data.code}
-                                        onChange={(e) => setData('code', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('code', e.target.value)
+                                        }
                                         placeholder="e.g. 1000"
                                         maxLength={20}
                                         disabled={isCodeDisabled}
                                     />
                                     {errors.code && (
-                                        <p className="text-sm text-destructive">{errors.code}</p>
+                                        <p className="text-sm text-destructive">
+                                            {errors.code}
+                                        </p>
                                     )}
                                 </div>
                                 <div className="space-y-1.5">
@@ -205,12 +228,16 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                                     <Input
                                         id="name"
                                         value={data.name}
-                                        onChange={(e) => setData('name', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('name', e.target.value)
+                                        }
                                         placeholder="e.g. Cash at Bank"
                                         maxLength={255}
                                     />
                                     {errors.name && (
-                                        <p className="text-sm text-destructive">{errors.name}</p>
+                                        <p className="text-sm text-destructive">
+                                            {errors.name}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -235,21 +262,28 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                                         </SelectTrigger>
                                         <SelectContent>
                                             {accountTypes.map((t) => (
-                                                <SelectItem key={t.value} value={t.value}>
+                                                <SelectItem
+                                                    key={t.value}
+                                                    value={t.value}
+                                                >
                                                     {t.label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {errors.type && (
-                                        <p className="text-sm text-destructive">{errors.type}</p>
+                                        <p className="text-sm text-destructive">
+                                            {errors.type}
+                                        </p>
                                     )}
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label>Sub Type</Label>
                                     <Select
                                         value={data.sub_type}
-                                        onValueChange={(value) => setData('sub_type', value)}
+                                        onValueChange={(value) =>
+                                            setData('sub_type', value)
+                                        }
                                         disabled={!data.type}
                                     >
                                         <SelectTrigger>
@@ -257,14 +291,19 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                                         </SelectTrigger>
                                         <SelectContent>
                                             {currentSubTypes.map((st) => (
-                                                <SelectItem key={st.value} value={st.value}>
+                                                <SelectItem
+                                                    key={st.value}
+                                                    value={st.value}
+                                                >
                                                     {st.label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {errors.sub_type && (
-                                        <p className="text-sm text-destructive">{errors.sub_type}</p>
+                                        <p className="text-sm text-destructive">
+                                            {errors.sub_type}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -273,7 +312,9 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                                 <Label>Parent Account</Label>
                                 <Select
                                     value={data.parent_id}
-                                    onValueChange={(value) => setData('parent_id', value)}
+                                    onValueChange={(value) =>
+                                        setData('parent_id', value)
+                                    }
                                     disabled={!data.type}
                                 >
                                     <SelectTrigger>
@@ -281,14 +322,19 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                                     </SelectTrigger>
                                     <SelectContent>
                                         {filteredParents.map((p) => (
-                                            <SelectItem key={p.id} value={String(p.id)}>
+                                            <SelectItem
+                                                key={p.id}
+                                                value={String(p.id)}
+                                            >
                                                 {p.code} - {p.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                                 {errors.parent_id && (
-                                    <p className="text-sm text-destructive">{errors.parent_id}</p>
+                                    <p className="text-sm text-destructive">
+                                        {errors.parent_id}
+                                    </p>
                                 )}
                             </div>
 
@@ -297,14 +343,22 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                                     <Label>Default Tax Rate</Label>
                                     <Select
                                         value={data.default_tax_rate_id}
-                                        onValueChange={(value) => setData('default_tax_rate_id', value)}
+                                        onValueChange={(value) =>
+                                            setData(
+                                                'default_tax_rate_id',
+                                                value,
+                                            )
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="None" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {taxRates.map((tr) => (
-                                                <SelectItem key={tr.id} value={String(tr.id)}>
+                                                <SelectItem
+                                                    key={tr.id}
+                                                    value={String(tr.id)}
+                                                >
                                                     {tr.name} ({tr.rate}%)
                                                 </SelectItem>
                                             ))}
@@ -315,14 +369,19 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                                     <Label>Funding Stream</Label>
                                     <Select
                                         value={data.funding_stream_id}
-                                        onValueChange={(value) => setData('funding_stream_id', value)}
+                                        onValueChange={(value) =>
+                                            setData('funding_stream_id', value)
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="None" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {fundingStreams.map((fs) => (
-                                                <SelectItem key={fs.id} value={String(fs.id)}>
+                                                <SelectItem
+                                                    key={fs.id}
+                                                    value={String(fs.id)}
+                                                >
                                                     {fs.code} - {fs.name}
                                                 </SelectItem>
                                             ))}
@@ -336,12 +395,16 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                                 <Textarea
                                     id="description"
                                     value={data.description}
-                                    onChange={(e) => setData('description', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('description', e.target.value)
+                                    }
                                     placeholder="Optional description for this account"
                                     rows={3}
                                 />
                                 {errors.description && (
-                                    <p className="text-sm text-destructive">{errors.description}</p>
+                                    <p className="text-sm text-destructive">
+                                        {errors.description}
+                                    </p>
                                 )}
                             </div>
 
@@ -351,10 +414,16 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                                         id="gst_applicable"
                                         checked={data.gst_applicable}
                                         onCheckedChange={(checked) =>
-                                            setData('gst_applicable', checked === true)
+                                            setData(
+                                                'gst_applicable',
+                                                checked === true,
+                                            )
                                         }
                                     />
-                                    <Label htmlFor="gst_applicable" className="font-normal">
+                                    <Label
+                                        htmlFor="gst_applicable"
+                                        className="font-normal"
+                                    >
                                         GST Applicable
                                     </Label>
                                 </div>
@@ -363,10 +432,16 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                                         id="is_active"
                                         checked={data.is_active}
                                         onCheckedChange={(checked) =>
-                                            setData('is_active', checked === true)
+                                            setData(
+                                                'is_active',
+                                                checked === true,
+                                            )
                                         }
                                     />
-                                    <Label htmlFor="is_active" className="font-normal">
+                                    <Label
+                                        htmlFor="is_active"
+                                        className="font-normal"
+                                    >
                                         Active
                                     </Label>
                                 </div>
@@ -374,7 +449,9 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
 
                             <div className="flex justify-end gap-3">
                                 <Link href={'/finance/accounts'}>
-                                    <Button type="button" variant="outline">Cancel</Button>
+                                    <Button type="button" variant="outline">
+                                        Cancel
+                                    </Button>
                                 </Link>
                                 <Button type="submit" disabled={processing}>
                                     {processing ? 'Saving...' : 'Save Changes'}

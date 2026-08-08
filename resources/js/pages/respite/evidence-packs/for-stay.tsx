@@ -1,13 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import RespiteSubnav from '@/components/respite-subnav';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import RespiteSubnav from '@/components/respite-subnav';
+import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
@@ -17,7 +23,15 @@ type Props = {
     pack: any;
 };
 
-const itemTypes = ['document', 'photo', 'form', 'note', 'assessment', 'incident_report', 'other'];
+const itemTypes = [
+    'document',
+    'photo',
+    'form',
+    'note',
+    'assessment',
+    'incident_report',
+    'other',
+];
 
 export default function EvidencePackForStay({ stay, pack }: Props) {
     const isSealed = pack ? !!pack.sealed_at : false;
@@ -46,16 +60,26 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
 
     const handleSeal = () => {
         if (!pack) return;
-        router.post(`/respite/evidence-packs/${pack.id}/seal`, { seal_reason: sealReason });
+        router.post(`/respite/evidence-packs/${pack.id}/seal`, {
+            seal_reason: sealReason,
+        });
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Respite', href: '/respite' },
-            { title: 'Stays', href: '/respite/stays' },
-            { title: `${stay.client?.first_name} ${stay.client?.last_name}`, href: `/respite/stays/${stay.id}` },
-            { title: 'Evidence Pack', href: `/respite/stays/${stay.id}/evidence-pack` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                { title: 'Stays', href: '/respite/stays' },
+                {
+                    title: `${stay.client?.first_name} ${stay.client?.last_name}`,
+                    href: `/respite/stays/${stay.id}`,
+                },
+                {
+                    title: 'Evidence Pack',
+                    href: `/respite/stays/${stay.id}/evidence-pack`,
+                },
+            ]}
+        >
             <Head title="Evidence Pack for Stay" />
 
             <PageLayout
@@ -88,19 +112,40 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                     <>
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Pack Details</CardTitle>
+                                <CardTitle className="text-base">
+                                    Pack Details
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm text-muted-foreground">
-                                <div className="font-medium">{pack.title || `Evidence Pack #${pack.id}`}</div>
-                                {pack.description && <div className="whitespace-pre-wrap">{pack.description}</div>}
+                                <div className="font-medium">
+                                    {pack.title || `Evidence Pack #${pack.id}`}
+                                </div>
+                                {pack.description && (
+                                    <div className="whitespace-pre-wrap">
+                                        {pack.description}
+                                    </div>
+                                )}
                                 <div className="flex flex-wrap gap-2">
-                                    <Badge variant="outline">{pack.status?.replace(/_/g, ' ')}</Badge>
-                                    {isSealed && <Badge variant="outline">Sealed</Badge>}
+                                    <Badge variant="outline">
+                                        {pack.status?.replace(/_/g, ' ')}
+                                    </Badge>
+                                    {isSealed && (
+                                        <Badge variant="outline">Sealed</Badge>
+                                    )}
                                 </div>
                                 {isSealed && (
                                     <>
-                                        <div>Sealed at: {formatDateTimeLong(pack.sealed_at)}</div>
-                                        {pack.sealed_by && <div>Sealed by: {pack.sealed_by.name || pack.sealed_by}</div>}
+                                        <div>
+                                            Sealed at:{' '}
+                                            {formatDateTimeLong(pack.sealed_at)}
+                                        </div>
+                                        {pack.sealed_by && (
+                                            <div>
+                                                Sealed by:{' '}
+                                                {pack.sealed_by.name ||
+                                                    pack.sealed_by}
+                                            </div>
+                                        )}
                                     </>
                                 )}
                             </CardContent>
@@ -108,30 +153,49 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
 
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Items</CardTitle>
+                                <CardTitle className="text-base">
+                                    Items
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 {pack.items?.length > 0 ? (
                                     <div className="space-y-2">
                                         {pack.items.map((item: any) => (
-                                            <div key={item.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
+                                            <div
+                                                key={item.id}
+                                                className="flex items-center justify-between rounded-md border p-3 text-sm"
+                                            >
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2">
-                                                        <Badge variant="outline">{item.type}</Badge>
-                                                        <span className="font-medium">{item.title}</span>
+                                                        <Badge variant="outline">
+                                                            {item.type}
+                                                        </Badge>
+                                                        <span className="font-medium">
+                                                            {item.title}
+                                                        </span>
                                                     </div>
                                                     {item.description && (
-                                                        <div className="mt-1 text-xs text-muted-foreground">{item.description}</div>
+                                                        <div className="mt-1 text-xs text-muted-foreground">
+                                                            {item.description}
+                                                        </div>
                                                     )}
                                                     {item.added_at && (
-                                                        <div className="mt-1 text-xs text-muted-foreground">{formatDateTimeLong(item.added_at)}</div>
+                                                        <div className="mt-1 text-xs text-muted-foreground">
+                                                            {formatDateTimeLong(
+                                                                item.added_at,
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
                                                 {!isSealed && (
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => handleRemoveItem(item.id)}
+                                                        onClick={() =>
+                                                            handleRemoveItem(
+                                                                item.id,
+                                                            )
+                                                        }
                                                     >
                                                         Remove
                                                     </Button>
@@ -140,7 +204,9 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="py-4 text-center text-sm text-muted-foreground">No items in this pack.</div>
+                                    <div className="py-4 text-center text-sm text-muted-foreground">
+                                        No items in this pack.
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>
@@ -148,44 +214,110 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                         {!isSealed && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-base">Add Item</CardTitle>
+                                    <CardTitle className="text-base">
+                                        Add Item
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <form onSubmit={handleAddItem} className="space-y-4">
+                                    <form
+                                        onSubmit={handleAddItem}
+                                        className="space-y-4"
+                                    >
                                         <div className="grid gap-4 sm:grid-cols-2">
                                             <div>
                                                 <Label>Type</Label>
-                                                <Select value={addItemForm.data.type} onValueChange={(v) => addItemForm.setData('type', v)}>
-                                                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                                                <Select
+                                                    value={
+                                                        addItemForm.data.type
+                                                    }
+                                                    onValueChange={(v) =>
+                                                        addItemForm.setData(
+                                                            'type',
+                                                            v,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select type" />
+                                                    </SelectTrigger>
                                                     <SelectContent>
                                                         {itemTypes.map((t) => (
-                                                            <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>
+                                                            <SelectItem
+                                                                key={t}
+                                                                value={t}
+                                                            >
+                                                                {t.replace(
+                                                                    /_/g,
+                                                                    ' ',
+                                                                )}
+                                                            </SelectItem>
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                                {addItemForm.errors.type && <div className="mt-1 text-xs text-status-critical">{addItemForm.errors.type}</div>}
+                                                {addItemForm.errors.type && (
+                                                    <div className="mt-1 text-xs text-status-critical">
+                                                        {
+                                                            addItemForm.errors
+                                                                .type
+                                                        }
+                                                    </div>
+                                                )}
                                             </div>
                                             <div>
                                                 <Label>Title</Label>
                                                 <Input
-                                                    value={addItemForm.data.title}
-                                                    onChange={(e) => addItemForm.setData('title', e.target.value)}
+                                                    value={
+                                                        addItemForm.data.title
+                                                    }
+                                                    onChange={(e) =>
+                                                        addItemForm.setData(
+                                                            'title',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                     placeholder="Item title"
                                                 />
-                                                {addItemForm.errors.title && <div className="mt-1 text-xs text-status-critical">{addItemForm.errors.title}</div>}
+                                                {addItemForm.errors.title && (
+                                                    <div className="mt-1 text-xs text-status-critical">
+                                                        {
+                                                            addItemForm.errors
+                                                                .title
+                                                        }
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <div>
                                             <Label>Description</Label>
                                             <Textarea
-                                                value={addItemForm.data.description}
-                                                onChange={(e) => addItemForm.setData('description', e.target.value)}
+                                                value={
+                                                    addItemForm.data.description
+                                                }
+                                                onChange={(e) =>
+                                                    addItemForm.setData(
+                                                        'description',
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 rows={2}
                                             />
-                                            {addItemForm.errors.description && <div className="mt-1 text-xs text-status-critical">{addItemForm.errors.description}</div>}
+                                            {addItemForm.errors.description && (
+                                                <div className="mt-1 text-xs text-status-critical">
+                                                    {
+                                                        addItemForm.errors
+                                                            .description
+                                                    }
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex justify-end">
-                                            <Button type="submit" size="sm" disabled={addItemForm.processing}>
+                                            <Button
+                                                type="submit"
+                                                size="sm"
+                                                disabled={
+                                                    addItemForm.processing
+                                                }
+                                            >
                                                 Add Item
                                             </Button>
                                         </div>
@@ -197,18 +329,26 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                         {!isSealed && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-base">Actions</CardTitle>
+                                    <CardTitle className="text-base">
+                                        Actions
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
                                     <div>
                                         <Label>Seal Reason</Label>
                                         <Input
                                             value={sealReason}
-                                            onChange={(e) => setSealReason(e.target.value)}
+                                            onChange={(e) =>
+                                                setSealReason(e.target.value)
+                                            }
                                             placeholder="Reason for sealing this pack"
                                         />
                                     </div>
-                                    <Button variant="outline" size="sm" onClick={handleSeal}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleSeal}
+                                    >
                                         Seal Evidence Pack
                                     </Button>
                                 </CardContent>

@@ -16,14 +16,20 @@ interface PageHeroMetaProps {
     className?: string;
 }
 
-export function PageHeroMeta({ items, alignResponsive = true, className }: PageHeroMetaProps) {
+export function PageHeroMeta({
+    items,
+    alignResponsive = true,
+    className,
+}: PageHeroMetaProps) {
     if (items.length === 0) return null;
 
     return (
         <div
             className={cn(
                 'mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-primary-foreground/60',
-                alignResponsive ? 'justify-center md:justify-start' : 'justify-start',
+                alignResponsive
+                    ? 'justify-center md:justify-start'
+                    : 'justify-start',
                 className,
             )}
         >

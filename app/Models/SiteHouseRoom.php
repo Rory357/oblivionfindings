@@ -14,6 +14,7 @@ class SiteHouseRoom extends Model
 
     protected $fillable = [
         'site_id',
+        'site_room_id',
         'tenant_id',
         'name',
         'notes',
@@ -40,6 +41,12 @@ class SiteHouseRoom extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    /** Canonical physical-space identity used by Devices and monitoring. */
+    public function canonicalRoom(): BelongsTo
+    {
+        return $this->belongsTo(SiteRoom::class, 'site_room_id');
     }
 
     public function assignedClient(): BelongsTo

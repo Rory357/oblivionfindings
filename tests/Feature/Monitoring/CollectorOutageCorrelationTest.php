@@ -52,6 +52,25 @@ it('marks collector-backed data stale and creates one root path correlation unti
 
     $health->recordHeartbeat(
         $record['collector']->fresh(),
+        [
+            ...CollectorOutageFixture::heartbeat(),
+            'state' => 'buffer_full',
+            'spool_items' => 2,
+            'spool_bytes' => 1024,
+            'oldest_spool_item_at' => CarbonImmutable::now('UTC')->subMinute()->format(DATE_ATOM),
+            'corrupted_frames' => 1,
+        ],
+        CarbonImmutable::now('UTC'),
+    );
+
+    expect($record['collector']->fresh()->status)->toBe('unavailable')
+        ->and($record['collector']->fresh()->last_recovered_at)->toBeNull()
+        ->and($first->fresh()->effective_state)->toBe(MonitorState::Stale)
+        ->and($second->fresh()->effective_state)->toBe(MonitorState::Stale)
+        ->and(DeviceEvent::query()->where('device_id', $record['collector']->collector_device_id)->where('event_type', 'online')->count())->toBe(0);
+
+    $health->recordHeartbeat(
+        $record['collector']->fresh(),
         CollectorOutageFixture::heartbeat(),
         CarbonImmutable::now('UTC'),
     );

@@ -2,8 +2,8 @@ import {
     ReviewBuilderDialog,
     type ReviewBuilderBand,
 } from '@/components/hr/review-builder-dialog';
-import { PageHero, PageLayout } from '@/components/page';
 import { StatusBadge } from '@/components/hr/status-badge';
+import { PageHero, PageLayout } from '@/components/page';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -17,7 +17,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Table,
     TableBody,
@@ -26,6 +25,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { CheckCircle2, ClipboardCheck, Play, Sparkles } from 'lucide-react';
@@ -104,7 +104,6 @@ const formatCurrency = (value: string | null) => {
     }).format(num);
 };
 
-
 const getCycleLabel = (cycle: string) => {
     switch (cycle) {
         case 'annual':
@@ -157,7 +156,8 @@ export default function CompensationReviewDetail({
             title: 'Approve this review?',
             body: 'This marks all pending line-items approved and unlocks applying it.',
             confirmLabel: 'Approve',
-            run: () => router.post(`/hr/compensation/reviews/${review.id}/approve`),
+            run: () =>
+                router.post(`/hr/compensation/reviews/${review.id}/approve`),
         });
     };
 
@@ -167,7 +167,8 @@ export default function CompensationReviewDetail({
             title: 'Apply this review?',
             body: 'This updates the approved employees’ salaries and writes their compensation history. This cannot be undone.',
             confirmLabel: 'Apply',
-            run: () => router.post(`/hr/compensation/reviews/${review.id}/apply`),
+            run: () =>
+                router.post(`/hr/compensation/reviews/${review.id}/apply`),
         });
     };
 
@@ -282,7 +283,11 @@ export default function CompensationReviewDetail({
                             <div className="flex items-center gap-2">
                                 <StatusBadge
                                     status={review.status}
-                                    tone={review.status === 'applied' ? 'info' : undefined}
+                                    tone={
+                                        review.status === 'applied'
+                                            ? 'info'
+                                            : undefined
+                                    }
                                 />
                                 {can.manage &&
                                     (review.status === 'planning' ||
@@ -363,7 +368,9 @@ export default function CompensationReviewDetail({
                                     <TableHead>Status</TableHead>
                                     <TableHead>Approved By</TableHead>
                                     {itemActionable && (
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead className="text-right">
+                                            Actions
+                                        </TableHead>
                                     )}
                                 </TableRow>
                             </TableHeader>
@@ -418,7 +425,11 @@ export default function CompensationReviewDetail({
                                                             type="button"
                                                             size="sm"
                                                             variant="outline"
-                                                            onClick={() => approveItem(item.id)}
+                                                            onClick={() =>
+                                                                approveItem(
+                                                                    item.id,
+                                                                )
+                                                            }
                                                         >
                                                             Approve
                                                         </Button>
@@ -427,7 +438,11 @@ export default function CompensationReviewDetail({
                                                             size="sm"
                                                             variant="ghost"
                                                             className="text-status-critical hover:text-status-critical"
-                                                            onClick={() => rejectItem(item.id)}
+                                                            onClick={() =>
+                                                                rejectItem(
+                                                                    item.id,
+                                                                )
+                                                            }
                                                         >
                                                             Reject
                                                         </Button>
@@ -460,7 +475,9 @@ export default function CompensationReviewDetail({
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            {confirmState?.title}
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
                             {confirmState?.body}
                         </AlertDialogDescription>
@@ -488,8 +505,8 @@ export default function CompensationReviewDetail({
                     <AlertDialogHeader>
                         <AlertDialogTitle>Reject this line?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            It will be excluded when the review is applied. Add a
-                            reason for the record (optional).
+                            It will be excluded when the review is applied. Add
+                            a reason for the record (optional).
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div>

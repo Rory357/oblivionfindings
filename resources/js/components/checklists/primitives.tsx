@@ -8,15 +8,22 @@ import {
     Search,
     X,
 } from 'lucide-react';
-import { createElement, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    createElement,
+    type ReactNode,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 
 import { cn } from '@/lib/utils';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { catBgVar, catColorVar } from './category';
 import { useChecklistConfig } from './context';
 import { categoryIcon } from './icons';
-import { Button as GuardrailButton } from '@/components/ui/button';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 /* ---- Floating dropdown (replaces native <select>) ----------------------- */
 export interface DropdownOption {
@@ -77,7 +84,12 @@ export function Dropdown({
             const w = menuWidth ?? Math.max(r.width, 220);
             let left = align === 'right' ? r.right - w : r.left;
             left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
-            setPos({ top: r.bottom + 6, left, width: w, maxH: window.innerHeight - r.bottom - 20 });
+            setPos({
+                top: r.bottom + 6,
+                left,
+                width: w,
+                maxH: window.innerHeight - r.bottom - 20,
+            });
         };
         place();
         const onDoc = (e: MouseEvent) => {
@@ -108,35 +120,42 @@ export function Dropdown({
 
     const selected = options.find((o) => String(o.value) === String(value));
     const norm = (s?: string) =>
-        (s || '')
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[̀-ͯ]/g, '');
+        (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const filtered = useMemo(() => {
         if (!searchable || !q) return options;
         const nq = norm(q);
-        return options.filter((o) => norm(o.label).includes(nq) || norm(o.sub).includes(nq));
+        return options.filter(
+            (o) => norm(o.label).includes(nq) || norm(o.sub).includes(nq),
+        );
     }, [options, q, searchable]);
 
     const trigger = dark
         ? 'border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/15 focus:border-primary-foreground/50'
         : 'border-input bg-card text-foreground hover:bg-accent/50 focus:border-ring';
-    const subColor = dark ? 'text-primary-foreground/60' : 'text-muted-foreground';
+    const subColor = dark
+        ? 'text-primary-foreground/60'
+        : 'text-muted-foreground';
 
     return (
         <div ref={ref} className={cn('relative', className)}>
-            <GuardrailButton unstyled
+            <GuardrailButton
+                unstyled
                 type="button"
                 onClick={() => setOpen((o) => !o)}
                 aria-haspopup="listbox"
                 aria-expanded={open}
                 className={cn(
-                    'flex h-9 w-full items-center gap-2 rounded-md border px-2.5 text-sm font-medium outline-none transition-colors',
+                    'flex h-9 w-full items-center gap-2 rounded-md border px-2.5 text-sm font-medium transition-colors outline-none',
                     trigger,
                 )}
             >
                 {Icon ? <Icon className={cn('h-3.5 w-3.5', subColor)} /> : null}
-                <span className={cn('flex-1 truncate text-left', !selected && subColor)}>
+                <span
+                    className={cn(
+                        'flex-1 truncate text-left',
+                        !selected && subColor,
+                    )}
+                >
                     {selected ? selected.label : placeholder}
                 </span>
                 <ChevronsUpDown className={cn('h-3.5 w-3.5', subColor)} />
@@ -151,26 +170,33 @@ export function Dropdown({
                     {searchable ? (
                         <div className="border-b border-border p-2">
                             <div className="relative">
-                                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                                 <input
                                     autoFocus
                                     value={q}
                                     onChange={(e) => setQ(e.target.value)}
                                     placeholder="Search…"
-                                    className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                                    className="h-8 w-full rounded-md border border-input bg-background pr-2 pl-8 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                                 />
                             </div>
                         </div>
                     ) : null}
-                    <div className="overflow-y-auto p-1" style={{ maxHeight: Math.min(pos.maxH, 320) }}>
+                    <div
+                        className="overflow-y-auto p-1"
+                        style={{ maxHeight: Math.min(pos.maxH, 320) }}
+                    >
                         {filtered.length === 0 ? (
-                            <div className="px-3 py-6 text-center text-xs text-muted-foreground">No matches</div>
+                            <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                                No matches
+                            </div>
                         ) : (
                             filtered.map((o) => {
-                                const active = String(o.value) === String(value);
+                                const active =
+                                    String(o.value) === String(value);
                                 const OptIcon = o.Icon;
                                 return (
-                                    <GuardrailButton unstyled
+                                    <GuardrailButton
+                                        unstyled
                                         key={o.value}
                                         type="button"
                                         role="option"
@@ -181,7 +207,9 @@ export function Dropdown({
                                         }}
                                         className={cn(
                                             'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors',
-                                            active ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
+                                            active
+                                                ? 'bg-accent text-accent-foreground'
+                                                : 'hover:bg-accent/60',
                                         )}
                                     >
                                         {o.dot ? (
@@ -193,14 +221,18 @@ export function Dropdown({
                                             <OptIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                                         ) : null}
                                         <span className="min-w-0 flex-1">
-                                            <span className="block truncate font-medium">{o.label}</span>
+                                            <span className="block truncate font-medium">
+                                                {o.label}
+                                            </span>
                                             {o.sub ? (
                                                 <span className="block truncate text-[11px] text-muted-foreground">
                                                     {o.sub}
                                                 </span>
                                             ) : null}
                                         </span>
-                                        {active ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
+                                        {active ? (
+                                            <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                        ) : null}
                                     </GuardrailButton>
                                 );
                             })
@@ -227,12 +259,16 @@ export function ViewToggle({
         { key: 'list', Icon: Rows3, label: 'List' },
     ];
     return (
-        <GuardrailCard unstyled className="inline-flex items-center rounded-lg border border-border bg-card p-0.5">
+        <GuardrailCard
+            unstyled
+            className="inline-flex items-center rounded-lg border border-border bg-card p-0.5"
+        >
             {opts.map((o) => {
                 const active = o.key === value;
                 const Icon = o.Icon;
                 return (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         key={o.key}
                         type="button"
                         onClick={() => onChange(o.key)}
@@ -273,21 +309,41 @@ export function CategoryIcon({
     // stable, registry-looked-up component, so this re-uses it, never re-creates it.
     return (
         <span
-            className={cn('flex shrink-0 items-center justify-center rounded-lg', className)}
-            style={{ width: box, height: box, background: catBgVar(cat?.tone), color: catColorVar(cat?.tone) }}
+            className={cn(
+                'flex shrink-0 items-center justify-center rounded-lg',
+                className,
+            )}
+            style={{
+                width: box,
+                height: box,
+                background: catBgVar(cat?.tone),
+                color: catColorVar(cat?.tone),
+            }}
         >
-            {createElement(categoryIcon(cat?.icon), { style: { width: size, height: size } })}
+            {createElement(categoryIcon(cat?.icon), {
+                style: { width: size, height: size },
+            })}
         </span>
     );
 }
 
-export function CategoryDot({ category, size = 8 }: { category: string | null | undefined; size?: number }) {
+export function CategoryDot({
+    category,
+    size = 8,
+}: {
+    category: string | null | undefined;
+    size?: number;
+}) {
     const { categoryMap } = useChecklistConfig();
     const cat = category ? categoryMap[category] : undefined;
     return (
         <span
             className="inline-block shrink-0 rounded-full"
-            style={{ width: size, height: size, background: catColorVar(cat?.tone) }}
+            style={{
+                width: size,
+                height: size,
+                background: catColorVar(cat?.tone),
+            }}
         />
     );
 }
@@ -328,11 +384,17 @@ export function StatusBadge({
     );
 }
 
-export function CountBadge({ children, className }: { children: ReactNode; className?: string }) {
+export function CountBadge({
+    children,
+    className,
+}: {
+    children: ReactNode;
+    className?: string;
+}) {
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground',
+                'inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground tabular-nums',
                 className,
             )}
         >
@@ -342,12 +404,26 @@ export function CountBadge({ children, className }: { children: ReactNode; class
 }
 
 /* ---- Progress bar -------------------------------------------------------- */
-export function Progress({ value, className }: { value: number; className?: string }) {
+export function Progress({
+    value,
+    className,
+}: {
+    value: number;
+    className?: string;
+}) {
     const v = Math.min(100, Math.max(0, value || 0));
     const color = v === 100 ? 'var(--status-success)' : 'var(--primary)';
     return (
-        <div className={cn('h-1.5 overflow-hidden rounded-full bg-muted', className)}>
-            <div className="h-full rounded-full transition-all" style={{ width: `${v}%`, background: color }} />
+        <div
+            className={cn(
+                'h-1.5 overflow-hidden rounded-full bg-muted',
+                className,
+            )}
+        >
+            <div
+                className="h-full rounded-full transition-all"
+                style={{ width: `${v}%`, background: color }}
+            />
         </div>
     );
 }
@@ -366,7 +442,9 @@ export function Empty({
         <div className="flex flex-col items-center justify-center py-12 text-center">
             <Icon className="mb-2 h-9 w-9 text-muted-foreground/40" />
             <p className="text-sm font-medium">{title}</p>
-            {sub ? <p className="text-xs text-muted-foreground">{sub}</p> : null}
+            {sub ? (
+                <p className="text-xs text-muted-foreground">{sub}</p>
+            ) : null}
         </div>
     );
 }
@@ -385,9 +463,15 @@ export function SectionHead({
         <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h3 className="text-base font-semibold">{title}</h3>
-                {desc ? <p className="text-sm text-muted-foreground">{desc}</p> : null}
+                {desc ? (
+                    <p className="text-sm text-muted-foreground">{desc}</p>
+                ) : null}
             </div>
-            {children ? <div className="flex flex-wrap items-center gap-2">{children}</div> : null}
+            {children ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    {children}
+                </div>
+            ) : null}
         </div>
     );
 }
@@ -406,18 +490,19 @@ export function SearchInput({
 }) {
     return (
         <div className={cn('relative', className)}>
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <input
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={placeholder}
-                className="h-9 w-full rounded-md border border-input bg-card pl-8 pr-8 text-sm outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
+                className="h-9 w-full rounded-md border border-input bg-card pr-8 pl-8 text-sm outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
             />
             {value ? (
-                <GuardrailButton unstyled
+                <GuardrailButton
+                    unstyled
                     type="button"
                     onClick={() => onChange('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                     <X className="h-3.5 w-3.5" />
                 </GuardrailButton>

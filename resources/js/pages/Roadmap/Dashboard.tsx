@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -26,10 +26,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import axios from 'axios';
-import { PageHero, PageLayout } from '@/components/page';
 import {
     AlertTriangle,
     CalendarClock,
@@ -317,7 +317,10 @@ function PlanDetailTable({ plan }: PlanDetailTableProps) {
             <TableBody>
                 {plan.items.length === 0 && (
                     <TableRow>
-                        <TableCell colSpan={6} className="text-muted-foreground">
+                        <TableCell
+                            colSpan={6}
+                            className="text-muted-foreground"
+                        >
                             This plan has no ranked items yet. Convert accepted
                             triage suggestions or quick-add initiatives, then
                             regenerate the quarterly draft.
@@ -338,10 +341,14 @@ function PlanDetailTable({ plan }: PlanDetailTableProps) {
                         </TableCell>
                         <TableCell>{item.score_at_snapshot ?? '-'}</TableCell>
                         <TableCell>
-                            {item.planned_capex ? currency(item.planned_capex) : '-'}
+                            {item.planned_capex
+                                ? currency(item.planned_capex)
+                                : '-'}
                         </TableCell>
                         <TableCell>
-                            {item.planned_opex ? currency(item.planned_opex) : '-'}
+                            {item.planned_opex
+                                ? currency(item.planned_opex)
+                                : '-'}
                         </TableCell>
                     </TableRow>
                 ))}
@@ -504,8 +511,7 @@ export default function RoadmapDashboard({
     const [selectedSuggestion, setSelectedSuggestion] =
         useState<SuggestionRow | null>(null);
     const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
-    const [isSuggestionDialogOpen, setIsSuggestionDialogOpen] =
-        useState(false);
+    const [isSuggestionDialogOpen, setIsSuggestionDialogOpen] = useState(false);
     const [suggestionNotesDraft, setSuggestionNotesDraft] = useState('');
     const [showTechnicalPayload, setShowTechnicalPayload] = useState(false);
     const planDetailSectionRef = useRef<HTMLDivElement | null>(null);
@@ -548,7 +554,9 @@ export default function RoadmapDashboard({
         return asStringArray(selectedSuggestion?.raw_payload?.asset_notes);
     }, [selectedSuggestion]);
     const suggestionIncidentExamples = useMemo(() => {
-        return asObjectArray(selectedSuggestion?.raw_payload?.incident_examples);
+        return asObjectArray(
+            selectedSuggestion?.raw_payload?.incident_examples,
+        );
     }, [selectedSuggestion]);
     const suggestionAssetExamples = useMemo(() => {
         return asObjectArray(selectedSuggestion?.raw_payload?.asset_examples);
@@ -627,9 +635,7 @@ export default function RoadmapDashboard({
                 ),
             ]);
 
-        const initiativeRows = (
-            initiativeResponse.data?.items?.data ?? []
-        ).map(
+        const initiativeRows = (initiativeResponse.data?.items?.data ?? []).map(
             (row: InitiativeApiRow): InitiativeRow => ({
                 id: row.id,
                 title: row.title,
@@ -645,9 +651,9 @@ export default function RoadmapDashboard({
         setInitiatives(initiativeRows);
         const planRows = planResponse.data?.items?.data ?? [];
         setPlans(planRows);
-        const suggestionRows = (
-            suggestionResponse.data?.items?.data ?? []
-        ).map((row: SuggestionApiRow): SuggestionRow => mapSuggestionRow(row));
+        const suggestionRows = (suggestionResponse.data?.items?.data ?? []).map(
+            (row: SuggestionApiRow): SuggestionRow => mapSuggestionRow(row),
+        );
         setSuggestions(suggestionRows);
 
         if (planRows.length === 0) {
@@ -754,9 +760,12 @@ export default function RoadmapDashboard({
             return;
         }
 
-        const ownerUserId = initiativeForm.ownerUserId ?? managers[0]?.id ?? null;
+        const ownerUserId =
+            initiativeForm.ownerUserId ?? managers[0]?.id ?? null;
         if (!ownerUserId) {
-            toast.error('Assign an owner manager before creating an initiative.');
+            toast.error(
+                'Assign an owner manager before creating an initiative.',
+            );
             return;
         }
 
@@ -926,7 +935,8 @@ export default function RoadmapDashboard({
                 return;
             }
 
-            const ownerUserId = initiativeForm.ownerUserId ?? managers[0]?.id ?? null;
+            const ownerUserId =
+                initiativeForm.ownerUserId ?? managers[0]?.id ?? null;
             if (!ownerUserId) {
                 toast.error(
                     'Assign an owner manager first, then convert the suggestion.',
@@ -941,7 +951,8 @@ export default function RoadmapDashboard({
                     `/roadmap/suggestions/${suggestionId}/convert`,
                     {
                         owner_user_id: ownerUserId,
-                        sponsor_user_id: initiativeForm.sponsorUserId ?? undefined,
+                        sponsor_user_id:
+                            initiativeForm.sponsorUserId ?? undefined,
                         target_fiscal_year: initiativeForm.targetFiscalYear,
                         target_quarter: initiativeForm.targetQuarter,
                         next_decision: initiativeForm.nextDecision,
@@ -1144,10 +1155,22 @@ export default function RoadmapDashboard({
                         title="Roadmap"
                         description="Quarterly initiatives, budgets, rollout, and board decisions in one place."
                         stats={[
-                            { label: 'Initiatives', value: summary.initiatives.total },
-                            { label: 'In progress', value: summary.initiatives.in_progress },
-                            { label: 'Blocked', value: summary.initiatives.blocked },
-                            { label: 'Decisions required', value: summary.decisions_required },
+                            {
+                                label: 'Initiatives',
+                                value: summary.initiatives.total,
+                            },
+                            {
+                                label: 'In progress',
+                                value: summary.initiatives.in_progress,
+                            },
+                            {
+                                label: 'Blocked',
+                                value: summary.initiatives.blocked,
+                            },
+                            {
+                                label: 'Decisions required',
+                                value: summary.decisions_required,
+                            },
                         ]}
                         actions={
                             <div className="flex flex-wrap gap-2">
@@ -1163,7 +1186,10 @@ export default function RoadmapDashboard({
                                     Refresh
                                 </Button>
                                 <Link href="/governance/dashboard">
-                                    <Button variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Button
+                                        variant="outline"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
                                         Back to Governance
                                     </Button>
                                 </Link>
@@ -1171,7 +1197,8 @@ export default function RoadmapDashboard({
                         }
                     >
                         <p className="text-xs text-primary-foreground/70">
-                            Last refreshed {new Date(generatedAt).toLocaleString()}
+                            Last refreshed{' '}
+                            {new Date(generatedAt).toLocaleString()}
                         </p>
                     </PageHero>
                 }
@@ -1183,16 +1210,20 @@ export default function RoadmapDashboard({
                                 Roadmap module is not ready in this environment.
                             </div>
                             <div className="text-status-warning">
-                                Reason: {summary.reason ?? 'Missing roadmap tables or seed data.'}
+                                Reason:{' '}
+                                {summary.reason ??
+                                    'Missing roadmap tables or seed data.'}
                             </div>
                             <div className="font-mono text-xs text-status-warning">
                                 php artisan migrate
                             </div>
                             <div className="font-mono text-xs text-status-warning">
-                                php artisan db:seed --class=Database\\Seeders\\RoadmapPermissionsSeeder
+                                php artisan db:seed
+                                --class=Database\\Seeders\\RoadmapPermissionsSeeder
                             </div>
                             <div className="font-mono text-xs text-status-warning">
-                                php artisan db:seed --class=Database\\Seeders\\RoadmapSeeder
+                                php artisan db:seed
+                                --class=Database\\Seeders\\RoadmapSeeder
                             </div>
                         </CardContent>
                     </Card>
@@ -1229,38 +1260,84 @@ export default function RoadmapDashboard({
                             {summary.governance_budget ? (
                                 <>
                                     <div className="text-2xl font-semibold">
-                                        {currency(summary.governance_budget.total_budget)}
+                                        {currency(
+                                            summary.governance_budget
+                                                .total_budget,
+                                        )}
                                     </div>
                                     <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
                                         <div>
-                                            Approved FY{summary.governance_budget.fiscal_year}
-                                            {summary.governance_budget.approved_at && (
-                                                <> on {summary.governance_budget.approved_at}</>
+                                            Approved FY
+                                            {
+                                                summary.governance_budget
+                                                    .fiscal_year
+                                            }
+                                            {summary.governance_budget
+                                                .approved_at && (
+                                                <>
+                                                    {' '}
+                                                    on{' '}
+                                                    {
+                                                        summary
+                                                            .governance_budget
+                                                            .approved_at
+                                                    }
+                                                </>
                                             )}
                                         </div>
                                         <div>
-                                            Actual: {currency(summary.governance_budget.total_actual)}
+                                            Actual:{' '}
+                                            {currency(
+                                                summary.governance_budget
+                                                    .total_actual,
+                                            )}
                                             {' / '}
-                                            Remaining: {currency(summary.governance_budget.remaining)}
+                                            Remaining:{' '}
+                                            {currency(
+                                                summary.governance_budget
+                                                    .remaining,
+                                            )}
                                         </div>
-                                        {summary.governance_budget.variance_pct !== 0 && (
-                                            <div className={summary.governance_budget.variance_pct > 5 ? 'text-destructive' : ''}>
-                                                Variance: {summary.governance_budget.variance_pct > 0 ? '+' : ''}
-                                                {summary.governance_budget.variance_pct}%
+                                        {summary.governance_budget
+                                            .variance_pct !== 0 && (
+                                            <div
+                                                className={
+                                                    summary.governance_budget
+                                                        .variance_pct > 5
+                                                        ? 'text-destructive'
+                                                        : ''
+                                                }
+                                            >
+                                                Variance:{' '}
+                                                {summary.governance_budget
+                                                    .variance_pct > 0
+                                                    ? '+'
+                                                    : ''}
+                                                {
+                                                    summary.governance_budget
+                                                        .variance_pct
+                                                }
+                                                %
                                             </div>
                                         )}
-                                        <div className="mt-1 pt-1 border-t">
-                                            Initiative Forecast: {currency(summary.budget.forecast_total)}
+                                        <div className="mt-1 border-t pt-1">
+                                            Initiative Forecast:{' '}
+                                            {currency(
+                                                summary.budget.forecast_total,
+                                            )}
                                         </div>
                                     </div>
                                 </>
                             ) : (
                                 <>
                                     <div className="text-2xl font-semibold">
-                                        {currency(summary.budget.forecast_total)}
+                                        {currency(
+                                            summary.budget.forecast_total,
+                                        )}
                                     </div>
                                     <div className="mt-1 text-xs text-muted-foreground">
-                                        Initiative forecast only &mdash; no approved governance budget
+                                        Initiative forecast only &mdash; no
+                                        approved governance budget
                                     </div>
                                 </>
                             )}
@@ -1314,27 +1391,33 @@ export default function RoadmapDashboard({
                     <CardContent>
                         <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
                             <li>
-                                Triage new suggestions in <strong>Triage Inbox</strong> and
-                                either reject noise or convert accepted items.
+                                Triage new suggestions in{' '}
+                                <strong>Triage Inbox</strong> and either reject
+                                noise or convert accepted items.
                             </li>
                             <li>
-                                Use <strong>Initiative Register</strong> quick add for direct
-                                manager-owned initiatives.
+                                Use <strong>Initiative Register</strong> quick
+                                add for direct manager-owned initiatives.
                             </li>
                             <li>
-                                Generate a draft in <strong>Quarterly Planning Control
-                                Center</strong> (year, quarter, scoring preset).
+                                Generate a draft in{' '}
+                                <strong>
+                                    Quarterly Planning Control Center
+                                </strong>{' '}
+                                (year, quarter, scoring preset).
                             </li>
                             <li>
-                                In <strong>Quarterly Plans</strong>, click <strong>Open</strong>{' '}
-                                to load and jump to plan detail.
+                                In <strong>Quarterly Plans</strong>, click{' '}
+                                <strong>Open</strong> to load and jump to plan
+                                detail.
                             </li>
                             <li>
                                 Run approvals in order: Approve, then Publish.
                             </li>
                             <li>
                                 Resolve funding/risk approvals in{' '}
-                                <strong>Decisions Required</strong> and export board reports.
+                                <strong>Decisions Required</strong> and export
+                                board reports.
                             </li>
                         </ol>
                     </CardContent>
@@ -1459,7 +1542,8 @@ export default function RoadmapDashboard({
                     <CardContent className="space-y-4">
                         {!can.manageRoadmap && (
                             <p className="text-sm text-muted-foreground">
-                                You can view roadmap data but cannot create or assign initiatives.
+                                You can view roadmap data but cannot create or
+                                assign initiatives.
                             </p>
                         )}
 
@@ -1467,8 +1551,9 @@ export default function RoadmapDashboard({
                             <>
                                 {managers.length === 0 && (
                                     <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
-                                        No manager users are available to assign as initiative owners.
-                                        Add manager roles in Access Control first.
+                                        No manager users are available to assign
+                                        as initiative owners. Add manager roles
+                                        in Access Control first.
                                     </div>
                                 )}
 
@@ -1482,10 +1567,13 @@ export default function RoadmapDashboard({
                                             placeholder="e.g. CCTV resilience uplift for high-risk homes"
                                             value={initiativeForm.title}
                                             onChange={(event) =>
-                                                setInitiativeForm((current) => ({
-                                                    ...current,
-                                                    title: event.target.value,
-                                                }))
+                                                setInitiativeForm(
+                                                    (current) => ({
+                                                        ...current,
+                                                        title: event.target
+                                                            .value,
+                                                    }),
+                                                )
                                             }
                                         />
                                     </div>
@@ -1495,24 +1583,28 @@ export default function RoadmapDashboard({
                                         <Select
                                             value={initiativeForm.stream}
                                             onValueChange={(value) =>
-                                                setInitiativeForm((current) => ({
-                                                    ...current,
-                                                    stream: value,
-                                                }))
+                                                setInitiativeForm(
+                                                    (current) => ({
+                                                        ...current,
+                                                        stream: value,
+                                                    }),
+                                                )
                                             }
                                         >
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Stream" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {STREAM_OPTIONS.map((stream) => (
-                                                    <SelectItem
-                                                        key={stream.key}
-                                                        value={stream.key}
-                                                    >
-                                                        {stream.label}
-                                                    </SelectItem>
-                                                ))}
+                                                {STREAM_OPTIONS.map(
+                                                    (stream) => (
+                                                        <SelectItem
+                                                            key={stream.key}
+                                                            value={stream.key}
+                                                        >
+                                                            {stream.label}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -1522,17 +1614,21 @@ export default function RoadmapDashboard({
                                         <Select
                                             value={
                                                 initiativeForm.ownerUserId
-                                                    ? String(initiativeForm.ownerUserId)
+                                                    ? String(
+                                                          initiativeForm.ownerUserId,
+                                                      )
                                                     : 'none'
                                             }
                                             onValueChange={(value) =>
-                                                setInitiativeForm((current) => ({
-                                                    ...current,
-                                                    ownerUserId:
-                                                        value === 'none'
-                                                            ? null
-                                                            : Number(value),
-                                                }))
+                                                setInitiativeForm(
+                                                    (current) => ({
+                                                        ...current,
+                                                        ownerUserId:
+                                                            value === 'none'
+                                                                ? null
+                                                                : Number(value),
+                                                    }),
+                                                )
                                             }
                                         >
                                             <SelectTrigger>
@@ -1545,7 +1641,9 @@ export default function RoadmapDashboard({
                                                 {managers.map((manager) => (
                                                     <SelectItem
                                                         key={manager.id}
-                                                        value={String(manager.id)}
+                                                        value={String(
+                                                            manager.id,
+                                                        )}
                                                     >
                                                         {managerLabel(manager)}
                                                     </SelectItem>
@@ -1559,17 +1657,21 @@ export default function RoadmapDashboard({
                                         <Select
                                             value={
                                                 initiativeForm.sponsorUserId
-                                                    ? String(initiativeForm.sponsorUserId)
+                                                    ? String(
+                                                          initiativeForm.sponsorUserId,
+                                                      )
                                                     : 'none'
                                             }
                                             onValueChange={(value) =>
-                                                setInitiativeForm((current) => ({
-                                                    ...current,
-                                                    sponsorUserId:
-                                                        value === 'none'
-                                                            ? null
-                                                            : Number(value),
-                                                }))
+                                                setInitiativeForm(
+                                                    (current) => ({
+                                                        ...current,
+                                                        sponsorUserId:
+                                                            value === 'none'
+                                                                ? null
+                                                                : Number(value),
+                                                    }),
+                                                )
                                             }
                                         >
                                             <SelectTrigger>
@@ -1582,7 +1684,9 @@ export default function RoadmapDashboard({
                                                 {managers.map((manager) => (
                                                     <SelectItem
                                                         key={manager.id}
-                                                        value={String(manager.id)}
+                                                        value={String(
+                                                            manager.id,
+                                                        )}
                                                     >
                                                         {managerLabel(manager)}
                                                     </SelectItem>
@@ -1600,14 +1704,21 @@ export default function RoadmapDashboard({
                                             type="number"
                                             min={2000}
                                             max={3000}
-                                            value={initiativeForm.targetFiscalYear}
+                                            value={
+                                                initiativeForm.targetFiscalYear
+                                            }
                                             onChange={(event) =>
-                                                setInitiativeForm((current) => ({
-                                                    ...current,
-                                                    targetFiscalYear:
-                                                        Number(event.target.value) ||
-                                                        new Date().getFullYear(),
-                                                }))
+                                                setInitiativeForm(
+                                                    (current) => ({
+                                                        ...current,
+                                                        targetFiscalYear:
+                                                            Number(
+                                                                event.target
+                                                                    .value,
+                                                            ) ||
+                                                            new Date().getFullYear(),
+                                                    }),
+                                                )
                                             }
                                         />
                                     </div>
@@ -1615,22 +1726,35 @@ export default function RoadmapDashboard({
                                     <div className="space-y-1">
                                         <Label>Target quarter</Label>
                                         <Select
-                                            value={String(initiativeForm.targetQuarter)}
+                                            value={String(
+                                                initiativeForm.targetQuarter,
+                                            )}
                                             onValueChange={(value) =>
-                                                setInitiativeForm((current) => ({
-                                                    ...current,
-                                                    targetQuarter: Number(value),
-                                                }))
+                                                setInitiativeForm(
+                                                    (current) => ({
+                                                        ...current,
+                                                        targetQuarter:
+                                                            Number(value),
+                                                    }),
+                                                )
                                             }
                                         >
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Quarter" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="1">Q1</SelectItem>
-                                                <SelectItem value="2">Q2</SelectItem>
-                                                <SelectItem value="3">Q3</SelectItem>
-                                                <SelectItem value="4">Q4</SelectItem>
+                                                <SelectItem value="1">
+                                                    Q1
+                                                </SelectItem>
+                                                <SelectItem value="2">
+                                                    Q2
+                                                </SelectItem>
+                                                <SelectItem value="3">
+                                                    Q3
+                                                </SelectItem>
+                                                <SelectItem value="4">
+                                                    Q4
+                                                </SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -1643,13 +1767,17 @@ export default function RoadmapDashboard({
                                             id="initiative-cost-low"
                                             inputMode="decimal"
                                             placeholder="0"
-                                            value={initiativeForm.costEstimateLow}
+                                            value={
+                                                initiativeForm.costEstimateLow
+                                            }
                                             onChange={(event) =>
-                                                setInitiativeForm((current) => ({
-                                                    ...current,
-                                                    costEstimateLow:
-                                                        event.target.value,
-                                                }))
+                                                setInitiativeForm(
+                                                    (current) => ({
+                                                        ...current,
+                                                        costEstimateLow:
+                                                            event.target.value,
+                                                    }),
+                                                )
                                             }
                                         />
                                     </div>
@@ -1662,13 +1790,17 @@ export default function RoadmapDashboard({
                                             id="initiative-cost-high"
                                             inputMode="decimal"
                                             placeholder="0"
-                                            value={initiativeForm.costEstimateHigh}
+                                            value={
+                                                initiativeForm.costEstimateHigh
+                                            }
                                             onChange={(event) =>
-                                                setInitiativeForm((current) => ({
-                                                    ...current,
-                                                    costEstimateHigh:
-                                                        event.target.value,
-                                                }))
+                                                setInitiativeForm(
+                                                    (current) => ({
+                                                        ...current,
+                                                        costEstimateHigh:
+                                                            event.target.value,
+                                                    }),
+                                                )
                                             }
                                         />
                                     </div>
@@ -1681,11 +1813,13 @@ export default function RoadmapDashboard({
                                             id="initiative-next-decision"
                                             value={initiativeForm.nextDecision}
                                             onChange={(event) =>
-                                                setInitiativeForm((current) => ({
-                                                    ...current,
-                                                    nextDecision:
-                                                        event.target.value,
-                                                }))
+                                                setInitiativeForm(
+                                                    (current) => ({
+                                                        ...current,
+                                                        nextDecision:
+                                                            event.target.value,
+                                                    }),
+                                                )
                                             }
                                         />
                                     </div>
@@ -1836,8 +1970,8 @@ export default function RoadmapDashboard({
                                 !planDetailLoading &&
                                 selectedPlan === null && (
                                     <p className="text-sm text-muted-foreground">
-                                        Choose a plan from the Quarterly Plans table to
-                                        inspect ranked items and costs.
+                                        Choose a plan from the Quarterly Plans
+                                        table to inspect ranked items and costs.
                                     </p>
                                 )}
 
@@ -1848,7 +1982,9 @@ export default function RoadmapDashboard({
                                         <div className="flex flex-wrap items-center gap-2 text-sm">
                                             <Badge variant="outline">{`FY${selectedPlan.fiscal_year} Q${selectedPlan.quarter} r${selectedPlan.revision_no}`}</Badge>
                                             <Badge variant="outline">
-                                                {statusLabel(selectedPlan.status)}
+                                                {statusLabel(
+                                                    selectedPlan.status,
+                                                )}
                                             </Badge>
                                             <Badge variant="outline">
                                                 {statusLabel(
@@ -1922,13 +2058,16 @@ export default function RoadmapDashboard({
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    {initiative.owner_name ?? '-'}
+                                                    {initiative.owner_name ??
+                                                        '-'}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {initiative.sponsor_name ?? '-'}
+                                                    {initiative.sponsor_name ??
+                                                        '-'}
                                                 </TableCell>
                                                 <TableCell className="max-w-[280px] truncate">
-                                                    {initiative.next_decision ?? '-'}
+                                                    {initiative.next_decision ??
+                                                        '-'}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -2185,7 +2324,9 @@ export default function RoadmapDashboard({
                                     {decisions.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={can.manageDecisions ? 6 : 5}
+                                                colSpan={
+                                                    can.manageDecisions ? 6 : 5
+                                                }
                                                 className="text-muted-foreground"
                                             >
                                                 No pending decisions.
@@ -2267,12 +2408,16 @@ export default function RoadmapDashboard({
                     </CardContent>
                 </Card>
 
-                <Dialog open={isPlanDialogOpen} onOpenChange={setIsPlanDialogOpen}>
+                <Dialog
+                    open={isPlanDialogOpen}
+                    onOpenChange={setIsPlanDialogOpen}
+                >
                     <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-5xl">
                         <DialogHeader>
                             <DialogTitle>Quarterly Plan Detail</DialogTitle>
                             <DialogDescription>
-                                Ranked initiatives and planned costs for this quarter.
+                                Ranked initiatives and planned costs for this
+                                quarter.
                             </DialogDescription>
                         </DialogHeader>
 
@@ -2297,7 +2442,9 @@ export default function RoadmapDashboard({
                                         {statusLabel(selectedPlan.status)}
                                     </Badge>
                                     <Badge variant="outline">
-                                        {statusLabel(selectedPlan.preset_profile)}
+                                        {statusLabel(
+                                            selectedPlan.preset_profile,
+                                        )}
                                     </Badge>
                                 </div>
 
@@ -2319,11 +2466,10 @@ export default function RoadmapDashboard({
                 >
                     <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
                         <DialogHeader>
-                            <DialogTitle>
-                                Triage Suggestion Details
-                            </DialogTitle>
+                            <DialogTitle>Triage Suggestion Details</DialogTitle>
                             <DialogDescription>
-                                Review source evidence before converting or triaging.
+                                Review source evidence before converting or
+                                triaging.
                             </DialogDescription>
                         </DialogHeader>
 
@@ -2389,18 +2535,22 @@ export default function RoadmapDashboard({
                                                         <SelectItem value="none">
                                                             Unassigned
                                                         </SelectItem>
-                                                        {managers.map((manager) => (
-                                                            <SelectItem
-                                                                key={manager.id}
-                                                                value={String(
-                                                                    manager.id,
-                                                                )}
-                                                            >
-                                                                {managerLabel(
-                                                                    manager,
-                                                                )}
-                                                            </SelectItem>
-                                                        ))}
+                                                        {managers.map(
+                                                            (manager) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        manager.id
+                                                                    }
+                                                                    value={String(
+                                                                        manager.id,
+                                                                    )}
+                                                                >
+                                                                    {managerLabel(
+                                                                        manager,
+                                                                    )}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -2510,16 +2660,20 @@ export default function RoadmapDashboard({
                                         </div>
                                         <div className="rounded-md border p-3">
                                             <div className="grid gap-2 md:grid-cols-2">
-                                                {suggestionIssueDetails.map((detail) => (
-                                                    <div
-                                                        key={`${detail.label}:${detail.value}`}
-                                                    >
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {detail.label}
+                                                {suggestionIssueDetails.map(
+                                                    (detail) => (
+                                                        <div
+                                                            key={`${detail.label}:${detail.value}`}
+                                                        >
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {detail.label}
+                                                            </div>
+                                                            <div>
+                                                                {detail.value}
+                                                            </div>
                                                         </div>
-                                                        <div>{detail.value}</div>
-                                                    </div>
-                                                ))}
+                                                    ),
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -2532,11 +2686,15 @@ export default function RoadmapDashboard({
                                         </div>
                                         <div className="rounded-md border p-3">
                                             <ul className="list-disc space-y-1 pl-4">
-                                                {suggestionIncidentNotes.map((note, index) => (
-                                                    <li key={`incident-note-${index}`}>
-                                                        {note}
-                                                    </li>
-                                                ))}
+                                                {suggestionIncidentNotes.map(
+                                                    (note, index) => (
+                                                        <li
+                                                            key={`incident-note-${index}`}
+                                                        >
+                                                            {note}
+                                                        </li>
+                                                    ),
+                                                )}
                                             </ul>
                                         </div>
                                     </div>
@@ -2548,27 +2706,36 @@ export default function RoadmapDashboard({
                                             Recent incident examples
                                         </div>
                                         <div className="space-y-2 rounded-md border p-3">
-                                            {suggestionIncidentExamples.map((example, index) => (
-                                                <div
-                                                    key={`incident-example-${index}`}
-                                                    className="rounded border bg-muted/20 p-2"
-                                                >
-                                                    <div className="font-medium">
-                                                        {asString(example.title) ?? 'Incident'}
+                                            {suggestionIncidentExamples.map(
+                                                (example, index) => (
+                                                    <div
+                                                        key={`incident-example-${index}`}
+                                                        className="rounded border bg-muted/20 p-2"
+                                                    >
+                                                        <div className="font-medium">
+                                                            {asString(
+                                                                example.title,
+                                                            ) ?? 'Incident'}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            ID{' '}
+                                                            {asString(
+                                                                example.id,
+                                                            ) ?? '-'}{' '}
+                                                            |{' '}
+                                                            {formatDateValue(
+                                                                asString(
+                                                                    example.occurred_at,
+                                                                ),
+                                                            )}{' '}
+                                                            |{' '}
+                                                            {asString(
+                                                                example.location,
+                                                            ) ?? 'No location'}
+                                                        </div>
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        ID {asString(example.id) ?? '-'} |{' '}
-                                                        {formatDateValue(
-                                                            asString(
-                                                                example.occurred_at,
-                                                            ),
-                                                        )}{' '}
-                                                        |{' '}
-                                                        {asString(example.location) ??
-                                                            'No location'}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                ),
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -2580,9 +2747,15 @@ export default function RoadmapDashboard({
                                         </div>
                                         <div className="rounded-md border p-3">
                                             <ul className="list-disc space-y-1 pl-4">
-                                                {suggestionAssetNotes.map((note, index) => (
-                                                    <li key={`asset-note-${index}`}>{note}</li>
-                                                ))}
+                                                {suggestionAssetNotes.map(
+                                                    (note, index) => (
+                                                        <li
+                                                            key={`asset-note-${index}`}
+                                                        >
+                                                            {note}
+                                                        </li>
+                                                    ),
+                                                )}
                                             </ul>
                                         </div>
                                     </div>
@@ -2594,35 +2767,43 @@ export default function RoadmapDashboard({
                                             Asset examples
                                         </div>
                                         <div className="space-y-2 rounded-md border p-3">
-                                            {suggestionAssetExamples.map((example, index) => (
-                                                <div
-                                                    key={`asset-example-${index}`}
-                                                    className="rounded border bg-muted/20 p-2"
-                                                >
-                                                    <div className="font-medium">
-                                                        {asString(example.name) ??
-                                                            'Asset'}
-                                                        {asString(example.asset_tag)
-                                                            ? ` (${asString(example.asset_tag)})`
-                                                            : ''}
+                                            {suggestionAssetExamples.map(
+                                                (example, index) => (
+                                                    <div
+                                                        key={`asset-example-${index}`}
+                                                        className="rounded border bg-muted/20 p-2"
+                                                    >
+                                                        <div className="font-medium">
+                                                            {asString(
+                                                                example.name,
+                                                            ) ?? 'Asset'}
+                                                            {asString(
+                                                                example.asset_tag,
+                                                            )
+                                                                ? ` (${asString(example.asset_tag)})`
+                                                                : ''}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            ID{' '}
+                                                            {asString(
+                                                                example.id,
+                                                            ) ?? '-'}{' '}
+                                                            | Maintenance due:{' '}
+                                                            {asString(
+                                                                example.maintenance_due_at,
+                                                            ) ?? '-'}{' '}
+                                                            | Warranty:{' '}
+                                                            {asString(
+                                                                example.warranty_expires_at,
+                                                            ) ?? '-'}{' '}
+                                                            | Risk:{' '}
+                                                            {asString(
+                                                                example.risk_level,
+                                                            ) ?? '-'}
+                                                        </div>
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        ID {asString(example.id) ?? '-'} |
-                                                        Maintenance due:{' '}
-                                                        {asString(
-                                                            example.maintenance_due_at,
-                                                        ) ?? '-'}{' '}
-                                                        | Warranty:{' '}
-                                                        {asString(
-                                                            example.warranty_expires_at,
-                                                        ) ?? '-'}{' '}
-                                                        | Risk:{' '}
-                                                        {asString(
-                                                            example.risk_level,
-                                                        ) ?? '-'}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                ),
+                                            )}
                                         </div>
                                     </div>
                                 )}

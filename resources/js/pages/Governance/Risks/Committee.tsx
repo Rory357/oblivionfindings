@@ -1,11 +1,11 @@
-import { Head } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, CheckCircle2, Calendar } from 'lucide-react';
+import { PageProps } from '@/types';
+import { Head } from '@inertiajs/react';
+import { AlertTriangle, Calendar, CheckCircle2 } from 'lucide-react';
 
 interface Props extends PageProps {
     committee: string;
@@ -35,11 +35,21 @@ const getSeverityBorder = (score: number) => {
 };
 
 export default function CommitteeRisks({ auth, committee, risks }: Props) {
-    const title = COMMITTEE_LABELS[committee] ?? committee.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    const sorted = [...risks].sort((a, b) => (b.residual_score ?? 0) - (a.residual_score ?? 0));
+    const title =
+        COMMITTEE_LABELS[committee] ??
+        committee.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const sorted = [...risks].sort(
+        (a, b) => (b.residual_score ?? 0) - (a.residual_score ?? 0),
+    );
 
     const formatDate = (d: string | null) =>
-        d ? new Date(d).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set';
+        d
+            ? new Date(d).toLocaleDateString('en-NZ', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+              })
+            : 'Not set';
 
     return (
         <AppLayout
@@ -60,49 +70,83 @@ export default function CommitteeRisks({ auth, committee, risks }: Props) {
                         description="Committee risk oversight."
                         stats={[
                             { label: 'Total Risks', value: sorted.length },
-                            { label: 'Above Appetite', value: sorted.filter((r) => r.within_appetite === false).length },
+                            {
+                                label: 'Above Appetite',
+                                value: sorted.filter(
+                                    (r) => r.within_appetite === false,
+                                ).length,
+                            },
                         ]}
                     />
                 }
             >
                 <div className="space-y-3">
                     {sorted.map((risk) => (
-                        <Card key={risk.id} className={cn('border-l-4', getSeverityBorder(risk.residual_score ?? 0))}>
+                        <Card
+                            key={risk.id}
+                            className={cn(
+                                'border-l-4',
+                                getSeverityBorder(risk.residual_score ?? 0),
+                            )}
+                        >
                             <CardContent className="pt-6">
                                 <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-semibold text-foreground">{risk.title}</span>
-                                            <Badge variant="outline">{risk.risk_reference}</Badge>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="font-semibold text-foreground">
+                                                {risk.title}
+                                            </span>
+                                            <Badge variant="outline">
+                                                {risk.risk_reference}
+                                            </Badge>
                                             {risk.category && (
-                                                <Badge variant="secondary" className="capitalize">
-                                                    {risk.category.replace(/_/g, ' ')}
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="capitalize"
+                                                >
+                                                    {risk.category.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
                                                 </Badge>
                                             )}
                                         </div>
                                         {risk.mitigation_strategy && (
-                                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                            <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
                                                 {risk.mitigation_strategy}
                                             </p>
                                         )}
-                                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                        <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
                                             <span className="flex items-center gap-1">
-                                                <Calendar className="w-3 h-3" />
-                                                Next review: {formatDate(risk.next_review_date)}
+                                                <Calendar className="h-3 w-3" />
+                                                Next review:{' '}
+                                                {formatDate(
+                                                    risk.next_review_date,
+                                                )}
                                             </span>
-                                            {risk.within_appetite !== undefined && (
+                                            {risk.within_appetite !==
+                                                undefined && (
                                                 <span className="flex items-center gap-1">
                                                     {risk.within_appetite ? (
-                                                        <CheckCircle2 className="w-3 h-3 text-status-success" />
+                                                        <CheckCircle2 className="h-3 w-3 text-status-success" />
                                                     ) : (
-                                                        <AlertTriangle className="w-3 h-3 text-primary" />
+                                                        <AlertTriangle className="h-3 w-3 text-primary" />
                                                     )}
-                                                    {risk.within_appetite ? 'Within appetite' : 'Above appetite'}
+                                                    {risk.within_appetite
+                                                        ? 'Within appetite'
+                                                        : 'Above appetite'}
                                                 </span>
                                             )}
                                         </div>
                                     </div>
-                                    <Badge className={cn('shrink-0 text-lg px-3 py-1', getSeverityColor(risk.residual_score ?? 0))}>
+                                    <Badge
+                                        className={cn(
+                                            'shrink-0 px-3 py-1 text-lg',
+                                            getSeverityColor(
+                                                risk.residual_score ?? 0,
+                                            ),
+                                        )}
+                                    >
                                         {risk.residual_score ?? '-'}
                                     </Badge>
                                 </div>

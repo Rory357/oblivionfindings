@@ -1,11 +1,11 @@
 import { useState } from 'react';
 
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { runStatusMeta } from '../category';
 import type { PaneCtx } from '../context';
 import { Dropdown, Empty, ViewToggle, type ChecklistView } from '../primitives';
 import { RunListRow, WorklistCard } from '../run-cards';
 import type { ChecklistRun } from '../types';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 const STATUS_OPTIONS = [
     { value: 'all', label: 'All statuses' },
@@ -46,7 +46,10 @@ export function RunsPane({ ctx }: { ctx: PaneCtx }) {
 
     return (
         <div className="space-y-3">
-            <GuardrailCard unstyled className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-3.5 shadow-sm">
+            <GuardrailCard
+                unstyled
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-3.5 shadow-sm"
+            >
                 <div>
                     <h3 className="text-base font-semibold">All runs</h3>
                     <p className="text-sm text-muted-foreground">
@@ -65,7 +68,10 @@ export function RunsPane({ ctx }: { ctx: PaneCtx }) {
                 </div>
             </GuardrailCard>
             {filtered.length === 0 ? (
-                <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-2 shadow-sm">
+                <GuardrailCard
+                    unstyled
+                    className="rounded-xl border border-border bg-card p-2 shadow-sm"
+                >
                     <Empty title="No runs match your filters." />
                 </GuardrailCard>
             ) : view === 'board' ? (
@@ -75,7 +81,10 @@ export function RunsPane({ ctx }: { ctx: PaneCtx }) {
                     ))}
                 </div>
             ) : (
-                <GuardrailCard unstyled className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                <GuardrailCard
+                    unstyled
+                    className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+                >
                     {filtered.map((r) => (
                         <RunListRow key={`${r.id}-${r.status}`} run={r} />
                     ))}

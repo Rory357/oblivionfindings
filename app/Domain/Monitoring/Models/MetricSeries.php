@@ -35,6 +35,47 @@ final class MetricSeries extends Model
         'last_point_at' => 'immutable_datetime',
     ];
 
+    protected static function booted(): void
+    {
+        self::creating(function (self $series): void {
+            self::assertValidPointerRange($series);
+        });
+
+        self::updating(function (self $series): void {
+            $changed = array_values(array_diff(
+                array_keys($series->getDirty()),
+                ['updated_at'],
+            ));
+            $unexpected = array_diff($changed, ['first_point_at', 'last_point_at']);
+            if ($unexpected !== []) {
+                throw new \UnexpectedValueException('Metric series identity evidence is immutable.');
+            }
+            if ($changed === []) {
+                throw new \UnexpectedValueException(
+                    'Metric series updates require a pointer lifecycle transition.',
+                );
+            }
+
+            self::assertValidPointerRange($series);
+        });
+
+        self::deleting(function (): void {
+            throw new \UnexpectedValueException(
+                'Metric series business-record pointers cannot be deleted.',
+            );
+        });
+    }
+
+    private static function assertValidPointerRange(self $series): void
+    {
+        $first = $series->first_point_at;
+        $last = $series->last_point_at;
+        if (($first === null) !== ($last === null)
+            || ($first !== null && $first->greaterThan($last))) {
+            throw new \UnexpectedValueException('Metric series pointer range is invalid.');
+        }
+    }
+
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);

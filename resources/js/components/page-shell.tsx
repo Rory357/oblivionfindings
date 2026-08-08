@@ -7,7 +7,12 @@ type Props = {
     actions?: ReactNode;
 };
 
-export default function PageShell({ children, title, description, actions }: Props) {
+export default function PageShell({
+    children,
+    title,
+    description,
+    actions,
+}: Props) {
     return (
         <div className="w-full space-y-8">
             {(title || description || actions) && (
@@ -24,7 +29,11 @@ export default function PageShell({ children, title, description, actions }: Pro
                             </p>
                         ) : null}
                     </div>
-                    {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+                    {actions ? (
+                        <div className="flex shrink-0 items-center gap-2">
+                            {actions}
+                        </div>
+                    ) : null}
                 </div>
             )}
             {children}

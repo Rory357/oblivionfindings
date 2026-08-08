@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
 import {
     Field,
     FieldErr,
@@ -18,6 +17,7 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/wizard/shell';
+import { cn } from '@/lib/utils';
 import { useForm } from '@inertiajs/react';
 import {
     Award,
@@ -40,19 +40,48 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { toast } from 'sonner';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
-type ObligationOption = { id: number; title: string; framework: string; due_date?: string | null };
+type ObligationOption = {
+    id: number;
+    title: string;
+    framework: string;
+    due_date?: string | null;
+};
 
 const MAX_BYTES = 10 * 1024 * 1024; // mirrors server file|max:10240
 const ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg';
 
 const EVIDENCE_TYPES = [
-    { key: 'document', label: 'Document', description: 'Policy, record or report', icon: FileText },
-    { key: 'audit_report', label: 'Audit report', description: 'Internal / external audit', icon: FileCheck2 },
-    { key: 'certification', label: 'Certification', description: 'Certificate or accreditation', icon: Award },
-    { key: 'system_export', label: 'System export', description: 'Generated data export', icon: Database },
-    { key: 'attestation', label: 'Attestation', description: 'Signed declaration', icon: BadgeCheck },
+    {
+        key: 'document',
+        label: 'Document',
+        description: 'Policy, record or report',
+        icon: FileText,
+    },
+    {
+        key: 'audit_report',
+        label: 'Audit report',
+        description: 'Internal / external audit',
+        icon: FileCheck2,
+    },
+    {
+        key: 'certification',
+        label: 'Certification',
+        description: 'Certificate or accreditation',
+        icon: Award,
+    },
+    {
+        key: 'system_export',
+        label: 'System export',
+        description: 'Generated data export',
+        icon: Database,
+    },
+    {
+        key: 'attestation',
+        label: 'Attestation',
+        description: 'Signed declaration',
+        icon: BadgeCheck,
+    },
 ];
 
 export type RecordEvidenceForm = {
@@ -65,9 +94,24 @@ export type RecordEvidenceForm = {
 };
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'obligation', label: 'Obligation', blurb: 'Where it attaches', icon: ShieldCheck },
-    { key: 'document', label: 'Document', blurb: 'Upload & describe', icon: FileUp },
-    { key: 'review', label: 'Review & save', blurb: 'Confirm and attach', icon: CheckCircle2 },
+    {
+        key: 'obligation',
+        label: 'Obligation',
+        blurb: 'Where it attaches',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'document',
+        label: 'Document',
+        blurb: 'Upload & describe',
+        icon: FileUp,
+    },
+    {
+        key: 'review',
+        label: 'Review & save',
+        blurb: 'Confirm and attach',
+        icon: CheckCircle2,
+    },
 ];
 
 function emptyForm(): RecordEvidenceForm {
@@ -111,14 +155,19 @@ function DocumentDropzone({
         [file],
     );
     // Free the blob URL when the preview changes or the dropzone unmounts.
-    useEffect(() => () => {
-        if (preview) URL.revokeObjectURL(preview);
-    }, [preview]);
+    useEffect(
+        () => () => {
+            if (preview) URL.revokeObjectURL(preview);
+        },
+        [preview],
+    );
 
     const accept = (f?: File | null) => {
         if (!f) return;
         if (f.size > MAX_BYTES) {
-            setLocalError(`That file is ${humanSize(f.size)} — the limit is 10 MB.`);
+            setLocalError(
+                `That file is ${humanSize(f.size)} — the limit is 10 MB.`,
+            );
             return;
         }
         setLocalError(null);
@@ -134,17 +183,28 @@ function DocumentDropzone({
     if (file) {
         const FileIcon = isImage(file) ? ImageIcon : FileText;
         return (
-            <GuardrailCard unstyled className="flex items-center gap-3 rounded-xl border border-border bg-card/70 p-3">
+            <GuardrailCard
+                unstyled
+                className="flex items-center gap-3 rounded-xl border border-border bg-card/70 p-3"
+            >
                 <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-primary/10 text-primary">
                     {preview ? (
-                        <img src={preview} alt="" className="h-full w-full object-cover" />
+                        <img
+                            src={preview}
+                            alt=""
+                            className="h-full w-full object-cover"
+                        />
                     ) : (
                         <FileIcon className="h-6 w-6" />
                     )}
                 </span>
                 <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">{file.name}</div>
-                    <div className="text-xs text-muted-foreground">{humanSize(file.size)}</div>
+                    <div className="truncate text-sm font-semibold">
+                        {file.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                        {humanSize(file.size)}
+                    </div>
                 </div>
                 <div className="flex items-center gap-1.5">
                     <Button
@@ -155,7 +215,8 @@ function DocumentDropzone({
                     >
                         Replace
                     </Button>
-                    <Button unstyled
+                    <Button
+                        unstyled
                         type="button"
                         onClick={() => {
                             onClear();
@@ -207,7 +268,8 @@ function DocumentDropzone({
                     <UploadCloud className="h-6 w-6" />
                 </span>
                 <div className="text-sm font-semibold">
-                    Drag a file here, or <span className="text-primary">browse</span>
+                    Drag a file here, or{' '}
+                    <span className="text-primary">browse</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
                     PDF, Word, Excel, CSV or image · up to 10&nbsp;MB
@@ -250,7 +312,10 @@ export function RecordEvidenceDialog({
         [obligations, obligationId],
     );
 
-    const set = <K extends keyof RecordEvidenceForm>(k: K, v: RecordEvidenceForm[K]) =>
+    const set = <K extends keyof RecordEvidenceForm>(
+        k: K,
+        v: RecordEvidenceForm[K],
+    ) =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setData(k, v as any);
     const fieldErr = (name: string) =>
@@ -258,18 +323,24 @@ export function RecordEvidenceDialog({
 
     const validateStep = (idx: number): Record<string, string> => {
         const e: Record<string, string> = {};
-        if (idx === 0 && !obligationId) e.obligation_id = 'Choose the obligation this evidences';
+        if (idx === 0 && !obligationId)
+            e.obligation_id = 'Choose the obligation this evidences';
         if (idx === 1) {
-            if (!data.evidence_type) e.evidence_type = 'Choose an evidence type';
+            if (!data.evidence_type)
+                e.evidence_type = 'Choose an evidence type';
             if (!data.title.trim()) e.title = 'A title is required';
             if (!data.file) e.file = 'Attach a document';
-            if (data.valid_until && data.valid_until <= new Date().toISOString().slice(0, 10))
+            if (
+                data.valid_until &&
+                data.valid_until <= new Date().toISOString().slice(0, 10)
+            )
                 e.valid_until = 'Valid-until must be a future date';
         }
         return e;
     };
 
-    const goTo = (idx: number) => setStepIndex(Math.max(0, Math.min(idx, STEPS.length - 1)));
+    const goTo = (idx: number) =>
+        setStepIndex(Math.max(0, Math.min(idx, STEPS.length - 1)));
     const next = () => {
         const e = validateStep(stepIndex);
         setErrors(e);
@@ -309,7 +380,9 @@ export function RecordEvidenceDialog({
 
     const cur = STEPS[stepIndex];
     const isReview = cur.key === 'review';
-    const typeLabel = EVIDENCE_TYPES.find((t) => t.key === data.evidence_type)?.label;
+    const typeLabel = EVIDENCE_TYPES.find(
+        (t) => t.key === data.evidence_type,
+    )?.label;
 
     if (done) {
         return (
@@ -329,7 +402,8 @@ export function RecordEvidenceDialog({
                         title="Evidence attached"
                         blurb={
                             <>
-                                <strong>{data.title}</strong> is now on the evidence trail for{' '}
+                                <strong>{data.title}</strong> is now on the
+                                evidence trail for{' '}
                                 <strong>{obligation?.title}</strong>.
                             </>
                         }
@@ -339,8 +413,15 @@ export function RecordEvidenceDialog({
                                     <Plus className="h-4 w-4" /> Record another
                                 </Button>
                                 <Button asChild>
-                                    <a href={obligation ? `/governance/compliance/${obligation.id}` : '/governance/compliance'}>
-                                        <ShieldCheck className="h-4 w-4" /> View obligation
+                                    <a
+                                        href={
+                                            obligation
+                                                ? `/governance/compliance/${obligation.id}`
+                                                : '/governance/compliance'
+                                        }
+                                    >
+                                        <ShieldCheck className="h-4 w-4" /> View
+                                        obligation
                                     </a>
                                 </Button>
                             </>
@@ -365,7 +446,11 @@ export function RecordEvidenceDialog({
             onStepClick={goTo}
             footerStart={
                 stepIndex > 0 && !(initialObligationId && stepIndex === 1) ? (
-                    <Button type="button" variant="ghost" onClick={() => goTo(stepIndex - 1)}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => goTo(stepIndex - 1)}
+                    >
                         <ChevronLeft className="h-4 w-4" /> Back
                     </Button>
                 ) : null
@@ -383,17 +468,27 @@ export function RecordEvidenceDialog({
                                 onClick={() => submit(true)}
                                 disabled={processing}
                             >
-                                {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                {processing ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Plus className="h-4 w-4" />
+                                )}
                                 Save & add another
                             </Button>
-                            <Button type="button" onClick={() => submit(false)} disabled={processing}>
+                            <Button
+                                type="button"
+                                onClick={() => submit(false)}
+                                disabled={processing}
+                            >
                                 {processing ? (
                                     <>
-                                        <Loader2 className="h-4 w-4 animate-spin" /> Uploading…
+                                        <Loader2 className="h-4 w-4 animate-spin" />{' '}
+                                        Uploading…
                                     </>
                                 ) : (
                                     <>
-                                        <Check className="h-4 w-4" /> Attach evidence
+                                        <Check className="h-4 w-4" /> Attach
+                                        evidence
                                     </>
                                 )}
                             </Button>
@@ -413,7 +508,11 @@ export function RecordEvidenceDialog({
                         title="Which obligation does this evidence?"
                         blurb="Evidence is filed against an obligation so it shows up in audit packs."
                     />
-                    <Field label="Obligation" required error={fieldErr('obligation_id')}>
+                    <Field
+                        label="Obligation"
+                        required
+                        error={fieldErr('obligation_id')}
+                    >
                         <SelectInput
                             value={obligationId}
                             onChange={setObligationId}
@@ -426,8 +525,8 @@ export function RecordEvidenceDialog({
                     </Field>
                     {obligations.length === 0 ? (
                         <InfoCard icon={ShieldCheck} tone="warn">
-                            There are no open obligations to attach evidence to yet. Log an
-                            obligation first.
+                            There are no open obligations to attach evidence to
+                            yet. Log an obligation first.
                         </InfoCard>
                     ) : null}
                 </WizardStepPane>
@@ -441,7 +540,11 @@ export function RecordEvidenceDialog({
                         blurb="Attach the file and tell us what kind of evidence it is."
                     />
                     <div className="grid gap-4">
-                        <Field label="Evidence type" required error={fieldErr('evidence_type')}>
+                        <Field
+                            label="Evidence type"
+                            required
+                            error={fieldErr('evidence_type')}
+                        >
                             <TilePicker
                                 value={data.evidence_type}
                                 onChange={(v) => set('evidence_type', v)}
@@ -458,10 +561,17 @@ export function RecordEvidenceDialog({
                             />
                         </Field>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Title" required error={fieldErr('title')} span>
+                            <Field
+                                label="Title"
+                                required
+                                error={fieldErr('title')}
+                                span
+                            >
                                 <Input
                                     value={data.title}
-                                    onChange={(e) => set('title', e.target.value)}
+                                    onChange={(e) =>
+                                        set('title', e.target.value)
+                                    }
                                     placeholder="e.g. 2026 Ngā Paerewa self-assessment (signed)"
                                     aria-invalid={!!fieldErr('title')}
                                 />
@@ -474,13 +584,17 @@ export function RecordEvidenceDialog({
                                 <Input
                                     type="date"
                                     value={data.valid_until}
-                                    onChange={(e) => set('valid_until', e.target.value)}
+                                    onChange={(e) =>
+                                        set('valid_until', e.target.value)
+                                    }
                                 />
                             </Field>
                             <Field label="Notes" hint="optional">
                                 <Input
                                     value={data.description}
-                                    onChange={(e) => set('description', e.target.value)}
+                                    onChange={(e) =>
+                                        set('description', e.target.value)
+                                    }
                                     placeholder="Context for auditors"
                                 />
                             </Field>
@@ -497,15 +611,34 @@ export function RecordEvidenceDialog({
                         blurb="Confirm the evidence before attaching it to the obligation."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={ShieldCheck} title="Obligation" onEdit={initialObligationId ? undefined : () => goTo(0)}>
-                            <ReviewRow label="Obligation" value={obligation?.title} />
-                            <ReviewRow label="Framework" value={obligation?.framework} />
+                        <ReviewCard
+                            icon={ShieldCheck}
+                            title="Obligation"
+                            onEdit={
+                                initialObligationId ? undefined : () => goTo(0)
+                            }
+                        >
+                            <ReviewRow
+                                label="Obligation"
+                                value={obligation?.title}
+                            />
+                            <ReviewRow
+                                label="Framework"
+                                value={obligation?.framework}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={Paperclip} title="Evidence" onEdit={() => goTo(1)}>
+                        <ReviewCard
+                            icon={Paperclip}
+                            title="Evidence"
+                            onEdit={() => goTo(1)}
+                        >
                             <ReviewRow label="Type" value={typeLabel} />
                             <ReviewRow label="Title" value={data.title} />
                             <ReviewRow label="File" value={data.file?.name} />
-                            <ReviewRow label="Valid until" value={data.valid_until} />
+                            <ReviewRow
+                                label="Valid until"
+                                value={data.valid_until}
+                            />
                             <ReviewRow label="Notes" value={data.description} />
                         </ReviewCard>
                     </div>

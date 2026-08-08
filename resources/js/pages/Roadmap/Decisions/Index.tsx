@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
@@ -59,7 +59,10 @@ export default function DecisionIndex({ items, filters, can }: Props) {
         );
     };
 
-    const resolveDecision = async (decisionId: number, nextStatus: 'approved' | 'rejected') => {
+    const resolveDecision = async (
+        decisionId: number,
+        nextStatus: 'approved' | 'rejected',
+    ) => {
         if (!can.manageDecisions) return;
 
         const key = `${decisionId}:${nextStatus}`;
@@ -79,7 +82,12 @@ export default function DecisionIndex({ items, filters, can }: Props) {
             toast.success(`Decision request ${nextStatus}.`);
             router.reload({ preserveScroll: true });
         } catch (error) {
-            toast.error(extractErrorMessage(error, 'Failed to resolve decision request.'));
+            toast.error(
+                extractErrorMessage(
+                    error,
+                    'Failed to resolve decision request.',
+                ),
+            );
         } finally {
             setLoadingKey(null);
         }
@@ -96,11 +104,15 @@ export default function DecisionIndex({ items, filters, can }: Props) {
                     { label: 'Total', value: items.data?.length ?? 0 },
                     {
                         label: 'Pending',
-                        value: items.data?.filter((d) => d.status === 'pending').length ?? 0,
+                        value:
+                            items.data?.filter((d) => d.status === 'pending')
+                                .length ?? 0,
                     },
                     {
                         label: 'Approved',
-                        value: items.data?.filter((d) => d.status === 'approved').length ?? 0,
+                        value:
+                            items.data?.filter((d) => d.status === 'approved')
+                                .length ?? 0,
                     },
                 ]}
             />
@@ -115,7 +127,9 @@ export default function DecisionIndex({ items, filters, can }: Props) {
                         >
                             {statusOptions.map((option) => (
                                 <option key={option || 'all'} value={option}>
-                                    {option ? statusLabel(option) : 'All statuses'}
+                                    {option
+                                        ? statusLabel(option)
+                                        : 'All statuses'}
                                 </option>
                             ))}
                         </select>
@@ -127,7 +141,9 @@ export default function DecisionIndex({ items, filters, can }: Props) {
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <Table data-testid="roadmap-decisions-table">
-                                <caption className="sr-only">Roadmap decision requests</caption>
+                                <caption className="sr-only">
+                                    Roadmap decision requests
+                                </caption>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Type</TableHead>
@@ -136,33 +152,59 @@ export default function DecisionIndex({ items, filters, can }: Props) {
                                         <TableHead>Due</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead>Rationale</TableHead>
-                                        {can.manageDecisions && <TableHead>Actions</TableHead>}
+                                        {can.manageDecisions && (
+                                            <TableHead>Actions</TableHead>
+                                        )}
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {items.data.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={can.manageDecisions ? 7 : 6}
+                                                colSpan={
+                                                    can.manageDecisions ? 7 : 6
+                                                }
                                                 className="text-muted-foreground"
                                             >
-                                                No decision requests match these filters.
+                                                No decision requests match these
+                                                filters.
                                             </TableCell>
                                         </TableRow>
                                     )}
                                     {items.data.map((decision) => (
                                         <TableRow key={decision.id}>
-                                            <TableCell>{statusLabel(decision.request_type)}</TableCell>
-                                            <TableCell>{statusLabel(decision.required_role)}</TableCell>
-                                            <TableCell>{formatCurrency(decision.amount)}</TableCell>
-                                            <TableCell>{formatDate(decision.due_date)}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline">{statusLabel(decision.status)}</Badge>
+                                                {statusLabel(
+                                                    decision.request_type,
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {statusLabel(
+                                                    decision.required_role,
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {formatCurrency(
+                                                    decision.amount,
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {formatDate(decision.due_date)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">
+                                                    {statusLabel(
+                                                        decision.status,
+                                                    )}
+                                                </Badge>
                                             </TableCell>
                                             <TableCell className="max-w-[360px]">
-                                                <div>{decision.rationale ?? '-'}</div>
+                                                <div>
+                                                    {decision.rationale ?? '-'}
+                                                </div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    {decision.recommendation ?? ''}
+                                                    {decision.recommendation ??
+                                                        ''}
                                                 </div>
                                             </TableCell>
                                             {can.manageDecisions && (
@@ -170,16 +212,32 @@ export default function DecisionIndex({ items, filters, can }: Props) {
                                                     <div className="flex min-w-[160px] flex-wrap gap-2">
                                                         <Button
                                                             size="sm"
-                                                            disabled={loadingKey === `${decision.id}:approved`}
-                                                            onClick={() => void resolveDecision(decision.id, 'approved')}
+                                                            disabled={
+                                                                loadingKey ===
+                                                                `${decision.id}:approved`
+                                                            }
+                                                            onClick={() =>
+                                                                void resolveDecision(
+                                                                    decision.id,
+                                                                    'approved',
+                                                                )
+                                                            }
                                                         >
                                                             Approve
                                                         </Button>
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            disabled={loadingKey === `${decision.id}:rejected`}
-                                                            onClick={() => void resolveDecision(decision.id, 'rejected')}
+                                                            disabled={
+                                                                loadingKey ===
+                                                                `${decision.id}:rejected`
+                                                            }
+                                                            onClick={() =>
+                                                                void resolveDecision(
+                                                                    decision.id,
+                                                                    'rejected',
+                                                                )
+                                                            }
                                                         >
                                                             Reject
                                                         </Button>
@@ -198,7 +256,10 @@ export default function DecisionIndex({ items, filters, can }: Props) {
                     <div className="text-sm text-muted-foreground">
                         Showing {items.data.length} of {items.total} decisions.
                     </div>
-                    <LaravelPagination links={items.links} lastPage={items.last_page} />
+                    <LaravelPagination
+                        links={items.links}
+                        lastPage={items.last_page}
+                    />
                 </div>
             </PageShell>
         </AppLayout>

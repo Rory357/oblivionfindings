@@ -1,5 +1,4 @@
 import {
-    Calendar,
     CalendarCheck,
     CalendarOff,
     CheckCircle,
@@ -84,7 +83,9 @@ export function AvailabilityPane({
     canManage,
 }: AvailabilityPaneProps) {
     const [search, setSearch] = useState('');
-    const [editing, setEditing] = useState<AvailabilityStaffMember | null>(null);
+    const [editing, setEditing] = useState<AvailabilityStaffMember | null>(
+        null,
+    );
     const searchTerm = search.trim().toLowerCase();
 
     const filtered = useMemo(
@@ -205,7 +206,7 @@ export function AvailabilityPane({
                     </CardContent>
                 </Card>
             ) : (
-                <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(320px,1fr))]">
+                <div className="grid [grid-template-columns:repeat(auto-fill,minmax(320px,1fr))] gap-3">
                     {filtered.map((member) => (
                         <AvailabilityCard
                             key={member.id}
@@ -261,9 +262,13 @@ function AvailabilityCard({
     const daysCovered = new Set(availability.map((a) => a.day_of_week)).size;
     const totalBlocks = availability.length;
     const hasAnyData =
-        availability.length > 0 || timeOff.length > 0 || upcomingLeave.length > 0;
+        availability.length > 0 ||
+        timeOff.length > 0 ||
+        upcomingLeave.length > 0;
 
-    const declaredToday = availability.some((slot) => slot.day_of_week === todayIdx);
+    const declaredToday = availability.some(
+        (slot) => slot.day_of_week === todayIdx,
+    );
     const now = new Date().toISOString();
     const currentlyOnLeave = upcomingLeave.some(
         (leave) => leave.starts_at <= now && leave.ends_at >= now,
@@ -304,12 +309,12 @@ function AvailabilityCard({
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                        <h3 className="m-0 truncate text-sm font-bold leading-tight">
+                        <h3 className="m-0 truncate text-sm leading-tight font-bold">
                             {member.name}
                         </h3>
                         <span
                             className={cn(
-                                'inline-flex shrink-0 items-center rounded-full px-2 py-[2px] text-[10.5px] font-bold uppercase tracking-wide',
+                                'inline-flex shrink-0 items-center rounded-full px-2 py-[2px] text-[10.5px] font-bold tracking-wide uppercase',
                                 statusBadge.classes,
                             )}
                         >
@@ -331,7 +336,7 @@ function AvailabilityCard({
             </header>
 
             <div>
-                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
                     Weekly availability
                 </p>
                 <div className="grid grid-cols-7 gap-1">
@@ -426,7 +431,7 @@ function AvailabilityCard({
             )}
 
             {!hasAnyData ? (
-                <p className="text-xs italic text-muted-foreground/70">
+                <p className="text-xs text-muted-foreground/70 italic">
                     No availability data configured.
                 </p>
             ) : null}
@@ -478,7 +483,7 @@ function AvailabilityStat({
                     <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                    <p className="text-2xl font-bold leading-none tabular-nums">
+                    <p className="text-2xl leading-none font-bold tabular-nums">
                         {value}
                     </p>
                     <p className="mt-1 truncate text-xs text-muted-foreground">
@@ -509,11 +514,16 @@ function Stat({
               : 'text-foreground';
     return (
         <div className="min-w-0">
-            <dt className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <dt className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
                 {icon}
                 {label}
             </dt>
-            <dd className={cn('m-0 mt-0.5 text-sm font-bold tabular-nums', valueTone)}>
+            <dd
+                className={cn(
+                    'm-0 mt-0.5 text-sm font-bold tabular-nums',
+                    valueTone,
+                )}
+            >
                 {value}
             </dd>
         </div>

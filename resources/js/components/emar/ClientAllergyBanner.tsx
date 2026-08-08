@@ -1,6 +1,13 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, ChevronDown, ChevronUp, Info, ShieldAlert, Skull } from 'lucide-react';
+import {
+    AlertTriangle,
+    ChevronDown,
+    ChevronUp,
+    Info,
+    ShieldAlert,
+    Skull,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type Allergy = {
@@ -13,7 +20,16 @@ interface Props {
     allergies: Allergy[];
 }
 
-const severityConfig: Record<string, { bg: string; border: string; text: string; badge: string; icon: typeof ShieldAlert }> = {
+const severityConfig: Record<
+    string,
+    {
+        bg: string;
+        border: string;
+        text: string;
+        badge: string;
+        icon: typeof ShieldAlert;
+    }
+> = {
     life_threatening: {
         bg: 'bg-status-critical-bg',
         border: 'border-status-critical/30 dark:border-status-critical/30',
@@ -61,7 +77,8 @@ export default function ClientAllergyBanner({ allergies }: Props) {
     if (!allergies || allergies.length === 0) return null;
 
     const sorted = [...allergies].sort(
-        (a, b) => (severityOrder[a.severity] ?? 4) - (severityOrder[b.severity] ?? 4),
+        (a, b) =>
+            (severityOrder[a.severity] ?? 4) - (severityOrder[b.severity] ?? 4),
     );
 
     const visibleAllergies = expanded ? sorted : sorted.slice(0, 3);
@@ -71,7 +88,9 @@ export default function ClientAllergyBanner({ allergies }: Props) {
     const highestConfig = getConfig(sorted[0].severity);
 
     return (
-        <div className={`rounded-lg border-2 ${highestConfig.border} ${highestConfig.bg} p-3`}>
+        <div
+            className={`rounded-lg border-2 ${highestConfig.border} ${highestConfig.bg} p-3`}
+        >
             <div className="mb-2 flex items-center gap-2">
                 <ShieldAlert className={`h-5 w-5 ${highestConfig.text}`} />
                 <span className={`text-sm font-bold ${highestConfig.text}`}>
@@ -87,7 +106,9 @@ export default function ClientAllergyBanner({ allergies }: Props) {
                             key={idx}
                             className="flex items-center gap-2 text-sm"
                         >
-                            <Icon className={`h-4 w-4 shrink-0 ${config.text}`} />
+                            <Icon
+                                className={`h-4 w-4 shrink-0 ${config.text}`}
+                            />
                             <span className={`font-semibold ${config.text}`}>
                                 {allergy.allergen}
                             </span>
@@ -96,7 +117,9 @@ export default function ClientAllergyBanner({ allergies }: Props) {
                                     &mdash; {allergy.reaction}
                                 </span>
                             )}
-                            <Badge className={`${config.badge} ml-1 text-[10px]`}>
+                            <Badge
+                                className={`${config.badge} ml-1 text-[10px]`}
+                            >
                                 {allergy.severity.replace('_', ' ')}
                             </Badge>
                         </div>

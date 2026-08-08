@@ -611,6 +611,71 @@ it('collects bounded provider pages and resolves provider identity through the c
         ->toBe(collect([$switch->id, $accessPoint->id])->sort()->values()->all());
 });
 
+it('discards provider topology when its mapped Site is retired during collection', function () {
+    $site = topologySite();
+    $switch = topologyDevice($site);
+    $accessPoint = topologyDevice($site);
+    IntegrationProviderConnection::query()->create([
+        'provider' => 'topology-fixture',
+        'secret_encrypted' => Crypt::encryptString('fixture-key'),
+        'secret_last4' => '-key',
+        'status' => IntegrationProviderConnection::STATUS_CONNECTED,
+    ]);
+    $siteConfig = IntegrationSiteConfig::query()->create([
+        'site_id' => $site->id,
+        'provider' => 'topology-fixture',
+        'status' => IntegrationSiteConfig::STATUS_HYBRID,
+        'mapped_external_site_id' => 'provider-site-retired-in-flight',
+        'is_active' => true,
+    ]);
+    $adapter = new TopologyFixtureAdapter(
+        [null => new ProviderTopologyPage(
+            nodes: [
+                ['key' => 'switch', 'device_id' => $switch->id],
+                ['key' => 'ap', 'device_id' => $accessPoint->id],
+            ],
+            edges: [[
+                'from' => 'switch',
+                'to' => 'ap',
+                'source' => 'provider',
+                'kind' => 'ethernet',
+                'confidence' => 0.97,
+                'evidence' => ['protocol' => 'provider_lldp'],
+            ]],
+        )],
+        static fn () => $siteConfig->update(['is_active' => false]),
+    );
+    app()->instance(TopologyFixtureAdapter::class, $adapter);
+    app(IntegrationAdapterRegistry::class)->register(
+        'topology-fixture',
+        TopologyFixtureAdapter::class,
+        new IntegrationCapabilityManifest(
+            provider: 'topology-fixture',
+            version: '1.0',
+            capabilities: [TopologyCollectionCapability::class],
+            requiredPermissions: ['securityDevices.integrations.view'],
+            sensitivityLabels: ['site_topology'],
+            pageLimit: 25,
+            minimumIntervalSeconds: 60,
+            backfillLimit: 100,
+        ),
+    );
+    $job = new BuildTopologySnapshot(
+        siteId: $site->id,
+        source: 'provider:topology-fixture',
+        checkpoint: 'provider-sync-retired-in-flight',
+        provider: 'topology-fixture',
+    );
+
+    expect(fn () => $job->handle(
+        app(TopologySnapshotBuilder::class),
+        app(ProviderTopologyCollector::class),
+        app(MonitoringOutboxPublisher::class),
+    ))->toThrow(UnexpectedValueException::class, 'became unavailable during collection')
+        ->and(TopologySnapshot::query()->count())->toBe(0)
+        ->and(MonitoringOutbox::query()->count())->toBe(0);
+});
+
 function topologySite(): Site
 {
     return Site::factory()->create([
@@ -645,7 +710,10 @@ final class TopologyFixtureAdapter implements IntegrationAdapterInterface, Topol
     public array $requestedLimits = [];
 
     /** @param array<string|int|null, ProviderTopologyPage> $pages */
-    public function __construct(private readonly array $pages) {}
+    public function __construct(
+        private readonly array $pages,
+        private readonly ?Closure $onCollect = null,
+    ) {}
 
     public function provider(): string
     {
@@ -697,6 +765,9 @@ final class TopologyFixtureAdapter implements IntegrationAdapterInterface, Topol
     ): ProviderTopologyPage {
         $this->requestedCursors[] = $cursor;
         $this->requestedLimits[] = $limit;
+        if ($this->onCollect !== null) {
+            ($this->onCollect)($siteConfig, $providerConnection, $cursor);
+        }
 
         return $this->pages[$cursor] ?? throw new RuntimeException('Unexpected provider topology cursor.');
     }

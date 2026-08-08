@@ -293,7 +293,7 @@ class IntegrationProviderSecretCutoverTest extends TestCase
         $this->assertSame(3, IntegrationSecretReference::query()->active()->count());
 
         $database = json_encode([
-            DB::table('integration_tenant_secrets')->get()->all(),
+            DB::table((new IntegrationProviderConnection)->getTable())->get()->all(),
             DB::table('integration_secret_references')->get()->all(),
         ], JSON_THROW_ON_ERROR);
         $projection = json_encode([
@@ -345,7 +345,7 @@ class IntegrationProviderSecretCutoverTest extends TestCase
             ->assertSessionHas('error')
             ->assertSessionMissing('_old_input.client_secret');
 
-        $this->assertDatabaseMissing('integration_tenant_secrets', ['provider' => 'milesight']);
+        $this->assertDatabaseMissing((new IntegrationProviderConnection)->getTable(), ['provider' => 'milesight']);
         $this->assertDatabaseCount('integration_secret_references', 0);
         $this->assertStringNotContainsString($sentinel, json_encode(session()->all(), JSON_THROW_ON_ERROR));
     }

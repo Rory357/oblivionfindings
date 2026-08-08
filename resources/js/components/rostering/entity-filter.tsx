@@ -1,6 +1,7 @@
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
 import {
     Command,
     CommandEmpty,
@@ -16,7 +17,6 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type EntityFilterOption = {
     id: number;
@@ -85,7 +85,10 @@ export function EntityFilter({
                             aria-label={`${label} filter: ${selected ? selected.name : `${allLabel} · ${items.length}`}`}
                             className="inline-flex items-center gap-1.5 rounded-full"
                         >
-                            <Search className="h-3.5 w-3.5" aria-hidden="true" />
+                            <Search
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                            />
                             <span className="max-w-[200px] truncate">
                                 {selected
                                     ? selected.name
@@ -97,7 +100,8 @@ export function EntityFilter({
                         </button>
                     </PopoverTrigger>
                     {selected ? (
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             type="button"
                             aria-label={`Clear ${label} filter`}
                             className={cn(

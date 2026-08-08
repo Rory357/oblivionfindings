@@ -11,11 +11,32 @@ php bin/oblivion-collector version
 php bin/oblivion-collector doctor --config=/path/collector.json [--identity=/path/collector.identity.json]
 php bin/oblivion-collector enrol --identity=/private/collector.identity.json --collector-id=<uuid> --central-url=https://... --tls-public-key-pin=sha256//... --state-directory=/private/state
 php bin/oblivion-collector run --identity=/private/collector.identity.json --config=/private/collector.json
+php bin/oblivion-collector verify-transport --identity=/private/collector.identity.json --expect=active --samples=5
+php bin/oblivion-collector verify-transport --identity=/private/collector.identity.json --expect=revoked --samples=5
 ```
 
 The one-time enrolment token is read from `OBLIVION_COLLECTOR_ENROLMENT_TOKEN` or a numeric `--token-fd`; it is never accepted as a command-line value. Enrolment returns a central-issued client certificate and the central Ed25519 configuration key. The collector writes the certificate, private key, request-signing key, spool key, and checkpoints only to private local state. Every runtime request uses mTLS plus a fresh nonce and an Ed25519 signature over the method, path, timestamp, nonce, and body hash. The central service accepts the verified certificate fingerprint header only from configured trusted reverse-proxy addresses.
 
 `run` fetches the latest central configuration and verifies it before atomically replacing the local copy. If configuration transport is unavailable, it can use only an existing still-valid signed copy. It flushes old frames first, executes scheduled checks only while the spool is writable, and accepts only an exact ordered-prefix central acknowledgement before deleting buffered frames.
+
+`verify-transport` is a bounded deployment-evidence probe, not a collection
+cycle. In active mode, each sample sends one signed request with the configured
+client certificate over pinned HTTPS and requires the deliberate invalid-
+checkpoint response contract. It then repeats the byte-identical signed
+request and requires the generic authentication-denial response contract. In
+revoked mode, every fresh signed request must match that generic denial
+contract. It fails on every unexpected status or response body and emits only
+aggregate value-free JSON. Active mode creates only short-lived nonce
+reservations in the configured replay store; it does not issue configuration,
+run checks, upload observations, change heartbeat state, or print identity
+material.
+
+The probe does not by itself prove that the proxy required or validated mTLS,
+that a matching response originated in Laravel rather than the proxy, why an
+identity was denied, which replay-store implementation handled a nonce, or
+that a replay crossed application instances. Pair its response-contract result
+with the approved proxy configuration, upstream-routing evidence, shared-Redis
+runtime evidence, and the central revocation/enrolment audit.
 
 ## Durable state
 
@@ -96,6 +117,15 @@ sudo systemctl status oblivion-monitoring-collector.timer oblivion-monitoring-co
 sudo systemctl list-timers oblivion-monitoring-collector.timer
 sudo journalctl -u oblivion-monitoring-collector.service --since today
 ```
+
+Run the active transport probe only against the approved load-balanced
+production collector endpoint and retain its value-free JSON with the release
+record. Separately prove that the central deployment uses the dedicated
+collector CA, requires mTLS at the reverse proxy, replaces the verified
+certificate header, disables the legacy fingerprint header, and resolves the
+replay store to the same shared Redis deployment on every application
+instance. A local or single-process response-contract result is not production
+evidence.
 
 For controlled recovery, stop the timer before repairing connectivity, time,
 the read-only artifact, or private file ownership. Preserve the spool,

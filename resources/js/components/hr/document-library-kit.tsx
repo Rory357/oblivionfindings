@@ -29,13 +29,31 @@ type FolderMeta = { icon: LucideIcon; tone: string };
 const FOLDER_META: Record<string, FolderMeta> = {
     contracts: { icon: FileText, tone: 'bg-accent text-primary' },
     contract: { icon: FileText, tone: 'bg-accent text-primary' },
-    compliance: { icon: ShieldCheck, tone: 'bg-status-info-bg text-status-info' },
-    certificates: { icon: Award, tone: 'bg-status-warning-bg text-status-warning' },
-    certificate: { icon: Award, tone: 'bg-status-warning-bg text-status-warning' },
+    compliance: {
+        icon: ShieldCheck,
+        tone: 'bg-status-info-bg text-status-info',
+    },
+    certificates: {
+        icon: Award,
+        tone: 'bg-status-warning-bg text-status-warning',
+    },
+    certificate: {
+        icon: Award,
+        tone: 'bg-status-warning-bg text-status-warning',
+    },
     letters: { icon: Mail, tone: 'bg-status-success-bg text-status-success' },
-    payslips: { icon: Wallet, tone: 'bg-status-success-bg text-status-success' },
-    policies: { icon: ScrollText, tone: 'bg-status-warning-bg text-status-warning' },
-    policy: { icon: ScrollText, tone: 'bg-status-warning-bg text-status-warning' },
+    payslips: {
+        icon: Wallet,
+        tone: 'bg-status-success-bg text-status-success',
+    },
+    policies: {
+        icon: ScrollText,
+        tone: 'bg-status-warning-bg text-status-warning',
+    },
+    policy: {
+        icon: ScrollText,
+        tone: 'bg-status-warning-bg text-status-warning',
+    },
     recruitment: { icon: FileText, tone: 'bg-status-info-bg text-status-info' },
 };
 
@@ -72,17 +90,56 @@ export function folderForCategory(category: string | null): string {
 /*  File-type & category iconography                                  */
 /* ------------------------------------------------------------------ */
 
-const FILE_ICONS: Record<string, { icon: LucideIcon; color: string; bg: string }> = {
-    pdf: { icon: FileText, color: 'text-status-critical', bg: 'bg-status-critical-bg' },
+const FILE_ICONS: Record<
+    string,
+    { icon: LucideIcon; color: string; bg: string }
+> = {
+    pdf: {
+        icon: FileText,
+        color: 'text-status-critical',
+        bg: 'bg-status-critical-bg',
+    },
     doc: { icon: FileText, color: 'text-status-info', bg: 'bg-status-info-bg' },
-    docx: { icon: FileText, color: 'text-status-info', bg: 'bg-status-info-bg' },
-    xls: { icon: FileSpreadsheet, color: 'text-status-success', bg: 'bg-status-success-bg' },
-    xlsx: { icon: FileSpreadsheet, color: 'text-status-success', bg: 'bg-status-success-bg' },
-    csv: { icon: FileSpreadsheet, color: 'text-status-success', bg: 'bg-status-success-bg' },
-    jpg: { icon: FileImage, color: 'text-status-warning', bg: 'bg-status-warning-bg' },
-    jpeg: { icon: FileImage, color: 'text-status-warning', bg: 'bg-status-warning-bg' },
-    png: { icon: FileImage, color: 'text-status-warning', bg: 'bg-status-warning-bg' },
-    gif: { icon: FileImage, color: 'text-status-warning', bg: 'bg-status-warning-bg' },
+    docx: {
+        icon: FileText,
+        color: 'text-status-info',
+        bg: 'bg-status-info-bg',
+    },
+    xls: {
+        icon: FileSpreadsheet,
+        color: 'text-status-success',
+        bg: 'bg-status-success-bg',
+    },
+    xlsx: {
+        icon: FileSpreadsheet,
+        color: 'text-status-success',
+        bg: 'bg-status-success-bg',
+    },
+    csv: {
+        icon: FileSpreadsheet,
+        color: 'text-status-success',
+        bg: 'bg-status-success-bg',
+    },
+    jpg: {
+        icon: FileImage,
+        color: 'text-status-warning',
+        bg: 'bg-status-warning-bg',
+    },
+    jpeg: {
+        icon: FileImage,
+        color: 'text-status-warning',
+        bg: 'bg-status-warning-bg',
+    },
+    png: {
+        icon: FileImage,
+        color: 'text-status-warning',
+        bg: 'bg-status-warning-bg',
+    },
+    gif: {
+        icon: FileImage,
+        color: 'text-status-warning',
+        bg: 'bg-status-warning-bg',
+    },
 };
 
 export function fileTypeInfo(
@@ -90,7 +147,13 @@ export function fileTypeInfo(
     name?: string | null,
 ): { icon: LucideIcon; color: string; bg: string } {
     const ext = (name ?? '').split('.').pop()?.toLowerCase() ?? '';
-    return FILE_ICONS[ext] ?? { icon: File, color: 'text-primary', bg: 'bg-primary/10' };
+    return (
+        FILE_ICONS[ext] ?? {
+            icon: File,
+            color: 'text-primary',
+            bg: 'bg-primary/10',
+        }
+    );
 }
 
 /** Icon map for a document by its business category (used by the hub table).
@@ -118,7 +181,9 @@ const CATEGORY_TONE: Record<string, string> = {
 };
 
 export function categoryTone(category: string | null): string {
-    return CATEGORY_TONE[category ?? 'other'] ?? 'bg-muted text-muted-foreground';
+    return (
+        CATEGORY_TONE[category ?? 'other'] ?? 'bg-muted text-muted-foreground'
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -157,19 +222,40 @@ export function formatBytes(bytes?: number | null): string {
 
 export type ExpiryState = 'valid' | 'expiring' | 'expired';
 export type ExpiryVariant = 'success' | 'warning' | 'critical';
-export type ExpiryInfo = { state: ExpiryState; variant: ExpiryVariant; label: string };
+export type ExpiryInfo = {
+    state: ExpiryState;
+    variant: ExpiryVariant;
+    label: string;
+};
 
 /**
  * Classify an expiry date. `warnDays` controls the "expiring soon" window
  * (design default 60). Labels match the self-service surface: expired →
  * "Expired <date>", expiring → "Expires <date>", valid → "Valid to <year>".
  */
-export function expiryStatus(iso: string | null | undefined, warnDays = 60): ExpiryInfo | null {
+export function expiryStatus(
+    iso: string | null | undefined,
+    warnDays = 60,
+): ExpiryInfo | null {
     if (!iso) return null;
     const target = new Date(iso);
     if (isNaN(target.getTime())) return null;
     const days = Math.round((target.getTime() - Date.now()) / 86_400_000);
-    if (days < 0) return { state: 'expired', variant: 'critical', label: `Expired ${formatDocDate(iso)}` };
-    if (days <= warnDays) return { state: 'expiring', variant: 'warning', label: `Expires ${formatDocDate(iso)}` };
-    return { state: 'valid', variant: 'success', label: `Valid to ${target.getFullYear()}` };
+    if (days < 0)
+        return {
+            state: 'expired',
+            variant: 'critical',
+            label: `Expired ${formatDocDate(iso)}`,
+        };
+    if (days <= warnDays)
+        return {
+            state: 'expiring',
+            variant: 'warning',
+            label: `Expires ${formatDocDate(iso)}`,
+        };
+    return {
+        state: 'valid',
+        variant: 'success',
+        label: `Valid to ${target.getFullYear()}`,
+    };
 }

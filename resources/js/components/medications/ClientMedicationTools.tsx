@@ -20,7 +20,14 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { router } from '@inertiajs/react';
-import { Activity, BellOff, Plus, Settings2, Syringe, Trash2 } from 'lucide-react';
+import {
+    Activity,
+    BellOff,
+    Plus,
+    Settings2,
+    Syringe,
+    Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -114,32 +121,49 @@ export default function ClientMedicationTools({
     const [syringeOpen, setSyringeOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
 
-    const canManage = can.manage_settings || can.manage_inr || can.manage_syringe_drivers;
+    const canManage =
+        can.manage_settings || can.manage_inr || can.manage_syringe_drivers;
     if (!canManage) return null;
 
     return (
         <>
             <div className="flex flex-wrap gap-2">
                 {can.manage_settings && (
-                    <Button variant="outline" size="sm" onClick={() => setAlertsOpen(true)}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAlertsOpen(true)}
+                    >
                         <Plus className="mr-1.5 h-4 w-4" />
                         Chart Alerts
                     </Button>
                 )}
                 {can.manage_inr && (
-                    <Button variant="outline" size="sm" onClick={() => setInrOpen(true)}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setInrOpen(true)}
+                    >
                         <Activity className="mr-1.5 h-4 w-4" />
                         INR / Warfarin
                     </Button>
                 )}
                 {can.manage_syringe_drivers && (
-                    <Button variant="outline" size="sm" onClick={() => setSyringeOpen(true)}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSyringeOpen(true)}
+                    >
                         <Syringe className="mr-1.5 h-4 w-4" />
                         Syringe Driver
                     </Button>
                 )}
                 {can.manage_settings && (
-                    <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSettingsOpen(true)}
+                    >
                         <Settings2 className="mr-1.5 h-4 w-4" />
                         Chart Settings
                     </Button>
@@ -202,7 +226,13 @@ function AttentionAlertsDialog({
         }
         router.post(
             `/emar/clients/${client.id}/attention-alerts`,
-            { type, title: title.trim(), detail: detail.trim() || null, prompt_on_open: promptOnOpen, enabled: true },
+            {
+                type,
+                title: title.trim(),
+                detail: detail.trim() || null,
+                prompt_on_open: promptOnOpen,
+                enabled: true,
+            },
             {
                 preserveScroll: true,
                 onStart: () => setSaving(true),
@@ -216,7 +246,11 @@ function AttentionAlertsDialog({
     }
 
     function resolve(id: number) {
-        router.post(`/emar/attention-alerts/${id}/resolve`, {}, { preserveScroll: true });
+        router.post(
+            `/emar/attention-alerts/${id}/resolve`,
+            {},
+            { preserveScroll: true },
+        );
     }
 
     return (
@@ -225,8 +259,9 @@ function AttentionAlertsDialog({
                 <DialogHeader>
                     <DialogTitle>Chart attention alerts</DialogTitle>
                     <DialogDescription>
-                        Warnings shown to every staff member on this client&apos;s MAR. Optionally prompt when the chart
-                        is opened.
+                        Warnings shown to every staff member on this
+                        client&apos;s MAR. Optionally prompt when the chart is
+                        opened.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -241,16 +276,25 @@ function AttentionAlertsDialog({
                                     <div className="flex items-center gap-2 font-medium">
                                         {alert.title}
                                         {alert.prompt_on_open && (
-                                            <Badge variant="outline" className="text-[10px]">
+                                            <Badge
+                                                variant="outline"
+                                                className="text-[10px]"
+                                            >
                                                 Prompt on open
                                             </Badge>
                                         )}
                                     </div>
                                     {alert.detail && (
-                                        <p className="mt-0.5 text-xs text-muted-foreground">{alert.detail}</p>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                            {alert.detail}
+                                        </p>
                                     )}
                                 </div>
-                                <Button size="sm" variant="ghost" onClick={() => resolve(alert.id)}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => resolve(alert.id)}
+                                >
                                     Resolve
                                 </Button>
                             </div>
@@ -271,7 +315,9 @@ function AttentionAlertsDialog({
                                     key={t.value}
                                     type="button"
                                     size="sm"
-                                    variant={type === t.value ? 'default' : 'outline'}
+                                    variant={
+                                        type === t.value ? 'default' : 'outline'
+                                    }
                                     onClick={() => setType(t.value)}
                                 >
                                     {t.label}
@@ -299,13 +345,21 @@ function AttentionAlertsDialog({
                         />
                     </div>
                     <label className="flex items-center justify-between rounded-md border p-3 text-sm">
-                        <span className="font-medium">Prompt when chart is opened</span>
-                        <Switch checked={promptOnOpen} onCheckedChange={setPromptOnOpen} />
+                        <span className="font-medium">
+                            Prompt when chart is opened
+                        </span>
+                        <Switch
+                            checked={promptOnOpen}
+                            onCheckedChange={setPromptOnOpen}
+                        />
                     </label>
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                    >
                         Close
                     </Button>
                     <Button onClick={add} disabled={saving}>
@@ -373,7 +427,12 @@ function InrDialog({
     }
 
     function disable(id: number) {
-        if (!window.confirm('Disable this INR result? It cannot be deleted, only disabled.')) return;
+        if (
+            !window.confirm(
+                'Disable this INR result? It cannot be deleted, only disabled.',
+            )
+        )
+            return;
         router.post(`/emar/inr/${id}/disable`, {}, { preserveScroll: true });
     }
 
@@ -381,9 +440,12 @@ function InrDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>INR results — {client ? 'warfarin monitoring' : ''}</DialogTitle>
+                    <DialogTitle>
+                        INR results — {client ? 'warfarin monitoring' : ''}
+                    </DialogTitle>
                     <DialogDescription>
-                        Record INR results with target range and dose. Results can be disabled but never deleted.
+                        Record INR results with target range and dose. Results
+                        can be disabled but never deleted.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -405,17 +467,27 @@ function InrDialog({
                                         key={r.id}
                                         className={`border-t ${r.disabled_at ? 'text-muted-foreground line-through' : ''}`}
                                     >
-                                        <td className="p-2">{r.tested_on ?? '—'}</td>
-                                        <td className="p-2 font-medium tabular-nums">{r.inr_value}</td>
-                                        <td className="p-2 text-muted-foreground">—</td>
-                                        <td className="p-2 tabular-nums">{r.next_test_date ?? '—'}</td>
+                                        <td className="p-2">
+                                            {r.tested_on ?? '—'}
+                                        </td>
+                                        <td className="p-2 font-medium tabular-nums">
+                                            {r.inr_value}
+                                        </td>
+                                        <td className="p-2 text-muted-foreground">
+                                            —
+                                        </td>
+                                        <td className="p-2 tabular-nums">
+                                            {r.next_test_date ?? '—'}
+                                        </td>
                                         <td className="p-2 text-right">
                                             {!r.disabled_at && (
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
                                                     className="h-7 text-status-critical"
-                                                    onClick={() => disable(r.id)}
+                                                    onClick={() =>
+                                                        disable(r.id)
+                                                    }
                                                 >
                                                     Disable
                                                 </Button>
@@ -425,7 +497,10 @@ function InrDialog({
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={5} className="p-4 text-center text-muted-foreground">
+                                    <td
+                                        colSpan={5}
+                                        className="p-4 text-center text-muted-foreground"
+                                    >
                                         No INR results recorded.
                                     </td>
                                 </tr>
@@ -456,7 +531,12 @@ function InrDialog({
                     </div>
                     <div className="space-y-1.5">
                         <Label htmlFor="inr-next">Next test</Label>
-                        <Input id="inr-next" type="date" value={nextTest} onChange={(e) => setNextTest(e.target.value)} />
+                        <Input
+                            id="inr-next"
+                            type="date"
+                            value={nextTest}
+                            onChange={(e) => setNextTest(e.target.value)}
+                        />
                     </div>
                     <div className="space-y-1.5">
                         <Label htmlFor="inr-low">Target low</Label>
@@ -497,7 +577,10 @@ function InrDialog({
                             <SelectContent>
                                 <SelectItem value="none">None</SelectItem>
                                 {medications.map((m) => (
-                                    <SelectItem key={m.id} value={m.id.toString()}>
+                                    <SelectItem
+                                        key={m.id}
+                                        value={m.id.toString()}
+                                    >
                                         {m.name}
                                     </SelectItem>
                                 ))}
@@ -506,12 +589,20 @@ function InrDialog({
                     </div>
                     <div className="space-y-1.5 sm:col-span-3">
                         <Label htmlFor="inr-notes">Notes</Label>
-                        <Textarea id="inr-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+                        <Textarea
+                            id="inr-notes"
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            rows={2}
+                        />
                     </div>
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                    >
                         Close
                     </Button>
                     <Button onClick={add} disabled={saving}>
@@ -524,7 +615,13 @@ function InrDialog({
 }
 
 // ─── Syringe driver ──────────────────────────────────────────
-type DriverContent = { client_medication_id: string; name: string; dose: string; unit: string; requires_witness: boolean };
+type DriverContent = {
+    client_medication_id: string;
+    name: string;
+    dose: string;
+    unit: string;
+    requires_witness: boolean;
+};
 
 function SyringeDriverDialog({
     open,
@@ -548,7 +645,13 @@ function SyringeDriverDialog({
     const [site, setSite] = useState('');
     const [notes, setNotes] = useState('');
     const [contents, setContents] = useState<DriverContent[]>([
-        { client_medication_id: 'none', name: '', dose: '', unit: 'mg', requires_witness: false },
+        {
+            client_medication_id: 'none',
+            name: '',
+            dose: '',
+            unit: 'mg',
+            requires_witness: false,
+        },
     ]);
     const [witnessId, setWitnessId] = useState('');
     const [witnessCredential, setWitnessCredential] = useState('');
@@ -558,24 +661,42 @@ function SyringeDriverDialog({
     const needsWitness = contents.some((c) => c.requires_witness);
 
     function updateContent(index: number, patch: Partial<DriverContent>) {
-        setContents((current) => current.map((c, i) => (i === index ? { ...c, ...patch } : c)));
+        setContents((current) =>
+            current.map((c, i) => (i === index ? { ...c, ...patch } : c)),
+        );
     }
 
     function addContent() {
-        setContents((c) => [...c, { client_medication_id: 'none', name: '', dose: '', unit: 'mg', requires_witness: false }]);
+        setContents((c) => [
+            ...c,
+            {
+                client_medication_id: 'none',
+                name: '',
+                dose: '',
+                unit: 'mg',
+                requires_witness: false,
+            },
+        ]);
     }
 
     function removeContent(index: number) {
-        setContents((c) => (c.length > 1 ? c.filter((_, i) => i !== index) : c));
+        setContents((c) =>
+            c.length > 1 ? c.filter((_, i) => i !== index) : c,
+        );
     }
 
     function start() {
         const cleaned = contents
             .map((c) => ({
-                client_medication_id: c.client_medication_id !== 'none' ? Number(c.client_medication_id) : null,
+                client_medication_id:
+                    c.client_medication_id !== 'none'
+                        ? Number(c.client_medication_id)
+                        : null,
                 name:
                     c.client_medication_id !== 'none'
-                        ? medications.find((m) => m.id.toString() === c.client_medication_id)?.name ?? c.name
+                        ? (medications.find(
+                              (m) => m.id.toString() === c.client_medication_id,
+                          )?.name ?? c.name)
                         : c.name.trim(),
                 dose: c.dose.trim() || null,
                 unit: c.unit.trim() || null,
@@ -588,7 +709,9 @@ function SyringeDriverDialog({
             return;
         }
         if (needsWitness && (!witnessId || !witnessCredential)) {
-            toast.error('A controlled-drug syringe driver needs a witness and their password/PIN.');
+            toast.error(
+                'A controlled-drug syringe driver needs a witness and their password/PIN.',
+            );
             return;
         }
 
@@ -623,15 +746,22 @@ function SyringeDriverDialog({
                 <DialogHeader>
                     <DialogTitle>Syringe drivers</DialogTitle>
                     <DialogDescription>
-                        Commence a continuous subcutaneous infusion, record routine checks, and complete the driver.
+                        Commence a continuous subcutaneous infusion, record
+                        routine checks, and complete the driver.
                     </DialogDescription>
                 </DialogHeader>
 
                 {running.length > 0 && (
                     <div className="space-y-2">
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Running</p>
+                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                            Running
+                        </p>
                         {running.map((d) => (
-                            <RunningDriverRow key={d.id} driver={d} staff={staff} />
+                            <RunningDriverRow
+                                key={d.id}
+                                driver={d}
+                                staff={staff}
+                            />
                         ))}
                     </div>
                 )}
@@ -650,11 +780,20 @@ function SyringeDriverDialog({
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="sd-rate">Rate</Label>
-                            <Input id="sd-rate" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="2" />
+                            <Input
+                                id="sd-rate"
+                                value={rate}
+                                onChange={(e) => setRate(e.target.value)}
+                                placeholder="2"
+                            />
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="sd-rate-unit">Unit</Label>
-                            <Input id="sd-rate-unit" value={rateUnit} onChange={(e) => setRateUnit(e.target.value)} />
+                            <Input
+                                id="sd-rate-unit"
+                                value={rateUnit}
+                                onChange={(e) => setRateUnit(e.target.value)}
+                            />
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="sd-duration">Duration (hrs)</Label>
@@ -663,32 +802,53 @@ function SyringeDriverDialog({
                                 type="number"
                                 step="0.5"
                                 value={durationHours}
-                                onChange={(e) => setDurationHours(e.target.value)}
+                                onChange={(e) =>
+                                    setDurationHours(e.target.value)
+                                }
                             />
                         </div>
                         <div className="space-y-1.5 sm:col-span-3">
                             <Label htmlFor="sd-site">Site of insertion</Label>
-                            <Input id="sd-site" value={site} onChange={(e) => setSite(e.target.value)} placeholder="e.g. Left upper arm" />
+                            <Input
+                                id="sd-site"
+                                value={site}
+                                onChange={(e) => setSite(e.target.value)}
+                                placeholder="e.g. Left upper arm"
+                            />
                         </div>
                     </div>
 
                     <div className="space-y-2">
                         <Label>Contents</Label>
                         {contents.map((c, i) => (
-                            <div key={i} className="grid grid-cols-12 items-end gap-2 rounded-md border p-2">
+                            <div
+                                key={i}
+                                className="grid grid-cols-12 items-end gap-2 rounded-md border p-2"
+                            >
                                 <div className="col-span-5 space-y-1">
-                                    <span className="text-[10px] text-muted-foreground">Medication</span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                        Medication
+                                    </span>
                                     <Select
                                         value={c.client_medication_id}
-                                        onValueChange={(v) => updateContent(i, { client_medication_id: v })}
+                                        onValueChange={(v) =>
+                                            updateContent(i, {
+                                                client_medication_id: v,
+                                            })
+                                        }
                                     >
                                         <SelectTrigger className="h-9">
                                             <SelectValue placeholder="Select / other" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="none">Other (type name)</SelectItem>
+                                            <SelectItem value="none">
+                                                Other (type name)
+                                            </SelectItem>
                                             {medications.map((m) => (
-                                                <SelectItem key={m.id} value={m.id.toString()}>
+                                                <SelectItem
+                                                    key={m.id}
+                                                    value={m.id.toString()}
+                                                >
                                                     {m.name}
                                                 </SelectItem>
                                             ))}
@@ -699,30 +859,50 @@ function SyringeDriverDialog({
                                             className="mt-1 h-8"
                                             placeholder="Medication name"
                                             value={c.name}
-                                            onChange={(e) => updateContent(i, { name: e.target.value })}
+                                            onChange={(e) =>
+                                                updateContent(i, {
+                                                    name: e.target.value,
+                                                })
+                                            }
                                         />
                                     )}
                                 </div>
                                 <div className="col-span-2 space-y-1">
-                                    <span className="text-[10px] text-muted-foreground">Dose</span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                        Dose
+                                    </span>
                                     <Input
                                         className="h-9"
                                         value={c.dose}
-                                        onChange={(e) => updateContent(i, { dose: e.target.value })}
+                                        onChange={(e) =>
+                                            updateContent(i, {
+                                                dose: e.target.value,
+                                            })
+                                        }
                                     />
                                 </div>
                                 <div className="col-span-2 space-y-1">
-                                    <span className="text-[10px] text-muted-foreground">Unit</span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                        Unit
+                                    </span>
                                     <Input
                                         className="h-9"
                                         value={c.unit}
-                                        onChange={(e) => updateContent(i, { unit: e.target.value })}
+                                        onChange={(e) =>
+                                            updateContent(i, {
+                                                unit: e.target.value,
+                                            })
+                                        }
                                     />
                                 </div>
                                 <label className="col-span-2 flex items-center gap-1.5 pb-2 text-xs">
                                     <Switch
                                         checked={c.requires_witness}
-                                        onCheckedChange={(checked) => updateContent(i, { requires_witness: checked })}
+                                        onCheckedChange={(checked) =>
+                                            updateContent(i, {
+                                                requires_witness: checked,
+                                            })
+                                        }
                                     />
                                     Controlled
                                 </label>
@@ -739,7 +919,12 @@ function SyringeDriverDialog({
                                 </div>
                             </div>
                         ))}
-                        <Button type="button" size="sm" variant="outline" onClick={addContent}>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={addContent}
+                        >
                             <Plus className="mr-1.5 h-4 w-4" />
                             Add medication
                         </Button>
@@ -749,13 +934,19 @@ function SyringeDriverDialog({
                         <div className="grid grid-cols-2 gap-3 rounded-md border border-status-warning/40 bg-status-warning-bg/40 p-3">
                             <div className="space-y-1.5">
                                 <Label>Witness</Label>
-                                <Select value={witnessId} onValueChange={setWitnessId}>
+                                <Select
+                                    value={witnessId}
+                                    onValueChange={setWitnessId}
+                                >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select witness" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {staff.map((s) => (
-                                            <SelectItem key={s.id} value={s.id.toString()}>
+                                            <SelectItem
+                                                key={s.id}
+                                                value={s.id.toString()}
+                                            >
                                                 {s.name}
                                             </SelectItem>
                                         ))}
@@ -763,12 +954,16 @@ function SyringeDriverDialog({
                                 </Select>
                             </div>
                             <div className="space-y-1.5">
-                                <Label htmlFor="sd-witness-cred">Witness password / PIN</Label>
+                                <Label htmlFor="sd-witness-cred">
+                                    Witness password / PIN
+                                </Label>
                                 <Input
                                     id="sd-witness-cred"
                                     type="password"
                                     value={witnessCredential}
-                                    onChange={(e) => setWitnessCredential(e.target.value)}
+                                    onChange={(e) =>
+                                        setWitnessCredential(e.target.value)
+                                    }
                                 />
                             </div>
                         </div>
@@ -776,12 +971,20 @@ function SyringeDriverDialog({
 
                     <div className="space-y-1.5">
                         <Label htmlFor="sd-notes">Notes</Label>
-                        <Textarea id="sd-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+                        <Textarea
+                            id="sd-notes"
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            rows={2}
+                        />
                     </div>
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                    >
                         Close
                     </Button>
                     <Button onClick={start} disabled={saving}>
@@ -794,7 +997,13 @@ function SyringeDriverDialog({
     );
 }
 
-function RunningDriverRow({ driver, staff }: { driver: SyringeDriver; staff: StaffMember[] }) {
+function RunningDriverRow({
+    driver,
+    staff,
+}: {
+    driver: SyringeDriver;
+    staff: StaffMember[];
+}) {
     const [checkOpen, setCheckOpen] = useState(false);
     const [running, setRunning] = useState(true);
     const [siteCondition, setSiteCondition] = useState('');
@@ -826,7 +1035,11 @@ function RunningDriverRow({ driver, staff }: { driver: SyringeDriver; staff: Sta
 
     function complete(status: 'completed' | 'stopped') {
         if (!window.confirm(`Mark this syringe driver as ${status}?`)) return;
-        router.post(`/emar/syringe-drivers/${driver.id}/complete`, { status }, { preserveScroll: true });
+        router.post(
+            `/emar/syringe-drivers/${driver.id}/complete`,
+            { status },
+            { preserveScroll: true },
+        );
     }
 
     return (
@@ -835,24 +1048,41 @@ function RunningDriverRow({ driver, staff }: { driver: SyringeDriver; staff: Sta
                 <div>
                     <div className="font-medium">
                         Driver #{driver.id}
-                        {driver.rate ? ` • ${driver.rate} ${driver.rate_unit ?? ''}` : ''}
+                        {driver.rate
+                            ? ` • ${driver.rate} ${driver.rate_unit ?? ''}`
+                            : ''}
                     </div>
                     <div className="text-xs text-muted-foreground">
                         {(driver.contents ?? [])
                             .map((c) => (c as { name?: string }).name)
                             .filter(Boolean)
                             .join(', ') || 'No contents recorded'}
-                        {driver.site_of_insertion ? ` • ${driver.site_of_insertion}` : ''}
+                        {driver.site_of_insertion
+                            ? ` • ${driver.site_of_insertion}`
+                            : ''}
                     </div>
                 </div>
                 <div className="flex gap-1.5">
-                    <Button size="sm" variant="outline" onClick={() => setCheckOpen((o) => !o)}>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setCheckOpen((o) => !o)}
+                    >
                         Record check
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => complete('completed')}>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => complete('completed')}
+                    >
                         Complete
                     </Button>
-                    <Button size="sm" variant="ghost" className="text-status-critical" onClick={() => complete('stopped')}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-status-critical"
+                        onClick={() => complete('stopped')}
+                    >
                         Stop
                     </Button>
                 </div>
@@ -861,14 +1091,21 @@ function RunningDriverRow({ driver, staff }: { driver: SyringeDriver; staff: Sta
                 <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3">
                     <label className="col-span-2 flex items-center justify-between rounded-md border p-2 text-xs">
                         <span className="font-medium">Infusion running</span>
-                        <Switch checked={running} onCheckedChange={setRunning} />
+                        <Switch
+                            checked={running}
+                            onCheckedChange={setRunning}
+                        />
                     </label>
                     <Input
                         placeholder="Site condition"
                         value={siteCondition}
                         onChange={(e) => setSiteCondition(e.target.value)}
                     />
-                    <Input placeholder="Volume remaining" value={volume} onChange={(e) => setVolume(e.target.value)} />
+                    <Input
+                        placeholder="Volume remaining"
+                        value={volume}
+                        onChange={(e) => setVolume(e.target.value)}
+                    />
                     <Input
                         className="col-span-2"
                         placeholder="Notes"
@@ -898,12 +1135,20 @@ function ChartSettingsDialog({
     client: { id: number };
     settings: Settings;
 }) {
-    const [suppress, setSuppress] = useState(Boolean(settings.suppress_med_admin_alerts));
-    const [reason, setReason] = useState(settings.med_alerts_suppressed_reason ?? '');
+    const [suppress, setSuppress] = useState(
+        Boolean(settings.suppress_med_admin_alerts),
+    );
+    const [reason, setReason] = useState(
+        settings.med_alerts_suppressed_reason ?? '',
+    );
     const [suppressBasis, setSuppressBasis] = useState('');
     const [careLevel, setCareLevel] = useState(settings.care_level ?? 'none');
-    const [interval, setInterval] = useState((settings.chart_review_interval_months ?? 3).toString());
-    const [nextReview, setNextReview] = useState(settings.next_chart_review_date ?? '');
+    const [interval, setInterval] = useState(
+        (settings.chart_review_interval_months ?? 3).toString(),
+    );
+    const [nextReview, setNextReview] = useState(
+        settings.next_chart_review_date ?? '',
+    );
     const [saving, setSaving] = useState(false);
 
     function saveSuppression() {
@@ -917,8 +1162,16 @@ function ChartSettingsDialog({
         }
         router.post(
             `/emar/clients/${client.id}/alert-suppression`,
-            { suppress_med_admin_alerts: suppress, reason: reason.trim() || null, basis: suppressBasis || null },
-            { preserveScroll: true, onStart: () => setSaving(true), onFinish: () => setSaving(false) },
+            {
+                suppress_med_admin_alerts: suppress,
+                reason: reason.trim() || null,
+                basis: suppressBasis || null,
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+            },
         );
     }
 
@@ -945,7 +1198,8 @@ function ChartSettingsDialog({
                 <DialogHeader>
                     <DialogTitle>Medication chart settings</DialogTitle>
                     <DialogDescription>
-                        Care level, chart review cadence, and whether due/overdue medication alerts are suppressed.
+                        Care level, chart review cadence, and whether
+                        due/overdue medication alerts are suppressed.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -954,25 +1208,41 @@ function ChartSettingsDialog({
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="flex items-center gap-1.5 text-sm font-medium">
-                                    <BellOff className="h-4 w-4" /> Suppress med-admin alerts
+                                    <BellOff className="h-4 w-4" /> Suppress
+                                    med-admin alerts
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                    For independent residents or extended social leave.
+                                    For independent residents or extended social
+                                    leave.
                                 </p>
                             </div>
-                            <Switch checked={suppress} onCheckedChange={setSuppress} />
+                            <Switch
+                                checked={suppress}
+                                onCheckedChange={setSuppress}
+                            />
                         </div>
                         {suppress && (
                             <>
-                                <Select value={suppressBasis} onValueChange={setSuppressBasis}>
+                                <Select
+                                    value={suppressBasis}
+                                    onValueChange={setSuppressBasis}
+                                >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Basis for suppression (required)" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="capacity_assessment">Capacity assessment</SelectItem>
-                                        <SelectItem value="mdt_decision">MDT decision</SelectItem>
-                                        <SelectItem value="clinical_judgement">Clinical judgement</SelectItem>
-                                        <SelectItem value="client_preference">Client preference</SelectItem>
+                                        <SelectItem value="capacity_assessment">
+                                            Capacity assessment
+                                        </SelectItem>
+                                        <SelectItem value="mdt_decision">
+                                            MDT decision
+                                        </SelectItem>
+                                        <SelectItem value="clinical_judgement">
+                                            Clinical judgement
+                                        </SelectItem>
+                                        <SelectItem value="client_preference">
+                                            Client preference
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <Textarea
@@ -984,7 +1254,12 @@ function ChartSettingsDialog({
                             </>
                         )}
                         <div className="flex justify-end">
-                            <Button size="sm" variant="outline" onClick={saveSuppression} disabled={saving}>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={saveSuppression}
+                                disabled={saving}
+                            >
                                 Save suppression
                             </Button>
                         </div>
@@ -993,14 +1268,22 @@ function ChartSettingsDialog({
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="space-y-1.5">
                             <Label>Care level</Label>
-                            <Select value={careLevel} onValueChange={setCareLevel}>
+                            <Select
+                                value={careLevel}
+                                onValueChange={setCareLevel}
+                            >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Not set" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="none">Not set</SelectItem>
+                                    <SelectItem value="none">
+                                        Not set
+                                    </SelectItem>
                                     {CARE_LEVELS.map((c) => (
-                                        <SelectItem key={c.value} value={c.value}>
+                                        <SelectItem
+                                            key={c.value}
+                                            value={c.value}
+                                        >
                                             {c.label}
                                         </SelectItem>
                                     ))}
@@ -1008,7 +1291,9 @@ function ChartSettingsDialog({
                             </Select>
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="cs-interval">Review interval (months)</Label>
+                            <Label htmlFor="cs-interval">
+                                Review interval (months)
+                            </Label>
                             <Input
                                 id="cs-interval"
                                 type="number"
@@ -1031,7 +1316,10 @@ function ChartSettingsDialog({
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                    >
                         Close
                     </Button>
                     <Button onClick={saveSettings} disabled={saving}>

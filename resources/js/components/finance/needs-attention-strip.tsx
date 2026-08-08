@@ -60,9 +60,13 @@ export function NeedsAttentionStrip({
         <section className={cn('space-y-3', className)}>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <AlertTriangle className="h-[18px] w-[18px] text-status-warning" />
-                <h2 className="text-sm font-bold tracking-tight">Needs attention</h2>
+                <h2 className="text-sm font-bold tracking-tight">
+                    Needs attention
+                </h2>
                 {subtitle ? (
-                    <span className="text-[12px] text-muted-foreground">{subtitle}</span>
+                    <span className="text-[12px] text-muted-foreground">
+                        {subtitle}
+                    </span>
                 ) : null}
                 {viewAllHref ? (
                     <Link
@@ -93,7 +97,9 @@ export function NeedsAttentionStrip({
                                 <Icon className="h-[15px] w-[15px]" />
                             </span>
                             <div className="min-w-0 flex-1">
-                                <div className="text-[13px] font-bold tracking-tight">{item.title}</div>
+                                <div className="text-[13px] font-bold tracking-tight">
+                                    {item.title}
+                                </div>
                                 <div className="mt-0.5 text-[11.8px] leading-snug text-muted-foreground">
                                     {item.body}
                                 </div>
@@ -109,7 +115,11 @@ export function NeedsAttentionStrip({
                         </div>
                     );
                     return item.href ? (
-                        <Link key={item.id} href={item.href} className="block transition-transform hover:-translate-y-px">
+                        <Link
+                            key={item.id}
+                            href={item.href}
+                            className="block transition-transform hover:-translate-y-px"
+                        >
                             {card}
                         </Link>
                     ) : (

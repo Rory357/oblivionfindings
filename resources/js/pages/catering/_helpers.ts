@@ -68,20 +68,30 @@ export function tagBadgeStyle(tag: DietaryTag): React.CSSProperties {
     };
 }
 
-export function formatMoneyFromCents(cents: number | null | undefined, currency = 'NZD'): string {
+export function formatMoneyFromCents(
+    cents: number | null | undefined,
+    currency = 'NZD',
+): string {
     if (cents === null || cents === undefined) return '—';
     const value = cents / 100;
     try {
-        return new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(value);
+        return new Intl.NumberFormat('en-NZ', {
+            style: 'currency',
+            currency,
+        }).format(value);
     } catch {
         return `${currency} ${value.toFixed(2)}`;
     }
 }
 
-export function formatQuantity(qty: number | string | null | undefined, unit: string | null): string {
+export function formatQuantity(
+    qty: number | string | null | undefined,
+    unit: string | null,
+): string {
     if (qty === null || qty === undefined) return '—';
     const n = typeof qty === 'string' ? parseFloat(qty) : qty;
     if (Number.isNaN(n)) return '—';
-    const stripped = n % 1 === 0 ? n.toFixed(0) : n.toFixed(2).replace(/\.?0+$/, '');
+    const stripped =
+        n % 1 === 0 ? n.toFixed(0) : n.toFixed(2).replace(/\.?0+$/, '');
     return unit ? `${stripped} ${unit}` : stripped;
 }

@@ -105,7 +105,7 @@ final class MonitorCheckRunner
         }
 
         if (in_array($monitor->kind, [MonitorKind::SshInventory, MonitorKind::WinRmInventory], true)
-            && in_array($observation->state, [MonitorState::Healthy, MonitorState::Degraded], true)) {
+            && $observation->state === MonitorState::Healthy) {
             $this->snapshots->captureFromInventory(
                 $monitor->device,
                 $siteId,

@@ -97,6 +97,9 @@ type Props = {
     healthcareWorkspace?: HealthcareWorkspaceData | null;
     trackingWorkspace?: TrackingWorkspaceData | null;
     bulkManagement?: BulkManagementWorkspaceData | null;
+    can: {
+        registerDevice: boolean;
+    };
 };
 
 // ── Icon map ──────────────────────────────────────────────────────
@@ -155,6 +158,27 @@ export function CategorySearchInput({
     );
 }
 
+export function CategoryRegisterAction({
+    canRegister,
+    href,
+    label,
+}: {
+    canRegister: boolean;
+    href: string;
+    label: string;
+}) {
+    if (!canRegister) return null;
+
+    return (
+        <Button asChild size="sm" className="frontline-focus min-h-11">
+            <Link href={href}>
+                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                {label}
+            </Link>
+        </Button>
+    );
+}
+
 // ── Component ─────────────────────────────────────────────────────
 
 export default function CategoryPage({
@@ -170,6 +194,7 @@ export default function CategoryPage({
     healthcareWorkspace,
     trackingWorkspace,
     bulkManagement,
+    can,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
@@ -225,14 +250,11 @@ export default function CategoryPage({
                     }
                     description={pageConfig.description}
                     actions={
-                        <Button asChild size="sm">
-                            <Link
-                                href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
-                            >
-                                <Plus className="mr-2 h-4 w-4" />
-                                {registerLabel}
-                            </Link>
-                        </Button>
+                        <CategoryRegisterAction
+                            canRegister={can.registerDevice}
+                            href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
+                            label={registerLabel}
+                        />
                     }
                 />
 
@@ -470,13 +492,13 @@ export default function CategoryPage({
                                             pageConfig.emptyDescription
                                         }
                                         action={
-                                            <Button asChild size="sm">
-                                                <Link
-                                                    href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
-                                                >
-                                                    {registerLabel}
-                                                </Link>
-                                            </Button>
+                                            <CategoryRegisterAction
+                                                canRegister={
+                                                    can.registerDevice
+                                                }
+                                                href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
+                                                label={registerLabel}
+                                            />
                                         }
                                     />
                                 )}

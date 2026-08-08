@@ -259,49 +259,14 @@ class DeviceAssignmentControllerTest extends TestCase
             ->assertSessionHas('info');
     }
 
-    // ── History ───────────────────────────────────────────────────
+    // ── Canonical assignment-history ownership ───────────────────
 
-    public function test_history_requires_authentication(): void
+    public function test_orphan_assignment_json_route_is_not_registered(): void
     {
         $device = Device::factory()->create([]);
-        $this->getJson("/security-devices/devices/{$device->id}/assignments")->assertUnauthorized();
-    }
-
-    public function test_history_returns_assignment_records(): void
-    {
-        $device = Device::factory()->create([]);
-        $siteA = Site::factory()->create([]);
-        $siteB = Site::factory()->create([]);
-
-        DeviceAssignment::create([
-            'device_id' => $device->id,
-            'assignable_type' => 'site',
-            'assignable_id' => $siteA->id,
-            'assigned_at' => now()->subDays(30),
-            'released_at' => now()->subDays(5),
-            'assigned_by_user_id' => $this->admin->id,
-            'released_by_user_id' => $this->admin->id,
-        ]);
-
-        DeviceAssignment::create([
-            'device_id' => $device->id,
-            'assignable_type' => 'site',
-            'assignable_id' => $siteB->id,
-            'assigned_at' => now(),
-            'assigned_by_user_id' => $this->admin->id,
-        ]);
-
-        $response = $this->actingAs($this->admin)
-            ->getJson("/security-devices/devices/{$device->id}/assignments");
-
-        $response->assertOk();
-        $data = $response->json('data');
-        $this->assertCount(2, $data);
-
-        // Newest first
-        $this->assertTrue($data[0]['is_active']);
-        $this->assertFalse($data[1]['is_active']);
-        $this->assertNotNull($data[1]['released_at']);
+        $this->actingAs($this->admin)
+            ->getJson("/security-devices/devices/{$device->id}/assignments")
+            ->assertNotFound();
     }
 
     // ── Show page includes assignment data ────────────────────────

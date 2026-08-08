@@ -114,7 +114,8 @@ export function RequestReplacementDialog({
                         onClick={() =>
                             onConfirm(shift, {
                                 reason: reason.trim(),
-                                notes: notes.trim() === '' ? null : notes.trim(),
+                                notes:
+                                    notes.trim() === '' ? null : notes.trim(),
                             })
                         }
                     >

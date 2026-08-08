@@ -212,7 +212,7 @@ class CategoryPageController extends Controller
                 ],
             ],
             'stats' => $stats,
-            'filters' => $request->only(['tab', 'device_id', 'subcategory', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction', 'history_kind', 'severity', 'event_type', 'source']),
+            'filters' => $request->only(['tab', 'device_id', 'subcategory', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction', 'history_kind', 'severity', 'event_type', 'source', 'attention']),
             'filterOptions' => [
                 'subcategories' => $subcategories,
                 'categories' => $categoryOptions,
@@ -254,7 +254,12 @@ class CategoryPageController extends Controller
                 ? $this->networkItWorkspacePresenter->present($user, clone $baseScope, $activeTab)
                 : null,
             'trackingWorkspace' => $slug === 'tracking'
-                ? $this->trackingWorkspacePresenter->present($user, clone $baseScope, $activeTab)
+                ? $this->trackingWorkspacePresenter->present(
+                    $user,
+                    clone $baseScope,
+                    $activeTab,
+                    $request->only(['attention']),
+                )
                 : null,
             'bulkManagement' => $activeTab['key'] === 'management'
                 && collect($activeTab['requiredAnyPermission'] ?? [])->contains(
@@ -262,6 +267,9 @@ class CategoryPageController extends Controller
                 )
                     ? $this->bulkDeviceCommandPresenter->present($user, clone $baseScope, $slug)
                     : null,
+            'can' => [
+                'registerDevice' => $user->canDo('securityDevices.devices.create'),
+            ],
         ]);
     }
 

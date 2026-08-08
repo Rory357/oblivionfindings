@@ -1,8 +1,17 @@
 import { Badge } from '@/components/ui/badge';
-import { Clock, CalendarCheck, Play, CheckCircle2, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import {
+    CalendarCheck,
+    CheckCircle2,
+    Clock,
+    Play,
+    XCircle,
+} from 'lucide-react';
 
-const config: Record<string, { label: string; className: string; icon: LucideIcon }> = {
+const config: Record<
+    string,
+    { label: string; className: string; icon: LucideIcon }
+> = {
     draft: {
         label: 'Draft',
         className: 'border-border text-muted-foreground bg-muted',
@@ -15,17 +24,20 @@ const config: Record<string, { label: string; className: string; icon: LucideIco
     },
     in_progress: {
         label: 'In Progress',
-        className: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         icon: Play,
     },
     completed: {
         label: 'Completed',
-        className: 'border-status-success/30 text-status-success bg-status-success-bg',
+        className:
+            'border-status-success/30 text-status-success bg-status-success-bg',
         icon: CheckCircle2,
     },
     cancelled: {
         label: 'Cancelled',
-        className: 'border-status-critical/30 text-status-critical bg-status-critical-bg',
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical-bg',
         icon: XCircle,
     },
 };
@@ -36,7 +48,11 @@ interface ShiftStatusBadgeProps {
     className?: string;
 }
 
-export function ShiftStatusBadge({ status, showIcon = false, className = '' }: ShiftStatusBadgeProps) {
+export function ShiftStatusBadge({
+    status,
+    showIcon = false,
+    className = '',
+}: ShiftStatusBadgeProps) {
     const c = config[status] ?? { label: status, className: '', icon: Clock };
     const Icon = c.icon;
 

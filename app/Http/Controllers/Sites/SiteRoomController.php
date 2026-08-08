@@ -8,13 +8,14 @@ use App\Models\ClientPersonalAsset;
 use App\Models\Site;
 use App\Models\SiteHouseRoom;
 use App\Services\Sites\SiteClientPlacementService;
+use App\Services\Sites\SitePhysicalRoomService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class SiteRoomController extends Controller
 {
     public function __construct(
         private readonly SiteClientPlacementService $placements,
+        private readonly SitePhysicalRoomService $physicalRooms,
     ) {}
 
     public function index(Request $request, Site $site)
@@ -97,6 +98,7 @@ class SiteRoomController extends Controller
 
                 return [
                     'id' => $r->id,
+                    'site_room_id' => $r->site_room_id,
                     'name' => $r->name,
                     'notes' => $r->notes,
                     'is_active' => (bool) $r->is_active,
@@ -214,17 +216,18 @@ class SiteRoomController extends Controller
         ];
 
         foreach ($defaults as $index => $room) {
-            SiteHouseRoom::query()->updateOrCreate(
-                [
-                    'site_id' => $site->id,
-                    'name' => $room['name'],
-                ],
-                [
-                    'is_active' => true,
-                    'is_assignable' => $room['assignable'],
-                    'sort_order' => $index + 1,
-                ],
-            );
+            $existing = SiteHouseRoom::query()
+                ->where('site_id', $site->id)
+                ->where('name', $room['name'])
+                ->first();
+            $payload = [
+                'is_active' => true,
+                'is_assignable' => $room['assignable'],
+                'sort_order' => $index + 1,
+            ];
+            $existing
+                ? $this->physicalRooms->updateResidentialRoom($site, $existing, $payload, $request->user())
+                : $this->physicalRooms->createResidentialRoom($site, ['name' => $room['name'], ...$payload]);
         }
 
         return back()->with('success', 'Standard rooms added.');
@@ -244,9 +247,8 @@ class SiteRoomController extends Controller
             ? (bool) $validated['is_assignable']
             : true;
 
-        SiteHouseRoom::create([
+        $this->physicalRooms->createResidentialRoom($site, [
             ...$validated,
-            'site_id' => $site->id,
             'is_active' => true,
             'is_assignable' => $isAssignable,
         ]);
@@ -265,15 +267,7 @@ class SiteRoomController extends Controller
             'is_assignable' => 'nullable|boolean',
         ]);
 
-        // If the room is being flipped to non-assignable, clear any active
-        // occupant and close their history row in one go.
-        if (array_key_exists('is_assignable', $validated) && ! $validated['is_assignable']) {
-            if ($room->assigned_client_id) {
-                $this->placements->assignRoom($site, $room, null, $request->user());
-            }
-        }
-
-        $room->update($validated);
+        $this->physicalRooms->updateResidentialRoom($site, $room, $validated, $request->user());
 
         return redirect()->back()->with('success', 'Bedroom updated.');
     }
@@ -283,10 +277,7 @@ class SiteRoomController extends Controller
         $this->authorize('update', $site);
         abort_unless($room->site_id === $site->id, 404);
 
-        if ($room->assigned_client_id) {
-            $this->placements->assignRoom($site, $room, null, $request->user());
-        }
-        $room->update(['is_active' => false]);
+        $this->physicalRooms->deactivateResidentialRoom($site, $room, $request->user());
 
         return redirect()->back()->with('success', 'Bedroom deactivated.');
     }
@@ -333,10 +324,7 @@ class SiteRoomController extends Controller
         ]);
 
         $asset = Asset::query()->findOrFail($validated['asset_id']);
-        abort_unless($asset->site_id === $site->id, 422, 'Asset belongs to another site.');
-
-        $asset->room_id = $room->id;
-        $asset->save();
+        $this->physicalRooms->placeAsset($site, $room, $asset);
 
         return back()->with('success', 'Asset attached to room.');
     }
@@ -345,11 +333,7 @@ class SiteRoomController extends Controller
     {
         $this->authorize('update', $site);
         abort_unless($room->site_id === $site->id, 404);
-        abort_unless($asset->site_id === $site->id, 404);
-        abort_unless($asset->room_id === $room->id, 404);
-
-        $asset->room_id = null;
-        $asset->save();
+        $this->physicalRooms->removeAsset($site, $room, $asset);
 
         return back()->with('success', 'Asset removed from bedroom.');
     }
@@ -368,14 +352,7 @@ class SiteRoomController extends Controller
             'ordered_ids.*' => ['integer', 'distinct', 'exists:site_house_rooms,id'],
         ]);
 
-        DB::transaction(function () use ($validated, $site) {
-            foreach ($validated['ordered_ids'] as $index => $id) {
-                SiteHouseRoom::query()
-                    ->where('site_id', $site->id)
-                    ->whereKey($id)
-                    ->update(['sort_order' => $index + 1]);
-            }
-        });
+        $this->physicalRooms->reorderResidentialRooms($site, $validated['ordered_ids']);
 
         return back()->with('success', 'Bedroom order updated.');
     }
@@ -416,7 +393,7 @@ class SiteRoomController extends Controller
         $this->authorize('update', $site);
         abort_unless($room->site_id === $site->id, 404);
 
-        $room->update(['is_active' => true]);
+        $this->physicalRooms->restoreResidentialRoom($site, $room);
 
         return back()->with('success', 'Bedroom restored.');
     }

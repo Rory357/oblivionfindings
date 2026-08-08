@@ -1,11 +1,10 @@
-import { Head, Link } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { AlertTriangle } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, Link } from '@inertiajs/react';
 
 interface LogEntry {
     id: number;
@@ -56,7 +55,10 @@ export default function BankFeedLogs({ feed, logs }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Bank Feeds', href: '/finance/bank-feeds' },
-        { title: `${feed.bank_account_name} Logs`, href: `/finance/bank-feeds/${feed.id}/logs` },
+        {
+            title: `${feed.bank_account_name} Logs`,
+            href: `/finance/bank-feeds/${feed.id}/logs`,
+        },
     ];
 
     return (
@@ -65,7 +67,8 @@ export default function BankFeedLogs({ feed, logs }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/bank-feeds"
                         title="Sync Logs"
@@ -73,11 +76,12 @@ export default function BankFeedLogs({ feed, logs }: Props) {
                     />
                 }
             >
-
                 {logs.data.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                            <h3 className="text-lg font-medium text-foreground mb-1">No sync logs</h3>
+                            <h3 className="mb-1 text-lg font-medium text-foreground">
+                                No sync logs
+                            </h3>
                             <p className="text-muted-foreground">
                                 This bank feed has not been synced yet.
                             </p>
@@ -91,39 +95,70 @@ export default function BankFeedLogs({ feed, logs }: Props) {
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b bg-muted/50">
-                                                <th className="text-left font-medium px-4 py-3">Synced At</th>
-                                                <th className="text-left font-medium px-4 py-3">Status</th>
-                                                <th className="text-right font-medium px-4 py-3">Fetched</th>
-                                                <th className="text-right font-medium px-4 py-3">Imported</th>
-                                                <th className="text-right font-medium px-4 py-3">Skipped</th>
-                                                <th className="text-right font-medium px-4 py-3">Duration</th>
-                                                <th className="text-left font-medium px-4 py-3">Error</th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Synced At
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Status
+                                                </th>
+                                                <th className="px-4 py-3 text-right font-medium">
+                                                    Fetched
+                                                </th>
+                                                <th className="px-4 py-3 text-right font-medium">
+                                                    Imported
+                                                </th>
+                                                <th className="px-4 py-3 text-right font-medium">
+                                                    Skipped
+                                                </th>
+                                                <th className="px-4 py-3 text-right font-medium">
+                                                    Duration
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Error
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {logs.data.map((log) => {
                                                 return (
-                                                    <tr key={log.id} className="border-b last:border-0 hover:bg-muted/25">
+                                                    <tr
+                                                        key={log.id}
+                                                        className="border-b last:border-0 hover:bg-muted/25"
+                                                    >
                                                         <td className="px-4 py-3 font-mono text-xs">
                                                             {log.synced_at}
                                                         </td>
                                                         <td className="px-4 py-3">
-                                                            <StatusBadge status={log.status} size="sm" />
+                                                            <StatusBadge
+                                                                status={
+                                                                    log.status
+                                                                }
+                                                                size="sm"
+                                                            />
                                                         </td>
                                                         <td className="px-4 py-3 text-right font-mono tabular-nums">
-                                                            {log.transactions_fetched}
+                                                            {
+                                                                log.transactions_fetched
+                                                            }
                                                         </td>
                                                         <td className="px-4 py-3 text-right font-mono tabular-nums">
-                                                            {log.transactions_imported}
+                                                            {
+                                                                log.transactions_imported
+                                                            }
                                                         </td>
                                                         <td className="px-4 py-3 text-right font-mono tabular-nums">
-                                                            {log.transactions_skipped}
+                                                            {
+                                                                log.transactions_skipped
+                                                            }
                                                         </td>
-                                                        <td className="px-4 py-3 text-right font-mono tabular-nums text-xs">
-                                                            {formatDuration(log.duration_ms)}
+                                                        <td className="px-4 py-3 text-right font-mono text-xs tabular-nums">
+                                                            {formatDuration(
+                                                                log.duration_ms,
+                                                            )}
                                                         </td>
-                                                        <td className="px-4 py-3 text-destructive max-w-xs truncate">
-                                                            {log.error_message || '-'}
+                                                        <td className="max-w-xs truncate px-4 py-3 text-destructive">
+                                                            {log.error_message ||
+                                                                '-'}
                                                         </td>
                                                     </tr>
                                                 );
@@ -135,11 +170,13 @@ export default function BankFeedLogs({ feed, logs }: Props) {
                         </Card>
 
                         {logs.last_page > 1 && (
-                            <div className="flex items-center justify-center gap-2 mt-4">
+                            <div className="mt-4 flex items-center justify-center gap-2">
                                 {logs.links.map((link, index) => (
                                     <Button
                                         key={index}
-                                        variant={link.active ? 'default' : 'outline'}
+                                        variant={
+                                            link.active ? 'default' : 'outline'
+                                        }
                                         size="sm"
                                         disabled={!link.url}
                                         asChild={!!link.url}
@@ -147,10 +184,16 @@ export default function BankFeedLogs({ feed, logs }: Props) {
                                         {link.url ? (
                                             <Link
                                                 href={link.url}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
+                                                dangerouslySetInnerHTML={{
+                                                    __html: link.label,
+                                                }}
                                             />
                                         ) : (
-                                            <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                            <span
+                                                dangerouslySetInnerHTML={{
+                                                    __html: link.label,
+                                                }}
+                                            />
                                         )}
                                     </Button>
                                 ))}

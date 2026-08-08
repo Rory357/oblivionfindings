@@ -15,6 +15,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -38,6 +39,7 @@ class SecurityWorkspacePresenter
         private readonly SecurityDevicesAccessService $access,
         private readonly UserSiteAccessService $siteAccess,
         private readonly AccessControlWorkspacePresenter $accessControlPresenter,
+        private readonly ControlRoomAlertAccessService $controlRoomAccess,
     ) {}
 
     public function present(User $viewer, Builder $securityScope, array $activeTab): array
@@ -46,6 +48,7 @@ class SecurityWorkspacePresenter
         $canViewMaintenance = $viewer->canDo('securityDevices.maintenance.view');
         $canViewControlRoom = $viewer->canDo('controlRoom.viewAny')
             || $viewer->canDo('controlRoom.alerts.view');
+        $canOpenControlRoomQueue = $viewer->canDo('controlRoom.viewAny');
         $canViewMedia = $viewer->canDo('securityDevices.cctv.media.view');
 
         $activeScope = clone $securityScope;
@@ -88,6 +91,7 @@ class SecurityWorkspacePresenter
                 ->limit(self::EVENT_LIMIT)
                 ->get()
             : collect();
+        $readableAlertIds = $this->controlRoomAccess->readableIds($alerts, $viewer);
 
         $restricted = isset($activeTab['requiredPermission'])
             && ! $viewer->canDo($activeTab['requiredPermission']);
@@ -105,6 +109,7 @@ class SecurityWorkspacePresenter
                 $canViewEvents,
                 $canViewMaintenance,
                 $canViewControlRoom,
+                $canOpenControlRoomQueue,
             ),
             'activeTab' => [
                 'key' => $activeTab['key'],
@@ -127,7 +132,10 @@ class SecurityWorkspacePresenter
                     : $events->map(fn (DeviceEvent $event) => $this->mapEvent($event))->values(),
                 'controlRoomAlerts' => $restricted
                     ? []
-                    : $alerts->map(fn (ControlRoomAlert $alert) => $this->mapAlert($alert))->values(),
+                    : $alerts->map(fn (ControlRoomAlert $alert) => $this->mapAlert(
+                        $alert,
+                        $readableAlertIds->contains((int) $alert->id),
+                    ))->values(),
                 'accessControl' => $activeTab['key'] === 'access-control'
                     ? $this->accessControlPresenter->present($viewer, clone $activeScope)
                     : null,
@@ -141,6 +149,7 @@ class SecurityWorkspacePresenter
         bool $canViewEvents,
         bool $canViewMaintenance,
         bool $canViewControlRoom,
+        bool $canOpenControlRoomQueue,
     ): array {
         $total = (clone $scope)->count();
         $cctv = (clone $scope)->where('category', 'cctv')->count();
@@ -187,7 +196,7 @@ class SecurityWorkspacePresenter
                 'Security devices without monitoring',
                 $unmonitoredDevices,
                 'Add an approved native monitor or confirm why monitoring is unsupported.',
-                '/security-devices/devices?domain=security&monitoring=unmonitored',
+                '/security-devices/devices?domain=security&view=unmonitored',
             ),
             $canViewEvents ? $this->action(
                 'unprocessed_events',
@@ -201,9 +210,9 @@ class SecurityWorkspacePresenter
                 'Overdue security maintenance',
                 $overdueMaintenance ?? 0,
                 'Schedule or complete overdue inspections and repairs.',
-                '/security-devices/maintenance-health?status=overdue&domain=security',
+                '/security-devices/maintenance?status=overdue&domain=security',
             ) : null,
-            $canViewControlRoom ? $this->action(
+            $canOpenControlRoomQueue ? $this->action(
                 'active_control_room_alerts',
                 'Active Control Room alerts',
                 $activeControlRoomAlerts ?? 0,
@@ -604,8 +613,22 @@ class SecurityWorkspacePresenter
         ];
     }
 
-    private function mapAlert(ControlRoomAlert $alert): array
+    private function mapAlert(ControlRoomAlert $alert, bool $readable): array
     {
+        if (! $readable) {
+            return [
+                'id' => $alert->id,
+                'reference' => null,
+                'title' => 'Control Room alert',
+                'severity' => null,
+                'status' => null,
+                'triggeredAt' => null,
+                'canonicalDeviceId' => null,
+                'href' => null,
+                'access' => $this->controlRoomAlertAccess(false),
+            ];
+        }
+
         return [
             'id' => $alert->id,
             'reference' => $alert->reference_number,
@@ -615,6 +638,18 @@ class SecurityWorkspacePresenter
             'triggeredAt' => $alert->triggered_at?->toISOString(),
             'canonicalDeviceId' => $alert->device?->canonical_device_id,
             'href' => "/control-room/alerts/{$alert->id}",
+            'access' => $this->controlRoomAlertAccess(true),
+        ];
+    }
+
+    /** @return array{state: string, label: string} */
+    private function controlRoomAlertAccess(bool $readable): array
+    {
+        return [
+            'state' => $readable ? 'available' : 'restricted',
+            'label' => $readable
+                ? 'Open Control Room alert'
+                : 'Control Room alert access required',
         ];
     }
 }

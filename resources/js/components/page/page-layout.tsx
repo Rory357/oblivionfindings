@@ -41,10 +41,18 @@ export function PageLayout({
     className,
 }: PageLayoutProps) {
     return (
-        <div className={cn('flex w-full flex-col gap-6', PADDING[padding], className)}>
+        <div
+            className={cn(
+                'flex w-full flex-col gap-6',
+                PADDING[padding],
+                className,
+            )}
+        >
             {hero}
             {tabs}
-            {children ? <PageContent width={width}>{children}</PageContent> : null}
+            {children ? (
+                <PageContent width={width}>{children}</PageContent>
+            ) : null}
         </div>
     );
 }

@@ -1,10 +1,13 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import {
+    CashFlowForecastDialog,
+    ConfirmDialog,
+    ReportsTabsFooter,
+    formatMoney,
+} from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
-import { CashFlowForecastDialog, ConfirmDialog, ReportsTabsFooter, formatMoney } from '@/components/finance';
 import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     Table,
     TableBody,
@@ -13,8 +16,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Plus, TrendingUp, Trash2, FileBarChart } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { FileBarChart, Plus, Trash2, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 
 type Forecast = {
@@ -44,7 +49,11 @@ type PageProps = {
 };
 
 const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(dateStr).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 
 const periodTypeLabels: Record<string, string> = {
     weekly: 'Weekly',
@@ -57,7 +66,10 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Cash Flow Forecast', href: '/finance/cash-flow-forecast' },
 ];
 
-export default function CashFlowForecastIndex({ forecasts, canManage = false }: PageProps) {
+export default function CashFlowForecastIndex({
+    forecasts,
+    canManage = false,
+}: PageProps) {
     const [createOpen, setCreateOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<Forecast | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -77,7 +89,8 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={TrendingUp}
                         title="Cash Flow Forecast"
                         description="Project future cash positions based on outstanding invoices, bills, and recurring transactions"
@@ -85,11 +98,15 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
                             { label: 'Total', value: forecasts.data.length },
                             {
                                 label: 'Final',
-                                value: forecasts.data.filter((f) => f.status === 'final').length,
+                                value: forecasts.data.filter(
+                                    (f) => f.status === 'final',
+                                ).length,
                             },
                             {
                                 label: 'Draft',
-                                value: forecasts.data.filter((f) => f.status === 'draft').length,
+                                value: forecasts.data.filter(
+                                    (f) => f.status === 'draft',
+                                ).length,
                             },
                         ]}
                         actions={
@@ -100,7 +117,9 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
                                 </Button>
                             )
                         }
-                        footer={<ReportsTabsFooter active="cash-flow-forecast" />}
+                        footer={
+                            <ReportsTabsFooter active="cash-flow-forecast" />
+                        }
                     />
                 }
             >
@@ -114,15 +133,22 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
                     <CardContent>
                         {forecasts.data.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-16 text-center">
-                                <div className="rounded-full bg-muted p-4 mb-4">
+                                <div className="mb-4 rounded-full bg-muted p-4">
                                     <FileBarChart className="h-8 w-8 text-muted-foreground" />
                                 </div>
-                                <h3 className="text-lg font-semibold">No forecasts yet</h3>
-                                <p className="text-muted-foreground mt-1 max-w-sm">
-                                    Create your first cash flow forecast to project future cash positions and plan ahead.
+                                <h3 className="text-lg font-semibold">
+                                    No forecasts yet
+                                </h3>
+                                <p className="mt-1 max-w-sm text-muted-foreground">
+                                    Create your first cash flow forecast to
+                                    project future cash positions and plan
+                                    ahead.
                                 </p>
                                 {canManage && (
-                                    <Button className="mt-4" onClick={() => setCreateOpen(true)}>
+                                    <Button
+                                        className="mt-4"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
                                         <Plus className="mr-2 h-4 w-4" />
                                         New Forecast
                                     </Button>
@@ -136,7 +162,9 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
                                             <TableHead>Name</TableHead>
                                             <TableHead>Period</TableHead>
                                             <TableHead>Type</TableHead>
-                                            <TableHead className="text-right">Opening Balance</TableHead>
+                                            <TableHead className="text-right">
+                                                Opening Balance
+                                            </TableHead>
                                             <TableHead>Scenarios</TableHead>
                                             <TableHead>Status</TableHead>
                                             <TableHead>Created</TableHead>
@@ -149,42 +177,85 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
                                                 <TableRow
                                                     key={forecast.id}
                                                     className="cursor-pointer"
-                                                    onClick={() => router.visit(`/finance/cash-flow-forecast/${forecast.id}`)}
+                                                    onClick={() =>
+                                                        router.visit(
+                                                            `/finance/cash-flow-forecast/${forecast.id}`,
+                                                        )
+                                                    }
                                                 >
-                                                    <TableCell className="font-medium">{forecast.name}</TableCell>
-                                                    <TableCell>
-                                                        {formatDate(forecast.period_start)} &ndash;{' '}
-                                                        {formatDate(forecast.period_end)}
+                                                    <TableCell className="font-medium">
+                                                        {forecast.name}
                                                     </TableCell>
                                                     <TableCell>
-                                                        {periodTypeLabels[forecast.period_type] ?? forecast.period_type}
+                                                        {formatDate(
+                                                            forecast.period_start,
+                                                        )}{' '}
+                                                        &ndash;{' '}
+                                                        {formatDate(
+                                                            forecast.period_end,
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {periodTypeLabels[
+                                                            forecast.period_type
+                                                        ] ??
+                                                            forecast.period_type}
                                                     </TableCell>
                                                     <TableCell className="text-right font-mono tabular-nums">
-                                                        {formatMoney(forecast.opening_balance)}
+                                                        {formatMoney(
+                                                            forecast.opening_balance,
+                                                        )}
                                                     </TableCell>
-                                                    <TableCell>{forecast.scenarios_count}</TableCell>
+                                                    <TableCell>
+                                                        {
+                                                            forecast.scenarios_count
+                                                        }
+                                                    </TableCell>
                                                     <TableCell>
                                                         <StatusBadge
-                                                            variant={forecast.status === 'final' ? 'success' : 'neutral'}
-                                                            label={forecast.status === 'final' ? 'Final' : 'Draft'}
+                                                            variant={
+                                                                forecast.status ===
+                                                                'final'
+                                                                    ? 'success'
+                                                                    : 'neutral'
+                                                            }
+                                                            label={
+                                                                forecast.status ===
+                                                                'final'
+                                                                    ? 'Final'
+                                                                    : 'Draft'
+                                                            }
                                                         />
                                                     </TableCell>
                                                     <TableCell className="whitespace-nowrap">
-                                                        <div>{formatDate(forecast.forecast_date)}</div>
+                                                        <div>
+                                                            {formatDate(
+                                                                forecast.forecast_date,
+                                                            )}
+                                                        </div>
                                                         {forecast.created_by && (
                                                             <div className="text-xs text-muted-foreground">
-                                                                {forecast.created_by.name}
+                                                                {
+                                                                    forecast
+                                                                        .created_by
+                                                                        .name
+                                                                }
                                                             </div>
                                                         )}
                                                     </TableCell>
                                                     <TableCell>
-                                                        {forecast.status === 'draft' && (
+                                                        {forecast.status ===
+                                                            'draft' && (
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
-                                                                onClick={(e) => {
+                                                                onClick={(
+                                                                    e,
+                                                                ) => {
                                                                     e.stopPropagation();
-                                                                    setDeleteTarget(forecast);
+                                                                    setDeleteTarget(
+                                                                        forecast,
+                                                                    );
                                                                 }}
                                                             >
                                                                 <Trash2 className="h-4 w-4 text-destructive" />
@@ -202,11 +273,20 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
                                         {forecasts.links.map((link, i) => (
                                             <Button
                                                 key={i}
-                                                variant={link.active ? 'default' : 'outline'}
+                                                variant={
+                                                    link.active
+                                                        ? 'default'
+                                                        : 'outline'
+                                                }
                                                 size="sm"
                                                 disabled={!link.url}
-                                                onClick={() => link.url && router.visit(link.url)}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
+                                                onClick={() =>
+                                                    link.url &&
+                                                    router.visit(link.url)
+                                                }
+                                                dangerouslySetInnerHTML={{
+                                                    __html: link.label,
+                                                }}
                                             />
                                         ))}
                                     </div>
@@ -218,7 +298,10 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
             </PageLayout>
 
             {canManage && (
-                <CashFlowForecastDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+                <CashFlowForecastDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                />
             )}
 
             <ConfirmDialog

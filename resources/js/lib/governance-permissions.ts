@@ -6,7 +6,10 @@
  * user's role is configured.
  */
 
-export type GovernancePermissionMap = Record<string, unknown> | null | undefined;
+export type GovernancePermissionMap =
+    | Record<string, unknown>
+    | null
+    | undefined;
 
 /**
  * Read a `section.action` permission flag from `auth.can.governance`.

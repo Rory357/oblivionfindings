@@ -16,7 +16,14 @@ import {
     Repeat,
     Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 
@@ -36,10 +43,7 @@ import {
     ymdKey,
 } from './calendar-shared';
 import { DayDetailDialog } from './day-detail-dialog';
-import {
-    ShiftContextMenu,
-    type ShiftCtxState,
-} from './shift-context-menu';
+import { ShiftContextMenu, type ShiftCtxState } from './shift-context-menu';
 import {
     buildShiftActions,
     type GridConflictPeer,
@@ -112,7 +116,9 @@ async function jsonRequest<T>(
             const data = await res.json();
             message =
                 data?.message ||
-                (Object.values(data?.errors ?? {}) as string[][])?.flat?.()?.[0] ||
+                (
+                    Object.values(data?.errors ?? {}) as string[][]
+                )?.flat?.()?.[0] ||
                 message;
         } catch {
             // keep the generic message
@@ -195,10 +201,11 @@ function mapGap(ev: RawCalendarEvent): CalendarGap | null {
         assignedStaff: ext.coverage_assigned_staff ?? null,
         preferredClientId: ext.coverage_preferred_client_id ?? null,
         recommendedFillAction: ext.coverage_recommended_fill_action ?? null,
-        roleShortages: Array.isArray(ext.coverage_planned_role_shortages) &&
-        ext.coverage_planned_role_shortages.length > 0
-            ? ext.coverage_planned_role_shortages
-            : (ext.coverage_role_shortages ?? []),
+        roleShortages:
+            Array.isArray(ext.coverage_planned_role_shortages) &&
+            ext.coverage_planned_role_shortages.length > 0
+                ? ext.coverage_planned_role_shortages
+                : (ext.coverage_role_shortages ?? []),
     };
 }
 
@@ -427,7 +434,8 @@ function DayCell({
                 <span
                     className={cn(
                         'inline-flex h-6 w-6 items-center justify-center rounded-lg text-[13px] font-semibold',
-                        isToday && 'bg-primary font-bold text-primary-foreground',
+                        isToday &&
+                            'bg-primary font-bold text-primary-foreground',
                         !inMonth && !isToday && 'text-muted-foreground/50',
                     )}
                 >
@@ -472,7 +480,9 @@ function DayCell({
                     <ShiftChip
                         key={s.id}
                         s={s}
-                        draggable={canDrag && DRAGGABLE_STATUSES.includes(s.status)}
+                        draggable={
+                            canDrag && DRAGGABLE_STATUSES.includes(s.status)
+                        }
                         onPeek={onPeek}
                         onCtx={onCtx}
                         onDragStart={onDragStart}
@@ -578,14 +588,15 @@ function PeekPopover({
     const taskPct = s.tasksTotal
         ? Math.round((s.tasksDone / s.tasksTotal) * 100)
         : 0;
-    const assignable = canManage && (s.status === 'open' || s.status === 'draft');
+    const assignable =
+        canManage && (s.status === 'open' || s.status === 'draft');
 
     return createPortal(
         <div
             ref={ref}
             role="dialog"
             aria-label={`Shift preview: ${s.client ?? 'shift'} ${s.start}–${s.end}`}
-            className="pointer-events-auto fixed z-[60] flex w-[320px] overflow-hidden rounded-2xl border border-border bg-popover shadow-xl animate-in fade-in-0 zoom-in-95 duration-150"
+            className="pointer-events-auto fixed z-[60] flex w-[320px] animate-in overflow-hidden rounded-2xl border border-border bg-popover shadow-xl duration-150 fade-in-0 zoom-in-95"
             style={
                 pos
                     ? { top: pos.top, left: pos.left }
@@ -593,7 +604,10 @@ function PeekPopover({
             }
             onClick={(e) => e.stopPropagation()}
         >
-            <div className="w-[5px] shrink-0" style={{ background: m.accent }} />
+            <div
+                className="w-[5px] shrink-0"
+                style={{ background: m.accent }}
+            />
             <div className="min-w-0 flex-1 p-4">
                 <div className="mb-3 flex items-start justify-between gap-2.5">
                     <div className="min-w-0">
@@ -601,8 +615,9 @@ function PeekPopover({
                             {s.client ?? 'Shift'}
                         </div>
                         <div className="mt-px truncate text-xs text-muted-foreground">
-                            {[s.siteName, s.context].filter(Boolean).join(' · ') ||
-                                'No site set'}
+                            {[s.siteName, s.context]
+                                .filter(Boolean)
+                                .join(' · ') || 'No site set'}
                         </div>
                     </div>
                     <span
@@ -647,7 +662,10 @@ function PeekPopover({
                     <div className="mb-3 h-[5px] overflow-hidden rounded-full bg-muted">
                         <span
                             className="block h-full rounded-full"
-                            style={{ width: `${taskPct}%`, background: m.accent }}
+                            style={{
+                                width: `${taskPct}%`,
+                                background: m.accent,
+                            }}
                         />
                     </div>
                 ) : null}
@@ -789,7 +807,7 @@ function MiniCalendar({
     return (
         <div
             ref={ref}
-            className="absolute top-[calc(100%+8px)] left-0 z-[60] w-[276px] rounded-2xl border border-border bg-popover p-3 shadow-xl animate-in fade-in-0 zoom-in-95 duration-100"
+            className="absolute top-[calc(100%+8px)] left-0 z-[60] w-[276px] animate-in rounded-2xl border border-border bg-popover p-3 shadow-xl duration-100 fade-in-0 zoom-in-95"
             onClick={(e) => e.stopPropagation()}
         >
             <div className="mb-2.5 flex items-center gap-0.5">
@@ -864,7 +882,7 @@ function MiniCalendar({
                             className={cn(
                                 'rounded-[9px] py-2.5 text-[13px] font-semibold transition-colors hover:bg-accent hover:text-primary',
                                 y === today.getFullYear() &&
-                                    'shadow-[inset_0_0_0_1.5px_var(--primary)] text-primary',
+                                    'text-primary shadow-[inset_0_0_0_1.5px_var(--primary)]',
                                 y === vm.getFullYear() &&
                                     'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground',
                             )}
@@ -903,7 +921,7 @@ function MiniCalendar({
                                         'relative flex aspect-square items-center justify-center rounded-[9px] text-[12.5px] font-semibold transition-colors hover:bg-accent hover:text-primary',
                                         out && 'text-muted-foreground/45',
                                         k === todayKey &&
-                                            'shadow-[inset_0_0_0_1.5px_var(--primary)] text-primary',
+                                            'text-primary shadow-[inset_0_0_0_1.5px_var(--primary)]',
                                         sel &&
                                             'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground',
                                     )}
@@ -957,7 +975,9 @@ export function CalendarPane(props: CalendarPaneProps) {
     // Hero-banner filter values (see CalendarPaneProps.filters). Staff/client
     // scoping mirrors the old embed's rule: only managers may scope to other
     // people; everyone else is already scoped server-side to their own shifts.
-    const staffIdFilter = canManageAny ? (props.filters?.staff_id ?? null) : null;
+    const staffIdFilter = canManageAny
+        ? (props.filters?.staff_id ?? null)
+        : null;
     const clientIdFilter = canManageAny
         ? (props.filters?.client_id ?? null)
         : null;
@@ -978,7 +998,10 @@ export function CalendarPane(props: CalendarPaneProps) {
     const [dragOver, setDragOver] = useState<string | null>(null);
     const dragShift = useRef<CalendarShift | null>(null);
     const lastRect = useRef(
-        new Map<number, { top: number; bottom: number; left: number; right: number }>(),
+        new Map<
+            number,
+            { top: number; bottom: number; left: number; right: number }
+        >(),
     );
     const focusTimer = useRef<number | null>(null);
 
@@ -1045,7 +1068,13 @@ export function CalendarPane(props: CalendarPaneProps) {
             cancelled = true;
             controller.abort();
         };
-    }, [rangeStartKey, rangeEndKey, staffIdFilter, clientIdFilter, refreshTick]);
+    }, [
+        rangeStartKey,
+        rangeEndKey,
+        staffIdFilter,
+        clientIdFilter,
+        refreshTick,
+    ]);
 
     // Every shift mutation in this workspace goes through Inertia
     // (assign/unassign/cancel/duplicate/publish/… and the shared
@@ -1062,10 +1091,7 @@ export function CalendarPane(props: CalendarPaneProps) {
     }, [events]);
 
     const gaps = useMemo(
-        () =>
-            events
-                .map(mapGap)
-                .filter((g): g is CalendarGap => g !== null),
+        () => events.map(mapGap).filter((g): g is CalendarGap => g !== null),
         [events],
     );
 
@@ -1230,18 +1256,15 @@ export function CalendarPane(props: CalendarPaneProps) {
         [openCtxAt],
     );
 
-    const onDragStart = useCallback(
-        (e: React.DragEvent, s: CalendarShift) => {
-            dragShift.current = s;
-            e.dataTransfer.effectAllowed = 'move';
-            try {
-                e.dataTransfer.setData('text/plain', String(s.id));
-            } catch {
-                // some browsers throw on setData with non-standard types
-            }
-        },
-        [],
-    );
+    const onDragStart = useCallback((e: React.DragEvent, s: CalendarShift) => {
+        dragShift.current = s;
+        e.dataTransfer.effectAllowed = 'move';
+        try {
+            e.dataTransfer.setData('text/plain', String(s.id));
+        } catch {
+            // some browsers throw on setData with non-standard types
+        }
+    }, []);
 
     const onDropDay = useCallback(
         async (dateKey: string) => {
@@ -1367,7 +1390,9 @@ export function CalendarPane(props: CalendarPaneProps) {
                 coverage_rule_name: gap.ruleName ?? 'Coverage gap',
                 coverage_required_staff: gap.requiredStaff,
                 coverage_missing_staff: gap.missingStaff,
-                coverage_role_shortages: JSON.stringify(gap.roleShortages ?? []),
+                coverage_role_shortages: JSON.stringify(
+                    gap.roleShortages ?? [],
+                ),
             });
         },
         [createShiftLauncher],
@@ -1494,7 +1519,7 @@ export function CalendarPane(props: CalendarPaneProps) {
                             <List className="mr-1 h-3.5 w-3.5" /> Legend
                         </Button>
                         {legendOpen ? (
-                            <div className="absolute top-[calc(100%+6px)] right-0 z-[60] flex min-w-[180px] flex-col gap-2 rounded-xl border border-border bg-popover px-3 py-2.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100">
+                            <div className="absolute top-[calc(100%+6px)] right-0 z-[60] flex min-w-[180px] animate-in flex-col gap-2 rounded-xl border border-border bg-popover px-3 py-2.5 shadow-lg duration-100 fade-in-0 zoom-in-95">
                                 {LEGEND.map((l) => (
                                     <div
                                         key={l.label}
@@ -1531,7 +1556,8 @@ export function CalendarPane(props: CalendarPaneProps) {
                             className="h-9 shadow-[0_6px_16px_-6px_color-mix(in_oklch,var(--primary)_50%,transparent)]"
                             onClick={() => quickAdd(todayKey)}
                         >
-                            <Plus className="mr-1 h-[15px] w-[15px]" /> New shift
+                            <Plus className="mr-1 h-[15px] w-[15px]" /> New
+                            shift
                         </Button>
                     ) : null}
                 </div>
@@ -1608,7 +1634,8 @@ export function CalendarPane(props: CalendarPaneProps) {
                                         key={key}
                                         date={date}
                                         inMonth={
-                                            date.getMonth() === cursor.getMonth()
+                                            date.getMonth() ===
+                                            cursor.getMonth()
                                         }
                                         isToday={key === todayKey}
                                         focused={focusDate === key}

@@ -5,7 +5,13 @@ const statusConfig: Record<string, { color: string; label: string }> = {
     offline: { color: 'bg-muted', label: 'Offline' },
 };
 
-export function PresenceDot({ status, size = 'sm' }: { status: string; size?: 'sm' | 'md' | 'lg' }) {
+export function PresenceDot({
+    status,
+    size = 'sm',
+}: {
+    status: string;
+    size?: 'sm' | 'md' | 'lg';
+}) {
     const config = statusConfig[status] ?? statusConfig.offline;
     const sizes = { sm: 'h-2.5 w-2.5', md: 'h-3 w-3', lg: 'h-3.5 w-3.5' };
     return (
@@ -26,7 +32,10 @@ export function PresenceBadge({ status }: { status: string }) {
     );
 }
 
-export function derivePresenceStatus(presenceStatus?: string | null, lastSeenAt?: string | null): string {
+export function derivePresenceStatus(
+    presenceStatus?: string | null,
+    lastSeenAt?: string | null,
+): string {
     if (!lastSeenAt) return 'offline';
     const lastSeen = new Date(lastSeenAt);
     const now = new Date();

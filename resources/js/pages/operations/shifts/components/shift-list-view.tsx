@@ -1,10 +1,18 @@
+import {
+    CalendarClock,
+    Eye,
+    MapPin,
+    MoreVertical,
+    Pencil,
+    Plus,
+} from 'lucide-react';
 import { useMemo } from 'react';
-import { CalendarClock, Eye, MapPin, MoreVertical, Pencil, Plus } from 'lucide-react';
 
 import { ShiftStatusBadge } from '@/components/shift-status-badge';
 import { shiftTypeMeta } from '@/lib/shift-types';
 
-import { StaffAvatar } from './staff-avatar';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     clientFullName,
     effectiveStatus,
@@ -15,8 +23,7 @@ import {
     shiftStartTime,
     type ShiftRow,
 } from './shift-row-types';
-import { Button as GuardrailButton } from '@/components/ui/button';
-import { Card as GuardrailCard } from '@/components/ui/card';
+import { StaffAvatar } from './staff-avatar';
 
 type Props = {
     shifts: ShiftRow[];
@@ -51,14 +58,15 @@ export function ShiftListView({
         for (const list of m.values()) {
             list.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
         }
-        return Array.from(m.entries()).sort((a, b) =>
-            a[0].localeCompare(b[0]),
-        );
+        return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     }, [shifts]);
 
     if (shifts.length === 0) {
         return (
-            <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-10 text-center">
+            <GuardrailCard
+                unstyled
+                className="rounded-xl border border-border bg-card p-10 text-center"
+            >
                 <CalendarClock className="mx-auto h-10 w-10 text-muted-foreground" />
                 <h3 className="mt-3 text-lg font-semibold text-foreground">
                     No shifts match these filters
@@ -157,7 +165,8 @@ function DayBlock({
                     ) : null}
                 </div>
                 {onCreateOnDay ? (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         onClick={() => onCreateOnDay(date)}
                         className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
@@ -206,8 +215,7 @@ function ShiftRowItem({
 }) {
     const open = isOpenShift(shift);
     const inProgress = shift.status === 'in_progress';
-    const locked =
-        shift.status === 'completed' || shift.status === 'cancelled';
+    const locked = shift.status === 'completed' || shift.status === 'cancelled';
     const coverRequested = Boolean(shift.cover_requested);
     const hours = shiftHours(shift.starts_at, shift.ends_at);
     const start = shiftStartTime(shift.starts_at);
@@ -233,7 +241,7 @@ function ShiftRowItem({
             onContextMenu={(e) => onContextMenu(shift, e)}
         >
             <div className="w-[88px] shrink-0">
-                <div className="whitespace-nowrap text-sm font-semibold text-foreground tabular-nums">
+                <div className="text-sm font-semibold whitespace-nowrap text-foreground tabular-nums">
                     {start}
                     <span className="font-normal text-muted-foreground">–</span>
                     {end}
@@ -276,7 +284,8 @@ function ShiftRowItem({
                     </div>
                 ) : (
                     <div className="min-w-0">
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             type="button"
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -301,31 +310,34 @@ function ShiftRowItem({
             </div>
 
             <div className="flex shrink-0 items-center gap-0.5">
-                <GuardrailButton unstyled
+                <GuardrailButton
+                    unstyled
                     type="button"
                     onClick={(e) => {
                         e.stopPropagation();
                         onClick();
                     }}
-                    className="hidden h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground group-hover:inline-flex"
+                    className="hidden h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition group-hover:inline-flex hover:bg-muted hover:text-foreground"
                     aria-label="View"
                 >
                     <Eye className="h-4 w-4" />
                 </GuardrailButton>
                 {locked ? null : (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
                             onEditClick();
                         }}
-                        className="hidden h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground group-hover:inline-flex"
+                        className="hidden h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition group-hover:inline-flex hover:bg-muted hover:text-foreground"
                         aria-label="Edit"
                     >
                         <Pencil className="h-4 w-4" />
                     </GuardrailButton>
                 )}
-                <GuardrailButton unstyled
+                <GuardrailButton
+                    unstyled
                     type="button"
                     onClick={(e) => {
                         e.stopPropagation();

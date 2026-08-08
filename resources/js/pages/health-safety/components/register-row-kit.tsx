@@ -43,7 +43,8 @@ const ENTITY_TONE = [
 export function initials(label: string | null | undefined): string {
     if (!label) return 'HS';
     const parts = label.split(/\s+/).filter(Boolean);
-    const text = parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : label.slice(0, 2);
+    const text =
+        parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : label.slice(0, 2);
     return text.toUpperCase();
 }
 
@@ -75,7 +76,10 @@ export function FlagBadge({
         }[tone] ?? 'bg-muted text-muted-foreground';
 
     return (
-        <span title={title} className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold whitespace-nowrap ${cls}`}>
+        <span
+            title={title}
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold whitespace-nowrap ${cls}`}
+        >
             <Icon className="h-3 w-3" />
             {children}
         </span>
@@ -104,8 +108,14 @@ export function RegisterTableHeader({
                     <Icon className="h-4 w-4" />
                 </span>
                 <div className="flex flex-wrap items-baseline gap-1.5">
-                    <h2 className="text-sm font-bold text-foreground">{title}</h2>
-                    {subtitle ? <span className="text-xs font-semibold text-muted-foreground">· {subtitle}</span> : null}
+                    <h2 className="text-sm font-bold text-foreground">
+                        {title}
+                    </h2>
+                    {subtitle ? (
+                        <span className="text-xs font-semibold text-muted-foreground">
+                            · {subtitle}
+                        </span>
+                    ) : null}
                 </div>
             </div>
             {hint ? (

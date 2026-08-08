@@ -255,7 +255,8 @@ class StoreClientRequest extends FormRequest
             if (filled($this->input('service_context_id'))
                 && ! $validator->errors()->has('service_context_id')
                 && ! ServiceContext::query()
-                    ->availableToSites($siteId === null ? [] : [$siteId])
+                    ->availableToSite($siteId)
+                    ->where('is_active', true)
                     ->whereKey((int) $this->input('service_context_id'))
                     ->exists()
             ) {

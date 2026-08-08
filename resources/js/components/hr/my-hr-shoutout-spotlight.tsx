@@ -11,7 +11,6 @@ import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
 
-import { hueFromId } from './my-hr-utils';
 import {
     MY_HR_KUDOS_LABELS,
     MY_HR_REACTIONS,
@@ -19,6 +18,7 @@ import {
     type MyHrReactor,
     type MyHrShoutout,
 } from './my-hr-types';
+import { hueFromId } from './my-hr-utils';
 
 type Perspective = 'received' | 'given';
 
@@ -30,7 +30,10 @@ function avatarBg(reactor: { id: number; you: boolean }) {
 }
 
 /** Toggle the viewer in/out of a reactor list (optimistic). */
-function toggleYou(list: MyHrReactor[], me: { initials: string }): MyHrReactor[] {
+function toggleYou(
+    list: MyHrReactor[],
+    me: { initials: string },
+): MyHrReactor[] {
     return list.some((r) => r.you)
         ? list.filter((r) => !r.you)
         : [...list, { id: -1, name: 'You', initials: me.initials, you: true }];
@@ -122,7 +125,8 @@ export function MyHrShoutoutSpotlight({
 
     const other = perspective === 'given' ? current.recipient : current.giver;
     const otherHue = hueFromId(other.id);
-    const isThanked = thanked.has(current.id) || current.replies.some((r) => r.you);
+    const isThanked =
+        thanked.has(current.id) || current.replies.some((r) => r.you);
     const canThanks = perspective === 'received';
 
     const visibleReplies =
@@ -240,7 +244,9 @@ export function MyHrShoutoutSpotlight({
     })();
 
     const eyebrow =
-        perspective === 'given' ? 'You gave a shout-out 💛' : 'You got a shout-out 🎉';
+        perspective === 'given'
+            ? 'You gave a shout-out 💛'
+            : 'You got a shout-out 🎉';
     const heading =
         perspective === 'given' ? `To ${other.name}` : `From ${other.name}`;
 
@@ -278,14 +284,16 @@ export function MyHrShoutoutSpotlight({
                     📣
                 </span>
                 <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-category-hr">
+                    <div className="text-[10px] font-bold tracking-[0.08em] text-category-hr uppercase">
                         {eyebrow}
                     </div>
-                    <h2 className="mt-px truncate text-[16px] font-bold">{heading}</h2>
+                    <h2 className="mt-px truncate text-[16px] font-bold">
+                        {heading}
+                    </h2>
                 </div>
                 {total > 1 ? (
                     <div className="ml-auto flex items-center gap-2">
-                        <span className="text-[11px] font-bold tabular-nums text-muted-foreground">
+                        <span className="text-[11px] font-bold text-muted-foreground tabular-nums">
                             {Math.min(index, total - 1) + 1} / {total}
                         </span>
                         <div className="flex items-center gap-1.5">
@@ -332,7 +340,7 @@ export function MyHrShoutoutSpotlight({
             </div>
 
             {/* quote */}
-            <p className="relative mt-3 max-w-[760px] text-[14.5px] font-semibold leading-relaxed">
+            <p className="relative mt-3 max-w-[760px] text-[14.5px] leading-relaxed font-semibold">
                 <span className="text-category-hr">“</span>
                 {current.message}
                 <span className="text-category-hr">”</span>
@@ -377,7 +385,9 @@ export function MyHrShoutoutSpotlight({
                                     title={
                                         list.length
                                             ? `${emoji}  ${list
-                                                  .map((r) => (r.you ? 'You' : r.name))
+                                                  .map((r) =>
+                                                      r.you ? 'You' : r.name,
+                                                  )
                                                   .join(', ')}`
                                             : 'Be the first to react'
                                     }
@@ -510,10 +520,13 @@ export function MyHrShoutoutSpotlight({
                                     >
                                         <div className="flex items-baseline gap-2">
                                             <span className="text-[11.5px] font-bold">
-                                                {rp.you ? `You · ${me.firstName}` : rp.name}
+                                                {rp.you
+                                                    ? `You · ${me.firstName}`
+                                                    : rp.name}
                                             </span>
                                             <span className="text-[10px] text-muted-foreground">
-                                                {timeAgoShort(rp.created_at) || 'just now'}
+                                                {timeAgoShort(rp.created_at) ||
+                                                    'just now'}
                                             </span>
                                         </div>
                                         <p className="mt-0.5 text-[12.5px] leading-snug">

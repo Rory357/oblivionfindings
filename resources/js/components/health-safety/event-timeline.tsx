@@ -5,18 +5,22 @@
  * and corrective actions. No new backend structure required.
  */
 
-import { StatusBadge } from '@/components/ui/status-badge';
 import {
-    Shield, Search, FileText, ClipboardList,
-    CheckCircle2, Clock, AlertTriangle,
+    AlertTriangle,
+    CheckCircle2,
+    ClipboardList,
+    Clock,
+    FileText,
+    Search,
+    Shield,
 } from 'lucide-react';
 
 interface TimelineEntry {
-    date: string;       // ISO 8601
+    date: string; // ISO 8601
     label: string;
     detail?: string;
     icon: React.ElementType;
-    color: string;      // Tailwind bg class
+    color: string; // Tailwind bg class
 }
 
 interface Investigation {
@@ -46,20 +50,42 @@ interface EventTimelineProps {
 
 function fmtDate(iso: string | null): string {
     if (!iso) return '';
-    return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
-export function EventTimeline({ reportedAt, occurredAt, closedAt, investigations, correctiveActions }: EventTimelineProps) {
+export function EventTimeline({
+    reportedAt,
+    occurredAt,
+    closedAt,
+    investigations,
+    correctiveActions,
+}: EventTimelineProps) {
     const entries: TimelineEntry[] = [];
 
     // Event occurred
     if (occurredAt) {
-        entries.push({ date: occurredAt, label: 'Event occurred', icon: AlertTriangle, color: 'bg-status-critical' });
+        entries.push({
+            date: occurredAt,
+            label: 'Event occurred',
+            icon: AlertTriangle,
+            color: 'bg-status-critical',
+        });
     }
 
     // Event reported
     if (reportedAt) {
-        entries.push({ date: reportedAt, label: 'Event reported', icon: Shield, color: 'bg-status-info' });
+        entries.push({
+            date: reportedAt,
+            label: 'Event reported',
+            icon: Shield,
+            color: 'bg-status-info',
+        });
     }
 
     // Investigation milestones
@@ -108,11 +134,18 @@ export function EventTimeline({ reportedAt, occurredAt, closedAt, investigations
 
     // Event closed
     if (closedAt) {
-        entries.push({ date: closedAt, label: 'Event closed', icon: CheckCircle2, color: 'bg-muted-foreground/80' });
+        entries.push({
+            date: closedAt,
+            label: 'Event closed',
+            icon: CheckCircle2,
+            color: 'bg-muted-foreground/80',
+        });
     }
 
     // Sort chronologically
-    entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    entries.sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
 
     if (entries.length === 0) {
         return (
@@ -126,25 +159,33 @@ export function EventTimeline({ reportedAt, occurredAt, closedAt, investigations
     return (
         <div className="relative space-y-0 pl-6">
             {/* Vertical line */}
-            <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border" />
+            <div className="absolute top-2 bottom-2 left-[11px] w-px bg-border" />
 
             {entries.map((entry, i) => {
                 const Icon = entry.icon;
                 return (
                     <div key={i} className="relative flex gap-3 pb-4">
                         {/* Dot */}
-                        <div className={`absolute -left-6 top-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full ${entry.color} text-white`}>
+                        <div
+                            className={`absolute top-0.5 -left-6 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full ${entry.color} text-white`}
+                        >
                             <Icon className="h-3 w-3" />
                         </div>
 
                         {/* Content */}
                         <div className="min-w-0 pt-0.5">
                             <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">{entry.label}</span>
-                                <span className="text-xs text-muted-foreground">{fmtDate(entry.date)}</span>
+                                <span className="text-sm font-medium">
+                                    {entry.label}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    {fmtDate(entry.date)}
+                                </span>
                             </div>
                             {entry.detail && (
-                                <p className="mt-0.5 text-xs text-muted-foreground truncate max-w-md">{entry.detail}</p>
+                                <p className="mt-0.5 max-w-md truncate text-xs text-muted-foreground">
+                                    {entry.detail}
+                                </p>
                             )}
                         </div>
                     </div>

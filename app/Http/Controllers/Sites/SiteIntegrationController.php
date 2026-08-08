@@ -19,8 +19,10 @@ use App\Services\Integration\IntegrationSecretManager;
 use App\Services\Integration\LegacyIntegrationSiteSecretWriter;
 use App\Support\SafeOperationalData;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class SiteIntegrationController extends Controller
 {
@@ -89,9 +91,14 @@ class SiteIntegrationController extends Controller
         ]);
     }
 
-    public function configure(Request $request, Site $site, string $provider)
-    {
+    public function configure(
+        Request $request,
+        Site $site,
+        string $provider,
+        IntegrationAdapterRegistry $registry,
+    ) {
         $this->authorize('update', $site);
+        abort_unless($registry->has($provider), 404);
 
         $validated = $request->validate([
             'mapped_external_site_id' => 'nullable|string|max:255',
@@ -103,9 +110,14 @@ class SiteIntegrationController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        $mappedId = $validated['mapped_external_site_id'] ?? null;
-        $isActive = $validated['is_active'] ?? ! empty($mappedId);
-        $status = $mappedId ? IntegrationSiteConfig::STATUS_HYBRID : IntegrationSiteConfig::STATUS_LOCAL_ONLY;
+        $mappedId = array_key_exists('mapped_external_site_id', $validated)
+            ? trim((string) $validated['mapped_external_site_id'])
+            : null;
+        $mappedId = $mappedId === '' ? null : $mappedId;
+        $isActive = $validated['is_active'] ?? $mappedId !== null;
+        $status = $mappedId !== null
+            ? IntegrationSiteConfig::STATUS_HYBRID
+            : IntegrationSiteConfig::STATUS_LOCAL_ONLY;
 
         $existingConfig = IntegrationSiteConfig::where('site_id', $site->id)
             ->where('provider', $provider)
@@ -123,21 +135,37 @@ class SiteIntegrationController extends Controller
         }
         $overrides = array_merge($existingOverrides, $overrideUpdates);
 
-        IntegrationSiteConfig::updateOrCreate(
-            [
-                'site_id' => $site->id,
-                'provider' => $provider,
-            ],
-            [
-                'mapped_external_site_id' => $mappedId,
-                'mapped_external_site_name' => $validated['mapped_external_site_name'] ?? null,
-                'status' => $status,
-                'is_active' => $isActive,
-                'overrides' => $overrides,
-            ]
-        );
+        try {
+            IntegrationSiteConfig::updateOrCreate(
+                [
+                    'site_id' => $site->id,
+                    'provider' => $provider,
+                ],
+                [
+                    'mapped_external_site_id' => $mappedId,
+                    'mapped_external_site_name' => $validated['mapped_external_site_name'] ?? null,
+                    'status' => $status,
+                    'is_active' => $isActive,
+                    'overrides' => $overrides,
+                ]
+            );
+        } catch (QueryException $exception) {
+            if (! $this->isExternalSiteIdentityConflict($exception)) {
+                throw $exception;
+            }
+
+            throw ValidationException::withMessages([
+                'mapped_external_site_id' => 'This provider location is already mapped to another Site.',
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Integration configured successfully.');
+    }
+
+    private function isExternalSiteIdentityConflict(QueryException $exception): bool
+    {
+        return (int) ($exception->errorInfo[1] ?? 0) === 1062
+            && str_contains($exception->getMessage(), 'integration_provider_external_site_unique');
     }
 
     public function syncSites(Request $request, Site $site, string $provider, IntegrationAdapterRegistry $registry)

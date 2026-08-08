@@ -19,6 +19,13 @@ use Throwable;
 
 final class ConfigurationSnapshotService
 {
+    private const array RETRIEVABLE_STORAGE_STATES = [
+        'available',
+        'integrity_failed',
+        'missing',
+        'unavailable',
+    ];
+
     private const array ROOT_ALLOWLIST = [
         'configuration',
         'firmware_version',
@@ -92,8 +99,14 @@ final class ConfigurationSnapshotService
             str_starts_with($observation->reasonCode, 'winrm_inventory_') => 'winrm',
             default => null,
         };
-        if ($sourceKind === null || ! in_array($observation->state->value, ['healthy', 'degraded'], true)) {
-            throw new InvalidArgumentException('Snapshot requires an approved read-only inventory result.');
+        if ($sourceKind === null
+            || $observation->state->value !== 'healthy'
+            || $observation->reasonCode !== "{$sourceKind}_inventory_ok"
+            || ($observation->evidence['inventory_status'] ?? null) !== 'ok'
+            || ! is_int($observation->evidence['completed_operations'] ?? null)
+            || $observation->evidence['completed_operations'] < 1
+            || ($observation->evidence['failed_operations'] ?? null) !== 0) {
+            throw new InvalidArgumentException('Snapshot requires a complete approved read-only inventory result.');
         }
 
         return $this->capture(
@@ -118,10 +131,13 @@ final class ConfigurationSnapshotService
         $device = Device::query()->findOrFail($snapshot->device_id);
         $this->access->assertCanViewDevice($actor, $device);
         abort_unless($this->sites->resolve((int) $device->id) === (int) $snapshot->site_id, 404);
-        abort_unless($snapshot->storage_state === 'available', 404);
-        abort_unless($this->store->exists($snapshot->storage_path), 404);
+        abort_unless(
+            $snapshot->payload_deleted_at === null
+                && in_array($snapshot->storage_state, self::RETRIEVABLE_STORAGE_STATES, true),
+            404,
+        );
 
-        return $this->store->read($snapshot->storage_path);
+        return $this->verifiedPersistedPayload($snapshot);
     }
 
     private function capture(
@@ -169,25 +185,42 @@ final class ConfigurationSnapshotService
             ->where('content_hash', $contentHash)
             ->where('storage_state', 'available')
             ->first();
-        if ($existing !== null && $this->store->exists($existing->storage_path)) {
+        if ($existing !== null) {
+            $this->verifiedPersistedPayload($existing);
+            $this->ensureRestoreHealthSentinel();
+            $existing->refresh();
+
             return $existing;
         }
 
         $previous = ConfigurationSnapshot::query()
             ->where('device_id', $device->id)
+            ->where('site_id', $siteId)
+            ->where('source_kind', $sourceKind)
+            ->where('source', $source)
             ->where('storage_state', 'available')
             ->orderByDesc('captured_at')
             ->orderByDesc('id')
             ->first();
         $previousPayload = [];
         if ($previous !== null) {
-            $previousPayload = $this->decode($this->store->read($previous->storage_path));
+            $previousPayload = $this->decode($this->verifiedPersistedPayload($previous));
         }
         $diff = $this->structuralDiff($previousPayload, $safe);
         $uuid = (string) Str::uuid();
         $path = "monitoring/configuration-snapshots/site-{$siteId}/device-{$device->id}/{$uuid}.json.enc";
 
         $this->store->put($path, $encoded);
+        try {
+            $this->assertStoredPayload($path, $contentHash, strlen($encoded));
+            $this->ensureRestoreHealthSentinel();
+        } catch (Throwable $exception) {
+            $this->deleteStoredPathBestEffort($path);
+
+            throw $exception instanceof SnapshotStoreUnavailable
+                ? $exception
+                : new SnapshotStoreUnavailable('Snapshot storage verification failed.', previous: $exception);
+        }
 
         try {
             return DB::transaction(function () use (
@@ -248,14 +281,109 @@ final class ConfigurationSnapshotService
                 return $snapshot;
             }, 3);
         } catch (Throwable $exception) {
-            try {
-                $this->store->delete($path);
-            } catch (SnapshotStoreUnavailable) {
-                // The database transaction remains rolled back. A storage
-                // reconciler can remove the unreferenced object later.
+            $this->deleteStoredPathBestEffort($path);
+
+            throw $exception;
+        }
+    }
+
+    private function verifiedPersistedPayload(ConfigurationSnapshot $snapshot): string
+    {
+        try {
+            if (! $this->store->exists((string) $snapshot->storage_path)) {
+                $this->recordStorageStateBestEffort($snapshot, 'missing');
+
+                throw new SnapshotStoreUnavailable('Stored snapshot payload is missing.');
+            }
+
+            $payload = $this->store->read((string) $snapshot->storage_path);
+        } catch (SnapshotStoreUnavailable $exception) {
+            if ($snapshot->storage_state !== 'missing') {
+                $this->recordStorageStateBestEffort($snapshot, 'unavailable');
             }
 
             throw $exception;
+        } catch (Throwable $exception) {
+            $this->recordStorageStateBestEffort($snapshot, 'unavailable');
+
+            throw new SnapshotStoreUnavailable('Snapshot storage is unavailable.', previous: $exception);
+        }
+
+        if (strlen($payload) !== (int) $snapshot->content_size
+            || ! hash_equals((string) $snapshot->content_hash, hash('sha256', $payload))) {
+            $this->recordStorageStateBestEffort($snapshot, 'integrity_failed');
+
+            throw new SnapshotStoreUnavailable('Stored snapshot payload failed its integrity check.');
+        }
+
+        $this->recordStorageStateBestEffort($snapshot, 'available');
+
+        return $payload;
+    }
+
+    private function assertStoredPayload(string $path, string $expectedHash, int $expectedSize): void
+    {
+        $payload = $this->store->read($path);
+        if (strlen($payload) !== $expectedSize
+            || ! hash_equals($expectedHash, hash('sha256', $payload))) {
+            throw new SnapshotStoreUnavailable('Stored snapshot payload failed its integrity check.');
+        }
+    }
+
+    private function ensureRestoreHealthSentinel(): void
+    {
+        if ($this->store->exists(SnapshotStore::RESTORE_HEALTH_PATH)) {
+            $this->assertRestoreHealthSentinel();
+
+            return;
+        }
+
+        $this->store->put(SnapshotStore::RESTORE_HEALTH_PATH, SnapshotStore::RESTORE_HEALTH_CONTENT);
+        $this->assertRestoreHealthSentinel();
+    }
+
+    private function assertRestoreHealthSentinel(): void
+    {
+        if (! $this->store->exists(SnapshotStore::RESTORE_HEALTH_PATH)) {
+            throw new SnapshotStoreUnavailable('Snapshot restore sentinel could not be verified.');
+        }
+
+        $contents = $this->store->read(SnapshotStore::RESTORE_HEALTH_PATH);
+        if (! hash_equals(SnapshotStore::RESTORE_HEALTH_CONTENT, $contents)) {
+            throw new SnapshotStoreUnavailable('Snapshot restore sentinel failed its integrity check.');
+        }
+    }
+
+    private function recordStorageStateBestEffort(ConfigurationSnapshot $snapshot, string $state): void
+    {
+        if ($snapshot->storage_state === $state) {
+            return;
+        }
+
+        try {
+            DB::transaction(function () use ($snapshot, $state): void {
+                $locked = ConfigurationSnapshot::query()->lockForUpdate()->find($snapshot->id);
+                if (! $locked instanceof ConfigurationSnapshot
+                    || $locked->payload_deleted_at !== null
+                    || $locked->storage_state === 'deleted') {
+                    return;
+                }
+
+                $locked->forceFill(['storage_state' => $state])->save();
+                $snapshot->setAttribute('storage_state', $state);
+            }, 3);
+        } catch (Throwable) {
+            // Retained hash/size evidence remains available for reconciliation.
+        }
+    }
+
+    private function deleteStoredPathBestEffort(string $path): void
+    {
+        try {
+            $this->store->delete($path);
+        } catch (Throwable) {
+            // No metadata row presents the unverified object as governed
+            // evidence; preserve the original write or transaction failure.
         }
     }
 

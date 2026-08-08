@@ -4,8 +4,8 @@ import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     InfoCard,
-    SelectInput,
     Segmented,
+    SelectInput,
     StepHead,
     SubHead,
     TilePicker,
@@ -49,10 +49,30 @@ const INCIDENT_TYPES = [
 ];
 
 const AUTHORITIES = [
-    { key: 'worksafe', label: 'WorkSafe NZ', description: 'HSWA 2015 notifiable event', icon: Siren },
-    { key: 'health_nz', label: 'Health NZ', description: 'Te Whatu Ora / sector', icon: Stethoscope },
-    { key: 'privacy_commissioner', label: 'Privacy Commissioner', description: 'Privacy Act 2020 breach', icon: Scale },
-    { key: 'charities_services', label: 'Charities Services', description: 'Serious wrongdoing', icon: Building2 },
+    {
+        key: 'worksafe',
+        label: 'WorkSafe NZ',
+        description: 'HSWA 2015 notifiable event',
+        icon: Siren,
+    },
+    {
+        key: 'health_nz',
+        label: 'Health NZ',
+        description: 'Te Whatu Ora / sector',
+        icon: Stethoscope,
+    },
+    {
+        key: 'privacy_commissioner',
+        label: 'Privacy Commissioner',
+        description: 'Privacy Act 2020 breach',
+        icon: Scale,
+    },
+    {
+        key: 'charities_services',
+        label: 'Charities Services',
+        description: 'Serious wrongdoing',
+        icon: Building2,
+    },
 ];
 
 const SEVERITIES = [
@@ -74,9 +94,24 @@ export type LogNotifiableForm = {
 };
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'event', label: 'Event', blurb: 'What happened & when', icon: AlertOctagon },
-    { key: 'notify', label: 'Notification', blurb: 'Authority & detail', icon: Bell },
-    { key: 'review', label: 'Review & log', blurb: 'Confirm and record', icon: CheckCircle2 },
+    {
+        key: 'event',
+        label: 'Event',
+        blurb: 'What happened & when',
+        icon: AlertOctagon,
+    },
+    {
+        key: 'notify',
+        label: 'Notification',
+        blurb: 'Authority & detail',
+        icon: Bell,
+    },
+    {
+        key: 'review',
+        label: 'Review & log',
+        blurb: 'Confirm and record',
+        icon: CheckCircle2,
+    },
 ];
 
 const STEP_FOR_FIELD: Record<string, number> = {
@@ -119,14 +154,19 @@ export function LogNotifiableDialog({
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [done, setDone] = useState(false);
 
-    const set = <K extends keyof LogNotifiableForm>(k: K, v: LogNotifiableForm[K]) =>
+    const set = <K extends keyof LogNotifiableForm>(
+        k: K,
+        v: LogNotifiableForm[K],
+    ) =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setData(k, v as any);
     const fieldErr = (name: string) =>
         errors[name] ?? (form.errors as Record<string, string>)[name];
 
     const authorityLabel = useMemo(
-        () => AUTHORITIES.find((a) => a.key === data.notification_authority)?.label ?? '',
+        () =>
+            AUTHORITIES.find((a) => a.key === data.notification_authority)
+                ?.label ?? '',
         [data.notification_authority],
     );
 
@@ -138,14 +178,16 @@ export function LogNotifiableDialog({
             if (!data.occurred_at) e.occurred_at = 'When did it occur?';
         }
         if (idx === 1) {
-            if (!data.notification_authority) e.notification_authority = 'Choose the authority';
+            if (!data.notification_authority)
+                e.notification_authority = 'Choose the authority';
             if (!data.title.trim()) e.title = 'A short title is required';
             if (!data.description.trim()) e.description = 'Describe the event';
         }
         return e;
     };
 
-    const goTo = (idx: number) => setStepIndex(Math.max(0, Math.min(idx, STEPS.length - 1)));
+    const goTo = (idx: number) =>
+        setStepIndex(Math.max(0, Math.min(idx, STEPS.length - 1)));
     const next = () => {
         const e = validateStep(stepIndex);
         setErrors(e);
@@ -205,8 +247,10 @@ export function LogNotifiableDialog({
                         title="Notifiable incident recorded"
                         blurb={
                             <>
-                                Recorded for notification to <strong>{authorityLabel}</strong>.
-                                Ensure the regulator is notified within the statutory timeframe.
+                                Recorded for notification to{' '}
+                                <strong>{authorityLabel}</strong>. Ensure the
+                                regulator is notified within the statutory
+                                timeframe.
                             </>
                         }
                         actions={
@@ -216,7 +260,8 @@ export function LogNotifiableDialog({
                                 </Button>
                                 <Button asChild>
                                     <a href="/governance/compliance">
-                                        <Bell className="h-4 w-4" /> Open register
+                                        <Bell className="h-4 w-4" /> Open
+                                        register
                                     </a>
                                 </Button>
                             </>
@@ -241,7 +286,11 @@ export function LogNotifiableDialog({
             onStepClick={goTo}
             footerStart={
                 stepIndex > 0 ? (
-                    <Button type="button" variant="ghost" onClick={() => goTo(stepIndex - 1)}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => goTo(stepIndex - 1)}
+                    >
                         <ChevronLeft className="h-4 w-4" /> Back
                     </Button>
                 ) : null
@@ -259,17 +308,27 @@ export function LogNotifiableDialog({
                                 onClick={() => submit(true)}
                                 disabled={processing}
                             >
-                                {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                {processing ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Plus className="h-4 w-4" />
+                                )}
                                 Save & add another
                             </Button>
-                            <Button type="button" onClick={() => submit(false)} disabled={processing}>
+                            <Button
+                                type="button"
+                                onClick={() => submit(false)}
+                                disabled={processing}
+                            >
                                 {processing ? (
                                     <>
-                                        <Loader2 className="h-4 w-4 animate-spin" /> Recording…
+                                        <Loader2 className="h-4 w-4 animate-spin" />{' '}
+                                        Recording…
                                     </>
                                 ) : (
                                     <>
-                                        <Check className="h-4 w-4" /> Record incident
+                                        <Check className="h-4 w-4" /> Record
+                                        incident
                                     </>
                                 )}
                             </Button>
@@ -290,7 +349,11 @@ export function LogNotifiableDialog({
                         blurb="Classify the event and capture when it occurred and was discovered."
                     />
                     <div className="grid gap-4">
-                        <Field label="Incident type" required error={fieldErr('incident_type')}>
+                        <Field
+                            label="Incident type"
+                            required
+                            error={fieldErr('incident_type')}
+                        >
                             <TilePicker
                                 value={data.incident_type}
                                 onChange={(v) => set('incident_type', v)}
@@ -299,26 +362,43 @@ export function LogNotifiableDialog({
                             />
                         </Field>
                         <div className="grid gap-4 sm:grid-cols-3">
-                            <Field label="Severity" required error={fieldErr('severity')} span>
+                            <Field
+                                label="Severity"
+                                required
+                                error={fieldErr('severity')}
+                                span
+                            >
                                 <Segmented
                                     value={data.severity}
                                     onChange={(v) => set('severity', v)}
                                     options={SEVERITIES}
                                 />
                             </Field>
-                            <Field label="Occurred" required error={fieldErr('occurred_at')}>
+                            <Field
+                                label="Occurred"
+                                required
+                                error={fieldErr('occurred_at')}
+                            >
                                 <Input
                                     type="date"
                                     value={data.occurred_at}
-                                    onChange={(e) => set('occurred_at', e.target.value)}
+                                    onChange={(e) =>
+                                        set('occurred_at', e.target.value)
+                                    }
                                     aria-invalid={!!fieldErr('occurred_at')}
                                 />
                             </Field>
-                            <Field label="Discovered" hint="if different" error={fieldErr('discovered_at')}>
+                            <Field
+                                label="Discovered"
+                                hint="if different"
+                                error={fieldErr('discovered_at')}
+                            >
                                 <Input
                                     type="date"
                                     value={data.discovered_at}
-                                    onChange={(e) => set('discovered_at', e.target.value)}
+                                    onChange={(e) =>
+                                        set('discovered_at', e.target.value)
+                                    }
                                 />
                             </Field>
                         </div>
@@ -341,7 +421,9 @@ export function LogNotifiableDialog({
                         >
                             <TilePicker
                                 value={data.notification_authority}
-                                onChange={(v) => set('notification_authority', v)}
+                                onChange={(v) =>
+                                    set('notification_authority', v)
+                                }
                                 cols={2}
                                 options={AUTHORITIES}
                             />
@@ -354,11 +436,17 @@ export function LogNotifiableDialog({
                                 aria-invalid={!!fieldErr('title')}
                             />
                         </Field>
-                        <Field label="Description" required error={fieldErr('description')}>
+                        <Field
+                            label="Description"
+                            required
+                            error={fieldErr('description')}
+                        >
                             <Textarea
                                 rows={3}
                                 value={data.description}
-                                onChange={(e) => set('description', e.target.value)}
+                                onChange={(e) =>
+                                    set('description', e.target.value)
+                                }
                                 placeholder="What happened, who was involved, immediate actions taken."
                                 aria-invalid={!!fieldErr('description')}
                             />
@@ -366,10 +454,16 @@ export function LogNotifiableDialog({
                         {relatedIncidents.length > 0 ? (
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <SubHead icon={ShieldAlert}>Linkage</SubHead>
-                                <Field label="Related incident" span hint="link to an existing incident (optional)">
+                                <Field
+                                    label="Related incident"
+                                    span
+                                    hint="link to an existing incident (optional)"
+                                >
                                     <SelectInput
                                         value={data.related_incident_id}
-                                        onChange={(v) => set('related_incident_id', v)}
+                                        onChange={(v) =>
+                                            set('related_incident_id', v)
+                                        }
                                         placeholder="Link an incident"
                                         options={relatedIncidents.map((i) => ({
                                             value: String(i.id),
@@ -380,9 +474,10 @@ export function LogNotifiableDialog({
                             </div>
                         ) : null}
                         <InfoCard icon={Siren} tone="warn">
-                            Recording here does <strong>not</strong> notify the regulator — it logs
-                            the obligation. Notify {authorityLabel || 'the authority'} directly
-                            within the statutory timeframe.
+                            Recording here does <strong>not</strong> notify the
+                            regulator — it logs the obligation. Notify{' '}
+                            {authorityLabel || 'the authority'} directly within
+                            the statutory timeframe.
                         </InfoCard>
                     </div>
                 </WizardStepPane>
@@ -396,32 +491,67 @@ export function LogNotifiableDialog({
                         blurb="Confirm the notifiable incident record."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={AlertOctagon} title="Event" onEdit={() => goTo(0)}>
+                        <ReviewCard
+                            icon={AlertOctagon}
+                            title="Event"
+                            onEdit={() => goTo(0)}
+                        >
                             <ReviewRow
                                 label="Type"
-                                value={INCIDENT_TYPES.find((t) => t.key === data.incident_type)?.label}
+                                value={
+                                    INCIDENT_TYPES.find(
+                                        (t) => t.key === data.incident_type,
+                                    )?.label
+                                }
                             />
                             <ReviewRow
                                 label="Severity"
-                                value={SEVERITIES.find((s) => s.value === data.severity)?.label}
+                                value={
+                                    SEVERITIES.find(
+                                        (s) => s.value === data.severity,
+                                    )?.label
+                                }
                             />
-                            <ReviewRow label="Occurred" value={data.occurred_at} />
-                            <ReviewRow label="Discovered" value={data.discovered_at} />
+                            <ReviewRow
+                                label="Occurred"
+                                value={data.occurred_at}
+                            />
+                            <ReviewRow
+                                label="Discovered"
+                                value={data.discovered_at}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={Bell} title="Notification" onEdit={() => goTo(1)}>
-                            <ReviewRow label="Authority" value={authorityLabel} />
+                        <ReviewCard
+                            icon={Bell}
+                            title="Notification"
+                            onEdit={() => goTo(1)}
+                        >
+                            <ReviewRow
+                                label="Authority"
+                                value={authorityLabel}
+                            />
                             <ReviewRow label="Title" value={data.title} />
                             <ReviewRow
                                 label="Linked incident"
                                 value={
                                     relatedIncidents.find(
-                                        (i) => String(i.id) === data.related_incident_id,
+                                        (i) =>
+                                            String(i.id) ===
+                                            data.related_incident_id,
                                     )?.label
                                 }
                             />
                         </ReviewCard>
-                        <ReviewCard icon={ShieldAlert} title="Description" span onEdit={() => goTo(1)}>
-                            <ReviewRow label="Detail" value={data.description} />
+                        <ReviewCard
+                            icon={ShieldAlert}
+                            title="Description"
+                            span
+                            onEdit={() => goTo(1)}
+                        >
+                            <ReviewRow
+                                label="Detail"
+                                value={data.description}
+                            />
                         </ReviewCard>
                     </div>
                 </WizardStepPane>

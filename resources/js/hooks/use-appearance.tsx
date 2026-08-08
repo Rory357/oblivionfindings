@@ -148,11 +148,11 @@ function applyAppearancePreferences(serverAppearance?: ServerAppearance) {
         applyAccent(readLS(APPEARANCE_STORAGE.accent));
     }
 
-    if (
-        serverAppearance &&
-        typeof serverAppearance.font_size === 'number'
-    ) {
-        cachePreference(APPEARANCE_STORAGE.fontSize, serverAppearance.font_size);
+    if (serverAppearance && typeof serverAppearance.font_size === 'number') {
+        cachePreference(
+            APPEARANCE_STORAGE.fontSize,
+            serverAppearance.font_size,
+        );
         applyFontSize(serverAppearance.font_size);
     } else {
         applyFontSize(readLS(APPEARANCE_STORAGE.fontSize));
@@ -304,21 +304,23 @@ export function useAppearance() {
         localStorage.removeItem(APPEARANCE_STORAGE.accent);
         // Force browser to pick up the brand defaults from the Blade-injected
         // <style> block by removing our inline overrides.
-        (Object.keys({
-            '--primary': 0,
-            '--primary-foreground': 0,
-            '--accent': 0,
-            '--accent-foreground': 0,
-            '--ring': 0,
-            '--sidebar-primary': 0,
-            '--sidebar-primary-foreground': 0,
-            '--sidebar-ring': 0,
-            '--chart-1': 0,
-            '--chart-2': 0,
-            '--chart-3': 0,
-            '--chart-4': 0,
-            '--chart-5': 0,
-        }) as string[]).forEach((key) => {
+        (
+            Object.keys({
+                '--primary': 0,
+                '--primary-foreground': 0,
+                '--accent': 0,
+                '--accent-foreground': 0,
+                '--ring': 0,
+                '--sidebar-primary': 0,
+                '--sidebar-primary-foreground': 0,
+                '--sidebar-ring': 0,
+                '--chart-1': 0,
+                '--chart-2': 0,
+                '--chart-3': 0,
+                '--chart-4': 0,
+                '--chart-5': 0,
+            }) as string[]
+        ).forEach((key) => {
             document.documentElement.style.removeProperty(key);
         });
     }, []);

@@ -45,7 +45,11 @@ interface PageHeroStatsProps {
     className?: string;
 }
 
-export function PageHeroStats({ stats, layout = 'inline', className }: PageHeroStatsProps) {
+export function PageHeroStats({
+    stats,
+    layout = 'inline',
+    className,
+}: PageHeroStatsProps) {
     if (stats.length === 0) return null;
 
     if (layout === 'tiles') {
@@ -56,10 +60,14 @@ export function PageHeroStats({ stats, layout = 'inline', className }: PageHeroS
                     const content = (
                         <div className="rounded-xl border border-primary-foreground/15 bg-primary-foreground/10 px-4 py-2 text-center backdrop-blur-sm transition-colors hover:bg-primary-foreground/15">
                             <div className="flex items-center justify-center gap-2">
-                                {Icon ? <Icon className="h-4 w-4 text-primary-foreground/70" /> : null}
-                                <div className="text-lg font-bold tabular-nums">{stat.value}</div>
+                                {Icon ? (
+                                    <Icon className="h-4 w-4 text-primary-foreground/70" />
+                                ) : null}
+                                <div className="text-lg font-bold tabular-nums">
+                                    {stat.value}
+                                </div>
                             </div>
-                            <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-primary-foreground/60">
+                            <div className="mt-0.5 text-[10px] font-medium tracking-wider text-primary-foreground/60 uppercase">
                                 {stat.label}
                             </div>
                         </div>
@@ -78,16 +86,23 @@ export function PageHeroStats({ stats, layout = 'inline', className }: PageHeroS
     }
 
     return (
-        <div className={cn('flex flex-wrap items-start gap-x-6 gap-y-3 text-center', className)}>
+        <div
+            className={cn(
+                'flex flex-wrap items-start gap-x-6 gap-y-3 text-center',
+                className,
+            )}
+        >
             {stats.map((stat) => {
                 const inner = (
                     <div
                         className={cn(
                             'min-w-0',
-                            stat.hideOnMobile === false ? '' : 'hidden md:block',
+                            stat.hideOnMobile === false
+                                ? ''
+                                : 'hidden md:block',
                         )}
                     >
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-foreground/70">
+                        <p className="text-[10px] font-semibold tracking-wider text-primary-foreground/70 uppercase">
                             {stat.label}
                         </p>
                         <p
@@ -101,7 +116,9 @@ export function PageHeroStats({ stats, layout = 'inline', className }: PageHeroS
                             {stat.value}
                         </p>
                         {stat.sub ? (
-                            <p className="text-[11px] text-primary-foreground/70">{stat.sub}</p>
+                            <p className="text-[11px] text-primary-foreground/70">
+                                {stat.sub}
+                            </p>
                         ) : null}
                     </div>
                 );

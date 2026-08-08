@@ -17,6 +17,11 @@ class HrAsset extends Model
 {
     use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
+    public const HR_OWNED_CATEGORIES = ['uniform', 'card', 'other'];
+
+    /** Technology rows retained only as history until they are reconciled to Device. */
+    public const LEGACY_TECHNOLOGY_CATEGORIES = ['laptop', 'phone', 'tablet'];
+
     protected $fillable = [
         'asset_tag',
         'name',
@@ -102,6 +107,19 @@ class HrAsset extends Model
     public function isFleetLinked(): bool
     {
         return $this->fleet_asset_id !== null;
+    }
+
+    /** A pre-canonical technology row whose lifecycle now belongs to Security & Devices. */
+    public function isLegacyTechnology(): bool
+    {
+        return in_array($this->category, self::LEGACY_TECHNOLOGY_CATEGORIES, true);
+    }
+
+    /** Whether HR remains the authoritative lifecycle owner for this record. */
+    public function isHrLifecycleOwned(): bool
+    {
+        return ! $this->isFleetLinked()
+            && in_array($this->category, self::HR_OWNED_CATEGORIES, true);
     }
 
     /* ------------------------------------------------------------------ */

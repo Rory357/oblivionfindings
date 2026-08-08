@@ -131,6 +131,7 @@ class ItTicketController extends Controller
 
         $isAgent = $user->canDo('it.view') || $user->canDo('it.manage');
         $canManage = $this->workAccess->canWork($user, $ticket);
+        $canLinkDevices = $canManage && $user->canDo('securityDevices.devices.view');
         $isRequester = (int) $ticket->requester_user_id === (int) $user->id;
         $canComment = ! $ticket->isMerged() && in_array($ticket->status, ItTicket::OPEN_STATUSES, true);
         $replyUnavailableReason = match (true) {
@@ -309,7 +310,7 @@ class ItTicketController extends Controller
             // Rail picker over the canonical (fleet-)assets register — never
             // a parallel IT register. Agents only.
             'assetOptions' => $canManage ? $this->assetOptions($user, $ticket) : [],
-            'deviceOptions' => $canManage
+            'deviceOptions' => $canLinkDevices
                 ? $this->linkedContextOptions->devices($user, $ticket)
                 : [],
             'siteOptions' => $canManage
@@ -363,6 +364,7 @@ class ItTicketController extends Controller
                 : [],
             'can' => [
                 'manage' => $canManage,
+                'linkDevices' => $canLinkDevices,
                 'assignApplicationWide' => $canManage
                     && $this->workAccess->canAssignScope($user, null, true),
                 'view' => $isAgent,

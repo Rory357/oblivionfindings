@@ -34,12 +34,14 @@ final class ItModuleNavigation
         if ($canView) {
             $groups[] = [
                 'label' => 'Service Delivery',
-                'items' => [
-                    self::item('Service catalogue', '/it?tab=catalog', 'book-open'),
+                'items' => array_values(array_filter([
+                    $canRequest
+                        ? self::item('Service catalogue', '/it?tab=catalog', 'book-open')
+                        : null,
                     self::item('Provisioning', '/it?tab=provisioning', 'package-check'),
                     self::item('Knowledge', '/it?tab=knowledge', 'library'),
                     self::item('Reports', '/it?tab=reports', 'chart-no-axes-column'),
-                ],
+                ])),
             ];
             $groups[] = [
                 'label' => 'Operations',

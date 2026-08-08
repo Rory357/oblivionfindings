@@ -32,11 +32,19 @@ type ClinicalRecordCan = {
     assessmentsRecord?: boolean;
 };
 
-export function ClientClinicalRecordLaunchers({ client }: { client: ProfileClient }) {
-    const page = usePage<{ auth?: { can?: { clinical?: ClinicalRecordCan } } }>();
+export function ClientClinicalRecordLaunchers({
+    client,
+}: {
+    client: ProfileClient;
+}) {
+    const page = usePage<{
+        auth?: { can?: { clinical?: ClinicalRecordCan } };
+    }>();
     const can = page.props.auth?.can?.clinical ?? {};
 
-    const canRecordObs = !!(can.observationsRecord || can.observationsRecordClinical);
+    const canRecordObs = !!(
+        can.observationsRecord || can.observationsRecordClinical
+    );
     const canRecordEvent = !!can.eventsRecord;
     const canRecordAssessment = !!can.assessmentsRecord;
 
@@ -65,17 +73,33 @@ export function ClientClinicalRecordLaunchers({ client }: { client: ProfileClien
                 <Stethoscope className="h-3.5 w-3.5" /> Clinical record
             </span>
             {canRecordObs ? (
-                <Button variant="outline" size="sm" onClick={() => setObsOpen(true)} data-test="clinical-record-observation">
-                    <HeartPulse className="mr-1.5 h-4 w-4" /> Observation (NEWS2)
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setObsOpen(true)}
+                    data-test="clinical-record-observation"
+                >
+                    <HeartPulse className="mr-1.5 h-4 w-4" /> Observation
+                    (NEWS2)
                 </Button>
             ) : null}
             {canRecordEvent ? (
-                <Button variant="outline" size="sm" onClick={() => setEventOpen(true)} data-test="clinical-record-event">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEventOpen(true)}
+                    data-test="clinical-record-event"
+                >
                     <Stethoscope className="mr-1.5 h-4 w-4" /> Clinical event
                 </Button>
             ) : null}
             {canRecordAssessment ? (
-                <Button variant="outline" size="sm" onClick={() => setAssessmentOpen(true)} data-test="clinical-record-assessment">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAssessmentOpen(true)}
+                    data-test="clinical-record-assessment"
+                >
                     <ClipboardList className="mr-1.5 h-4 w-4" /> Risk assessment
                 </Button>
             ) : null}

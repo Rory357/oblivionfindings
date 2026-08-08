@@ -54,10 +54,12 @@ export default function MyHrShoutouts({ myHr, received, given }: Props) {
                         <Megaphone className="h-6 w-6" />
                     </span>
                     <div className="min-w-0 flex-1">
-                        <div className="text-[15.5px] font-bold">Shout-outs</div>
+                        <div className="text-[15.5px] font-bold">
+                            Shout-outs
+                        </div>
                         <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted-foreground">
-                            Recognition from your team — and the ones you’ve given. React,
-                            reply and close the loop. 💛
+                            Recognition from your team — and the ones you’ve
+                            given. React, reply and close the loop. 💛
                         </p>
                     </div>
                     <button

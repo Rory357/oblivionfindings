@@ -17,6 +17,7 @@ import { type MouseEvent as ReactMouseEvent, useMemo } from 'react';
 
 import { cn } from '@/lib/utils';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
 import { useHandoverContextMenu } from './handover-context-menu';
 import {
     type Handover,
@@ -31,7 +32,6 @@ import {
     relTime,
     ymd,
 } from './shared';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 export function EmptyState() {
     return (
@@ -131,7 +131,8 @@ function HandoverCard({
                 >
                     <StatusPill status={h.status} />
                     {h.status === 'draft' && h.can_submit ? (
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             type="button"
                             onClick={() => onSubmit(h)}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold transition-colors hover:bg-accent"
@@ -141,7 +142,8 @@ function HandoverCard({
                         </GuardrailButton>
                     ) : null}
                     {h.status === 'submitted' && h.can_acknowledge ? (
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             type="button"
                             onClick={() => onAcknowledge(h)}
                             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
@@ -168,7 +170,8 @@ function HandoverCard({
                 {h.outgoing_shift ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground">
                         <Clock className="h-3 w-3" />
-                        {h.outgoing_shift.label} · {fmtShiftRange(h.outgoing_shift)}
+                        {h.outgoing_shift.label} ·{' '}
+                        {fmtShiftRange(h.outgoing_shift)}
                     </span>
                 ) : null}
                 {h.site ? (
@@ -265,37 +268,37 @@ export function CardsView({
 
     return (
         <>
-        <div className="space-y-6">
-            {groups.map((g) => (
-                <div key={ymd(g.date)} className="space-y-3">
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm font-bold">
-                            {dayLabel(g.date)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                            {g.date.toLocaleDateString('en-NZ', {
-                                day: 'numeric',
-                                month: 'long',
-                            })}
-                        </span>
-                        <span className="h-px flex-1 bg-border" />
-                        <span className="text-xs text-muted-foreground tabular-nums">
-                            {g.items.length} handover
-                            {g.items.length === 1 ? '' : 's'}
-                        </span>
+            <div className="space-y-6">
+                {groups.map((g) => (
+                    <div key={ymd(g.date)} className="space-y-3">
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold">
+                                {dayLabel(g.date)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                {g.date.toLocaleDateString('en-NZ', {
+                                    day: 'numeric',
+                                    month: 'long',
+                                })}
+                            </span>
+                            <span className="h-px flex-1 bg-border" />
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                                {g.items.length} handover
+                                {g.items.length === 1 ? '' : 's'}
+                            </span>
+                        </div>
+                        {g.items.map((h) => (
+                            <HandoverCard
+                                key={h.id}
+                                h={h}
+                                {...handlers}
+                                onContextMenu={openCtx}
+                            />
+                        ))}
                     </div>
-                    {g.items.map((h) => (
-                        <HandoverCard
-                            key={h.id}
-                            h={h}
-                            {...handlers}
-                            onContextMenu={openCtx}
-                        />
-                    ))}
-                </div>
-            ))}
-        </div>
-        {menu}
+                ))}
+            </div>
+            {menu}
         </>
     );
 }

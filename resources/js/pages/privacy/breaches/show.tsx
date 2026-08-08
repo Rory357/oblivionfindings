@@ -54,8 +54,7 @@ export default function ShowDataBreach({ breach }: Props) {
     };
 
     const authorityNotificationPending =
-        breach.requires_authority_notification &&
-        !breach.authority_notified_at;
+        breach.requires_authority_notification && !breach.authority_notified_at;
 
     return (
         <AppLayout
@@ -77,9 +76,14 @@ export default function ShowDataBreach({ breach }: Props) {
                         backHref="/privacy/breaches"
                         backLabel="Back to List"
                         title={breach.breach_reference}
-                        description={statusLabels[breach.status] ?? breach.status}
+                        description={
+                            statusLabels[breach.status] ?? breach.status
+                        }
                     >
-                        <div className="flex flex-wrap gap-2" data-test="privacy-breach-show">
+                        <div
+                            className="flex flex-wrap gap-2"
+                            data-test="privacy-breach-show"
+                        >
                             <Badge
                                 className={getStatusColor(breach.status)}
                                 data-test="privacy-breach-status"

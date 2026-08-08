@@ -42,7 +42,6 @@ import {
     Send,
     Settings2,
     Shield,
-    Smartphone,
     Users,
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';

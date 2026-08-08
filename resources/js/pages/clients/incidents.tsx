@@ -204,7 +204,8 @@ export default function ClientIncidents({
                                     <Link href={`/clients/${client.id}`}>
                                         Back to{' '}
                                         {(
-                                            labels?.['client.singular'] ?? 'Client'
+                                            labels?.['client.singular'] ??
+                                            'Client'
                                         ).toLowerCase()}
                                     </Link>
                                 </Button>

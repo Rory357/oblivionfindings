@@ -25,7 +25,12 @@ export function AssetsHubTabs({
     onItemContextMenu?: (id: string, event: React.MouseEvent) => void;
 }) {
     const items: HrTabItem[] = [
-        { id: 'overview', label: 'Overview', icon: LayoutDashboard, tone: 'primary' },
+        {
+            id: 'overview',
+            label: 'Overview',
+            icon: LayoutDashboard,
+            tone: 'primary',
+        },
         {
             id: 'inventory',
             label: 'Inventory',

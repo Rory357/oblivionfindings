@@ -6,6 +6,16 @@
  * write goes through POST /meds/today/record → EnhancedMarService, so witness
  * rules, CD register entries and the audit trail run exactly like the admin
  * recording path. */
+import {
+    CdBadge,
+    ClientSummaryCard,
+    StatusPill,
+} from '@/components/meds/board-bits';
+import {
+    MedsWizardDialog,
+    SummaryRow,
+    type MedsWizardStep,
+} from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,16 +29,6 @@ import {
     StepHead,
     SubHead,
 } from '@/components/wizard/primitives';
-import {
-    CdBadge,
-    ClientSummaryCard,
-    StatusPill,
-} from '@/components/meds/board-bits';
-import {
-    MedsWizardDialog,
-    SummaryRow,
-    type MedsWizardStep,
-} from '@/components/meds/wizard-shell';
 import { cn } from '@/lib/utils';
 import { useForm } from '@inertiajs/react';
 import {
@@ -174,9 +174,7 @@ export function RecordDoseWizard({
 
     const toggleRight = (key: string) =>
         setRights((prev) =>
-            prev.includes(key)
-                ? prev.filter((k) => k !== key)
-                : [...prev, key],
+            prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
         );
 
     // Recording an overdue dose lands outside the MAR dosing window, and the
@@ -200,14 +198,16 @@ export function RecordDoseWizard({
             if (needsLateReason && !form.data.reason.trim())
                 e.reason = 'Explain why this dose is being recorded late';
             if (needsWitness && !form.data.witnessed_by)
-                e.witnessed_by =
-                    'A witness is required for this medication';
-            if (needsWitness && form.data.witnessed_by && !form.data.witness_credential)
+                e.witnessed_by = 'A witness is required for this medication';
+            if (
+                needsWitness &&
+                form.data.witnessed_by &&
+                !form.data.witness_credential
+            )
                 e.witness_credential =
                     'The witness confirms by entering their password';
             if (needsBalance && form.data.quantity_administered === '')
-                e.quantity_administered =
-                    'Record how many units were given';
+                e.quantity_administered = 'Record how many units were given';
             if (needsBalance && form.data.cd_balance === '')
                 e.cd_balance = 'Record the running balance';
         }
@@ -227,7 +227,8 @@ export function RecordDoseWizard({
             client_medication_id: data.client_medication_id,
             scheduled_for: data.scheduled_for,
             status: data.status,
-            reason_code: data.status === 'given' ? null : data.reason_code || null,
+            reason_code:
+                data.status === 'given' ? null : data.reason_code || null,
             reason: data.reason.trim() || null,
             // No timezone suffix — the backend parses bare datetimes in the
             // worker timezone (Pacific/Auckland), matching the board's day.
@@ -314,13 +315,21 @@ export function RecordDoseWizard({
                 <>
                     <div>
                         {stepIndex > 0 ? (
-                            <Button type="button" variant="ghost" onClick={back}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={back}
+                            >
                                 <ChevronLeft className="h-4 w-4" /> Back
                             </Button>
                         ) : null}
                     </div>
                     <div className="flex items-center gap-2.5">
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
                             Cancel
                         </Button>
                         {isReview ? (
@@ -354,7 +363,7 @@ export function RecordDoseWizard({
             {stepIndex === 0 ? (
                 <div
                     key="verify"
-                    className="animate-in fade-in slide-in-from-right-2 duration-300"
+                    className="animate-in duration-300 fade-in slide-in-from-right-2"
                 >
                     <StepHead
                         icon={Shield}
@@ -391,11 +400,12 @@ export function RecordDoseWizard({
 
                         {row.status === 'overdue' || row.status === 'missed' ? (
                             <InfoCard icon={AlertTriangle} tone="warn">
-                                <strong>This dose is overdue.</strong> It was due at{' '}
-                                {row.time} and the dosing window has passed. Record what
-                                actually happened — give it now (you’ll be asked why it’s
-                                late), or mark it refused/withheld with a reason. Don’t
-                                leave it unrecorded.
+                                <strong>This dose is overdue.</strong> It was
+                                due at {row.time} and the dosing window has
+                                passed. Record what actually happened — give it
+                                now (you’ll be asked why it’s late), or mark it
+                                refused/withheld with a reason. Don’t leave it
+                                unrecorded.
                             </InfoCard>
                         ) : null}
 
@@ -463,7 +473,7 @@ export function RecordDoseWizard({
             {stepIndex === 1 ? (
                 <div
                     key="record"
-                    className="animate-in fade-in slide-in-from-right-2 duration-300"
+                    className="animate-in duration-300 fade-in slide-in-from-right-2"
                 >
                     <StepHead
                         icon={ClipboardCheck}
@@ -476,7 +486,11 @@ export function RecordDoseWizard({
                                 value={outcome}
                                 onChange={(v) => form.setData('status', v)}
                                 options={[
-                                    { value: 'given', label: 'Given', icon: Check },
+                                    {
+                                        value: 'given',
+                                        label: 'Given',
+                                        icon: Check,
+                                    },
                                     {
                                         value: 'refused',
                                         label: 'Refused',
@@ -679,7 +693,9 @@ export function RecordDoseWizard({
                                             type="number"
                                             step="0.1"
                                             min={0}
-                                            value={form.data.blood_glucose_level}
+                                            value={
+                                                form.data.blood_glucose_level
+                                            }
                                             onChange={(e) =>
                                                 form.setData(
                                                     'blood_glucose_level',
@@ -811,7 +827,7 @@ export function RecordDoseWizard({
             {isReview ? (
                 <div
                     key="review"
-                    className="animate-in fade-in slide-in-from-right-2 duration-300"
+                    className="animate-in duration-300 fade-in slide-in-from-right-2"
                 >
                     <StepHead
                         icon={FileText}

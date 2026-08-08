@@ -112,6 +112,11 @@ class SecurityWorkspaceTest extends TestCase
                     ['offline_devices', 'unmonitored_devices', 'unprocessed_events', 'overdue_maintenance', 'active_control_room_alerts'],
                     collect($security['overview']['requiredActions'])->pluck('key')->all(),
                 );
+                $this->assertSame(
+                    '/security-devices/devices?domain=security&view=unmonitored',
+                    collect($security['overview']['requiredActions'])
+                        ->firstWhere('key', 'unmonitored_devices')['href'],
+                );
                 $this->assertContains(
                     'Unrelated camera',
                     collect($security['activeTab']['devices'])->pluck('name')->all(),
@@ -257,6 +262,8 @@ class SecurityWorkspaceTest extends TestCase
                 $this->assertSame('triggered', $devices['Driveway beam']['observed']['sensor_state']);
                 $this->assertSame(['alarm_trigger'], collect($active['recentEvents'])->pluck('type')->all());
                 $this->assertSame(['Reception alarm'], collect($active['controlRoomAlerts'])->pluck('title')->all());
+                $this->assertSame('available', $active['controlRoomAlerts'][0]['access']['state']);
+                $this->assertNotNull($active['controlRoomAlerts'][0]['href']);
                 $this->assertSame('Panel battery test', $devices['Main panel']['maintenance']['next']['description']);
             });
     }
@@ -514,6 +521,88 @@ class SecurityWorkspaceTest extends TestCase
             'assignment_type' => 'permanent',
             'assigned_at' => now(),
         ]);
+    }
+
+    public function test_all_sites_security_scope_does_not_emit_an_unreadable_control_room_alert_link(): void
+    {
+        $assignedSite = Site::factory()->create();
+        $unrelatedSite = Site::factory()->create();
+        $viewer = $this->viewerWithRole('support_worker');
+        $permissionIds = Permission::query()
+            ->whereIn('key', [
+                'securityDevices.devices.viewAllSites',
+                'controlRoom.viewAny',
+                'controlRoom.alerts.view',
+            ])
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])
+            ->all();
+        $viewer->permissionOverrides()->syncWithoutDetaching($permissionIds);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $assignedSite->id,
+            'secondary_site_ids' => [],
+        ]);
+        $panel = Device::factory()->create([
+            'domain' => 'security',
+            'category' => 'alarm',
+        ]);
+        $this->assignToSite($panel, $unrelatedSite);
+        $this->createControlRoomAlert($panel, $unrelatedSite, 'Private alarm detail');
+
+        $this->actingAs($viewer)
+            ->get('/security-devices/security?tab=alarms')
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $alert = $page->toArray()['props']['securityWorkspace']['activeTab']['controlRoomAlerts'][0];
+
+                $this->assertSame('restricted', $alert['access']['state']);
+                $this->assertSame('Control Room alert access required', $alert['access']['label']);
+                $this->assertNull($alert['href']);
+                $this->assertNull($alert['reference']);
+                $this->assertSame('Control Room alert', $alert['title']);
+                $this->assertNotSame('Private alarm detail', $alert['title']);
+            });
+    }
+
+    public function test_alert_detail_permission_does_not_emit_an_inaccessible_control_room_queue_action(): void
+    {
+        $site = Site::factory()->create();
+        $viewer = $this->viewerWithRole('support_worker');
+        $permissions = Permission::query()
+            ->whereIn('key', [
+                'securityDevices.devices.view',
+                'securityDevices.devices.viewAllSites',
+                'controlRoom.alerts.view',
+                'controlRoom.viewAny',
+            ])
+            ->get()
+            ->mapWithKeys(fn (Permission $permission): array => [
+                $permission->id => [
+                    'allowed' => $permission->key !== 'controlRoom.viewAny',
+                ],
+            ])
+            ->all();
+        $viewer->permissionOverrides()->syncWithoutDetaching($permissions);
+        $panel = Device::factory()->create([
+            'domain' => 'security',
+            'category' => 'alarm',
+        ]);
+        $this->assignToSite($panel, $site);
+        $this->createControlRoomAlert($panel, $site, 'Readable alert');
+
+        $this->actingAs($viewer)
+            ->get('/security-devices/security')
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $overview = $page->toArray()['props']['securityWorkspace']['overview'];
+
+                $this->assertSame(1, $overview['attention']['active_control_room_alerts']);
+                $this->assertNotContains(
+                    'active_control_room_alerts',
+                    collect($overview['requiredActions'])->pluck('key')->all(),
+                );
+            });
     }
 
     private function assignToStaff(Device $device, User $viewer): void

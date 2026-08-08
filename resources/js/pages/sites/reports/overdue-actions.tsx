@@ -1,11 +1,24 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
 import { AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 
@@ -38,7 +51,11 @@ const severityColors: Record<string, string> = {
     critical: 'bg-status-critical-bg text-status-critical',
 };
 
-export default function OverdueActions({ overdueActions, sites, filters }: Props) {
+export default function OverdueActions({
+    overdueActions,
+    sites,
+    filters,
+}: Props) {
     const [siteId, setSiteId] = useState(filters.site_id || '');
     const [severity, setSeverity] = useState(filters.severity || '');
 
@@ -46,20 +63,29 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
         const params: Record<string, string> = {};
         if (siteId) params.site_id = siteId;
         if (severity) params.severity = severity;
-        router.get('/sites/reports/overdue-actions', params, { preserveState: true });
+        router.get('/sites/reports/overdue-actions', params, {
+            preserveState: true,
+        });
     };
 
     const daysOverdue = (dueDate: string) => {
         const due = new Date(dueDate);
         const now = new Date();
-        return Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+        return Math.floor(
+            (now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24),
+        );
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Reports', href: '/sites/reports' },
-            { title: 'Overdue Actions', href: '/sites/reports/overdue-actions' },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Reports', href: '/sites/reports' },
+                {
+                    title: 'Overdue Actions',
+                    href: '/sites/reports/overdue-actions',
+                },
+            ]}
+        >
             <Head title="Overdue Corrective Actions" />
 
             <PageLayout
@@ -69,9 +95,24 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                         title="Overdue Corrective Actions"
                         description="Hazards past their due date that remain open"
                         stats={[
-                            { label: 'Total overdue', value: overdueActions.length },
-                            { label: 'High/Critical', value: overdueActions.filter(a => a.severity === 'critical' || a.severity === 'high').length },
-                            { label: 'Unassigned', value: overdueActions.filter(a => !a.assigned_to).length },
+                            {
+                                label: 'Total overdue',
+                                value: overdueActions.length,
+                            },
+                            {
+                                label: 'High/Critical',
+                                value: overdueActions.filter(
+                                    (a) =>
+                                        a.severity === 'critical' ||
+                                        a.severity === 'high',
+                                ).length,
+                            },
+                            {
+                                label: 'Unassigned',
+                                value: overdueActions.filter(
+                                    (a) => !a.assigned_to,
+                                ).length,
+                            },
                         ]}
                     />
                 }
@@ -82,15 +123,21 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                         <CardTitle className="text-sm">Filters</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="flex gap-4 flex-wrap">
+                        <div className="flex flex-wrap gap-4">
                             <div className="w-48">
-                                <Select value={siteId || undefined} onValueChange={setSiteId}>
+                                <Select
+                                    value={siteId || undefined}
+                                    onValueChange={setSiteId}
+                                >
                                     <SelectTrigger>
                                         <SelectValue placeholder="All Sites" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {sites.map(site => (
-                                            <SelectItem key={site.id} value={String(site.id)}>
+                                        {sites.map((site) => (
+                                            <SelectItem
+                                                key={site.id}
+                                                value={String(site.id)}
+                                            >
                                                 {site.name}
                                             </SelectItem>
                                         ))}
@@ -98,25 +145,40 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                                 </Select>
                             </div>
                             <div className="w-40">
-                                <Select value={severity || undefined} onValueChange={setSeverity}>
+                                <Select
+                                    value={severity || undefined}
+                                    onValueChange={setSeverity}
+                                >
                                     <SelectTrigger>
                                         <SelectValue placeholder="All Severity" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="low">Low</SelectItem>
-                                        <SelectItem value="medium">Medium</SelectItem>
-                                        <SelectItem value="high">High</SelectItem>
-                                        <SelectItem value="critical">Critical</SelectItem>
+                                        <SelectItem value="medium">
+                                            Medium
+                                        </SelectItem>
+                                        <SelectItem value="high">
+                                            High
+                                        </SelectItem>
+                                        <SelectItem value="critical">
+                                            Critical
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <Button variant="outline" onClick={applyFilters}>Apply</Button>
+                            <Button variant="outline" onClick={applyFilters}>
+                                Apply
+                            </Button>
                             <Button
                                 variant="ghost"
                                 onClick={() => {
                                     setSiteId('');
                                     setSeverity('');
-                                    router.get('/sites/reports/overdue-actions', {}, { preserveState: true });
+                                    router.get(
+                                        '/sites/reports/overdue-actions',
+                                        {},
+                                        { preserveState: true },
+                                    );
                                 }}
                             >
                                 Clear
@@ -134,7 +196,9 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                     </CardHeader>
                     <CardContent>
                         {overdueActions.length === 0 ? (
-                            <p className="text-sm text-muted-foreground text-center py-8">No overdue corrective actions found.</p>
+                            <p className="py-8 text-center text-sm text-muted-foreground">
+                                No overdue corrective actions found.
+                            </p>
                         ) : (
                             <Table>
                                 <TableHeader>
@@ -153,33 +217,60 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                                     {overdueActions.map((action) => (
                                         <TableRow key={action.id}>
                                             <TableCell className="font-mono text-sm">
-                                                {action.reference_number || `#${action.id}`}
+                                                {action.reference_number ||
+                                                    `#${action.id}`}
                                             </TableCell>
-                                            <TableCell>{action.site?.name || 'N/A'}</TableCell>
+                                            <TableCell>
+                                                {action.site?.name || 'N/A'}
+                                            </TableCell>
                                             <TableCell className="max-w-xs truncate">
                                                 {action.description}
                                             </TableCell>
                                             <TableCell>
-                                                <Badge className={severityColors[action.severity] || ''}>
+                                                <Badge
+                                                    className={
+                                                        severityColors[
+                                                            action.severity
+                                                        ] || ''
+                                                    }
+                                                >
                                                     {action.severity}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
                                                 {action.assigned_to?.name || (
-                                                    <span className="text-muted-foreground">Unassigned</span>
+                                                    <span className="text-muted-foreground">
+                                                        Unassigned
+                                                    </span>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
-                                                {new Date(action.due_date).toLocaleDateString()}
+                                                {new Date(
+                                                    action.due_date,
+                                                ).toLocaleDateString()}
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className="text-status-critical">
-                                                    {daysOverdue(action.due_date)} days
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-status-critical"
+                                                >
+                                                    {daysOverdue(
+                                                        action.due_date,
+                                                    )}{' '}
+                                                    days
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                <Button asChild variant="ghost" size="sm">
-                                                    <Link href={`/hazards/${action.id}`}>View</Link>
+                                                <Button
+                                                    asChild
+                                                    variant="ghost"
+                                                    size="sm"
+                                                >
+                                                    <Link
+                                                        href={`/hazards/${action.id}`}
+                                                    >
+                                                        View
+                                                    </Link>
                                                 </Button>
                                             </TableCell>
                                         </TableRow>

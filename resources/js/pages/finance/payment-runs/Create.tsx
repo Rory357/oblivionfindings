@@ -1,17 +1,30 @@
-import AppLayout from '@/layouts/app-layout';
+import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { Banknote, FileText } from 'lucide-react';
-import { PageHero, PageLayout } from '@/components/page';
-import { formatMoney } from '@/components/finance/money';
 import { useMemo } from 'react';
 
 type BankAccount = {
@@ -66,7 +79,10 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
     };
 
     const selectAll = () => {
-        setData('bill_ids', bills.map((b) => b.id));
+        setData(
+            'bill_ids',
+            bills.map((b) => b.id),
+        );
     };
 
     const deselectAll = () => {
@@ -79,7 +95,9 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
     };
 
     const isOverdue = (dueDate: string) => {
-        return new Date(dueDate) < new Date(new Date().toISOString().slice(0, 10));
+        return (
+            new Date(dueDate) < new Date(new Date().toISOString().slice(0, 10))
+        );
     };
 
     return (
@@ -88,7 +106,8 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/payment-runs"
                         title="New Payment Run"
@@ -107,37 +126,58 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="bank_account_id">Bank Account</Label>
+                                    <Label htmlFor="bank_account_id">
+                                        Bank Account
+                                    </Label>
                                     <Select
                                         value={String(data.bank_account_id)}
-                                        onValueChange={(val) => setData('bank_account_id', Number(val))}
+                                        onValueChange={(val) =>
+                                            setData(
+                                                'bank_account_id',
+                                                Number(val),
+                                            )
+                                        }
                                     >
                                         <SelectTrigger id="bank_account_id">
                                             <SelectValue placeholder="Select bank account" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {bankAccounts.map((acc) => (
-                                                <SelectItem key={acc.id} value={String(acc.id)}>
+                                                <SelectItem
+                                                    key={acc.id}
+                                                    value={String(acc.id)}
+                                                >
                                                     {acc.name} ({acc.bank_name})
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {errors.bank_account_id && (
-                                        <p className="text-sm text-destructive">{errors.bank_account_id}</p>
+                                        <p className="text-sm text-destructive">
+                                            {errors.bank_account_id}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="payment_date">Payment Date</Label>
+                                    <Label htmlFor="payment_date">
+                                        Payment Date
+                                    </Label>
                                     <Input
                                         id="payment_date"
                                         type="date"
                                         value={data.payment_date}
-                                        onChange={(e) => setData('payment_date', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'payment_date',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                     {errors.payment_date && (
-                                        <p className="text-sm text-destructive">{errors.payment_date}</p>
+                                        <p className="text-sm text-destructive">
+                                            {errors.payment_date}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -147,12 +187,16 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
                                 <Textarea
                                     id="notes"
                                     value={data.notes}
-                                    onChange={(e) => setData('notes', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('notes', e.target.value)
+                                    }
                                     placeholder="Optional notes for this payment run..."
                                     rows={2}
                                 />
                                 {errors.notes && (
-                                    <p className="text-sm text-destructive">{errors.notes}</p>
+                                    <p className="text-sm text-destructive">
+                                        {errors.notes}
+                                    </p>
                                 )}
                             </div>
                         </CardContent>
@@ -166,10 +210,20 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
                                     <CardTitle>Select Bills</CardTitle>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <Button type="button" variant="outline" size="sm" onClick={selectAll}>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={selectAll}
+                                    >
                                         Select All
                                     </Button>
-                                    <Button type="button" variant="outline" size="sm" onClick={deselectAll}>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={deselectAll}
+                                    >
                                         Deselect All
                                     </Button>
                                 </div>
@@ -177,12 +231,15 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
                         </CardHeader>
                         <CardContent>
                             {errors.bill_ids && (
-                                <p className="mb-4 text-sm text-destructive">{errors.bill_ids}</p>
+                                <p className="mb-4 text-sm text-destructive">
+                                    {errors.bill_ids}
+                                </p>
                             )}
 
                             {bills.length === 0 ? (
                                 <div className="py-12 text-center text-muted-foreground">
-                                    No approved or partially-paid bills available for payment.
+                                    No approved or partially-paid bills
+                                    available for payment.
                                 </div>
                             ) : (
                                 <>
@@ -194,7 +251,9 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
                                                 <TableHead>Bill #</TableHead>
                                                 <TableHead>Bill Date</TableHead>
                                                 <TableHead>Due Date</TableHead>
-                                                <TableHead className="text-right">Amount Due</TableHead>
+                                                <TableHead className="text-right">
+                                                    Amount Due
+                                                </TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -202,31 +261,51 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
                                                 <TableRow
                                                     key={bill.id}
                                                     className="cursor-pointer"
-                                                    onClick={() => toggleBill(bill.id)}
+                                                    onClick={() =>
+                                                        toggleBill(bill.id)
+                                                    }
                                                 >
                                                     <TableCell>
                                                         <Checkbox
-                                                            checked={data.bill_ids.includes(bill.id)}
-                                                            onCheckedChange={() => toggleBill(bill.id)}
+                                                            checked={data.bill_ids.includes(
+                                                                bill.id,
+                                                            )}
+                                                            onCheckedChange={() =>
+                                                                toggleBill(
+                                                                    bill.id,
+                                                                )
+                                                            }
                                                         />
                                                     </TableCell>
                                                     <TableCell className="font-medium">
-                                                        {bill.vendor?.name || '-'}
+                                                        {bill.vendor?.name ||
+                                                            '-'}
                                                     </TableCell>
-                                                    <TableCell className="font-mono">{bill.bill_number}</TableCell>
-                                                    <TableCell>{bill.bill_date}</TableCell>
+                                                    <TableCell className="font-mono">
+                                                        {bill.bill_number}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {bill.bill_date}
+                                                    </TableCell>
                                                     <TableCell>
                                                         <span className="flex items-center gap-2">
                                                             {bill.due_date}
-                                                            {isOverdue(bill.due_date) && (
-                                                                <Badge variant="destructive" className="text-xs">
+                                                            {isOverdue(
+                                                                bill.due_date,
+                                                            ) && (
+                                                                <Badge
+                                                                    variant="destructive"
+                                                                    className="text-xs"
+                                                                >
                                                                     Overdue
                                                                 </Badge>
                                                             )}
                                                         </span>
                                                     </TableCell>
                                                     <TableCell className="text-right font-mono tabular-nums">
-                                                        {formatMoney(bill.amount_due)}
+                                                        {formatMoney(
+                                                            bill.amount_due,
+                                                        )}
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
@@ -235,11 +314,14 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
 
                                     <div className="mt-4 flex items-center justify-between border-t pt-4">
                                         <span className="text-sm text-muted-foreground">
-                                            {data.bill_ids.length} of {bills.length} bills selected
+                                            {data.bill_ids.length} of{' '}
+                                            {bills.length} bills selected
                                         </span>
                                         <div className="text-right">
-                                            <span className="text-sm text-muted-foreground">Selected Total: </span>
-                                            <span className="text-lg font-semibold font-mono tabular-nums">
+                                            <span className="text-sm text-muted-foreground">
+                                                Selected Total:{' '}
+                                            </span>
+                                            <span className="font-mono text-lg font-semibold tabular-nums">
                                                 {formatMoney(selectedTotal)}
                                             </span>
                                         </div>
@@ -252,7 +334,11 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
                     <div className="flex justify-end">
                         <Button
                             type="submit"
-                            disabled={processing || data.bill_ids.length === 0 || !data.bank_account_id}
+                            disabled={
+                                processing ||
+                                data.bill_ids.length === 0 ||
+                                !data.bank_account_id
+                            }
                             size="lg"
                         >
                             Create Payment Run

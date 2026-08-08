@@ -1,6 +1,6 @@
-import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 
 export type EligibilityStatus = 'eligible' | 'warnings' | 'blocked';
 
@@ -10,33 +10,44 @@ interface EligibilityStatusBadgeProps {
     className?: string;
 }
 
-const config: Record<EligibilityStatus, {
-    label: string;
-    icon: typeof CheckCircle2;
-    badgeClass: string;
-}> = {
+const config: Record<
+    EligibilityStatus,
+    {
+        label: string;
+        icon: typeof CheckCircle2;
+        badgeClass: string;
+    }
+> = {
     eligible: {
         label: 'Eligible',
         icon: CheckCircle2,
-        badgeClass: 'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success',
+        badgeClass:
+            'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success',
     },
     warnings: {
         label: 'Warnings',
         icon: AlertTriangle,
-        badgeClass: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning',
+        badgeClass:
+            'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning',
     },
     blocked: {
         label: 'Blocked',
         icon: XCircle,
-        badgeClass: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical',
+        badgeClass:
+            'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical',
     },
 };
 
-export function EligibilityStatusBadge({ status, warningCount, className }: EligibilityStatusBadgeProps) {
+export function EligibilityStatusBadge({
+    status,
+    warningCount,
+    className,
+}: EligibilityStatusBadgeProps) {
     const { label, icon: Icon, badgeClass } = config[status];
-    const displayLabel = status === 'warnings' && warningCount
-        ? `${warningCount} ${warningCount === 1 ? 'Warning' : 'Warnings'}`
-        : label;
+    const displayLabel =
+        status === 'warnings' && warningCount
+            ? `${warningCount} ${warningCount === 1 ? 'Warning' : 'Warnings'}`
+            : label;
 
     return (
         <Badge variant="outline" className={cn(badgeClass, className)}>

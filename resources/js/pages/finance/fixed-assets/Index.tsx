@@ -1,6 +1,3 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     FixedAssetDialog,
     LedgerTabsFooter,
@@ -11,27 +8,9 @@ import {
     type RowCtxItem,
 } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -42,8 +21,40 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { EmptyList } from '@/components/ui/empty-state';
-import { Eye, Pencil, Plus, Search, Package, DollarSign, TrendingDown, Calculator, Hash, Download } from 'lucide-react';
-import { useState, useCallback, FormEvent } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import {
+    Calculator,
+    DollarSign,
+    Download,
+    Eye,
+    Hash,
+    Package,
+    Pencil,
+    Plus,
+    Search,
+    TrendingDown,
+} from 'lucide-react';
+import { FormEvent, useCallback, useState } from 'react';
 
 interface FixedAsset {
     id: number;
@@ -119,7 +130,14 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Fixed Assets', href: '/finance/fixed-assets' },
 ];
 
-export default function FixedAssetsIndex({ assets, summary, filters, canManage = false, assetAccounts = [], expenseAccounts = [] }: Props) {
+export default function FixedAssetsIndex({
+    assets,
+    summary,
+    filters,
+    canManage = false,
+    assetAccounts = [],
+    expenseAccounts = [],
+}: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const [depModalOpen, setDepModalOpen] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
@@ -182,10 +200,20 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
     const rowMenu = useRowContextMenu();
     const rowMenuItems = (asset: FixedAsset): RowCtxItem[] => {
         const items: RowCtxItem[] = [
-            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/fixed-assets/${asset.id}`) },
+            {
+                kind: 'item',
+                label: 'Open',
+                icon: Eye,
+                onSelect: () => router.get(`/finance/fixed-assets/${asset.id}`),
+            },
         ];
         if (canManage && asset.status !== 'disposed') {
-            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => openEdit(asset) });
+            items.push({
+                kind: 'item',
+                label: 'Edit',
+                icon: Pencil,
+                onSelect: () => openEdit(asset),
+            });
         }
         return items;
     };
@@ -196,68 +224,131 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         footer={<LedgerTabsFooter active="fixed-assets" />}
                         icon={Package}
                         title="Fixed Assets"
                         description="Manage your organisation's fixed asset register"
                         stats={[
-                            { label: 'Total assets', value: summary.total_count },
-                            { label: 'Total cost', value: formatMoney(summary.total_cost) },
-                            { label: 'Depreciation', value: formatMoney(summary.total_depreciation) },
-                            { label: 'Book value', value: formatMoney(summary.net_book_value) },
+                            {
+                                label: 'Total assets',
+                                value: summary.total_count,
+                            },
+                            {
+                                label: 'Total cost',
+                                value: formatMoney(summary.total_cost),
+                            },
+                            {
+                                label: 'Depreciation',
+                                value: formatMoney(summary.total_depreciation),
+                            },
+                            {
+                                label: 'Book value',
+                                value: formatMoney(summary.net_book_value),
+                            },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
-                                <Button size="sm" variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
-                                    <a href={`/finance/fixed-assets/export?${new URLSearchParams(Object.entries({ category: filters.category ?? '', status: filters.status ?? '', search: filters.search ?? '' }).filter(([, v]) => v)).toString()}`}>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    asChild
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <a
+                                        href={`/finance/fixed-assets/export?${new URLSearchParams(Object.entries({ category: filters.category ?? '', status: filters.status ?? '', search: filters.search ?? '' }).filter(([, v]) => v)).toString()}`}
+                                    >
                                         <Download className="mr-1.5 h-4 w-4" />
                                         Export CSV
                                     </a>
                                 </Button>
-                                <Dialog open={depModalOpen} onOpenChange={setDepModalOpen}>
+                                <Dialog
+                                    open={depModalOpen}
+                                    onOpenChange={setDepModalOpen}
+                                >
                                     <DialogTrigger asChild>
-                                        <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                        >
                                             <Calculator className="mr-1.5 h-4 w-4" />
                                             Run Depreciation
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent>
                                         <DialogHeader>
-                                            <DialogTitle>Run Depreciation</DialogTitle>
+                                            <DialogTitle>
+                                                Run Depreciation
+                                            </DialogTitle>
                                             <DialogDescription>
-                                                Process monthly depreciation for all active assets. This will create depreciation
-                                                records and post GL journals.
+                                                Process monthly depreciation for
+                                                all active assets. This will
+                                                create depreciation records and
+                                                post GL journals.
                                             </DialogDescription>
                                         </DialogHeader>
                                         <form onSubmit={handleRunDepreciation}>
                                             <div className="space-y-4 py-4">
                                                 <div className="space-y-1.5">
-                                                    <Label htmlFor="depreciation_date">Depreciation Date</Label>
+                                                    <Label htmlFor="depreciation_date">
+                                                        Depreciation Date
+                                                    </Label>
                                                     <Input
                                                         id="depreciation_date"
                                                         type="date"
-                                                        value={depForm.data.depreciation_date}
-                                                        onChange={(e) => depForm.setData('depreciation_date', e.target.value)}
+                                                        value={
+                                                            depForm.data
+                                                                .depreciation_date
+                                                        }
+                                                        onChange={(e) =>
+                                                            depForm.setData(
+                                                                'depreciation_date',
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                     />
-                                                    {depForm.errors.depreciation_date && (
-                                                        <p className="text-sm text-destructive">{depForm.errors.depreciation_date}</p>
+                                                    {depForm.errors
+                                                        .depreciation_date && (
+                                                        <p className="text-sm text-destructive">
+                                                            {
+                                                                depForm.errors
+                                                                    .depreciation_date
+                                                            }
+                                                        </p>
                                                     )}
                                                 </div>
                                             </div>
                                             <DialogFooter>
-                                                <Button type="button" variant="outline" onClick={() => setDepModalOpen(false)}>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        setDepModalOpen(false)
+                                                    }
+                                                >
                                                     Cancel
                                                 </Button>
-                                                <Button type="submit" disabled={depForm.processing}>
-                                                    {depForm.processing ? 'Processing...' : 'Run Depreciation'}
+                                                <Button
+                                                    type="submit"
+                                                    disabled={
+                                                        depForm.processing
+                                                    }
+                                                >
+                                                    {depForm.processing
+                                                        ? 'Processing...'
+                                                        : 'Run Depreciation'}
                                                 </Button>
                                             </DialogFooter>
                                         </form>
                                     </DialogContent>
                                 </Dialog>
                                 {canManage && (
-                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         Add Asset
                                     </Button>
@@ -276,8 +367,12 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                     <Hash className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Total Assets</p>
-                                    <p className="text-2xl font-bold">{summary.total_count}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Total Assets
+                                    </p>
+                                    <p className="text-2xl font-bold">
+                                        {summary.total_count}
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>
@@ -289,8 +384,10 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                     <DollarSign className="h-5 w-5 text-status-info" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Total Cost</p>
-                                    <p className="text-2xl font-bold font-mono tabular-nums">
+                                    <p className="text-sm text-muted-foreground">
+                                        Total Cost
+                                    </p>
+                                    <p className="font-mono text-2xl font-bold tabular-nums">
                                         {formatMoney(summary.total_cost)}
                                     </p>
                                 </div>
@@ -304,9 +401,13 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                     <TrendingDown className="h-5 w-5 text-status-warning" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Total Depreciation</p>
-                                    <p className="text-2xl font-bold font-mono tabular-nums">
-                                        {formatMoney(summary.total_depreciation)}
+                                    <p className="text-sm text-muted-foreground">
+                                        Total Depreciation
+                                    </p>
+                                    <p className="font-mono text-2xl font-bold tabular-nums">
+                                        {formatMoney(
+                                            summary.total_depreciation,
+                                        )}
                                     </p>
                                 </div>
                             </div>
@@ -319,8 +420,10 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                     <Package className="h-5 w-5 text-status-success" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Net Book Value</p>
-                                    <p className="text-2xl font-bold font-mono tabular-nums">
+                                    <p className="text-sm text-muted-foreground">
+                                        Net Book Value
+                                    </p>
+                                    <p className="font-mono text-2xl font-bold tabular-nums">
                                         {formatMoney(summary.net_book_value)}
                                     </p>
                                 </div>
@@ -332,14 +435,16 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                 {/* Filters */}
                 <Card>
                     <CardContent className="pt-6">
-                        <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex flex-col gap-4 sm:flex-row">
                             <div className="flex-1">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
                                         placeholder="Search by name or tag..."
                                         value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
+                                        onChange={(e) =>
+                                            setSearch(e.target.value)
+                                        }
                                         onKeyDown={handleSearchKeyDown}
                                         className="pl-10"
                                     />
@@ -348,36 +453,66 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                             <Select
                                 value={filters.category || 'all'}
                                 onValueChange={(value) =>
-                                    applyFilters({ category: value === 'all' ? '' : value })
+                                    applyFilters({
+                                        category: value === 'all' ? '' : value,
+                                    })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]" aria-label="Filter by category">
+                                <SelectTrigger
+                                    className="w-[180px]"
+                                    aria-label="Filter by category"
+                                >
                                     <SelectValue placeholder="All Categories" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Categories</SelectItem>
-                                    <SelectItem value="vehicle">Vehicle</SelectItem>
-                                    <SelectItem value="equipment">Equipment</SelectItem>
-                                    <SelectItem value="building">Building</SelectItem>
-                                    <SelectItem value="furniture">Furniture</SelectItem>
-                                    <SelectItem value="it_equipment">IT Equipment</SelectItem>
+                                    <SelectItem value="all">
+                                        All Categories
+                                    </SelectItem>
+                                    <SelectItem value="vehicle">
+                                        Vehicle
+                                    </SelectItem>
+                                    <SelectItem value="equipment">
+                                        Equipment
+                                    </SelectItem>
+                                    <SelectItem value="building">
+                                        Building
+                                    </SelectItem>
+                                    <SelectItem value="furniture">
+                                        Furniture
+                                    </SelectItem>
+                                    <SelectItem value="it_equipment">
+                                        IT Equipment
+                                    </SelectItem>
                                     <SelectItem value="land">Land</SelectItem>
                                 </SelectContent>
                             </Select>
                             <Select
                                 value={filters.status || 'all'}
                                 onValueChange={(value) =>
-                                    applyFilters({ status: value === 'all' ? '' : value })
+                                    applyFilters({
+                                        status: value === 'all' ? '' : value,
+                                    })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]" aria-label="Filter by status">
+                                <SelectTrigger
+                                    className="w-[180px]"
+                                    aria-label="Filter by status"
+                                >
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Statuses</SelectItem>
-                                    <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="fully_depreciated">Fully Depreciated</SelectItem>
-                                    <SelectItem value="disposed">Disposed</SelectItem>
+                                    <SelectItem value="all">
+                                        All Statuses
+                                    </SelectItem>
+                                    <SelectItem value="active">
+                                        Active
+                                    </SelectItem>
+                                    <SelectItem value="fully_depreciated">
+                                        Fully Depreciated
+                                    </SelectItem>
+                                    <SelectItem value="disposed">
+                                        Disposed
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                             <Button variant="outline" onClick={handleSearch}>
@@ -399,7 +534,10 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                 className="border-0"
                                 action={
                                     canManage ? (
-                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setCreateOpen(true)}
+                                        >
                                             Add asset
                                         </Button>
                                     ) : undefined
@@ -413,18 +551,35 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                         <TableHead>Tag</TableHead>
                                         <TableHead>Category</TableHead>
                                         <TableHead>Purchase Date</TableHead>
-                                        <TableHead className="text-right">Cost</TableHead>
-                                        <TableHead className="text-right">Accum. Depr.</TableHead>
-                                        <TableHead className="text-right">Book Value</TableHead>
+                                        <TableHead className="text-right">
+                                            Cost
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Accum. Depr.
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Book Value
+                                        </TableHead>
                                         <TableHead>Status</TableHead>
-                                        {canManage && <TableHead className="w-12 text-right" />}
+                                        {canManage && (
+                                            <TableHead className="w-12 text-right" />
+                                        )}
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {assets.data.map((asset) => {
-                                        const bookValue = Number(asset.purchase_cost) - Number(asset.accumulated_depreciation);
+                                        const bookValue =
+                                            Number(asset.purchase_cost) -
+                                            Number(
+                                                asset.accumulated_depreciation,
+                                            );
                                         return (
-                                            <TableRow key={asset.id} onContextMenu={rowMenu.open(rowMenuItems(asset))}>
+                                            <TableRow
+                                                key={asset.id}
+                                                onContextMenu={rowMenu.open(
+                                                    rowMenuItems(asset),
+                                                )}
+                                            >
                                                 <TableCell>
                                                     <Link
                                                         href={`/finance/fixed-assets/${asset.id}`}
@@ -433,41 +588,62 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                                         {asset.asset_name}
                                                     </Link>
                                                 </TableCell>
-                                                <TableCell className="text-muted-foreground font-mono text-sm">
+                                                <TableCell className="font-mono text-sm text-muted-foreground">
                                                     {asset.asset_tag || '-'}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge
                                                         variant="secondary"
-                                                        className={categoryColors[asset.category] || ''}
+                                                        className={
+                                                            categoryColors[
+                                                                asset.category
+                                                            ] || ''
+                                                        }
                                                     >
-                                                        {categoryLabels[asset.category] || asset.category}
+                                                        {categoryLabels[
+                                                            asset.category
+                                                        ] || asset.category}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-sm">
-                                                    {new Date(asset.purchase_date).toLocaleDateString('en-NZ')}
+                                                    {new Date(
+                                                        asset.purchase_date,
+                                                    ).toLocaleDateString(
+                                                        'en-NZ',
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                    {formatMoney(asset.purchase_cost)}
+                                                <TableCell className="text-right font-mono text-sm tabular-nums">
+                                                    {formatMoney(
+                                                        asset.purchase_cost,
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                    {formatMoney(asset.accumulated_depreciation)}
+                                                <TableCell className="text-right font-mono text-sm tabular-nums">
+                                                    {formatMoney(
+                                                        asset.accumulated_depreciation,
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-sm font-medium">
+                                                <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
                                                     {formatMoney(bookValue)}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <StatusBadge status={asset.status} />
+                                                    <StatusBadge
+                                                        status={asset.status}
+                                                    />
                                                 </TableCell>
                                                 {canManage && (
                                                     <TableCell className="text-right">
-                                                        {asset.status !== 'disposed' && (
+                                                        {asset.status !==
+                                                            'disposed' && (
                                                             <Button
                                                                 size="sm"
                                                                 variant="ghost"
                                                                 className="h-7 w-7 p-0"
                                                                 aria-label={`Edit ${asset.asset_name}`}
-                                                                onClick={() => openEdit(asset)}
+                                                                onClick={() =>
+                                                                    openEdit(
+                                                                        asset,
+                                                                    )
+                                                                }
                                                             >
                                                                 <Pencil className="h-3.5 w-3.5" />
                                                             </Button>
@@ -487,19 +663,29 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                 {assets.last_page > 1 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {(assets.current_page - 1) * assets.per_page + 1} to{' '}
-                            {Math.min(assets.current_page * assets.per_page, assets.total)} of{' '}
-                            {assets.total} assets
+                            Showing{' '}
+                            {(assets.current_page - 1) * assets.per_page + 1} to{' '}
+                            {Math.min(
+                                assets.current_page * assets.per_page,
+                                assets.total,
+                            )}{' '}
+                            of {assets.total} assets
                         </p>
                         <div className="flex gap-1">
                             {assets.links.map((link, i) => (
                                 <Button
                                     key={i}
-                                    variant={link.active ? 'default' : 'outline'}
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
                                     size="sm"
                                     disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                    onClick={() =>
+                                        link.url && router.get(link.url)
+                                    }
+                                    dangerouslySetInnerHTML={{
+                                        __html: link.label,
+                                    }}
                                 />
                             ))}
                         </div>

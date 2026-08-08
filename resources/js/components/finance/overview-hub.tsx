@@ -10,7 +10,11 @@ import { FinanceTabs, type FinanceTabItem } from './finance-tabs';
  * Ledger/Receivables hub pattern). Every tab is `finance.dashboard`-gated, so
  * the strip is homogeneous; `requires` keeps the contract explicit.
  */
-export type OverviewTabId = 'summary' | 'executive' | 'by-site' | 'cash-position';
+export type OverviewTabId =
+    | 'summary'
+    | 'executive'
+    | 'by-site'
+    | 'cash-position';
 
 type CanTree = Record<string, any> | undefined;
 type OverviewTabDef = FinanceTabItem & {
@@ -22,10 +26,38 @@ type OverviewTabDef = FinanceTabItem & {
 const dashboard = (c: CanTree) => !!c?.finance?.dashboard;
 
 export const OVERVIEW_TABS: OverviewTabDef[] = [
-    { id: 'summary', label: 'Summary', icon: LayoutDashboard, tone: 'primary', href: '/finance', requires: dashboard },
-    { id: 'executive', label: 'Executive', icon: BarChart3, tone: 'violet', href: '/finance/executive-dashboard', requires: dashboard },
-    { id: 'by-site', label: 'By site', icon: Building2, tone: 'info', href: '/finance/sites', requires: dashboard },
-    { id: 'cash-position', label: 'Cash position', icon: Wallet, tone: 'success', href: '/finance/cash-position', requires: dashboard },
+    {
+        id: 'summary',
+        label: 'Summary',
+        icon: LayoutDashboard,
+        tone: 'primary',
+        href: '/finance',
+        requires: dashboard,
+    },
+    {
+        id: 'executive',
+        label: 'Executive',
+        icon: BarChart3,
+        tone: 'violet',
+        href: '/finance/executive-dashboard',
+        requires: dashboard,
+    },
+    {
+        id: 'by-site',
+        label: 'By site',
+        icon: Building2,
+        tone: 'info',
+        href: '/finance/sites',
+        requires: dashboard,
+    },
+    {
+        id: 'cash-position',
+        label: 'Cash position',
+        icon: Wallet,
+        tone: 'success',
+        href: '/finance/cash-position',
+        requires: dashboard,
+    },
 ];
 
 /**
@@ -36,7 +68,9 @@ export function OverviewTabsFooter({ active }: { active: OverviewTabId }) {
     const page = usePage();
     const can = (page.props as { auth?: { can?: CanTree } })?.auth?.can;
 
-    const visible = OVERVIEW_TABS.filter((t) => t.id === active || t.requires(can));
+    const visible = OVERVIEW_TABS.filter(
+        (t) => t.id === active || t.requires(can),
+    );
 
     const handleTab = (id: string) => {
         if (id === active) return;

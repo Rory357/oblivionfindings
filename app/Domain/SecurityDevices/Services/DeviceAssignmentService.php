@@ -73,6 +73,34 @@ class DeviceAssignmentService
     }
 
     /**
+     * Release every active assignment as part of canonical Device retirement.
+     *
+     * The reason is retained on every historical row, including non-personal
+     * assignments that do not use the tracking collection-stop fields.
+     */
+    public function releaseAllForDecommission(Device $device, int $releasedByUserId): int
+    {
+        return DB::transaction(function () use ($device, $releasedByUserId): int {
+            $lockedDevice = $this->lockDevice($device);
+            $activeCount = DeviceAssignment::query()
+                ->where('device_id', $lockedDevice->id)
+                ->active()
+                ->lockForUpdate()
+                ->get(['id'])
+                ->count();
+
+            $this->releaseActiveAssignments(
+                $lockedDevice,
+                $releasedByUserId,
+                'device_decommissioned',
+                retainReason: true,
+            );
+
+            return $activeCount;
+        });
+    }
+
+    /**
      * Release only when every active row still belongs to the expected target.
      * Stale projections must never release a Device that has since moved to a
      * different Client, staff member, Site, room or vehicle.
@@ -136,6 +164,7 @@ class DeviceAssignmentService
         string $reason,
         ?string $expectedAssignableType = null,
         ?int $expectedAssignableId = null,
+        bool $retainReason = false,
     ): ?DeviceAssignment {
         $activeAssignments = DeviceAssignment::query()
             ->where('device_id', $device->id)
@@ -157,10 +186,14 @@ class DeviceAssignmentService
 
         $releasedAt = now();
         foreach ($activeAssignments as $assignment) {
-            $assignment->update([
+            $attributes = [
                 'released_at' => $releasedAt,
                 'released_by_user_id' => $userId,
-            ]);
+            ];
+            if ($retainReason) {
+                $attributes['notes'] = $this->notesWithLifecycleReason($assignment->notes, $reason);
+            }
+            $assignment->update($attributes);
             $this->stopPersonalTrackingCollection(
                 $assignment,
                 $userId,
@@ -171,6 +204,16 @@ class DeviceAssignmentService
         app(SiteTypePlanPinStatusService::class)->markDevicePinsStale($device, $reason, $releasedAt);
 
         return $activeAssignments->first()->fresh();
+    }
+
+    private function notesWithLifecycleReason(?string $notes, string $reason): string
+    {
+        $stamp = "Lifecycle reason: {$reason}.";
+        $notes = trim((string) $notes);
+
+        return str_contains($notes, $stamp)
+            ? $notes
+            : trim($notes.PHP_EOL.$stamp);
     }
 
     private function lockDevice(Device $device): Device

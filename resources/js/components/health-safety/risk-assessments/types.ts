@@ -3,9 +3,21 @@
  * App\Support\HealthSafety\RiskAssessmentPresenter. */
 
 export type AttachType = 'standalone' | 'site' | 'client' | 'event';
-export type RaStatus = 'draft' | 'active' | 'under_review' | 'superseded' | 'archived';
+export type RaStatus =
+    | 'draft'
+    | 'active'
+    | 'under_review'
+    | 'superseded'
+    | 'archived';
 export type RaLevel = 'low' | 'medium' | 'high' | 'extreme';
-export type RaModalKind = 'new' | 'edit' | 'supersede' | 'approve' | 'review' | 'residual' | 'archive';
+export type RaModalKind =
+    | 'new'
+    | 'edit'
+    | 'supersede'
+    | 'approve'
+    | 'review'
+    | 'residual'
+    | 'archive';
 
 export interface AttachedTo {
     type: AttachType;
@@ -83,7 +95,11 @@ export interface RaDetail extends RaRow {
     created_by_name: string | null;
     created_at: string | null;
     updated_at: string | null;
-    superseded_by: { id: number; reference_number: string; status: RaStatus } | null;
+    superseded_by: {
+        id: number;
+        reference_number: string;
+        status: RaStatus;
+    } | null;
     hs_event: { id: number; reference_number: string } | null;
     attachments: RaAttachment[];
     can: { manage: boolean };

@@ -6,8 +6,6 @@
  * token-based so tenant white-label theming still propagates. Mirrors the People
  * hero (resources/js/components/hr/people-hero.tsx). */
 import {
-    Clock,
-    Download,
     FileText,
     FolderOpen,
     PenLine,
@@ -59,7 +57,8 @@ const HERO_STYLE: CSSProperties = {
     ['--hr-amber' as string]: 'oklch(0.86 0.13 90)',
     background:
         'linear-gradient(120deg, color-mix(in oklch, var(--primary) 72%, black 22%), var(--primary) 58%, color-mix(in oklch, var(--primary) 90%, white 8%))',
-    boxShadow: '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
+    boxShadow:
+        '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
 };
 
 type HeroRight = 'ring' | 'recent';
@@ -105,7 +104,7 @@ export function DocumentsHero({
         >
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
                 <div className="absolute -top-20 right-[26%] h-60 w-60 rounded-full bg-primary-foreground/[0.05]" />
-                <div className="absolute -bottom-24 -right-10 h-64 w-64 rounded-full bg-primary-foreground/[0.04]" />
+                <div className="absolute -right-10 -bottom-24 h-64 w-64 rounded-full bg-primary-foreground/[0.04]" />
             </div>
 
             <div className="relative flex flex-wrap items-stretch">
@@ -116,7 +115,7 @@ export function DocumentsHero({
                             <FolderOpen className="h-[26px] w-[26px]" />
                         </span>
                         <div className="min-w-0">
-                            <h1 className="text-[27px] font-bold leading-[1.05] tracking-tight">
+                            <h1 className="text-[27px] leading-[1.05] font-bold tracking-tight">
                                 Documents
                             </h1>
                             <p className="mt-1.5 text-[13px] font-semibold text-primary-foreground/75">
@@ -127,7 +126,7 @@ export function DocumentsHero({
                     </div>
 
                     {/* stats */}
-                    <div className="-ml-3 mt-5 flex flex-wrap gap-0.5">
+                    <div className="mt-5 -ml-3 flex flex-wrap gap-0.5">
                         <HeroStat
                             label="On file"
                             value={stats.on_file}
@@ -180,7 +179,7 @@ export function DocumentsHero({
                     {/* needs you */}
                     {needs.length > 0 ? (
                         <div className="mt-[18px] flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary-foreground/50">
+                            <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/50 uppercase">
                                 Needs you
                             </span>
                             {needs.map((chip) => {
@@ -190,7 +189,7 @@ export function DocumentsHero({
                                         key={chip.key}
                                         type="button"
                                         onClick={chip.onClick}
-                                        className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/[0.13] py-1.5 pl-2.5 pr-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
+                                        className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/[0.13] py-1.5 pr-3 pl-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
                                     >
                                         <span className="h-1.5 w-1.5 flex-none rounded-full bg-[color:var(--hr-amber)] shadow-[0_0_0_3px_color-mix(in_oklch,var(--hr-amber)_32%,transparent)]" />
                                         <Icon className="h-[13px] w-[13px]" />
@@ -203,9 +202,9 @@ export function DocumentsHero({
                 </div>
 
                 {/* ── right rail ── */}
-                <div className="flex w-full flex-none flex-col border-t border-primary-foreground/15 bg-black/[0.08] p-[22px_24px] sm:w-[320px] sm:border-l sm:border-t-0">
+                <div className="flex w-full flex-none flex-col border-t border-primary-foreground/15 bg-black/[0.08] p-[22px_24px] sm:w-[320px] sm:border-t-0 sm:border-l">
                     <div className="mb-3 flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary-foreground/55">
+                        <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/55 uppercase">
                             {right === 'ring'
                                 ? 'Signature completion'
                                 : 'Recently filed'}
@@ -283,7 +282,7 @@ function CompletionRing({
                     />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-[26px] font-bold leading-none tabular-nums">
+                    <span className="text-[26px] leading-none font-bold tabular-nums">
                         {pct}%
                     </span>
                     <span className="mt-0.5 text-[10px] text-primary-foreground/65">
@@ -365,7 +364,7 @@ function HeroStat({
 }) {
     const inner = (
         <>
-            <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.09em] text-primary-foreground/60">
+            <span className="text-[10px] font-bold tracking-[0.09em] whitespace-nowrap text-primary-foreground/60 uppercase">
                 {label}
             </span>
             <span

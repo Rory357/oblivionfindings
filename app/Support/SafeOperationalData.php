@@ -11,6 +11,7 @@ use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Site;
+use App\Models\SiteHouseRoom;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\Integration\IntegrationDiscoveryException;
@@ -367,7 +368,7 @@ final class SafeOperationalData
 
         $siteIds = [$asset->site_id, $asset->home_site_id];
         if (is_numeric($asset->room_id)) {
-            $siteIds[] = SiteRoom::query()->whereKey((int) $asset->room_id)->value('site_id');
+            $siteIds[] = SiteHouseRoom::query()->whereKey((int) $asset->room_id)->value('site_id');
         }
         if (is_numeric($asset->client_id)) {
             $siteIds[] = Client::withTrashed()->whereKey((int) $asset->client_id)->value('site_id');

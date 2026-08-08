@@ -135,10 +135,15 @@ test('impacted services sites related incidents and the canonical Control Room a
         ->assertOk()
         ->assertJsonPath('linked_context.major_incidents.0.reference', $majorIncident->ticket->reference)
         ->assertJsonPath('linked_context.major_incidents.0.href', "/it/major-incidents/{$majorIncident->id}");
+    $majorIncident->ticket()->update(['requester_user_id' => $this->requester->id]);
     $this->actingAs($this->requester)
         ->getJson("/it/tickets/{$incident->id}")
         ->assertOk()
-        ->assertJsonCount(0, 'linked_context.major_incidents');
+        ->assertJsonPath('linked_context.major_incidents.0.reference', $majorIncident->ticket->reference)
+        ->assertJsonPath('linked_context.major_incidents.0.href', null)
+        ->assertJsonPath('linked_context.major_incidents.0.workspace_access.state', 'restricted')
+        ->assertJsonPath('linked_context.major_incidents.0.workspace_access.message', 'IT workspace access is required to open this record.')
+        ->assertJsonPath('linked_context.major_incidents.0.ticket_href', "/it/tickets/{$majorIncident->ticket_id}");
 });
 
 test('update cadence becomes overdue and audience safe communications notify affected requesters', function () {
@@ -193,11 +198,30 @@ test('update cadence becomes overdue and audience safe communications notify aff
             ->count())->toBe(2);
 
     $this->actingAs($this->requester)
-        ->getJson("/it/major-incidents/{$majorIncident->id}/status")
+        ->get("/it/major-incidents/{$majorIncident->id}/status")
+        ->assertInertia(fn ($page) => $page
+            ->component('it/major-incidents/status')
+            ->where('status.reference', $majorIncident->ticket->reference)
+            ->where('status.title', $majorIncident->ticket->title)
+            ->where('status.updates.0.audience', 'staff')
+            ->missing('status.updates.1')
+            ->missing('status.commander')
+            ->missing('status.root_cause_summary'));
+
+    $this->actingAs($this->requester)
+        ->getJson("/it/major-incidents/{$majorIncident->id}/status.json")
         ->assertOk()
         ->assertJsonCount(1, 'updates')
         ->assertJsonPath('updates.0.audience', 'staff')
         ->assertJsonMissing(['summary' => 'Identity vendor bridge opened with privileged diagnostics.']);
+
+    $outsideRequester = majorIncidentUser('support_worker', Site::factory()->create());
+    $this->actingAs($outsideRequester)
+        ->get("/it/major-incidents/{$majorIncident->id}/status")
+        ->assertNotFound();
+    $this->actingAs($outsideRequester)
+        ->getJson("/it/major-incidents/{$majorIncident->id}/status.json")
+        ->assertNotFound();
 });
 
 test('restoration resolution review and closure require explicit evidence', function () {

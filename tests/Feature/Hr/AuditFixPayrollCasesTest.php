@@ -291,8 +291,8 @@ test('assigning an asset notifies the assignee', function () {
 
     $asset = HrAsset::query()->create([
         'asset_tag' => 'AST-9001',
-        'name' => 'MacBook Air',
-        'category' => 'laptop',
+        'name' => 'Issued access card',
+        'category' => 'card',
         'status' => 'available',
         'qr_token' => (string) Str::uuid(),
     ]);

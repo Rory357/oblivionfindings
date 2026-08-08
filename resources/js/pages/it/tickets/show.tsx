@@ -165,6 +165,7 @@ interface Props {
     };
     can: {
         manage: boolean;
+        linkDevices: boolean;
         assignApplicationWide: boolean;
         view: boolean;
         internal: boolean;
@@ -1097,6 +1098,7 @@ export default function ItTicketShow({
                                         'security_request',
                                     ].includes(ticket.work_type)
                                 }
+                                canLinkDevices={can.linkDevices}
                                 deviceOptions={deviceOptions}
                                 recoveredAt={ticket.monitoring_recovered_at}
                                 devices={linked_context.devices}

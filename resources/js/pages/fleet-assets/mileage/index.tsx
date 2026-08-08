@@ -1,15 +1,6 @@
-import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
-import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HorizontalBarChart } from '@/components/fleet-charts';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { FleetEmptyState } from '@/components/fleet-empty-state';
+import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +23,17 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
+import { toDateInput } from '@/lib/datetime';
+import { formatCurrency, formatDate, formatDistance } from '@/lib/fleet-utils';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Car,
@@ -49,8 +51,6 @@ import {
     X,
 } from 'lucide-react';
 import { useState } from 'react';
-import { formatCurrency, formatDate, formatDistance, statusColor } from '@/lib/fleet-utils';
-import { toDateInput } from '@/lib/datetime';
 
 type PersonalTrip = {
     id: number;
@@ -119,11 +119,17 @@ const _PURPOSE_LABELS: Record<string, string> = {
 function statusBadge(status: string) {
     switch (status) {
         case 'pending':
-            return <Badge className="bg-status-warning text-white">Pending</Badge>;
+            return (
+                <Badge className="bg-status-warning text-white">Pending</Badge>
+            );
         case 'approved':
             return <Badge className="bg-primary text-white">Approved</Badge>;
         case 'rejected':
-            return <Badge className="bg-status-critical text-white">Rejected</Badge>;
+            return (
+                <Badge className="bg-status-critical text-white">
+                    Rejected
+                </Badge>
+            );
         case 'paid':
             return <Badge className="bg-status-success text-white">Paid</Badge>;
         default:
@@ -131,7 +137,17 @@ function statusBadge(status: string) {
     }
 }
 
-export default function MileageIndex({ trips, filters, staff, stats, staff_summary, is_manager, clients, ird_rate, can }: Props) {
+export default function MileageIndex({
+    trips,
+    filters,
+    staff,
+    stats,
+    staff_summary,
+    is_manager,
+    clients,
+    ird_rate,
+    can,
+}: Props) {
     const { labels } = usePage().props as any;
     const clientSingular = labels?.['client.singular'] ?? 'Client';
     const canApprove = can?.approve ?? false;
@@ -141,7 +157,12 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
     };
     const safeData = trips?.data ?? [];
     const safeMeta = trips?.meta ?? { current_page: 1, last_page: 1, total: 0 };
-    const safeStats = stats ?? { trips_this_month: 0, total_distance: 0, total_reimbursement: 0, pending_approval: 0 };
+    const safeStats = stats ?? {
+        trips_this_month: 0,
+        total_distance: 0,
+        total_reimbursement: 0,
+        pending_approval: 0,
+    };
     const safeStaff = staff ?? [];
     const safeStaffSummary = staff_summary ?? [];
     const irdRate = ird_rate ?? 0.95;
@@ -177,20 +198,37 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
     };
 
     const clearFilters = () => {
-        setLocalFilters({ date_from: '', date_to: '', status: '', user_id: '' });
+        setLocalFilters({
+            date_from: '',
+            date_to: '',
+            status: '',
+            user_id: '',
+        });
         router.get('/fleet-assets/mileage', {}, { preserveState: true });
     };
 
     const handleApprove = (tripId: number) => {
-        router.post(`/fleet-assets/mileage/${tripId}/approve`, {}, { preserveScroll: true });
+        router.post(
+            `/fleet-assets/mileage/${tripId}/approve`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
     const handleReject = (tripId: number) => {
-        router.post(`/fleet-assets/mileage/${tripId}/reject`, {}, { preserveScroll: true });
+        router.post(
+            `/fleet-assets/mileage/${tripId}/reject`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
     const handleMarkPaid = (tripId: number) => {
-        router.post(`/fleet-assets/mileage/${tripId}/mark-paid`, {}, { preserveScroll: true });
+        router.post(
+            `/fleet-assets/mileage/${tripId}/mark-paid`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
     return (
@@ -206,10 +244,15 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={Receipt} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Mileage claims · IRD ${irdRate.toFixed(2)}/km</HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Staff Mileage Claims</h1>
+                            <HeroStatusPill>
+                                Mileage claims · IRD ${irdRate.toFixed(2)}/km
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Staff Mileage Claims
+                            </h1>
                             <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Personal vehicle mileage reimbursement claims. NZ IRD rate: ${irdRate.toFixed(2)}/km.
+                                Personal vehicle mileage reimbursement claims.
+                                NZ IRD rate: ${irdRate.toFixed(2)}/km.
                             </p>
                         </div>
                         <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
@@ -218,19 +261,29 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                 label="Pending approval"
                                 value={fmt(safeStats.pending_approval)}
                                 caption="awaiting review"
-                                tone={safeStats.pending_approval > 0 ? 'warning' : 'success'}
+                                tone={
+                                    safeStats.pending_approval > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/mileage?status=approved"
                                 label="Approved unpaid"
                                 value={fmt(safeStats.approved_unpaid ?? 0)}
                                 caption="ready for payroll"
-                                tone={(safeStats.approved_unpaid ?? 0) > 0 ? 'warning' : 'neutral'}
+                                tone={
+                                    (safeStats.approved_unpaid ?? 0) > 0
+                                        ? 'warning'
+                                        : 'neutral'
+                                }
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/mileage?status=paid"
                                 label="Paid this month"
-                                value={formatCurrency(safeStats.paid_this_month ?? 0)}
+                                value={formatCurrency(
+                                    safeStats.paid_this_month ?? 0,
+                                )}
                                 caption="reimbursed"
                                 tone="neutral"
                             />
@@ -244,7 +297,11 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction icon={Plus} emphasis onClick={() => setWizardOpen(true)}>
+                        <FleetHeroAction
+                            icon={Plus}
+                            emphasis
+                            onClick={() => setWizardOpen(true)}
+                        >
                             New claim
                         </FleetHeroAction>
                         <FleetHeroAction
@@ -258,7 +315,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                 </HeroShell>
 
                 {/* KPI Cards */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
+                <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <FleetStatCard
                         label="Trips This Month"
                         value={safeStats.trips_this_month}
@@ -287,53 +344,96 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                     <CardContent className="p-4">
                         <div className="flex flex-wrap items-end gap-3">
                             <div className="min-w-[140px]">
-                                <label className="mb-1 block text-xs font-medium text-muted-foreground">From</label>
+                                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                                    From
+                                </label>
                                 <Input
                                     type="date"
                                     value={localFilters.date_from}
-                                    onChange={(e) => setLocalFilters((f) => ({ ...f, date_from: e.target.value }))}
+                                    onChange={(e) =>
+                                        setLocalFilters((f) => ({
+                                            ...f,
+                                            date_from: e.target.value,
+                                        }))
+                                    }
                                 />
                             </div>
                             <div className="min-w-[140px]">
-                                <label className="mb-1 block text-xs font-medium text-muted-foreground">To</label>
+                                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                                    To
+                                </label>
                                 <Input
                                     type="date"
                                     value={localFilters.date_to}
-                                    onChange={(e) => setLocalFilters((f) => ({ ...f, date_to: e.target.value }))}
+                                    onChange={(e) =>
+                                        setLocalFilters((f) => ({
+                                            ...f,
+                                            date_to: e.target.value,
+                                        }))
+                                    }
                                 />
                             </div>
                             <div className="min-w-[140px]">
-                                <label className="mb-1 block text-xs font-medium text-muted-foreground">Status</label>
+                                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                                    Status
+                                </label>
                                 <Select
                                     value={localFilters.status}
-                                    onValueChange={(v) => setLocalFilters((f) => ({ ...f, status: v === 'all' ? '' : v }))}
+                                    onValueChange={(v) =>
+                                        setLocalFilters((f) => ({
+                                            ...f,
+                                            status: v === 'all' ? '' : v,
+                                        }))
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="All Statuses" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All Statuses</SelectItem>
-                                        <SelectItem value="pending">Pending</SelectItem>
-                                        <SelectItem value="approved">Approved</SelectItem>
-                                        <SelectItem value="rejected">Rejected</SelectItem>
-                                        <SelectItem value="paid">Paid</SelectItem>
+                                        <SelectItem value="all">
+                                            All Statuses
+                                        </SelectItem>
+                                        <SelectItem value="pending">
+                                            Pending
+                                        </SelectItem>
+                                        <SelectItem value="approved">
+                                            Approved
+                                        </SelectItem>
+                                        <SelectItem value="rejected">
+                                            Rejected
+                                        </SelectItem>
+                                        <SelectItem value="paid">
+                                            Paid
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             {is_manager && safeStaff.length > 0 && (
                                 <div className="min-w-[180px]">
-                                    <label className="mb-1 block text-xs font-medium text-muted-foreground">Staff Member</label>
+                                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                                        Staff Member
+                                    </label>
                                     <Select
                                         value={localFilters.user_id}
-                                        onValueChange={(v) => setLocalFilters((f) => ({ ...f, user_id: v === 'all' ? '' : v }))}
+                                        onValueChange={(v) =>
+                                            setLocalFilters((f) => ({
+                                                ...f,
+                                                user_id: v === 'all' ? '' : v,
+                                            }))
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="All Staff" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="all">All Staff</SelectItem>
+                                            <SelectItem value="all">
+                                                All Staff
+                                            </SelectItem>
                                             {safeStaff.map((s) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
                                                     {s.name}
                                                 </SelectItem>
                                             ))}
@@ -345,7 +445,11 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                 <Search className="mr-1.5 h-4 w-4" />
                                 Filter
                             </Button>
-                            <Button size="sm" variant="outline" onClick={clearFilters}>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={clearFilters}
+                            >
                                 Clear
                             </Button>
                         </div>
@@ -368,94 +472,173 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                 ) : (
                                     <div className="overflow-x-auto">
                                         <FleetResponsiveTable>
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b bg-muted/30">
-                                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
-                                                    {is_manager && <th className="px-4 py-3 text-left font-medium text-muted-foreground">Staff</th>}
-                                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Route</th>
-                                                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Distance</th>
-                                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{clientSingular}</th>
-                                                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Amount</th>
-                                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                                                    {canApprove && <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>}
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y">
-                                                {safeData.map((trip) => (
-                                                    <tr key={trip.id} className="hover:bg-muted/20 transition-colors">
-                                                        <td data-fleet-row-time className="px-4 py-3 whitespace-nowrap text-xs">
-                                                            {formatDate(trip.date)}
-                                                        </td>
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b bg-muted/30">
+                                                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                                                            Date
+                                                        </th>
                                                         {is_manager && (
-                                                            <td className="px-4 py-3">
-                                                                <span className="font-medium text-xs">{trip.user?.name ?? '---'}</span>
-                                                            </td>
+                                                            <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                                                                Staff
+                                                            </th>
                                                         )}
-                                                        <td data-fleet-row-identity className="px-4 py-3">
-                                                            <div className="flex items-center gap-1 text-xs">
-                                                                <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
-                                                                <span className="truncate max-w-[120px]">{trip.start_location}</span>
-                                                                <span className="text-muted-foreground mx-1">&rarr;</span>
-                                                                <span className="truncate max-w-[120px]">{trip.end_location}</span>
-                                                            </div>
-                                                            <span className="text-[10px] text-muted-foreground">
-                                                                {PURPOSE_LABELS[trip.purpose] ?? trip.purpose}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right tabular-nums text-xs">
-                                                            {formatDistance(trip.distance_km)}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-xs">
-                                                            {trip.client?.name ?? '---'}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right tabular-nums text-xs font-medium">
-                                                            {formatCurrency(trip.total_amount)}
-                                                        </td>
-                                                        <td data-fleet-row-status className="px-4 py-3">
-                                                            {statusBadge(trip.status)}
-                                                        </td>
+                                                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                                                            Route
+                                                        </th>
+                                                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                                                            Distance
+                                                        </th>
+                                                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                                                            {clientSingular}
+                                                        </th>
+                                                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                                                            Amount
+                                                        </th>
+                                                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                                                            Status
+                                                        </th>
                                                         {canApprove && (
-                                                            <td data-fleet-row-action className="px-4 py-3 text-right">
-                                                                {trip.status === 'pending' && (
-                                                                    <div className="flex items-center justify-end gap-1">
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={() => handleApprove(trip.id)}
-                                                                            className="text-xs h-7"
-                                                                        >
-                                                                            <Check className="mr-1 h-3 w-3" />
-                                                                            Approve
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={() => handleReject(trip.id)}
-                                                                            className="text-xs h-7 text-status-critical hover:text-status-critical"
-                                                                        >
-                                                                            <X className="mr-1 h-3 w-3" />
-                                                                            Reject
-                                                                        </Button>
-                                                                    </div>
-                                                                )}
-                                                                {trip.status === 'approved' && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        onClick={() => handleMarkPaid(trip.id)}
-                                                                        className="text-xs h-7 text-status-success hover:text-status-success"
-                                                                    >
-                                                                        <CheckCircle className="mr-1 h-3 w-3" />
-                                                                        Mark Paid
-                                                                    </Button>
-                                                                )}
-                                                            </td>
+                                                            <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                                                                Actions
+                                                            </th>
                                                         )}
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody className="divide-y">
+                                                    {safeData.map((trip) => (
+                                                        <tr
+                                                            key={trip.id}
+                                                            className="transition-colors hover:bg-muted/20"
+                                                        >
+                                                            <td
+                                                                data-fleet-row-time
+                                                                className="px-4 py-3 text-xs whitespace-nowrap"
+                                                            >
+                                                                {formatDate(
+                                                                    trip.date,
+                                                                )}
+                                                            </td>
+                                                            {is_manager && (
+                                                                <td className="px-4 py-3">
+                                                                    <span className="text-xs font-medium">
+                                                                        {trip
+                                                                            .user
+                                                                            ?.name ??
+                                                                            '---'}
+                                                                    </span>
+                                                                </td>
+                                                            )}
+                                                            <td
+                                                                data-fleet-row-identity
+                                                                className="px-4 py-3"
+                                                            >
+                                                                <div className="flex items-center gap-1 text-xs">
+                                                                    <MapPin className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                                                    <span className="max-w-[120px] truncate">
+                                                                        {
+                                                                            trip.start_location
+                                                                        }
+                                                                    </span>
+                                                                    <span className="mx-1 text-muted-foreground">
+                                                                        &rarr;
+                                                                    </span>
+                                                                    <span className="max-w-[120px] truncate">
+                                                                        {
+                                                                            trip.end_location
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                                <span className="text-[10px] text-muted-foreground">
+                                                                    {PURPOSE_LABELS[
+                                                                        trip
+                                                                            .purpose
+                                                                    ] ??
+                                                                        trip.purpose}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right text-xs tabular-nums">
+                                                                {formatDistance(
+                                                                    trip.distance_km,
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-xs">
+                                                                {trip.client
+                                                                    ?.name ??
+                                                                    '---'}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right text-xs font-medium tabular-nums">
+                                                                {formatCurrency(
+                                                                    trip.total_amount,
+                                                                )}
+                                                            </td>
+                                                            <td
+                                                                data-fleet-row-status
+                                                                className="px-4 py-3"
+                                                            >
+                                                                {statusBadge(
+                                                                    trip.status,
+                                                                )}
+                                                            </td>
+                                                            {canApprove && (
+                                                                <td
+                                                                    data-fleet-row-action
+                                                                    className="px-4 py-3 text-right"
+                                                                >
+                                                                    {trip.status ===
+                                                                        'pending' && (
+                                                                        <div className="flex items-center justify-end gap-1">
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                onClick={() =>
+                                                                                    handleApprove(
+                                                                                        trip.id,
+                                                                                    )
+                                                                                }
+                                                                                className="h-7 text-xs"
+                                                                            >
+                                                                                <Check className="mr-1 h-3 w-3" />
+                                                                                Approve
+                                                                            </Button>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                onClick={() =>
+                                                                                    handleReject(
+                                                                                        trip.id,
+                                                                                    )
+                                                                                }
+                                                                                className="h-7 text-xs text-status-critical hover:text-status-critical"
+                                                                            >
+                                                                                <X className="mr-1 h-3 w-3" />
+                                                                                Reject
+                                                                            </Button>
+                                                                        </div>
+                                                                    )}
+                                                                    {trip.status ===
+                                                                        'approved' && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() =>
+                                                                                handleMarkPaid(
+                                                                                    trip.id,
+                                                                                )
+                                                                            }
+                                                                            className="h-7 text-xs text-status-success hover:text-status-success"
+                                                                        >
+                                                                            <CheckCircle className="mr-1 h-3 w-3" />
+                                                                            Mark
+                                                                            Paid
+                                                                        </Button>
+                                                                    )}
+                                                                </td>
+                                                            )}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
                                         </FleetResponsiveTable>
                                     </div>
                                 )}
@@ -466,20 +649,37 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                         {safeMeta.last_page > 1 && (
                             <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
                                 <span>
-                                    Page {safeMeta.current_page} of {safeMeta.last_page} ({safeMeta.total} total)
+                                    Page {safeMeta.current_page} of{' '}
+                                    {safeMeta.last_page} ({safeMeta.total}{' '}
+                                    total)
                                 </span>
                                 <div className="flex gap-1">
-                                    {(trips?.links ?? []).map((link: any, i: number) => (
-                                        <Button
-                                            key={i}
-                                            size="sm"
-                                            variant={link.active ? 'default' : 'outline'}
-                                            disabled={!link.url}
-                                            onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                            className="text-xs"
-                                            dangerouslySetInnerHTML={{ __html: link.label }}
-                                        />
-                                    ))}
+                                    {(trips?.links ?? []).map(
+                                        (link: any, i: number) => (
+                                            <Button
+                                                key={i}
+                                                size="sm"
+                                                variant={
+                                                    link.active
+                                                        ? 'default'
+                                                        : 'outline'
+                                                }
+                                                disabled={!link.url}
+                                                onClick={() =>
+                                                    link.url &&
+                                                    router.get(
+                                                        link.url,
+                                                        {},
+                                                        { preserveState: true },
+                                                    )
+                                                }
+                                                className="text-xs"
+                                                dangerouslySetInnerHTML={{
+                                                    __html: link.label,
+                                                }}
+                                            />
+                                        ),
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -490,7 +690,9 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                         <div>
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-sm">Staff Distance This Month</CardTitle>
+                                    <CardTitle className="text-sm">
+                                        Staff Distance This Month
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <HorizontalBarChart
@@ -501,9 +703,16 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                     />
                                     <div className="mt-4 space-y-2">
                                         {safeStaffSummary.map((s, i) => (
-                                            <div key={i} className="flex items-center justify-between text-xs">
-                                                <span className="text-muted-foreground truncate max-w-[60%]">{s.label}</span>
-                                                <span className="font-medium tabular-nums">{formatCurrency(s.amount)}</span>
+                                            <div
+                                                key={i}
+                                                className="flex items-center justify-between text-xs"
+                                            >
+                                                <span className="max-w-[60%] truncate text-muted-foreground">
+                                                    {s.label}
+                                                </span>
+                                                <span className="font-medium tabular-nums">
+                                                    {formatCurrency(s.amount)}
+                                                </span>
                                             </div>
                                         ))}
                                     </div>
@@ -530,9 +739,24 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
 /* ------------------------------------------------------------------ */
 
 const WIZARD_STEPS: WizardStep[] = [
-    { key: 'trip', label: 'Trip details', blurb: 'Where and how far', icon: Route },
-    { key: 'purpose', label: 'Purpose & links', blurb: 'Why you drove', icon: ClipboardList },
-    { key: 'review', label: 'Review & submit', blurb: 'Check, then claim', icon: FileCheck2 },
+    {
+        key: 'trip',
+        label: 'Trip details',
+        blurb: 'Where and how far',
+        icon: Route,
+    },
+    {
+        key: 'purpose',
+        label: 'Purpose & links',
+        blurb: 'Why you drove',
+        icon: ClipboardList,
+    },
+    {
+        key: 'review',
+        label: 'Review & submit',
+        blurb: 'Check, then claim',
+        icon: FileCheck2,
+    },
 ];
 
 function MileageClaimWizard({
@@ -570,7 +794,8 @@ function MileageClaimWizard({
         form.data.end_location.trim() !== '' &&
         distance > 0;
     const purposeValid = form.data.purpose !== '';
-    const canContinue = stepIndex === 0 ? tripValid : stepIndex === 1 ? purposeValid : true;
+    const canContinue =
+        stepIndex === 0 ? tripValid : stepIndex === 1 ? purposeValid : true;
 
     const resetAll = () => {
         form.reset();
@@ -589,18 +814,23 @@ function MileageClaimWizard({
             preserveScroll: true,
             onSuccess: (page) => {
                 // flash.error arrives via onSuccess in Inertia — only celebrate a clean redirect.
-                const flash = (page.props as { flash?: { error?: string | null } }).flash;
+                const flash = (
+                    page.props as { flash?: { error?: string | null } }
+                ).flash;
                 if (!flash?.error) setSubmitted(true);
             },
         });
     };
 
     const clientName = form.data.client_id
-        ? (clients.find((c) => String(c.id) === form.data.client_id)?.name ?? '—')
+        ? (clients.find((c) => String(c.id) === form.data.client_id)?.name ??
+          '—')
         : null;
 
     const fieldError = (key: keyof typeof form.errors) =>
-        form.errors[key] ? <p className="mt-1 text-xs text-destructive">{form.errors[key]}</p> : null;
+        form.errors[key] ? (
+            <p className="mt-1 text-xs text-destructive">{form.errors[key]}</p>
+        ) : null;
 
     return (
         <WizardShell
@@ -619,7 +849,9 @@ function MileageClaimWizard({
                     {distance > 0 ? (
                         <>
                             {distance} km × ${irdRate.toFixed(2)} ={' '}
-                            <span className="font-semibold text-foreground">{formatCurrency(calculatedTotal)}</span>
+                            <span className="font-semibold text-foreground">
+                                {formatCurrency(calculatedTotal)}
+                            </span>
                         </>
                     ) : (
                         'Reimbursement is calculated from distance.'
@@ -630,17 +862,25 @@ function MileageClaimWizard({
                 submitted ? null : (
                     <>
                         {stepIndex > 0 && (
-                            <Button variant="outline" onClick={() => setStepIndex(stepIndex - 1)}>
+                            <Button
+                                variant="outline"
+                                onClick={() => setStepIndex(stepIndex - 1)}
+                            >
                                 Back
                             </Button>
                         )}
                         {stepIndex < WIZARD_STEPS.length - 1 ? (
-                            <Button onClick={() => setStepIndex(stepIndex + 1)} disabled={!canContinue}>
+                            <Button
+                                onClick={() => setStepIndex(stepIndex + 1)}
+                                disabled={!canContinue}
+                            >
                                 Continue
                             </Button>
                         ) : (
                             <Button onClick={submit} disabled={form.processing}>
-                                {form.processing ? 'Submitting…' : 'Submit claim'}
+                                {form.processing
+                                    ? 'Submitting…'
+                                    : 'Submit claim'}
                             </Button>
                         )}
                     </>
@@ -672,16 +912,25 @@ function MileageClaimWizard({
                                 id="claim-date"
                                 type="date"
                                 value={form.data.date}
-                                onChange={(e) => form.setData('date', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('date', e.target.value)
+                                }
                             />
                             {fieldError('date')}
                         </div>
                         <div className="grid gap-1.5">
-                            <Label htmlFor="claim-start">Start location *</Label>
+                            <Label htmlFor="claim-start">
+                                Start location *
+                            </Label>
                             <Input
                                 id="claim-start"
                                 value={form.data.start_location}
-                                onChange={(e) => form.setData('start_location', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'start_location',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="e.g. Office, Home"
                             />
                             {fieldError('start_location')}
@@ -691,13 +940,17 @@ function MileageClaimWizard({
                             <Input
                                 id="claim-end"
                                 value={form.data.end_location}
-                                onChange={(e) => form.setData('end_location', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('end_location', e.target.value)
+                                }
                                 placeholder="e.g. Client home, Meeting venue"
                             />
                             {fieldError('end_location')}
                         </div>
                         <div className="grid gap-1.5">
-                            <Label htmlFor="claim-distance">Distance (km) *</Label>
+                            <Label htmlFor="claim-distance">
+                                Distance (km) *
+                            </Label>
                             <Input
                                 id="claim-distance"
                                 type="number"
@@ -705,7 +958,9 @@ function MileageClaimWizard({
                                 min="0.1"
                                 max="9999"
                                 value={form.data.distance_km}
-                                onChange={(e) => form.setData('distance_km', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('distance_km', e.target.value)
+                                }
                                 placeholder="0.0"
                             />
                             {fieldError('distance_km')}
@@ -719,16 +974,26 @@ function MileageClaimWizard({
                     <div className="grid gap-4 sm:max-w-lg">
                         <div className="grid gap-1.5">
                             <Label>Purpose *</Label>
-                            <Select value={form.data.purpose} onValueChange={(v) => form.setData('purpose', v)}>
+                            <Select
+                                value={form.data.purpose}
+                                onValueChange={(v) =>
+                                    form.setData('purpose', v)
+                                }
+                            >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select purpose" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {Object.entries(purposeLabels).map(([value, label]) => (
-                                        <SelectItem key={value} value={value}>
-                                            {label}
-                                        </SelectItem>
-                                    ))}
+                                    {Object.entries(purposeLabels).map(
+                                        ([value, label]) => (
+                                            <SelectItem
+                                                key={value}
+                                                value={value}
+                                            >
+                                                {label}
+                                            </SelectItem>
+                                        ),
+                                    )}
                                 </SelectContent>
                             </Select>
                             {fieldError('purpose')}
@@ -738,15 +1003,25 @@ function MileageClaimWizard({
                                 <Label>Link to client</Label>
                                 <Select
                                     value={form.data.client_id || 'none'}
-                                    onValueChange={(v) => form.setData('client_id', v === 'none' ? '' : v)}
+                                    onValueChange={(v) =>
+                                        form.setData(
+                                            'client_id',
+                                            v === 'none' ? '' : v,
+                                        )
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select client (optional)" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">No client</SelectItem>
+                                        <SelectItem value="none">
+                                            No client
+                                        </SelectItem>
                                         {clients.map((c) => (
-                                            <SelectItem key={c.id} value={String(c.id)}>
+                                            <SelectItem
+                                                key={c.id}
+                                                value={String(c.id)}
+                                            >
                                                 {c.name}
                                             </SelectItem>
                                         ))}
@@ -762,7 +1037,9 @@ function MileageClaimWizard({
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                 rows={3}
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 placeholder="Any additional details about this trip..."
                             />
                             {fieldError('notes')}
@@ -774,29 +1051,75 @@ function MileageClaimWizard({
             {stepIndex === 2 && (
                 <WizardStepPane>
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={Route} title="Trip details" onEdit={() => setStepIndex(0)}>
+                        <ReviewCard
+                            icon={Route}
+                            title="Trip details"
+                            onEdit={() => setStepIndex(0)}
+                        >
                             <ReviewRow label="Date" value={form.data.date} />
-                            <ReviewRow label="From" value={form.data.start_location} />
-                            <ReviewRow label="To" value={form.data.end_location} />
-                            <ReviewRow label="Distance" value={distance > 0 ? `${distance} km` : undefined} />
+                            <ReviewRow
+                                label="From"
+                                value={form.data.start_location}
+                            />
+                            <ReviewRow
+                                label="To"
+                                value={form.data.end_location}
+                            />
+                            <ReviewRow
+                                label="Distance"
+                                value={
+                                    distance > 0 ? `${distance} km` : undefined
+                                }
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={ClipboardList} title="Purpose & links" onEdit={() => setStepIndex(1)}>
-                            <ReviewRow label="Purpose" value={purposeLabels[form.data.purpose] ?? form.data.purpose} />
-                            <ReviewRow label="Client" value={clientName ?? undefined} />
-                            <ReviewRow label="Notes" value={form.data.notes || undefined} />
+                        <ReviewCard
+                            icon={ClipboardList}
+                            title="Purpose & links"
+                            onEdit={() => setStepIndex(1)}
+                        >
+                            <ReviewRow
+                                label="Purpose"
+                                value={
+                                    purposeLabels[form.data.purpose] ??
+                                    form.data.purpose
+                                }
+                            />
+                            <ReviewRow
+                                label="Client"
+                                value={clientName ?? undefined}
+                            />
+                            <ReviewRow
+                                label="Notes"
+                                value={form.data.notes || undefined}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={DollarSign} title="Reimbursement" span>
-                            <ReviewRow label="IRD rate" value={`$${irdRate.toFixed(2)}/km`} />
-                            <ReviewRow label="Distance" value={`${distance} km`} />
+                        <ReviewCard
+                            icon={DollarSign}
+                            title="Reimbursement"
+                            span
+                        >
+                            <ReviewRow
+                                label="IRD rate"
+                                value={`$${irdRate.toFixed(2)}/km`}
+                            />
+                            <ReviewRow
+                                label="Distance"
+                                value={`${distance} km`}
+                            />
                             <ReviewRow
                                 label="Total"
-                                value={<span className="font-bold text-primary">{formatCurrency(calculatedTotal)}</span>}
+                                value={
+                                    <span className="font-bold text-primary">
+                                        {formatCurrency(calculatedTotal)}
+                                    </span>
+                                }
                             />
                         </ReviewCard>
                     </div>
                     {Object.keys(form.errors).length > 0 && (
                         <p className="mt-4 text-sm text-destructive">
-                            Please fix the highlighted fields on the earlier steps before submitting.
+                            Please fix the highlighted fields on the earlier
+                            steps before submitting.
                         </p>
                     )}
                 </WizardStepPane>

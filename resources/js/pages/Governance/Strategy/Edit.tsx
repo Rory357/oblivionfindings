@@ -1,12 +1,18 @@
-import { Head, useForm } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { Head, useForm } from '@inertiajs/react';
 import { Compass } from 'lucide-react';
 
 interface Plan {
@@ -65,50 +71,127 @@ export default function EditStrategy({ plan }: { plan: Plan }) {
                 }
             >
                 <Card>
-                    <CardHeader><CardTitle>Plan Details</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle>Plan Details</CardTitle>
+                    </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
                                 <Label>Title</Label>
-                                <Input value={data.title} onChange={(e) => setData('title', e.target.value)} />
-                                {errors.title && <p className="text-sm text-status-critical mt-1">{errors.title}</p>}
+                                <Input
+                                    value={data.title}
+                                    onChange={(e) =>
+                                        setData('title', e.target.value)
+                                    }
+                                />
+                                {errors.title && (
+                                    <p className="mt-1 text-sm text-status-critical">
+                                        {errors.title}
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <Label>Planning Horizon</Label>
-                                <Select value={data.planning_horizon} onValueChange={(v) => setData('planning_horizon', v)}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                <Select
+                                    value={data.planning_horizon}
+                                    onValueChange={(v) =>
+                                        setData('planning_horizon', v)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="1_year">1 Year</SelectItem>
-                                        <SelectItem value="3_year">3 Year</SelectItem>
-                                        <SelectItem value="5_year">5 Year</SelectItem>
+                                        <SelectItem value="1_year">
+                                            1 Year
+                                        </SelectItem>
+                                        <SelectItem value="3_year">
+                                            3 Year
+                                        </SelectItem>
+                                        <SelectItem value="5_year">
+                                            5 Year
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <Label>Period Start</Label>
-                                    <Input type="date" value={data.period_start} onChange={(e) => setData('period_start', e.target.value)} />
+                                    <Input
+                                        type="date"
+                                        value={data.period_start}
+                                        onChange={(e) =>
+                                            setData(
+                                                'period_start',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
                                 </div>
                                 <div>
                                     <Label>Period End</Label>
-                                    <Input type="date" value={data.period_end} onChange={(e) => setData('period_end', e.target.value)} />
+                                    <Input
+                                        type="date"
+                                        value={data.period_end}
+                                        onChange={(e) =>
+                                            setData(
+                                                'period_end',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
                                 </div>
                             </div>
                             <div>
                                 <Label>Vision Statement</Label>
-                                <Textarea value={data.vision_statement} onChange={(e) => setData('vision_statement', e.target.value)} rows={3} />
+                                <Textarea
+                                    value={data.vision_statement}
+                                    onChange={(e) =>
+                                        setData(
+                                            'vision_statement',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={3}
+                                />
                             </div>
                             <div>
                                 <Label>Mission Statement</Label>
-                                <Textarea value={data.mission_statement} onChange={(e) => setData('mission_statement', e.target.value)} rows={3} />
+                                <Textarea
+                                    value={data.mission_statement}
+                                    onChange={(e) =>
+                                        setData(
+                                            'mission_statement',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={3}
+                                />
                             </div>
                             <div>
                                 <Label>Values (one per line)</Label>
-                                <Textarea value={data.values} onChange={(e) => setData('values', e.target.value)} rows={4} placeholder={"Excellence\nIntegrity\nCompassion"} />
+                                <Textarea
+                                    value={data.values}
+                                    onChange={(e) =>
+                                        setData('values', e.target.value)
+                                    }
+                                    rows={4}
+                                    placeholder={
+                                        'Excellence\nIntegrity\nCompassion'
+                                    }
+                                />
                             </div>
                             <div className="flex gap-2 pt-4">
-                                <Button type="submit" disabled={processing}>Update Plan</Button>
-                                <Button type="button" variant="outline" onClick={() => window.history.back()}>Cancel</Button>
+                                <Button type="submit" disabled={processing}>
+                                    Update Plan
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => window.history.back()}
+                                >
+                                    Cancel
+                                </Button>
                             </div>
                         </form>
                     </CardContent>

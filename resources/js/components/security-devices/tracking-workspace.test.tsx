@@ -29,6 +29,7 @@ const base: TrackingWorkspaceData = {
         retentionDays: 365,
     },
     overview: {
+        countsComplete: true,
         inventory: {
             total: 5,
             personal_safety: 2,
@@ -83,6 +84,7 @@ const base: TrackingWorkspaceData = {
         inventoryTotal: 5,
         inventoryShown: 0,
         inventoryTruncated: false,
+        attentionFilter: null,
         devices: [],
         markers: [],
         geofences: [],
@@ -151,6 +153,41 @@ describe('TrackingWorkspacePanels', () => {
             'href',
             '/security-devices/tracking?tab=personal-safety',
         );
+    });
+
+    it('labels bounded counts and makes attention handoffs visible and reversible', () => {
+        render(
+            <TrackingWorkspacePanels
+                data={{
+                    ...base,
+                    overview: { ...base.overview, countsComplete: false },
+                    activeTab: {
+                        ...base.activeTab,
+                        inventoryShown: 1,
+                        inventoryTotal: 1,
+                        inventoryTruncated: true,
+                        attentionFilter: {
+                            key: 'offline',
+                            label: 'Offline tracking devices',
+                        },
+                    },
+                }}
+            />,
+        );
+
+        expect(
+            screen.getByText(/Counts below describe the first 100/),
+        ).toBeInTheDocument();
+        expect(screen.getByText('2 personal safety shown')).toBeInTheDocument();
+        expect(
+            screen.getByText(/1 matching authorised trackers shown/),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/Filtered to:/)).toHaveTextContent(
+            'Offline tracking devices',
+        );
+        expect(
+            screen.getByRole('link', { name: 'Clear attention filter' }),
+        ).toHaveAttribute('href', '/security-devices/tracking?tab=overview');
     });
 
     it('shows active client consent, minimum identity and canonical links', () => {

@@ -8,6 +8,7 @@ use App\Domain\Monitoring\Data\ProbeScope;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Jobs\RunMonitorCheck;
+use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Protocols\RemoteInventory\SshCommandResponse;
@@ -69,6 +70,8 @@ final class TaskElevenFeatureSshConnection implements SshConnection
 {
     public int $executions = 0;
 
+    public bool $failServiceInventory = false;
+
     public function fingerprint(): string
     {
         return 'SHA256:'.'A'.str_repeat('B', 42);
@@ -82,6 +85,9 @@ final class TaskElevenFeatureSshConnection implements SshConnection
     public function execute(array $command, int $timeoutSeconds, int $maxOutputBytes): SshCommandResponse
     {
         $this->executions++;
+        if ($this->failServiceInventory && $command[0] === 'systemctl') {
+            return new SshCommandResponse('', 1, false, false, 2);
+        }
         $output = match ($command[0]) {
             'uname' => "Linux 6.8.0\n",
             'uptime' => "2026-07-20 01:02:03\n",
@@ -267,4 +273,27 @@ it('schedules both approved inventory monitor kinds as central direct checks', f
     Queue::assertPushed(RunMonitorCheck::class, 2);
     Queue::assertPushed(RunMonitorCheck::class, fn (RunMonitorCheck $job): bool => $job->monitorId === $record['ssh']->id);
     Queue::assertPushed(RunMonitorCheck::class, fn (RunMonitorCheck $job): bool => $job->monitorId === $record['winrm']->id);
+});
+
+it('records a partial inventory observation without creating an authoritative configuration snapshot', function () {
+    $record = taskElevenFeatureMonitors();
+    $credentials = new TaskElevenFeatureCredentialProvider;
+    $ssh = new TaskElevenFeatureSshFactory;
+    $ssh->connection->failServiceInventory = true;
+    app()->instance(ApprovedProbeScopeProvider::class, new TaskElevenFeatureScopeProvider);
+    app()->instance(CredentialLeaseProvider::class, $credentials);
+    app()->instance(SshConnectionFactory::class, $ssh);
+    app()->forgetInstance(EgressPolicy::class);
+    app()->forgetInstance(ProbeAdapterRegistry::class);
+
+    app(MonitorCheckRunner::class)->run($record['ssh']->id, 'scheduled:ssh-partial');
+
+    $observation = $record['ssh']->observations()->sole();
+    expect($observation->state)->toBe(MonitorState::Degraded)
+        ->and($observation->message)->toBe('ssh_inventory_partial')
+        ->and($observation->metrics)->toMatchArray([
+            'inventory_status' => 'partial',
+            'completed_operations' => 3,
+            'failed_operations' => 1,
+        ])->and(ConfigurationSnapshot::query()->count())->toBe(0);
 });

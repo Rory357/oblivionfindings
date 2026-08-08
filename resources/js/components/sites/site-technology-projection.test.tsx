@@ -117,6 +117,8 @@ const projection: SiteTechnologyProjection = {
     can: {
         view_control_room: false,
         view_it_work: false,
+        view_monitoring: true,
+        view_maintenance: true,
         view_room_placement: true,
     },
 };
@@ -189,5 +191,65 @@ describe('Site technology projection', () => {
         expect(
             screen.getByRole('link', { name: /room placement/i }),
         ).toHaveAttribute('href', '/sites/9004/hardware');
+    });
+
+    it('shows explicit restricted states without links or source counts', () => {
+        render(
+            <SiteTechnologyProjectionPanel
+                siteId={9004}
+                data={{
+                    ...projection,
+                    summary: {
+                        ...projection.summary,
+                        monitored_devices: null,
+                        unmonitored_devices: null,
+                        coverage_percent: null,
+                        failed_monitors: null,
+                        active_findings: null,
+                        overdue_maintenance: null,
+                        collector: null,
+                    },
+                    devices: projection.devices.map((device) => ({
+                        ...device,
+                        monitor_count: null,
+                        monitoring_state: null,
+                    })),
+                    monitoring: {
+                        ...projection.monitoring,
+                        monitored_devices: null,
+                        unmonitored_devices: null,
+                        failed_monitors: null,
+                        uncertain_monitors: null,
+                        issues: [],
+                    },
+                    maintenance: [],
+                    collectors: [],
+                    links: {
+                        ...projection.links,
+                        monitoring: null,
+                        maintenance: null,
+                    },
+                    can: {
+                        ...projection.can,
+                        view_monitoring: false,
+                        view_maintenance: false,
+                    },
+                }}
+                canViewHardwarePlacement={false}
+            />,
+        );
+
+        expect(
+            screen.getByText(/Monitoring access is required to view coverage/),
+        ).toBeVisible();
+        expect(screen.getByText('Collector restricted')).toBeVisible();
+        expect(
+            screen.getByText(
+                /Maintenance access is required to view this queue/,
+            ),
+        ).toBeVisible();
+        expect(
+            screen.queryByRole('link', { name: 'Open monitoring' }),
+        ).not.toBeInTheDocument();
     });
 });

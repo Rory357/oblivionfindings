@@ -1,8 +1,8 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Table,
@@ -13,7 +13,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
@@ -53,13 +52,27 @@ type Props = {
     can: RoadmapCan;
 };
 
-const statusOptions = ['', 'triage_pending', 'accepted', 'rejected', 'snoozed', 'converted'];
+const statusOptions = [
+    '',
+    'triage_pending',
+    'accepted',
+    'rejected',
+    'snoozed',
+    'converted',
+];
 
-export default function SuggestionIndex({ items, filters, managers, can }: Props) {
+export default function SuggestionIndex({
+    items,
+    filters,
+    managers,
+    can,
+}: Props) {
     const [status, setStatus] = useState(filters.status ?? 'triage_pending');
     const [source, setSource] = useState(filters.source ?? '');
     const [notes, setNotes] = useState<Record<number, string>>(() =>
-        Object.fromEntries(items.data.map((item) => [item.id, item.triage_notes ?? ''])),
+        Object.fromEntries(
+            items.data.map((item) => [item.id, item.triage_notes ?? '']),
+        ),
     );
     const [loadingKey, setLoadingKey] = useState<string | null>(null);
     const currentYear = new Date().getFullYear();
@@ -96,7 +109,10 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
                 `/roadmap/suggestions/${suggestion.id}/triage`,
                 {
                     status: nextStatus,
-                    triage_owner_id: triageOwnerId ?? suggestion.triage_owner_id ?? undefined,
+                    triage_owner_id:
+                        triageOwnerId ??
+                        suggestion.triage_owner_id ??
+                        undefined,
                     triage_notes: notes[suggestion.id]?.trim() || null,
                     snoozed_until:
                         nextStatus === 'snoozed'
@@ -110,7 +126,9 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
             toast.success('Suggestion updated.');
             router.reload({ preserveScroll: true });
         } catch (error) {
-            toast.error(extractErrorMessage(error, 'Failed to update suggestion.'));
+            toast.error(
+                extractErrorMessage(error, 'Failed to update suggestion.'),
+            );
         } finally {
             setLoadingKey(null);
         }
@@ -124,7 +142,10 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
             await axios.post(
                 `/roadmap/suggestions/${suggestion.id}/convert`,
                 {
-                    owner_user_id: suggestion.triage_owner_id ?? defaultOwnerId ?? undefined,
+                    owner_user_id:
+                        suggestion.triage_owner_id ??
+                        defaultOwnerId ??
+                        undefined,
                     target_fiscal_year: currentYear,
                     target_quarter: currentQuarter,
                     triage_notes: notes[suggestion.id]?.trim() || null,
@@ -134,7 +155,9 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
             toast.success('Suggestion converted to initiative.');
             router.reload({ preserveScroll: true });
         } catch (error) {
-            toast.error(extractErrorMessage(error, 'Failed to convert suggestion.'));
+            toast.error(
+                extractErrorMessage(error, 'Failed to convert suggestion.'),
+            );
         } finally {
             setLoadingKey(null);
         }
@@ -151,11 +174,16 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
                     { label: 'Total', value: items.data?.length ?? 0 },
                     {
                         label: 'Pending triage',
-                        value: items.data?.filter((s) => s.status === 'triage_pending').length ?? 0,
+                        value:
+                            items.data?.filter(
+                                (s) => s.status === 'triage_pending',
+                            ).length ?? 0,
                     },
                     {
                         label: 'Accepted',
-                        value: items.data?.filter((s) => s.status === 'accepted').length ?? 0,
+                        value:
+                            items.data?.filter((s) => s.status === 'accepted')
+                                .length ?? 0,
                     },
                 ]}
             />
@@ -170,7 +198,9 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
                         >
                             {statusOptions.map((option) => (
                                 <option key={option || 'all'} value={option}>
-                                    {option ? statusLabel(option) : 'All statuses'}
+                                    {option
+                                        ? statusLabel(option)
+                                        : 'All statuses'}
                                 </option>
                             ))}
                         </select>
@@ -195,7 +225,9 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <Table data-testid="suggestion-backlog-table">
-                                <caption className="sr-only">Roadmap suggestion backlog</caption>
+                                <caption className="sr-only">
+                                    Roadmap suggestion backlog
+                                </caption>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Suggestion</TableHead>
@@ -203,72 +235,126 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
                                         <TableHead>Status</TableHead>
                                         <TableHead>Owner</TableHead>
                                         <TableHead>Notes</TableHead>
-                                        {can.manageRoadmap && <TableHead>Actions</TableHead>}
+                                        {can.manageRoadmap && (
+                                            <TableHead>Actions</TableHead>
+                                        )}
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {items.data.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={can.manageRoadmap ? 6 : 5}
+                                                colSpan={
+                                                    can.manageRoadmap ? 6 : 5
+                                                }
                                                 className="text-muted-foreground"
                                             >
-                                                No suggestions match these filters.
+                                                No suggestions match these
+                                                filters.
                                             </TableCell>
                                         </TableRow>
                                     )}
                                     {items.data.map((suggestion) => (
                                         <TableRow key={suggestion.id}>
                                             <TableCell className="min-w-[300px]">
-                                                <div className="font-medium">{suggestion.title}</div>
+                                                <div className="font-medium">
+                                                    {suggestion.title}
+                                                </div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    {suggestion.summary ?? 'No summary'} · {suggestion.hit_count ?? 0} hits · last seen {formatDate(suggestion.last_seen_at)}
+                                                    {suggestion.summary ??
+                                                        'No summary'}{' '}
+                                                    ·{' '}
+                                                    {suggestion.hit_count ?? 0}{' '}
+                                                    hits · last seen{' '}
+                                                    {formatDate(
+                                                        suggestion.last_seen_at,
+                                                    )}
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{statusLabel(suggestion.source)}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline">{statusLabel(suggestion.status)}</Badge>
+                                                {statusLabel(suggestion.source)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">
+                                                    {statusLabel(
+                                                        suggestion.status,
+                                                    )}
+                                                </Badge>
                                             </TableCell>
                                             <TableCell>
                                                 {can.manageRoadmap ? (
                                                     <select
                                                         className="h-9 min-w-[180px] rounded-md border bg-background px-2 text-sm"
-                                                        defaultValue={suggestion.triage_owner_id ?? ''}
+                                                        defaultValue={
+                                                            suggestion.triage_owner_id ??
+                                                            ''
+                                                        }
                                                         onChange={(event) =>
                                                             void triage(
                                                                 suggestion,
                                                                 'triage_pending',
-                                                                event.target.value ? Number(event.target.value) : null,
+                                                                event.target
+                                                                    .value
+                                                                    ? Number(
+                                                                          event
+                                                                              .target
+                                                                              .value,
+                                                                      )
+                                                                    : null,
                                                             )
                                                         }
                                                         aria-label={`Assign ${suggestion.title}`}
                                                     >
-                                                        <option value="">Unassigned</option>
-                                                        {managers.map((manager) => (
-                                                            <option key={manager.id} value={manager.id}>
-                                                                {manager.name}
-                                                            </option>
-                                                        ))}
+                                                        <option value="">
+                                                            Unassigned
+                                                        </option>
+                                                        {managers.map(
+                                                            (manager) => (
+                                                                <option
+                                                                    key={
+                                                                        manager.id
+                                                                    }
+                                                                    value={
+                                                                        manager.id
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        manager.name
+                                                                    }
+                                                                </option>
+                                                            ),
+                                                        )}
                                                     </select>
                                                 ) : (
-                                                    suggestion.triage_owner?.name ?? 'Unassigned'
+                                                    (suggestion.triage_owner
+                                                        ?.name ?? 'Unassigned')
                                                 )}
                                             </TableCell>
                                             <TableCell className="min-w-[260px]">
                                                 {can.manageRoadmap ? (
                                                     <Textarea
-                                                        value={notes[suggestion.id] ?? ''}
+                                                        value={
+                                                            notes[
+                                                                suggestion.id
+                                                            ] ?? ''
+                                                        }
                                                         onChange={(event) =>
-                                                            setNotes((current) => ({
-                                                                ...current,
-                                                                [suggestion.id]: event.target.value,
-                                                            }))
+                                                            setNotes(
+                                                                (current) => ({
+                                                                    ...current,
+                                                                    [suggestion.id]:
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                }),
+                                                            )
                                                         }
                                                         rows={2}
                                                         aria-label={`Notes for ${suggestion.title}`}
                                                     />
                                                 ) : (
-                                                    suggestion.triage_notes ?? '-'
+                                                    (suggestion.triage_notes ??
+                                                    '-')
                                                 )}
                                             </TableCell>
                                             {can.manageRoadmap && (
@@ -277,31 +363,62 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            disabled={loadingKey === `${suggestion.id}:triage_pending`}
-                                                            onClick={() => void triage(suggestion, 'triage_pending')}
+                                                            disabled={
+                                                                loadingKey ===
+                                                                `${suggestion.id}:triage_pending`
+                                                            }
+                                                            onClick={() =>
+                                                                void triage(
+                                                                    suggestion,
+                                                                    'triage_pending',
+                                                                )
+                                                            }
                                                         >
                                                             Save
                                                         </Button>
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            disabled={loadingKey === `${suggestion.id}:accepted`}
-                                                            onClick={() => void triage(suggestion, 'accepted')}
+                                                            disabled={
+                                                                loadingKey ===
+                                                                `${suggestion.id}:accepted`
+                                                            }
+                                                            onClick={() =>
+                                                                void triage(
+                                                                    suggestion,
+                                                                    'accepted',
+                                                                )
+                                                            }
                                                         >
                                                             Accept
                                                         </Button>
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            disabled={loadingKey === `${suggestion.id}:rejected`}
-                                                            onClick={() => void triage(suggestion, 'rejected')}
+                                                            disabled={
+                                                                loadingKey ===
+                                                                `${suggestion.id}:rejected`
+                                                            }
+                                                            onClick={() =>
+                                                                void triage(
+                                                                    suggestion,
+                                                                    'rejected',
+                                                                )
+                                                            }
                                                         >
                                                             Reject
                                                         </Button>
                                                         <Button
                                                             size="sm"
-                                                            disabled={loadingKey === `${suggestion.id}:convert`}
-                                                            onClick={() => void convert(suggestion)}
+                                                            disabled={
+                                                                loadingKey ===
+                                                                `${suggestion.id}:convert`
+                                                            }
+                                                            onClick={() =>
+                                                                void convert(
+                                                                    suggestion,
+                                                                )
+                                                            }
                                                         >
                                                             Convert
                                                         </Button>
@@ -318,9 +435,13 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
 
                 <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="text-sm text-muted-foreground">
-                        Showing {items.data.length} of {items.total} suggestions.
+                        Showing {items.data.length} of {items.total}{' '}
+                        suggestions.
                     </div>
-                    <LaravelPagination links={items.links} lastPage={items.last_page} />
+                    <LaravelPagination
+                        links={items.links}
+                        lastPage={items.last_page}
+                    />
                 </div>
             </PageShell>
         </AppLayout>

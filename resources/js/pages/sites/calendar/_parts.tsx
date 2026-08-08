@@ -3,6 +3,8 @@
  * Ported from the prototype's cal-views.jsx; icons swapped for lucide-react and
  * shared UI state threaded via context to keep view signatures small.
  */
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     colorVars,
     parseDT,
@@ -26,8 +28,8 @@ import {
     KeyRound,
     Lock,
     MapPin,
-    Plus,
     Pill,
+    Plus,
     Repeat,
     ShieldCheck,
     Siren,
@@ -47,8 +49,6 @@ import {
     type CSSProperties,
     type ReactNode,
 } from 'react';
-import { Button as GuardrailButton } from '@/components/ui/button';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type Density = 'comfortable' | 'compact';
 
@@ -183,7 +183,8 @@ export function MiniMonth({
     return (
         <div className="w-60 p-1">
             <div className="mb-1 flex items-center justify-between px-1">
-                <GuardrailButton unstyled
+                <GuardrailButton
+                    unstyled
                     type="button"
                     onClick={() => shiftMonth(-1)}
                     aria-label="Previous month"
@@ -194,7 +195,8 @@ export function MiniMonth({
                 <span className="text-sm font-semibold">
                     {MO[cursor.getMonth()]} {cursor.getFullYear()}
                 </span>
-                <GuardrailButton unstyled
+                <GuardrailButton
+                    unstyled
                     type="button"
                     onClick={() => shiftMonth(1)}
                     aria-label="Next month"
@@ -221,7 +223,8 @@ export function MiniMonth({
                             ? 'text-foreground hover:bg-muted'
                             : 'text-muted-foreground/40 hover:bg-muted';
                     return (
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             key={d.toISOString()}
                             type="button"
                             onClick={() => onSelect(d)}
@@ -408,7 +411,8 @@ function MiniChip({
     const { colorBy, onSelect, onPreview, onPreviewEnd } = useCalUI();
     const overdue = ev.status === 'overdue';
     return (
-        <GuardrailButton unstyled
+        <GuardrailButton
+            unstyled
             onClick={(e) => {
                 e.stopPropagation();
                 onPreviewEnd?.();
@@ -716,7 +720,8 @@ function AllDayRow({
                         {events
                             .filter((e) => e.allDay && sameDay(e._start, d))
                             .map((e) => (
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     key={e.id}
                                     onClick={() => {
                                         onPreviewEnd?.();
@@ -886,7 +891,10 @@ export function MonthView({
     );
 
     return (
-        <GuardrailCard unstyled className="flex h-full flex-col overflow-hidden rounded-xl border bg-card">
+        <GuardrailCard
+            unstyled
+            className="flex h-full flex-col overflow-hidden rounded-xl border bg-card"
+        >
             <div
                 role="presentation"
                 className="grid grid-cols-7 border-b bg-muted/40"
@@ -1021,7 +1029,8 @@ export function MonthView({
                                             />
                                         ))}
                                         {dayEvents.length > cap && (
-                                            <GuardrailButton unstyled
+                                            <GuardrailButton
+                                                unstyled
                                                 onClick={(ev) => {
                                                     ev.stopPropagation();
                                                     if (onMore) onMore(d);
@@ -1073,7 +1082,10 @@ export function WeekView({
         onContext(e, d, h);
     };
     return (
-        <GuardrailCard unstyled className="flex h-full flex-col overflow-hidden rounded-xl border bg-card">
+        <GuardrailCard
+            unstyled
+            className="flex h-full flex-col overflow-hidden rounded-xl border bg-card"
+        >
             <div className="flex border-b" style={{ paddingRight: sbw }}>
                 <div className="w-14 shrink-0" />
                 {days.map((d, i) => {
@@ -1173,7 +1185,10 @@ export function DayView({
         onContext(e, day, h);
     };
     return (
-        <GuardrailCard unstyled className="flex h-full flex-col overflow-hidden rounded-xl border bg-card">
+        <GuardrailCard
+            unstyled
+            className="flex h-full flex-col overflow-hidden rounded-xl border bg-card"
+        >
             <div className="flex items-center gap-3 border-b px-4 py-3">
                 <span
                     className={`tnum flex h-11 w-11 flex-col items-center justify-center rounded-xl ${sameDay(day, TODAY) ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}
@@ -1271,7 +1286,10 @@ export function AgendaView({
         g.items.push(e);
     });
     return (
-        <GuardrailCard unstyled className="scroll-pretty h-full overflow-y-auto rounded-xl border bg-card">
+        <GuardrailCard
+            unstyled
+            className="scroll-pretty h-full overflow-y-auto rounded-xl border bg-card"
+        >
             {groups.length === 0 && (
                 <div className="flex h-full flex-col items-center justify-center gap-3 py-16 text-center text-muted-foreground">
                     <CalendarDays className="h-10 w-10 opacity-40" />
@@ -1317,7 +1335,8 @@ export function AgendaView({
                         </div>
                         <div className="flex-1 divide-y">
                             {g.items.map((e) => (
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     key={e.id}
                                     onClick={() => onSelect(e)}
                                     className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
@@ -1412,7 +1431,10 @@ export function TimelineView({
     const used = sources.filter((s) => events.some((e) => e.source === s.key));
     const lanes = used.length ? used : sources;
     return (
-        <GuardrailCard unstyled className="scroll-pretty h-full overflow-auto rounded-xl border bg-card">
+        <GuardrailCard
+            unstyled
+            className="scroll-pretty h-full overflow-auto rounded-xl border bg-card"
+        >
             <div style={{ minWidth: 160 + days.length * COLW }}>
                 <div className="sticky top-0 z-20 flex border-b bg-card">
                     <div className="sticky left-0 z-10 flex w-40 shrink-0 items-center border-r bg-card px-3 py-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
@@ -1495,7 +1517,8 @@ export function TimelineView({
                                                             string
                                                         >;
                                                         return (
-                                                            <GuardrailButton unstyled
+                                                            <GuardrailButton
+                                                                unstyled
                                                                 key={e.id}
                                                                 onClick={() => {
                                                                     onPreviewEnd?.();
@@ -1564,7 +1587,8 @@ function RailRow({
     showDay?: boolean;
 }) {
     return (
-        <GuardrailButton unstyled
+        <GuardrailButton
+            unstyled
             onClick={() => onSelect(ev)}
             className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent/40"
         >
@@ -1693,7 +1717,8 @@ export function TodayRail({
                         </div>
                     </div>
                     {!viewingToday && (
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             onClick={onJumpToday}
                             className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/15"
                         >
@@ -1703,7 +1728,8 @@ export function TodayRail({
                 </div>
                 <div className="p-3">
                     {focus ? (
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             onClick={() => onSelect(focus)}
                             className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-md"
                             style={{
@@ -1775,7 +1801,8 @@ export function TodayRail({
                     </div>
                     <div className="divide-y">
                         {overdue.slice(0, 3).map((e) => (
-                            <GuardrailButton unstyled
+                            <GuardrailButton
+                                unstyled
                                 key={`${e.id}-${e.start}`}
                                 onClick={() => onSelect(e)}
                                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent/40"
@@ -1798,7 +1825,8 @@ export function TodayRail({
                             </GuardrailButton>
                         ))}
                         {pending.length > 0 && (
-                            <GuardrailButton unstyled
+                            <GuardrailButton
+                                unstyled
                                 onClick={onApprovals}
                                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent/40"
                             >

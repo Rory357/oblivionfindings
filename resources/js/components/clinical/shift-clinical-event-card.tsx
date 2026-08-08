@@ -1,6 +1,6 @@
 import EventRecordSheet from '@/components/clinical/event-record-sheet';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { router } from '@inertiajs/react';
 import { Activity, Plus } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -31,9 +31,13 @@ export default function ShiftClinicalEventCard({ shiftId }: Props) {
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-1">
-                        <p className="text-sm font-medium">Record a shift-linked clinical event</p>
+                        <p className="text-sm font-medium">
+                            Record a shift-linked clinical event
+                        </p>
                         <p className="text-xs text-muted-foreground">
-                            Use this when something clinically significant happens during the shift and should be logged immediately.
+                            Use this when something clinically significant
+                            happens during the shift and should be logged
+                            immediately.
                         </p>
                     </div>
                     <Button onClick={() => setSheetOpen(true)}>

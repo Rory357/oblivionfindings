@@ -2,12 +2,13 @@
 
 namespace Tests\Unit\Operations;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
-use App\Models\Client;
-use App\Models\Site;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -82,24 +83,46 @@ class ShiftShowPropsTest extends TestCase
 
     public function test_handover_summary_returns_correct_shape(): void
     {
-        $outgoing = User::factory()->create(['name' => 'Outgoing Staff']);
-        $incoming = User::factory()->create(['name' => 'Incoming Staff']);
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $outgoing = User::factory()->frontlineWorker()->create(['name' => 'Outgoing Staff']);
+        $incoming = User::factory()->frontlineWorker()->create(['name' => 'Incoming Staff']);
+
+        foreach ([$outgoing, $incoming] as $worker) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $worker->id,
+                'employee_number' => 'EMP-SHIFT-SHOW-'.$worker->id,
+                'work_email' => $worker->email,
+                'position_title' => 'Support Worker',
+                'position_role' => 'support_worker',
+                'start_date' => now()->subMonth()->toDateString(),
+                'is_active' => true,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+                'created_by' => $worker->id,
+                'updated_by' => $worker->id,
+            ]);
+        }
 
         $outShift = $this->makeShift([
             'user_id' => $outgoing->id,
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'status' => 'in_progress',
             'actual_starts_at' => now()->subHours(2),
+            'created_by' => $outgoing->id,
         ]);
 
         $inShift = $this->makeShift([
             'user_id' => $incoming->id,
             'client_id' => $client->id,
+            'site_id' => $site->id,
+            'created_by' => $incoming->id,
         ]);
 
-        // Create handover directly to avoid invariant triggers
-        $handover = ShiftHandover::forceCreate([
+        // Persist through model events so the fail-closed handover invariant
+        // validates the canonical Shift, staff, Client, and Site provenance.
+        $handover = ShiftHandover::create([
             'outgoing_shift_id' => $outShift->id,
             'incoming_shift_id' => $inShift->id,
             'client_id' => $client->id,
@@ -107,8 +130,8 @@ class ShiftShowPropsTest extends TestCase
             'incoming_staff_id' => $incoming->id,
             'status' => 'submitted',
             'handover_notes' => 'Test handover',
-            'created_at' => now(),
-            'updated_at' => now(),
+            'submitted_at' => now(),
+            'submitted_by' => $outgoing->id,
         ]);
 
         $h = ShiftHandover::where('outgoing_shift_id', $outShift->id)

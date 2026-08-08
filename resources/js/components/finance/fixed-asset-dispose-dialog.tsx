@@ -12,9 +12,9 @@ import {
     ReviewCard,
     ReviewRow,
     StepHead,
+    useWizard,
     WizardShell,
     type WizardStep,
-    useWizard,
 } from './wizard';
 
 export type DisposableGlAccount = { code: string; name: string } | null;
@@ -32,8 +32,18 @@ export type DisposableAsset = {
 };
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Disposal', blurb: 'Date & proceeds', icon: Coins },
-    { key: 'review', label: 'Review', blurb: 'Confirm the journal', icon: ListChecks },
+    {
+        key: 'details',
+        label: 'Disposal',
+        blurb: 'Date & proceeds',
+        icon: Coins,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm the journal',
+        icon: ListChecks,
+    },
 ];
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -75,7 +85,12 @@ export function FixedAssetDisposeDialog({
         if (!asset.gl_asset_account) return [];
         const lines: PostingLine[] = [];
         if (proceeds > 0) {
-            lines.push({ accountCode: '1000', accountName: 'Bank', debit: proceeds, memo: 'Disposal proceeds' });
+            lines.push({
+                accountCode: '1000',
+                accountName: 'Bank',
+                debit: proceeds,
+                memo: 'Disposal proceeds',
+            });
         }
         if (accumulated > 0 && asset.gl_depreciation_account) {
             lines.push({
@@ -96,15 +111,32 @@ export function FixedAssetDisposeDialog({
         const balancing = purchaseCost - proceeds - accumulated;
         if (Math.round(balancing * 100) !== 0) {
             if (balancing > 0) {
-                lines.push({ accountCode: '8400', accountName: 'Gain/Loss on Asset Disposal', debit: Math.abs(balancing), memo: 'Loss on disposal' });
+                lines.push({
+                    accountCode: '8400',
+                    accountName: 'Gain/Loss on Asset Disposal',
+                    debit: Math.abs(balancing),
+                    memo: 'Loss on disposal',
+                });
             } else {
-                lines.push({ accountCode: '8400', accountName: 'Gain/Loss on Asset Disposal', credit: Math.abs(balancing), memo: 'Gain on disposal' });
+                lines.push({
+                    accountCode: '8400',
+                    accountName: 'Gain/Loss on Asset Disposal',
+                    credit: Math.abs(balancing),
+                    memo: 'Gain on disposal',
+                });
             }
         }
         return lines;
-    }, [asset.gl_asset_account, asset.gl_depreciation_account, proceeds, accumulated, purchaseCost]);
+    }, [
+        asset.gl_asset_account,
+        asset.gl_depreciation_account,
+        proceeds,
+        accumulated,
+        purchaseCost,
+    ]);
 
-    const detailsValid = !!data.disposed_date && data.disposal_proceeds !== '' && proceeds >= 0;
+    const detailsValid =
+        !!data.disposed_date && data.disposal_proceeds !== '' && proceeds >= 0;
 
     const close = () => {
         reset();
@@ -131,7 +163,9 @@ export function FixedAssetDisposeDialog({
             description={`Record the disposal of ${asset.asset_name}`}
             railIcon={PackageMinus}
             railTitle="Dispose Asset"
-            railSub={asset.asset_tag ? `Tag ${asset.asset_tag}` : 'Fixed assets'}
+            railSub={
+                asset.asset_tag ? `Tag ${asset.asset_tag}` : 'Fixed assets'
+            }
             steps={STEPS}
             stepIndex={index}
             onStepClick={goTo}
@@ -139,23 +173,40 @@ export function FixedAssetDisposeDialog({
             pctLabel="Disposal"
             footerStart={
                 <span className="text-[13px] text-muted-foreground">
-                    Book value <span className="font-semibold text-foreground">{formatMoney(bookValue)}</span>
+                    Book value{' '}
+                    <span className="font-semibold text-foreground">
+                        {formatMoney(bookValue)}
+                    </span>
                 </span>
             }
             footerEnd={
                 <>
                     {!isFirst && (
-                        <Button type="button" variant="outline" onClick={back} disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={back}
+                            disabled={processing}
+                        >
                             Back
                         </Button>
                     )}
                     {!isLast && (
-                        <Button type="button" onClick={next} disabled={!detailsValid}>
+                        <Button
+                            type="button"
+                            onClick={next}
+                            disabled={!detailsValid}
+                        >
                             Continue
                         </Button>
                     )}
                     {isLast && (
-                        <Button type="button" variant="destructive" onClick={submit} disabled={processing || !detailsValid}>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={submit}
+                            disabled={processing || !detailsValid}
+                        >
                             Dispose asset
                         </Button>
                     )}
@@ -164,29 +215,83 @@ export function FixedAssetDisposeDialog({
         >
             {index === 0 && (
                 <div>
-                    <StepHead icon={Coins} title="Disposal details" blurb="When it was disposed, and what you got for it." />
+                    <StepHead
+                        icon={Coins}
+                        title="Disposal details"
+                        blurb="When it was disposed, and what you got for it."
+                    />
                     {generalError && (
                         <div className="mb-4">
-                            <InfoCard icon={AlertTriangle} tone="crit">{generalError}</InfoCard>
+                            <InfoCard icon={AlertTriangle} tone="crit">
+                                {generalError}
+                            </InfoCard>
                         </div>
                     )}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Disposal date" required error={errors.disposed_date}>
-                            <Input type="date" value={data.disposed_date} onChange={(e) => setData('disposed_date', e.target.value)} />
+                        <Field
+                            label="Disposal date"
+                            required
+                            error={errors.disposed_date}
+                        >
+                            <Input
+                                type="date"
+                                value={data.disposed_date}
+                                onChange={(e) =>
+                                    setData('disposed_date', e.target.value)
+                                }
+                            />
                         </Field>
-                        <Field label="Disposal proceeds (NZD)" required error={errors.disposal_proceeds}>
-                            <Input type="number" step="0.01" min="0" value={data.disposal_proceeds} onChange={(e) => setData('disposal_proceeds', e.target.value)} placeholder="0.00" />
+                        <Field
+                            label="Disposal proceeds (NZD)"
+                            required
+                            error={errors.disposal_proceeds}
+                        >
+                            <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={data.disposal_proceeds}
+                                onChange={(e) =>
+                                    setData('disposal_proceeds', e.target.value)
+                                }
+                                placeholder="0.00"
+                            />
                         </Field>
                     </div>
                     {/* eslint-disable-next-line no-restricted-syntax -- summary panel, not a content card */}
                     <div className="mt-4 space-y-1 rounded-xl border border-border bg-card/60 p-3 text-sm">
-                        <div className="flex justify-between"><span className="text-muted-foreground">Purchase cost</span><span className="tabular-nums">{formatMoney(purchaseCost)}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Accumulated depreciation</span><span className="tabular-nums">-{formatMoney(accumulated)}</span></div>
-                        <div className="flex justify-between border-t pt-1 font-semibold"><span>Book value</span><span className="tabular-nums">{formatMoney(bookValue)}</span></div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                                Purchase cost
+                            </span>
+                            <span className="tabular-nums">
+                                {formatMoney(purchaseCost)}
+                            </span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                                Accumulated depreciation
+                            </span>
+                            <span className="tabular-nums">
+                                -{formatMoney(accumulated)}
+                            </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-1 font-semibold">
+                            <span>Book value</span>
+                            <span className="tabular-nums">
+                                {formatMoney(bookValue)}
+                            </span>
+                        </div>
                         {data.disposal_proceeds !== '' && (
                             <div className="flex justify-between pt-1">
-                                <span className="text-muted-foreground">{gainLoss >= 0 ? 'Gain on disposal' : 'Loss on disposal'}</span>
-                                <span className={`tabular-nums font-semibold ${gainLoss >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
+                                <span className="text-muted-foreground">
+                                    {gainLoss >= 0
+                                        ? 'Gain on disposal'
+                                        : 'Loss on disposal'}
+                                </span>
+                                <span
+                                    className={`font-semibold tabular-nums ${gainLoss >= 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                >
                                     {formatMoney(Math.abs(gainLoss))}
                                 </span>
                             </div>
@@ -195,8 +300,9 @@ export function FixedAssetDisposeDialog({
                     {!asset.gl_asset_account && (
                         <div className="mt-4">
                             <InfoCard icon={AlertTriangle} tone="warn">
-                                No GL asset account is mapped to this asset, so disposal won't post a journal — it only
-                                marks the asset disposed.
+                                No GL asset account is mapped to this asset, so
+                                disposal won't post a journal — it only marks
+                                the asset disposed.
                             </InfoCard>
                         </div>
                     )}
@@ -205,19 +311,46 @@ export function FixedAssetDisposeDialog({
 
             {index === 1 && (
                 <div>
-                    <StepHead icon={ListChecks} title="Review disposal" blurb="This marks the asset disposed and posts the disposal journal. It can't be undone." />
+                    <StepHead
+                        icon={ListChecks}
+                        title="Review disposal"
+                        blurb="This marks the asset disposed and posts the disposal journal. It can't be undone."
+                    />
                     <ReviewCard icon={PackageMinus} title={asset.asset_name}>
-                        <ReviewRow label="Disposal date" value={data.disposed_date} />
-                        <ReviewRow label="Proceeds" value={formatMoney(proceeds)} />
-                        <ReviewRow label="Book value" value={formatMoney(bookValue)} />
-                        <ReviewRow label={gainLoss >= 0 ? 'Gain on disposal' : 'Loss on disposal'} value={formatMoney(Math.abs(gainLoss))} />
+                        <ReviewRow
+                            label="Disposal date"
+                            value={data.disposed_date}
+                        />
+                        <ReviewRow
+                            label="Proceeds"
+                            value={formatMoney(proceeds)}
+                        />
+                        <ReviewRow
+                            label="Book value"
+                            value={formatMoney(bookValue)}
+                        />
+                        <ReviewRow
+                            label={
+                                gainLoss >= 0
+                                    ? 'Gain on disposal'
+                                    : 'Loss on disposal'
+                            }
+                            value={formatMoney(Math.abs(gainLoss))}
+                        />
                     </ReviewCard>
                     {disposalLines.length > 0 && (
                         <div className="mt-4">
-                            <PostingPreview lines={disposalLines} title="Disposal journal preview" />
+                            <PostingPreview
+                                lines={disposalLines}
+                                title="Disposal journal preview"
+                            />
                         </div>
                     )}
-                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">Disposing…</p>}
+                    {processing && (
+                        <p className="mt-3 text-[13px] text-muted-foreground">
+                            Disposing…
+                        </p>
+                    )}
                 </div>
             )}
         </WizardShell>

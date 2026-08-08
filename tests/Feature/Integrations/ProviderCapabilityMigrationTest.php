@@ -217,6 +217,30 @@ it('discards an in-flight provider result when the connection is disabled before
         ->and(MonitoringOutbox::query()->count())->toBe(0);
 });
 
+it('discards an in-flight provider result when its Site scope is retired before persistence', function () {
+    $site = providerCapabilitySite();
+    $adapter = registerObservationFixture(
+        new ProviderObservationPage(
+            items: [providerObservation($site->id, 'retired-cursor', 'retired-source')],
+            nextCursor: 'retired-cursor',
+        ),
+        function (IntegrationProviderConnection $_connection) use ($site): void {
+            IntegrationSiteConfig::query()
+                ->where('site_id', $site->id)
+                ->where('provider', 'fixture')
+                ->update(['is_active' => false]);
+            $site->update(['archived' => true, 'archived_at' => now()]);
+        },
+    );
+
+    (new PullProviderCapability('fixture', $site->id))
+        ->handle(app(IntegrationAdapterRegistry::class), app(MonitoringOutboxPublisher::class));
+
+    expect($adapter->requestedLimit)->toBe(25)
+        ->and(ProviderCapabilityCursor::query()->sole()->cursor)->toBeNull()
+        ->and(MonitoringOutbox::query()->count())->toBe(0);
+});
+
 it('collects provider snapshots through the declared capability and advances only persisted evidence', function () {
     $site = providerCapabilitySite('snapshot-fixture');
     $device = Device::factory()->itInfrastructure()->create();

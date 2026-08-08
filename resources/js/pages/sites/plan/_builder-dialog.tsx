@@ -9,6 +9,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -46,7 +47,6 @@ import {
     type Taxonomy,
 } from './_types';
 import { usePlanEditor } from './_use-plan-editor';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 type TypePlanSummary = {
     tab_label: string;
@@ -446,7 +446,10 @@ export default function SiteTypePlanBuilderDialog({
                         </div>
                     </DialogHeader>
                     <div className="grid min-h-0 gap-3 p-3 lg:grid-cols-[270px_minmax(0,1fr)_350px]">
-                        <GuardrailCard unstyled className="min-h-0 overflow-y-auto rounded-lg border bg-background p-2 shadow-sm">
+                        <GuardrailCard
+                            unstyled
+                            className="min-h-0 overflow-y-auto rounded-lg border bg-background p-2 shadow-sm"
+                        >
                             <ToolPalette
                                 taxonomy={taxonomy}
                                 activeKind={state.activeKind}

@@ -1,3 +1,5 @@
+import { formatMoney } from '@/components/finance/money';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,8 +12,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero } from '@/components/page';
-import { formatMoney } from '@/components/finance/money';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { CalendarDays, DollarSign, FileText, UserRound } from 'lucide-react';
@@ -64,19 +64,25 @@ export default function BillingEntriesPage({
     const rows = entries?.data ?? [];
 
     const updateFilters = (key: string, value: string | null) => {
-        router.get('/finance/billing/entries', {
-            ...filters,
-            [key]: value,
-        }, {
-            preserveState: true,
-            replace: true,
-        });
+        router.get(
+            '/finance/billing/entries',
+            {
+                ...filters,
+                [key]: value,
+            },
+            {
+                preserveState: true,
+                replace: true,
+            },
+        );
     };
 
     return (
         <AppLayout>
             <Head title="Billing Entries" />
-            <PageHero category="finance" variant="compact"
+            <PageHero
+                category="finance"
+                variant="compact"
                 title="Billing Entries"
                 description="Review generated billing rows by client, service date, and status."
                 backHref="/finance/billing"
@@ -86,7 +92,10 @@ export default function BillingEntriesPage({
                     <Select
                         value={filters?.client_id ?? ANY}
                         onValueChange={(value) =>
-                            updateFilters('client_id', value === ANY ? null : value)
+                            updateFilters(
+                                'client_id',
+                                value === ANY ? null : value,
+                            )
                         }
                     >
                         <SelectTrigger className="h-9 text-xs">
@@ -95,7 +104,10 @@ export default function BillingEntriesPage({
                         <SelectContent>
                             <SelectItem value={ANY}>All Clients</SelectItem>
                             {clients.map((client) => (
-                                <SelectItem key={client.id} value={String(client.id)}>
+                                <SelectItem
+                                    key={client.id}
+                                    value={String(client.id)}
+                                >
                                     {client.first_name} {client.last_name}
                                 </SelectItem>
                             ))}
@@ -105,7 +117,10 @@ export default function BillingEntriesPage({
                     <Select
                         value={filters?.status ?? ANY}
                         onValueChange={(value) =>
-                            updateFilters('status', value === ANY ? null : value)
+                            updateFilters(
+                                'status',
+                                value === ANY ? null : value,
+                            )
                         }
                     >
                         <SelectTrigger className="h-9 text-xs">
@@ -113,7 +128,13 @@ export default function BillingEntriesPage({
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value={ANY}>All Statuses</SelectItem>
-                            {['pending', 'approved', 'billed', 'paid', 'cancelled'].map((status) => (
+                            {[
+                                'pending',
+                                'approved',
+                                'billed',
+                                'paid',
+                                'cancelled',
+                            ].map((status) => (
                                 <SelectItem key={status} value={status}>
                                     {status}
                                 </SelectItem>
@@ -126,7 +147,10 @@ export default function BillingEntriesPage({
                         className="h-9 text-xs"
                         value={filters?.date_from ?? ''}
                         onChange={(event) =>
-                            updateFilters('date_from', event.target.value || null)
+                            updateFilters(
+                                'date_from',
+                                event.target.value || null,
+                            )
                         }
                     />
 
@@ -149,7 +173,8 @@ export default function BillingEntriesPage({
                                     No Billing Entries
                                 </h2>
                                 <p className="mt-1 text-sm text-muted-foreground/80">
-                                    Approved billable activity will surface here once it has been generated.
+                                    Approved billable activity will surface here
+                                    once it has been generated.
                                 </p>
                             </CardContent>
                         </Card>
@@ -165,7 +190,10 @@ export default function BillingEntriesPage({
                                                 ? `${entry.client.first_name} ${entry.client.last_name}`
                                                 : `Entry #${entry.id}`}
                                         </p>
-                                        <Badge variant="outline" className="h-4 px-1.5 text-[9px] capitalize">
+                                        <Badge
+                                            variant="outline"
+                                            className="h-4 px-1.5 text-[9px] capitalize"
+                                        >
                                             {entry.status}
                                         </Badge>
                                     </div>
@@ -175,9 +203,13 @@ export default function BillingEntriesPage({
                                             {formatDate(entry.service_date)}
                                         </span>
                                         {entry.service_agreement?.title && (
-                                            <span>{entry.service_agreement.title}</span>
+                                            <span>
+                                                {entry.service_agreement.title}
+                                            </span>
                                         )}
-                                        {entry.notes && <span>{entry.notes}</span>}
+                                        {entry.notes && (
+                                            <span>{entry.notes}</span>
+                                        )}
                                     </div>
                                 </div>
                                 <p className="inline-flex items-center gap-1 text-sm text-muted-foreground">

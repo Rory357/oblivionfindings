@@ -139,147 +139,156 @@ export default function Photos({
                         icon={ImageIcon}
                         title="Photos"
                         description={`Photos shared with and by ${clientName}'s care team.`}
-                        stats={[
-                            { label: 'Total', value: photos.data.length },
-                        ]}
+                        stats={[{ label: 'Total', value: photos.data.length }]}
                         actions={
                             canUpload ? (
-                                <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+                                <Dialog
+                                    open={uploadOpen}
+                                    onOpenChange={setUploadOpen}
+                                >
                                     <DialogTrigger asChild>
                                         <Button>
                                             <Upload className="mr-2 h-4 w-4" />
                                             Upload Photo
                                         </Button>
                                     </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Upload Photo</DialogTitle>
-                                    {requiresApproval && (
-                                        <DialogDescription>
-                                            Photos will be reviewed by the care
-                                            team before appearing.
-                                        </DialogDescription>
-                                    )}
-                                </DialogHeader>
-                                <form
-                                    onSubmit={handleUpload}
-                                    className="space-y-4"
-                                >
-                                    <div
-                                        className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors ${
-                                            dragActive
-                                                ? 'border-primary bg-primary/5'
-                                                : 'border-muted-foreground/25 hover:border-primary/50'
-                                        }`}
-                                        onDragEnter={handleDrag}
-                                        onDragLeave={handleDrag}
-                                        onDragOver={handleDrag}
-                                        onDrop={handleDrop}
-                                        onClick={() =>
-                                            fileInputRef.current?.click()
-                                        }
-                                    >
-                                        {form.data.photo ? (
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">
-                                                    {form.data.photo.name}
-                                                </span>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        form.setData(
-                                                            'photo',
-                                                            null,
-                                                        );
-                                                    }}
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <Camera className="mb-2 h-8 w-8 text-muted-foreground" />
-                                                <p className="text-sm text-muted-foreground">
-                                                    Drag and drop or click to
-                                                    select
-                                                </p>
-                                            </>
-                                        )}
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
-                                            onChange={handleFileChange}
-                                        />
-                                    </div>
-                                    {form.errors.photo && (
-                                        <p className="text-sm text-destructive">
-                                            {form.errors.photo}
-                                        </p>
-                                    )}
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="caption">Caption</Label>
-                                        <Input
-                                            id="caption"
-                                            value={form.data.caption}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'caption',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Add a caption..."
-                                        />
-                                        {form.errors.caption && (
-                                            <p className="text-sm text-destructive">
-                                                {form.errors.caption}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="tags">
-                                            Tags (comma separated)
-                                        </Label>
-                                        <Input
-                                            id="tags"
-                                            value={form.data.tags}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'tags',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="e.g. outing, birthday, activity"
-                                        />
-                                        {form.errors.tags && (
-                                            <p className="text-sm text-destructive">
-                                                {form.errors.tags}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <DialogFooter>
-                                        <Button
-                                            type="submit"
-                                            disabled={
-                                                !form.data.photo ||
-                                                form.processing
-                                            }
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>
+                                                Upload Photo
+                                            </DialogTitle>
+                                            {requiresApproval && (
+                                                <DialogDescription>
+                                                    Photos will be reviewed by
+                                                    the care team before
+                                                    appearing.
+                                                </DialogDescription>
+                                            )}
+                                        </DialogHeader>
+                                        <form
+                                            onSubmit={handleUpload}
+                                            className="space-y-4"
                                         >
-                                            {form.processing
-                                                ? 'Uploading...'
-                                                : 'Upload'}
-                                        </Button>
-                                    </DialogFooter>
-                                </form>
-                            </DialogContent>
+                                            <div
+                                                className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors ${
+                                                    dragActive
+                                                        ? 'border-primary bg-primary/5'
+                                                        : 'border-muted-foreground/25 hover:border-primary/50'
+                                                }`}
+                                                onDragEnter={handleDrag}
+                                                onDragLeave={handleDrag}
+                                                onDragOver={handleDrag}
+                                                onDrop={handleDrop}
+                                                onClick={() =>
+                                                    fileInputRef.current?.click()
+                                                }
+                                            >
+                                                {form.data.photo ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-medium">
+                                                            {
+                                                                form.data.photo
+                                                                    .name
+                                                            }
+                                                        </span>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                form.setData(
+                                                                    'photo',
+                                                                    null,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <Camera className="mb-2 h-8 w-8 text-muted-foreground" />
+                                                        <p className="text-sm text-muted-foreground">
+                                                            Drag and drop or
+                                                            click to select
+                                                        </p>
+                                                    </>
+                                                )}
+                                                <input
+                                                    ref={fileInputRef}
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    onChange={handleFileChange}
+                                                />
+                                            </div>
+                                            {form.errors.photo && (
+                                                <p className="text-sm text-destructive">
+                                                    {form.errors.photo}
+                                                </p>
+                                            )}
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="caption">
+                                                    Caption
+                                                </Label>
+                                                <Input
+                                                    id="caption"
+                                                    value={form.data.caption}
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'caption',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="Add a caption..."
+                                                />
+                                                {form.errors.caption && (
+                                                    <p className="text-sm text-destructive">
+                                                        {form.errors.caption}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="tags">
+                                                    Tags (comma separated)
+                                                </Label>
+                                                <Input
+                                                    id="tags"
+                                                    value={form.data.tags}
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'tags',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="e.g. outing, birthday, activity"
+                                                />
+                                                {form.errors.tags && (
+                                                    <p className="text-sm text-destructive">
+                                                        {form.errors.tags}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <DialogFooter>
+                                                <Button
+                                                    type="submit"
+                                                    disabled={
+                                                        !form.data.photo ||
+                                                        form.processing
+                                                    }
+                                                >
+                                                    {form.processing
+                                                        ? 'Uploading...'
+                                                        : 'Upload'}
+                                                </Button>
+                                            </DialogFooter>
+                                        </form>
+                                    </DialogContent>
                                 </Dialog>
                             ) : undefined
                         }

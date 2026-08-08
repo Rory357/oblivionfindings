@@ -413,10 +413,7 @@ export default function Appearance() {
                 <Card>
                     <CardHeader>
                         <CardTitle>
-                            {t(
-                                'app.appearance.accent.title',
-                                'Accent colour',
-                            )}
+                            {t('app.appearance.accent.title', 'Accent colour')}
                         </CardTitle>
                         <CardDescription>
                             {t(

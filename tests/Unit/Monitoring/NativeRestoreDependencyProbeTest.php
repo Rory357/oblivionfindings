@@ -20,7 +20,36 @@ it('probes Redis InfluxDB and the private snapshot store without writing data', 
     $snapshots = Mockery::mock(SnapshotStore::class);
     $snapshots->shouldReceive('exists')
         ->once()
-        ->with('monitoring/configuration-snapshots/.restore-health-check')
+        ->with(SnapshotStore::RESTORE_HEALTH_PATH)
+        ->andReturnTrue();
+    $snapshots->shouldReceive('read')
+        ->once()
+        ->with(SnapshotStore::RESTORE_HEALTH_PATH)
+        ->andReturn(SnapshotStore::RESTORE_HEALTH_CONTENT);
+    $snapshots->shouldNotReceive('put');
+    $snapshots->shouldNotReceive('delete');
+    $secretManager = Mockery::mock(SecretManagerRestoreProbe::class);
+    $secretManager->shouldReceive('healthy')->once()->andReturnTrue();
+
+    expect((new NativeRestoreDependencyProbe($timeseries, $snapshots, $secretManager))->health())->toBe([
+        'redis' => true,
+        'timeseries' => true,
+        'snapshots' => true,
+        'secret_manager' => true,
+    ]);
+});
+
+it('fails the snapshot dependency closed when the restored sentinel is absent', function (): void {
+    $redis = Mockery::mock(Connection::class);
+    $redis->shouldReceive('command')->once()->with('ping')->andReturn('PONG');
+    Redis::shouldReceive('connection')->once()->andReturn($redis);
+
+    $timeseries = Mockery::mock(TimeSeriesStore::class);
+    $timeseries->shouldReceive('healthy')->once()->andReturnTrue();
+    $snapshots = Mockery::mock(SnapshotStore::class);
+    $snapshots->shouldReceive('exists')
+        ->once()
+        ->with(SnapshotStore::RESTORE_HEALTH_PATH)
         ->andReturnFalse();
     $snapshots->shouldNotReceive('put');
     $snapshots->shouldNotReceive('read');
@@ -31,7 +60,36 @@ it('probes Redis InfluxDB and the private snapshot store without writing data', 
     expect((new NativeRestoreDependencyProbe($timeseries, $snapshots, $secretManager))->health())->toBe([
         'redis' => true,
         'timeseries' => true,
-        'snapshots' => true,
+        'snapshots' => false,
+        'secret_manager' => true,
+    ]);
+});
+
+it('fails the snapshot dependency closed when the restored sentinel content is wrong', function (): void {
+    $redis = Mockery::mock(Connection::class);
+    $redis->shouldReceive('command')->once()->with('ping')->andReturn('PONG');
+    Redis::shouldReceive('connection')->once()->andReturn($redis);
+
+    $timeseries = Mockery::mock(TimeSeriesStore::class);
+    $timeseries->shouldReceive('healthy')->once()->andReturnTrue();
+    $snapshots = Mockery::mock(SnapshotStore::class);
+    $snapshots->shouldReceive('exists')
+        ->once()
+        ->with(SnapshotStore::RESTORE_HEALTH_PATH)
+        ->andReturnTrue();
+    $snapshots->shouldReceive('read')
+        ->once()
+        ->with(SnapshotStore::RESTORE_HEALTH_PATH)
+        ->andReturn('wrong-restore-sentinel');
+    $snapshots->shouldNotReceive('put');
+    $snapshots->shouldNotReceive('delete');
+    $secretManager = Mockery::mock(SecretManagerRestoreProbe::class);
+    $secretManager->shouldReceive('healthy')->once()->andReturnTrue();
+
+    expect((new NativeRestoreDependencyProbe($timeseries, $snapshots, $secretManager))->health())->toBe([
+        'redis' => true,
+        'timeseries' => true,
+        'snapshots' => false,
         'secret_manager' => true,
     ]);
 });

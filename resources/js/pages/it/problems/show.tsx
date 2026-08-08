@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
 import { ItModuleShell } from '@/components/it/it-module-shell';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -143,339 +143,355 @@ export default function ItProblemShow({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${ticket.reference} — ${ticket.title}`} />
             <ItModuleShell>
-            <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
-                <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <Link
-                        href="/it/problems"
-                        className="frontline-focus inline-flex min-h-10 items-center gap-2 rounded-md text-sm text-muted-foreground hover:text-foreground"
-                    >
-                        <ArrowLeft className="h-4 w-4" aria-hidden="true" />{' '}
-                        Back to problems
-                    </Link>
-                    <div className="mt-3 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-                        <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-mono text-sm font-bold text-primary">
-                                    {ticket.reference}
-                                </span>
-                                <StatusBadge
-                                    variant={
-                                        problemStateVariant[
-                                            ticket.workflow_state
-                                        ] ?? 'neutral'
-                                    }
-                                >
-                                    {problemLabel(ticket.workflow_state)}
-                                </StatusBadge>
-                                <StatusBadge
-                                    variant={
-                                        ticket.priority === 'high' ||
-                                        ticket.priority === 'urgent'
-                                            ? 'critical'
-                                            : 'neutral'
-                                    }
-                                >
-                                    {problemLabel(ticket.priority)}
-                                </StatusBadge>
-                            </div>
-                            <h1 className="mt-2 text-2xl font-bold tracking-tight">
-                                {ticket.title}
-                            </h1>
-                            <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
-                                {ticket.description ||
-                                    'No investigation summary has been added yet.'}
-                            </p>
-                        </div>
-                        <Button asChild variant="outline" className="min-h-11">
-                            <Link href={ticket.href}>
-                                <ExternalLink
-                                    className="h-4 w-4"
-                                    aria-hidden="true"
-                                />{' '}
-                                Open canonical ticket workspace
-                            </Link>
-                        </Button>
-                    </div>
-                    {can.manage &&
-                    (nextStates[ticket.workflow_state] ?? []).length > 0 ? (
-                        <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
-                            {(nextStates[ticket.workflow_state] ?? []).map(
-                                (state) => (
-                                    <Button
-                                        key={state}
+                <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
+                    <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                        <Link
+                            href="/it/problems"
+                            className="frontline-focus inline-flex min-h-10 items-center gap-2 rounded-md text-sm text-muted-foreground hover:text-foreground"
+                        >
+                            <ArrowLeft className="h-4 w-4" aria-hidden="true" />{' '}
+                            Back to problems
+                        </Link>
+                        <div className="mt-3 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-mono text-sm font-bold text-primary">
+                                        {ticket.reference}
+                                    </span>
+                                    <StatusBadge
                                         variant={
-                                            state === 'closed'
-                                                ? 'outline'
-                                                : 'secondary'
+                                            problemStateVariant[
+                                                ticket.workflow_state
+                                            ] ?? 'neutral'
                                         }
-                                        onClick={() => setTransitioning(state)}
                                     >
-                                        Move to {problemLabel(state)}
-                                    </Button>
-                                ),
-                            )}
-                        </div>
-                    ) : null}
-                </header>
-
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-                    <form
-                        onSubmit={save}
-                        className="space-y-5 rounded-2xl border border-border bg-card p-5"
-                    >
-                        <div className="flex items-center justify-between gap-3">
-                            <div>
-                                <h2 className="font-semibold">
-                                    Investigation knowledge
-                                </h2>
-                                <p className="text-sm text-muted-foreground">
-                                    This becomes the known-error context shown
-                                    to affected incident responders.
+                                        {problemLabel(ticket.workflow_state)}
+                                    </StatusBadge>
+                                    <StatusBadge
+                                        variant={
+                                            ticket.priority === 'high' ||
+                                            ticket.priority === 'urgent'
+                                                ? 'critical'
+                                                : 'neutral'
+                                        }
+                                    >
+                                        {problemLabel(ticket.priority)}
+                                    </StatusBadge>
+                                </div>
+                                <h1 className="mt-2 text-2xl font-bold tracking-tight">
+                                    {ticket.title}
+                                </h1>
+                                <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
+                                    {ticket.description ||
+                                        'No investigation summary has been added yet.'}
                                 </p>
                             </div>
-                            {can.manage ? (
-                                <Button
-                                    type="submit"
-                                    disabled={form.processing}
-                                >
-                                    <Save
+                            <Button
+                                asChild
+                                variant="outline"
+                                className="min-h-11"
+                            >
+                                <Link href={ticket.href}>
+                                    <ExternalLink
                                         className="h-4 w-4"
                                         aria-hidden="true"
                                     />{' '}
-                                    Save
-                                </Button>
-                            ) : null}
+                                    Open canonical ticket workspace
+                                </Link>
+                            </Button>
                         </div>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Title">
-                                <Input
-                                    value={form.data.title}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'title',
-                                            event.target.value,
-                                        )
-                                    }
-                                    disabled={!can.manage}
-                                />
-                            </Field>
-                            <Field label="Next action">
-                                <Input
-                                    value={form.data.next_action}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'next_action',
-                                            event.target.value,
-                                        )
-                                    }
-                                    disabled={!can.manage}
-                                    placeholder="State the next owned action"
-                                />
-                            </Field>
-                        </div>
-                        <Field label="Impact summary">
-                            <Textarea
-                                value={form.data.impact_summary}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'impact_summary',
-                                        event.target.value,
-                                    )
-                                }
-                                disabled={!can.manage}
-                                rows={3}
-                            />
-                        </Field>
-                        <Field label="Root cause">
-                            <Textarea
-                                value={form.data.root_cause}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'root_cause',
-                                        event.target.value,
-                                    )
-                                }
-                                disabled={!can.manage}
-                                rows={5}
-                                placeholder="What underlying condition creates the incidents?"
-                            />
-                        </Field>
-                        <Field label="Safe workaround">
-                            <Textarea
-                                value={form.data.workaround}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'workaround',
-                                        event.target.value,
-                                    )
-                                }
-                                disabled={!can.manage}
-                                rows={5}
-                                placeholder="What can responders do safely before the permanent fix?"
-                            />
-                        </Field>
-                        <Field label="Corrective action">
-                            <Textarea
-                                value={form.data.corrective_action}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'corrective_action',
-                                        event.target.value,
-                                    )
-                                }
-                                disabled={!can.manage}
-                                rows={5}
-                                placeholder="What permanent correction removes the root cause?"
-                            />
-                        </Field>
-
-                        {can.manage ? (
-                            <section className="border-t border-border pt-5">
-                                <h3 className="font-semibold">
-                                    Affected incidents
-                                </h3>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    Link only incidents that share this
-                                    problem’s cause or workaround.
-                                </p>
-                                <div className="mt-3 grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">
-                                    {incidentOptions.map((incident) => (
-                                        <label
-                                            key={incident.id}
-                                            className="frontline-focus flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-border p-3 hover:bg-muted/50"
+                        {can.manage &&
+                        (nextStates[ticket.workflow_state] ?? []).length > 0 ? (
+                            <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
+                                {(nextStates[ticket.workflow_state] ?? []).map(
+                                    (state) => (
+                                        <Button
+                                            key={state}
+                                            variant={
+                                                state === 'closed'
+                                                    ? 'outline'
+                                                    : 'secondary'
+                                            }
+                                            onClick={() =>
+                                                setTransitioning(state)
+                                            }
                                         >
-                                            <input
-                                                type="checkbox"
-                                                className="mt-1 h-4 w-4"
-                                                checked={form.data.incident_ids.includes(
-                                                    incident.id,
-                                                )}
-                                                onChange={() =>
-                                                    toggleIncident(incident.id)
-                                                }
-                                            />
-                                            <span className="min-w-0">
-                                                <span className="block font-mono text-xs font-bold text-primary">
-                                                    {incident.reference}
-                                                </span>
-                                                <span className="block truncate text-sm">
-                                                    {incident.title}
-                                                </span>
-                                            </span>
-                                        </label>
-                                    ))}
-                                </div>
-                                <Field label="Permanent-fix change">
-                                    <select
-                                        className="frontline-focus min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                        value={
-                                            form.data.permanent_fix_change_id ??
-                                            ''
-                                        }
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'permanent_fix_change_id',
-                                                event.target.value
-                                                    ? Number(event.target.value)
-                                                    : null,
-                                            )
-                                        }
-                                    >
-                                        <option value="">
-                                            No linked change yet
-                                        </option>
-                                        {changeOptions.map((change) => (
-                                            <option
-                                                key={change.id}
-                                                value={change.id}
-                                            >
-                                                {change.reference} —{' '}
-                                                {change.title}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </Field>
-                            </section>
-                        ) : null}
-                    </form>
-
-                    <aside className="space-y-5">
-                        <section className="rounded-2xl border border-border bg-card p-5">
-                            <div className="flex items-center gap-2">
-                                <FileClock
-                                    className="h-4 w-4 text-primary"
-                                    aria-hidden="true"
-                                />
-                                <h2 className="font-semibold">
-                                    Shared work record
-                                </h2>
-                            </div>
-                            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                                <Metric
-                                    label="Conversation"
-                                    value={ticket.comments_count}
-                                />
-                                <Metric
-                                    label="Tasks"
-                                    value={ticket.tasks_count}
-                                />
-                                <Metric
-                                    label="Approvals"
-                                    value={ticket.approvals_count}
-                                />
-                                <Metric
-                                    label="Attachments"
-                                    value={ticket.attachments_count}
-                                />
-                                <Metric
-                                    label="Timeline events"
-                                    value={ticket.events_count}
-                                />
-                                <Metric
-                                    label="SLA"
-                                    value={problemLabel(ticket.sla_state)}
-                                />
-                            </dl>
-                        </section>
-                        <section className="rounded-2xl border border-border bg-card p-5">
-                            <div className="flex items-center gap-2">
-                                <Link2
-                                    className="h-4 w-4 text-primary"
-                                    aria-hidden="true"
-                                />
-                                <h2 className="font-semibold">Linked work</h2>
-                            </div>
-                            <div className="mt-4 space-y-2">
-                                {incidents.map((incident) => (
-                                    <TicketLink
-                                        key={incident.id}
-                                        item={incident}
-                                    />
-                                ))}
-                                {incidents.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No affected incidents linked yet.
-                                    </p>
-                                ) : null}
-                            </div>
-                            <div className="mt-5 border-t border-border pt-4">
-                                <p className="text-xs font-bold tracking-wide text-muted-foreground uppercase">
-                                    Permanent fix
-                                </p>
-                                {permanentFixChange ? (
-                                    <div className="mt-2">
-                                        <TicketLink item={permanentFixChange} />
-                                    </div>
-                                ) : (
-                                    <p className="mt-2 text-sm text-muted-foreground">
-                                        No change linked yet.
-                                    </p>
+                                            Move to {problemLabel(state)}
+                                        </Button>
+                                    ),
                                 )}
                             </div>
-                        </section>
-                    </aside>
-                </div>
-            </main>
+                        ) : null}
+                    </header>
+
+                    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+                        <form
+                            onSubmit={save}
+                            className="space-y-5 rounded-2xl border border-border bg-card p-5"
+                        >
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <h2 className="font-semibold">
+                                        Investigation knowledge
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        This becomes the known-error context
+                                        shown to affected incident responders.
+                                    </p>
+                                </div>
+                                {can.manage ? (
+                                    <Button
+                                        type="submit"
+                                        disabled={form.processing}
+                                    >
+                                        <Save
+                                            className="h-4 w-4"
+                                            aria-hidden="true"
+                                        />{' '}
+                                        Save
+                                    </Button>
+                                ) : null}
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <Field label="Title">
+                                    <Input
+                                        value={form.data.title}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'title',
+                                                event.target.value,
+                                            )
+                                        }
+                                        disabled={!can.manage}
+                                    />
+                                </Field>
+                                <Field label="Next action">
+                                    <Input
+                                        value={form.data.next_action}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'next_action',
+                                                event.target.value,
+                                            )
+                                        }
+                                        disabled={!can.manage}
+                                        placeholder="State the next owned action"
+                                    />
+                                </Field>
+                            </div>
+                            <Field label="Impact summary">
+                                <Textarea
+                                    value={form.data.impact_summary}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'impact_summary',
+                                            event.target.value,
+                                        )
+                                    }
+                                    disabled={!can.manage}
+                                    rows={3}
+                                />
+                            </Field>
+                            <Field label="Root cause">
+                                <Textarea
+                                    value={form.data.root_cause}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'root_cause',
+                                            event.target.value,
+                                        )
+                                    }
+                                    disabled={!can.manage}
+                                    rows={5}
+                                    placeholder="What underlying condition creates the incidents?"
+                                />
+                            </Field>
+                            <Field label="Safe workaround">
+                                <Textarea
+                                    value={form.data.workaround}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'workaround',
+                                            event.target.value,
+                                        )
+                                    }
+                                    disabled={!can.manage}
+                                    rows={5}
+                                    placeholder="What can responders do safely before the permanent fix?"
+                                />
+                            </Field>
+                            <Field label="Corrective action">
+                                <Textarea
+                                    value={form.data.corrective_action}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'corrective_action',
+                                            event.target.value,
+                                        )
+                                    }
+                                    disabled={!can.manage}
+                                    rows={5}
+                                    placeholder="What permanent correction removes the root cause?"
+                                />
+                            </Field>
+
+                            {can.manage ? (
+                                <section className="border-t border-border pt-5">
+                                    <h3 className="font-semibold">
+                                        Affected incidents
+                                    </h3>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Link only incidents that share this
+                                        problem’s cause or workaround.
+                                    </p>
+                                    <div className="mt-3 grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">
+                                        {incidentOptions.map((incident) => (
+                                            <label
+                                                key={incident.id}
+                                                className="frontline-focus flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-border p-3 hover:bg-muted/50"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    className="mt-1 h-4 w-4"
+                                                    checked={form.data.incident_ids.includes(
+                                                        incident.id,
+                                                    )}
+                                                    onChange={() =>
+                                                        toggleIncident(
+                                                            incident.id,
+                                                        )
+                                                    }
+                                                />
+                                                <span className="min-w-0">
+                                                    <span className="block font-mono text-xs font-bold text-primary">
+                                                        {incident.reference}
+                                                    </span>
+                                                    <span className="block truncate text-sm">
+                                                        {incident.title}
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <Field label="Permanent-fix change">
+                                        <select
+                                            className="frontline-focus min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                            value={
+                                                form.data
+                                                    .permanent_fix_change_id ??
+                                                ''
+                                            }
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'permanent_fix_change_id',
+                                                    event.target.value
+                                                        ? Number(
+                                                              event.target
+                                                                  .value,
+                                                          )
+                                                        : null,
+                                                )
+                                            }
+                                        >
+                                            <option value="">
+                                                No linked change yet
+                                            </option>
+                                            {changeOptions.map((change) => (
+                                                <option
+                                                    key={change.id}
+                                                    value={change.id}
+                                                >
+                                                    {change.reference} —{' '}
+                                                    {change.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+                                </section>
+                            ) : null}
+                        </form>
+
+                        <aside className="space-y-5">
+                            <section className="rounded-2xl border border-border bg-card p-5">
+                                <div className="flex items-center gap-2">
+                                    <FileClock
+                                        className="h-4 w-4 text-primary"
+                                        aria-hidden="true"
+                                    />
+                                    <h2 className="font-semibold">
+                                        Shared work record
+                                    </h2>
+                                </div>
+                                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                                    <Metric
+                                        label="Conversation"
+                                        value={ticket.comments_count}
+                                    />
+                                    <Metric
+                                        label="Tasks"
+                                        value={ticket.tasks_count}
+                                    />
+                                    <Metric
+                                        label="Approvals"
+                                        value={ticket.approvals_count}
+                                    />
+                                    <Metric
+                                        label="Attachments"
+                                        value={ticket.attachments_count}
+                                    />
+                                    <Metric
+                                        label="Timeline events"
+                                        value={ticket.events_count}
+                                    />
+                                    <Metric
+                                        label="SLA"
+                                        value={problemLabel(ticket.sla_state)}
+                                    />
+                                </dl>
+                            </section>
+                            <section className="rounded-2xl border border-border bg-card p-5">
+                                <div className="flex items-center gap-2">
+                                    <Link2
+                                        className="h-4 w-4 text-primary"
+                                        aria-hidden="true"
+                                    />
+                                    <h2 className="font-semibold">
+                                        Linked work
+                                    </h2>
+                                </div>
+                                <div className="mt-4 space-y-2">
+                                    {incidents.map((incident) => (
+                                        <TicketLink
+                                            key={incident.id}
+                                            item={incident}
+                                        />
+                                    ))}
+                                    {incidents.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground">
+                                            No affected incidents linked yet.
+                                        </p>
+                                    ) : null}
+                                </div>
+                                <div className="mt-5 border-t border-border pt-4">
+                                    <p className="text-xs font-bold tracking-wide text-muted-foreground uppercase">
+                                        Permanent fix
+                                    </p>
+                                    {permanentFixChange ? (
+                                        <div className="mt-2">
+                                            <TicketLink
+                                                item={permanentFixChange}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <p className="mt-2 text-sm text-muted-foreground">
+                                            No change linked yet.
+                                        </p>
+                                    )}
+                                </div>
+                            </section>
+                        </aside>
+                    </div>
+                </main>
             </ItModuleShell>
 
             <Dialog

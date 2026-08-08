@@ -1,12 +1,20 @@
 import { Link } from '@inertiajs/react';
-import { ArrowRight, Building2, Moon, Route as RouteIcon, Sun, Sunset, UserX } from 'lucide-react';
+import {
+    ArrowRight,
+    Building2,
+    Moon,
+    Route as RouteIcon,
+    Sun,
+    Sunset,
+    UserX,
+} from 'lucide-react';
 import { useState, type ComponentType } from 'react';
 
 import { cn } from '@/lib/utils';
 
-import type { TimelineBar, TimelineData, TimelineRow } from './types';
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import type { TimelineBar, TimelineData, TimelineRow } from './types';
 
 const TYPE_ICON: Record<string, ComponentType<{ className?: string }>> = {
     overnight: Moon,
@@ -46,15 +54,24 @@ function barColor(bar: TimelineBar): string {
     return 'white';
 }
 
-function TimelineRowView({ row, hasNowLine }: { row: TimelineRow; hasNowLine: boolean }) {
-    const Icon = row.icon ? TYPE_ICON[row.icon] ?? Building2 : null;
+function TimelineRowView({
+    row,
+    hasNowLine,
+}: {
+    row: TimelineRow;
+    hasNowLine: boolean;
+}) {
+    const Icon = row.icon ? (TYPE_ICON[row.icon] ?? Building2) : null;
     const labelInner = (
         <div className="flex w-[140px] shrink-0 items-center gap-2">
             {row.avatar !== undefined ? (
                 row.is_open ? (
                     <div
                         className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-dashed"
-                        style={{ borderColor: 'var(--status-critical)', color: 'var(--status-critical)' }}
+                        style={{
+                            borderColor: 'var(--status-critical)',
+                            color: 'var(--status-critical)',
+                        }}
                     >
                         <UserX className="h-3 w-3" />
                     </div>
@@ -71,12 +88,12 @@ function TimelineRowView({ row, hasNowLine }: { row: TimelineRow; hasNowLine: bo
                             row.type === 'overnight'
                                 ? 'color-mix(in oklch, var(--primary) 75%, black)'
                                 : row.type === 'day'
-                                ? 'var(--primary)'
-                                : row.type === 'evening'
-                                ? 'color-mix(in oklch, var(--primary) 85%, white)'
-                                : row.type === 'community'
-                                ? 'color-mix(in oklch, var(--primary) 60%, white)'
-                                : 'color-mix(in oklch, var(--primary) 80%, transparent)',
+                                  ? 'var(--primary)'
+                                  : row.type === 'evening'
+                                    ? 'color-mix(in oklch, var(--primary) 85%, white)'
+                                    : row.type === 'community'
+                                      ? 'color-mix(in oklch, var(--primary) 60%, white)'
+                                      : 'color-mix(in oklch, var(--primary) 80%, transparent)',
                     }}
                 >
                     <Icon className="h-3 w-3" />
@@ -91,14 +108,19 @@ function TimelineRowView({ row, hasNowLine }: { row: TimelineRow; hasNowLine: bo
                 >
                     {row.label}
                 </div>
-                <div className="truncate text-[10px] text-muted-foreground">{row.sublabel}</div>
+                <div className="truncate text-[10px] text-muted-foreground">
+                    {row.sublabel}
+                </div>
             </div>
         </div>
     );
     return (
         <div className="flex items-center gap-3">
             {row.href ? (
-                <Link href={row.href} className="block w-[140px] shrink-0 hover:opacity-80">
+                <Link
+                    href={row.href}
+                    className="block w-[140px] shrink-0 hover:opacity-80"
+                >
                     {labelInner}
                 </Link>
             ) : (
@@ -142,19 +164,35 @@ export function ShiftTimeline({ timeline }: Props) {
     const [view, setView] = useState<ViewKey>('site');
 
     const rows =
-        view === 'site' ? timeline.sites : view === 'staff' ? timeline.staff : timeline.shift_types;
+        view === 'site'
+            ? timeline.sites
+            : view === 'staff'
+              ? timeline.staff
+              : timeline.shift_types;
 
     return (
         <section>
-            <GuardrailCard unstyled className="rounded-xl border bg-card" style={{ borderColor: 'var(--border)' }}>
+            <GuardrailCard
+                unstyled
+                className="rounded-xl border bg-card"
+                style={{ borderColor: 'var(--border)' }}
+            >
                 <div
                     className="flex items-center justify-between border-b px-4 py-3"
                     style={{ borderColor: 'var(--border)' }}
                 >
                     <div>
-                        <h3 className="text-[14px] font-semibold">Today’s shift timeline</h3>
+                        <h3 className="text-[14px] font-semibold">
+                            Today’s shift timeline
+                        </h3>
                         <p className="text-[11px] text-muted-foreground">
-                            Live coverage across {rows.length} {view === 'staff' ? 'staff' : view === 'type' ? 'types' : 'sites'} · times in NZST
+                            Live coverage across {rows.length}{' '}
+                            {view === 'staff'
+                                ? 'staff'
+                                : view === 'type'
+                                  ? 'types'
+                                  : 'sites'}{' '}
+                            · times in NZST
                         </p>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -166,9 +204,13 @@ export function ShiftTimeline({ timeline }: Props) {
                             {[
                                 { v: 'site' as ViewKey, label: 'By site' },
                                 { v: 'staff' as ViewKey, label: 'By staff' },
-                                { v: 'type' as ViewKey, label: 'By shift type' },
+                                {
+                                    v: 'type' as ViewKey,
+                                    label: 'By shift type',
+                                },
                             ].map((opt, i) => (
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     key={opt.v}
                                     type="button"
                                     role="tab"
@@ -178,7 +220,7 @@ export function ShiftTimeline({ timeline }: Props) {
                                         'px-2.5 py-1 text-[11px] font-medium transition-colors',
                                         i > 0 && 'border-l',
                                         view === opt.v
-                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            ? 'bg-accent font-semibold text-accent-foreground'
                                             : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                                     )}
                                     style={{ borderColor: 'var(--border)' }}
@@ -197,8 +239,18 @@ export function ShiftTimeline({ timeline }: Props) {
                 </div>
 
                 <div className="p-4">
-                    <div className="mb-1.5 ml-[152px] flex select-none text-[10px] tabular-nums text-muted-foreground">
-                        {['00', '03', '06', '09', '12', '15', '18', '21', '24'].map((h) => (
+                    <div className="mb-1.5 ml-[152px] flex text-[10px] text-muted-foreground tabular-nums select-none">
+                        {[
+                            '00',
+                            '03',
+                            '06',
+                            '09',
+                            '12',
+                            '15',
+                            '18',
+                            '21',
+                            '24',
+                        ].map((h) => (
                             <div key={h} className="flex-1 text-center">
                                 {h}
                             </div>
@@ -208,18 +260,24 @@ export function ShiftTimeline({ timeline }: Props) {
                     <div className="relative space-y-2">
                         {/* Now indicator */}
                         <div
-                            className="pointer-events-none absolute bottom-0 top-0 z-10"
-                            style={{ left: `calc(152px + (100% - 152px) * ${timeline.now_pct})` }}
+                            className="pointer-events-none absolute top-0 bottom-0 z-10"
+                            style={{
+                                left: `calc(152px + (100% - 152px) * ${timeline.now_pct})`,
+                            }}
                         >
                             <div
-                                className="absolute -top-1 -translate-x-1/2 rounded px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-white"
+                                className="absolute -top-1 -translate-x-1/2 rounded px-1.5 py-0.5 text-[9px] font-bold text-white tabular-nums"
                                 style={{ background: 'var(--primary)' }}
                             >
                                 {timeline.now_label}
                             </div>
                             <div
                                 className="h-full"
-                                style={{ marginLeft: '-1px', width: '2px', background: 'var(--primary)' }}
+                                style={{
+                                    marginLeft: '-1px',
+                                    width: '2px',
+                                    background: 'var(--primary)',
+                                }}
                             />
                         </div>
 
@@ -228,7 +286,13 @@ export function ShiftTimeline({ timeline }: Props) {
                                 No shifts scheduled for today.
                             </div>
                         ) : (
-                            rows.map((row) => <TimelineRowView key={row.key} row={row} hasNowLine />)
+                            rows.map((row) => (
+                                <TimelineRowView
+                                    key={row.key}
+                                    row={row}
+                                    hasNowLine
+                                />
+                            ))
                         )}
                     </div>
 
@@ -239,30 +303,45 @@ export function ShiftTimeline({ timeline }: Props) {
                         <span className="inline-flex items-center gap-1.5">
                             <span
                                 className="h-2.5 w-2.5 rounded"
-                                style={{ background: 'color-mix(in oklch, var(--primary) 75%, black)' }}
+                                style={{
+                                    background:
+                                        'color-mix(in oklch, var(--primary) 75%, black)',
+                                }}
                             />
                             Overnight
                         </span>
                         <span className="inline-flex items-center gap-1.5">
-                            <span className="h-2.5 w-2.5 rounded" style={{ background: 'var(--primary)' }} />
+                            <span
+                                className="h-2.5 w-2.5 rounded"
+                                style={{ background: 'var(--primary)' }}
+                            />
                             Day
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                             <span
                                 className="h-2.5 w-2.5 rounded"
-                                style={{ background: 'color-mix(in oklch, var(--primary) 85%, white)' }}
+                                style={{
+                                    background:
+                                        'color-mix(in oklch, var(--primary) 85%, white)',
+                                }}
                             />
                             Evening
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                             <span
                                 className="h-2.5 w-2.5 rounded border border-dashed"
-                                style={{ background: 'color-mix(in oklch, var(--primary) 60%, transparent)' }}
+                                style={{
+                                    background:
+                                        'color-mix(in oklch, var(--primary) 60%, transparent)',
+                                }}
                             />
                             Unassigned
                         </span>
                         <span className="ml-auto inline-flex items-center gap-1.5">
-                            <span className="h-2.5 w-2.5 rounded" style={{ background: 'var(--status-critical)' }} />
+                            <span
+                                className="h-2.5 w-2.5 rounded"
+                                style={{ background: 'var(--status-critical)' }}
+                            />
                             Conflict/breach
                         </span>
                     </div>

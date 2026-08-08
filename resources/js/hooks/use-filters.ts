@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 interface UseFiltersOptions<T> {
     route: string;
@@ -34,7 +34,7 @@ export function useFilters<T extends Record<string, any>>({
     const applyFilters = useCallback(
         (newFilters: T) => {
             setIsPending(true);
-            
+
             router.get(
                 route,
                 // Remove null/undefined/empty values from URL
@@ -43,17 +43,17 @@ export function useFilters<T extends Record<string, any>>({
                         if (v === null || v === undefined) return false;
                         if (typeof v === 'string' && v === '') return false;
                         return true;
-                    })
+                    }),
                 ),
                 {
                     preserveState,
                     preserveScroll,
                     replace,
                     onFinish: () => setIsPending(false),
-                }
+                },
             );
         },
-        [route, preserveState, preserveScroll, replace]
+        [route, preserveState, preserveScroll, replace],
     );
 
     const updateFilter = useCallback(
@@ -72,7 +72,7 @@ export function useFilters<T extends Record<string, any>>({
                 applyFilters(newFilters);
             }
         },
-        [filters, applyFilters, debounceMs]
+        [filters, applyFilters, debounceMs],
     );
 
     const updateFilters = useCallback(
@@ -91,7 +91,7 @@ export function useFilters<T extends Record<string, any>>({
                 applyFilters(newFilters);
             }
         },
-        [filters, applyFilters, debounceMs]
+        [filters, applyFilters, debounceMs],
     );
 
     const resetFilters = useCallback(() => {

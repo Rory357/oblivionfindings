@@ -18,8 +18,8 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     BarChart3,
     Bookmark,
-    CalendarDays,
     CalendarClock,
+    CalendarDays,
     Clock3,
     Download,
     GraduationCap,
@@ -145,17 +145,27 @@ export default function ReportsIndex({
             <Head title="HR Reports" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={BarChart3}
                         title="HR Reports"
                         description="Export, schedule, and subscribe to HR analytics reports."
                         stats={[
-                            { label: 'Available', value: availableReports.length },
-                            { label: 'Recent exports', value: recentExports.length },
+                            {
+                                label: 'Available',
+                                value: availableReports.length,
+                            },
+                            {
+                                label: 'Recent exports',
+                                value: recentExports.length,
+                            },
                             {
                                 label: 'Active schedules',
                                 value: activeSubscriptions,
-                                tone: activeSubscriptions > 0 ? 'success' : undefined,
+                                tone:
+                                    activeSubscriptions > 0
+                                        ? 'success'
+                                        : undefined,
                             },
                         ]}
                         actions={
@@ -343,17 +353,14 @@ export default function ReportsIndex({
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
-                                                {report.period_start ||
-                                                    '—'}{' '}
-                                                to{' '}
+                                                {report.period_start || '—'} to{' '}
                                                 {report.period_end || '—'}
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
                                                 {report.row_count}
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
-                                                {report.generated_at ||
-                                                    '—'}
+                                                {report.generated_at || '—'}
                                                 {report.generated_by
                                                     ? ` by ${report.generated_by}`
                                                     : ''}

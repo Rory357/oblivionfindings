@@ -1,20 +1,29 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { useInitials } from '@/hooks/use-initials';
-import { Input } from '@/components/ui/input';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero } from '@/components/page';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Search, X, Users, UserCheck, Briefcase, MoreVertical, Eye, Pencil, UserCog } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { useInitials } from '@/hooks/use-initials';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import {
+    Eye,
+    MoreVertical,
+    Pencil,
+    Plus,
+    Search,
+    UserCog,
+    Users,
+    X,
+} from 'lucide-react';
 
 type StaffUser = {
     id: number;
@@ -47,21 +56,49 @@ type Props = {
 /* ------------------------------------------------------------------ */
 
 const STAT_COLORS = {
-    blue: { bg: 'bg-status-info-bg', icon: 'text-status-info dark:text-status-info', ring: 'ring-status-info dark:ring-status-info/20' },
-    emerald: { bg: 'bg-status-success-bg', icon: 'text-status-success dark:text-status-success', ring: 'ring-status-success dark:ring-status-success/20' },
-    amber: { bg: 'bg-status-warning-bg', icon: 'text-status-warning dark:text-status-warning', ring: 'ring-status-warning dark:ring-status-warning/20' },
+    blue: {
+        bg: 'bg-status-info-bg',
+        icon: 'text-status-info dark:text-status-info',
+        ring: 'ring-status-info dark:ring-status-info/20',
+    },
+    emerald: {
+        bg: 'bg-status-success-bg',
+        icon: 'text-status-success dark:text-status-success',
+        ring: 'ring-status-success dark:ring-status-success/20',
+    },
+    amber: {
+        bg: 'bg-status-warning-bg',
+        icon: 'text-status-warning dark:text-status-warning',
+        ring: 'ring-status-warning dark:ring-status-warning/20',
+    },
 };
 
-function StatCard({ label, value, icon: Icon, color }: { label: string; value: number; icon: React.ElementType; color: keyof typeof STAT_COLORS }) {
+function StatCard({
+    label,
+    value,
+    icon: Icon,
+    color,
+}: {
+    label: string;
+    value: number;
+    icon: React.ElementType;
+    color: keyof typeof STAT_COLORS;
+}) {
     const c = STAT_COLORS[color];
     return (
-        <div className={`relative flex items-center gap-4 rounded-xl p-4 ring-1 ${c.bg} ${c.ring} transition-shadow hover:shadow-md`}>
-            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${c.bg} ${c.icon}`}>
+        <div
+            className={`relative flex items-center gap-4 rounded-xl p-4 ring-1 ${c.bg} ${c.ring} transition-shadow hover:shadow-md`}
+        >
+            <div
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${c.bg} ${c.icon}`}
+            >
                 <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
                 <p className="text-2xl font-bold tracking-tight">{value}</p>
-                <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+                <p className="truncate text-xs font-medium text-muted-foreground">
+                    {label}
+                </p>
             </div>
         </div>
     );
@@ -78,8 +115,12 @@ export default function StaffIndex({ users, filters }: Props) {
 
     const hasFilters = !!filters?.q;
     const data = users.data;
-    const activeCount = data.filter((u) => u.staff_profile?.is_active !== false).length;
-    const withClients = data.filter((u) => (u.assigned_clients_count ?? 0) > 0).length;
+    const activeCount = data.filter(
+        (u) => u.staff_profile?.is_active !== false,
+    ).length;
+    const withClients = data.filter(
+        (u) => (u.assigned_clients_count ?? 0) > 0,
+    ).length;
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Staff', href: '/staff' }]}>
@@ -111,14 +152,21 @@ export default function StaffIndex({ users, filters }: Props) {
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             defaultValue={filters?.q ?? ''}
                             placeholder="Search name or email..."
                             className="w-64 pl-9"
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
-                                    router.get('/staff', { q: (e.target as HTMLInputElement).value }, { preserveState: true, replace: true });
+                                    router.get(
+                                        '/staff',
+                                        {
+                                            q: (e.target as HTMLInputElement)
+                                                .value,
+                                        },
+                                        { preserveState: true, replace: true },
+                                    );
                                 }
                             }}
                         />
@@ -127,7 +175,13 @@ export default function StaffIndex({ users, filters }: Props) {
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => router.get('/staff', {}, { preserveState: true, replace: true })}
+                            onClick={() =>
+                                router.get(
+                                    '/staff',
+                                    {},
+                                    { preserveState: true, replace: true },
+                                )
+                            }
                             className="gap-1.5 text-muted-foreground"
                         >
                             <X className="h-3.5 w-3.5" />
@@ -143,11 +197,21 @@ export default function StaffIndex({ users, filters }: Props) {
                             <table className="w-full text-sm">
                                 <thead className="border-b bg-muted/50">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">Email</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Role(s)</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">Assigned Clients</th>
-                                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                            Name
+                                        </th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase md:table-cell">
+                                            Email
+                                        </th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase sm:table-cell">
+                                            Role(s)
+                                        </th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase lg:table-cell">
+                                            Assigned Clients
+                                        </th>
+                                        <th className="px-4 py-3 text-right text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                            Actions
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
@@ -155,64 +219,122 @@ export default function StaffIndex({ users, filters }: Props) {
                                         <tr
                                             key={u.id}
                                             className="group cursor-pointer transition-colors hover:bg-muted/40"
-                                            onClick={() => router.visit(`/staff/${u.id}`)}
+                                            onClick={() =>
+                                                router.visit(`/staff/${u.id}`)
+                                            }
                                         >
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="h-9 w-9">
-                                                        <AvatarImage src={u.avatar ?? u.profile_photo_url ?? undefined} alt={u.name} />
-                                                        <AvatarFallback className="text-xs font-semibold">{getInitials(u.name)}</AvatarFallback>
+                                                        <AvatarImage
+                                                            src={
+                                                                u.avatar ??
+                                                                u.profile_photo_url ??
+                                                                undefined
+                                                            }
+                                                            alt={u.name}
+                                                        />
+                                                        <AvatarFallback className="text-xs font-semibold">
+                                                            {getInitials(
+                                                                u.name,
+                                                            )}
+                                                        </AvatarFallback>
                                                     </Avatar>
                                                     <div className="min-w-0">
                                                         <Link
                                                             href={`/staff/${u.id}`}
                                                             className="font-medium text-foreground group-hover:text-primary"
-                                                            onClick={(e) => e.stopPropagation()}
+                                                            onClick={(e) =>
+                                                                e.stopPropagation()
+                                                            }
                                                         >
                                                             {u.name}
                                                         </Link>
-                                                        {u.staff_profile?.job_title && (
+                                                        {u.staff_profile
+                                                            ?.job_title && (
                                                             <div className="truncate text-xs text-muted-foreground">
-                                                                {u.staff_profile.job_title}
+                                                                {
+                                                                    u
+                                                                        .staff_profile
+                                                                        .job_title
+                                                                }
                                                             </div>
                                                         )}
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{u.email}</td>
+                                            <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
+                                                {u.email}
+                                            </td>
                                             <td className="hidden px-4 py-3 sm:table-cell">
-                                                {u.roles?.length
-                                                    ? u.roles.map((r) => (
-                                                        <Badge key={r.id} variant="outline" className="mr-1 text-[11px]">
+                                                {u.roles?.length ? (
+                                                    u.roles.map((r) => (
+                                                        <Badge
+                                                            key={r.id}
+                                                            variant="outline"
+                                                            className="mr-1 text-[11px]"
+                                                        >
                                                             {r.label}
                                                         </Badge>
                                                     ))
-                                                    : <span className="text-muted-foreground">{u.role ?? '—'}</span>
-                                                }
+                                                ) : (
+                                                    <span className="text-muted-foreground">
+                                                        {u.role ?? '—'}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">
                                                 {u.assigned_clients_count ?? 0}
                                             </td>
-                                            <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                                            <td
+                                                className="px-4 py-3 text-right"
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                }
+                                            >
                                                 <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <button className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+                                                    <DropdownMenuTrigger
+                                                        asChild
+                                                    >
+                                                        <button className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                                                             <MoreVertical className="h-4 w-4" />
                                                         </button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-48">
-                                                        <DropdownMenuItem onClick={() => router.visit(`/staff/${u.id}`)}>
+                                                    <DropdownMenuContent
+                                                        align="end"
+                                                        className="w-48"
+                                                    >
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                router.visit(
+                                                                    `/staff/${u.id}`,
+                                                                )
+                                                            }
+                                                        >
                                                             <Eye className="mr-2 h-4 w-4" />
                                                             View profile
                                                         </DropdownMenuItem>
                                                         {can?.staff?.update && (
-                                                            <DropdownMenuItem onClick={() => router.visit(`/staff/${u.id}/edit`)}>
+                                                            <DropdownMenuItem
+                                                                onClick={() =>
+                                                                    router.visit(
+                                                                        `/staff/${u.id}/edit`,
+                                                                    )
+                                                                }
+                                                            >
                                                                 <Pencil className="mr-2 h-4 w-4" />
                                                                 Edit
                                                             </DropdownMenuItem>
                                                         )}
-                                                        {can?.staff?.assignmentsUpdate && (
-                                                            <DropdownMenuItem onClick={() => router.visit(`/staff/${u.id}/assignments`)}>
+                                                        {can?.staff
+                                                            ?.assignmentsUpdate && (
+                                                            <DropdownMenuItem
+                                                                onClick={() =>
+                                                                    router.visit(
+                                                                        `/staff/${u.id}/assignments`,
+                                                                    )
+                                                                }
+                                                            >
                                                                 <UserCog className="mr-2 h-4 w-4" />
                                                                 Assignments
                                                             </DropdownMenuItem>
@@ -225,11 +347,18 @@ export default function StaffIndex({ users, filters }: Props) {
 
                                     {data.length === 0 && (
                                         <tr>
-                                            <td colSpan={5} className="px-4 py-16 text-center">
+                                            <td
+                                                colSpan={5}
+                                                className="px-4 py-16 text-center"
+                                            >
                                                 <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                                                <p className="font-medium text-muted-foreground">No staff found</p>
+                                                <p className="font-medium text-muted-foreground">
+                                                    No staff found
+                                                </p>
                                                 <p className="mt-1 text-sm text-muted-foreground/70">
-                                                    {hasFilters ? 'Try adjusting your search' : 'Add staff members to get started'}
+                                                    {hasFilters
+                                                        ? 'Try adjusting your search'
+                                                        : 'Add staff members to get started'}
                                                 </p>
                                             </td>
                                         </tr>

@@ -19,7 +19,7 @@ export function NowRule({ time, className }: NowRuleProps) {
             )}
         >
             <span className="h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_0_4px_var(--accent)]" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary">
+            <span className="text-[11px] font-bold tracking-[0.12em] text-primary uppercase">
                 Now · {time}
             </span>
             <span className="h-px flex-1 bg-brand-tint-deep" />

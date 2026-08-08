@@ -24,7 +24,7 @@ return new class extends Migration
 
         Schema::create('access_control_schedule_revisions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('access_schedule_id')->constrained('access_control_schedules')->cascadeOnDelete();
+            $table->foreignId('access_schedule_id')->constrained('access_control_schedules')->restrictOnDelete();
             $table->unsignedInteger('version');
             $table->string('action', 24);
             $table->json('snapshot');
@@ -41,27 +41,35 @@ return new class extends Migration
             ->orderBy('id')
             ->chunkById(100, function ($schedules): void {
                 $now = now();
-                $rows = collect($schedules)->map(fn (object $schedule): array => [
-                    'access_schedule_id' => $schedule->id,
-                    'version' => 1,
-                    'action' => 'imported',
-                    'snapshot' => json_encode([
-                        'name' => $schedule->name,
-                        'timezone' => $schedule->timezone,
-                        'days' => json_decode($schedule->days, true, flags: JSON_THROW_ON_ERROR),
-                        'starts_at' => $schedule->starts_at,
-                        'ends_at' => $schedule->ends_at,
-                        'is_active' => (bool) $schedule->is_active,
-                        'provider_reconciliation_status' => 'required',
-                    ], JSON_THROW_ON_ERROR),
-                    'change_reason' => 'Imported when governed schedule lifecycle was enabled.',
-                    'active_credentials_affected' => DB::table('access_control_credentials')
+                $rows = collect($schedules)->map(function (object $schedule) use ($now): array {
+                    $legacyLocalActiveClaims = DB::table('access_control_credentials')
                         ->where('access_schedule_id', $schedule->id)
                         ->where('status', 'active')
-                        ->count(),
-                    'recorded_by_user_id' => $schedule->created_by_user_id,
-                    'created_at' => $schedule->created_at ?? $now,
-                ])->all();
+                        ->count();
+
+                    return [
+                        'access_schedule_id' => $schedule->id,
+                        'version' => 1,
+                        'action' => 'imported',
+                        'snapshot' => json_encode([
+                            'name' => $schedule->name,
+                            'site_id' => $schedule->site_id,
+                            'timezone' => $schedule->timezone,
+                            'days' => json_decode($schedule->days, true, flags: JSON_THROW_ON_ERROR),
+                            'starts_at' => $schedule->starts_at,
+                            'ends_at' => $schedule->ends_at,
+                            'is_active' => (bool) $schedule->is_active,
+                            'provider_reconciliation_status' => 'required',
+                            'legacy_local_active_claims' => $legacyLocalActiveClaims,
+                        ], JSON_THROW_ON_ERROR),
+                        'change_reason' => 'Imported as unconfirmed local state when governed schedule lifecycle was enabled.',
+                        // Legacy "active" rows had no provider evidence and must never be reported
+                        // as provider-confirmed impact.
+                        'active_credentials_affected' => 0,
+                        'recorded_by_user_id' => $schedule->created_by_user_id,
+                        'created_at' => $schedule->created_at ?? $now,
+                    ];
+                })->all();
 
                 DB::table('access_control_schedule_revisions')->insert($rows);
             }, 'id');
@@ -69,6 +77,13 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::hasTable('access_control_schedule_revisions')
+            && DB::table('access_control_schedule_revisions')->exists()) {
+            throw new RuntimeException(
+                'Cannot remove governed schedule lifecycle columns while immutable revision evidence exists.',
+            );
+        }
+
         Schema::dropIfExists('access_control_schedule_revisions');
 
         Schema::table('access_control_schedules', function (Blueprint $table): void {

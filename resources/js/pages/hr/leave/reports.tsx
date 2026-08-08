@@ -364,8 +364,7 @@ export default function LeaveReports({
                             </span>
                             <p className="mb-2.5 text-[11.5px] text-muted-foreground">
                                 Frequency² × days — flags disruptive short
-                                absences. Top 8 shown; export for the full
-                                list.
+                                absences. Top 8 shown; export for the full list.
                             </p>
                             {bradfordFactor.employees.length === 0 ? (
                                 <p className="py-6 text-center text-sm text-muted-foreground">

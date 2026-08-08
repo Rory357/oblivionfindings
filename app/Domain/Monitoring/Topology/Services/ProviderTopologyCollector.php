@@ -32,6 +32,8 @@ final class ProviderTopologyCollector
             ->forProvider($provider)
             ->active()
             ->where('site_id', $siteId)
+            ->whereNotNull('mapped_external_site_id')
+            ->whereRaw("TRIM(`mapped_external_site_id`) <> ''")
             ->whereHas('site', fn ($query) => $query
                 ->where('is_active', true)
                 ->where(fn ($siteQuery) => $siteQuery->whereNull('archived')->orWhere('archived', false))
@@ -44,6 +46,9 @@ final class ProviderTopologyCollector
         if ($siteConfig === null || $connection === null) {
             throw new UnexpectedValueException('Provider topology Site scope is unavailable.');
         }
+        $siteConfigId = (int) $siteConfig->getKey();
+        $connectionId = (int) $connection->getKey();
+        $externalSiteId = (string) $siteConfig->mapped_external_site_id;
 
         $manifest = $this->registry->manifest($provider);
         $maximum = min(5000, $manifest->backfillLimit);
@@ -53,6 +58,13 @@ final class ProviderTopologyCollector
         $evidence = [];
 
         do {
+            $this->assertCollectionScopeStillUsable(
+                $siteId,
+                $provider,
+                $siteConfigId,
+                $connectionId,
+                $externalSiteId,
+            );
             $cursorKey = $cursor ?? '__first__';
             if (isset($seenCursors[$cursorKey]) || count($seenCursors) >= 1000) {
                 throw new UnexpectedValueException('Provider topology cursor did not advance.');
@@ -63,6 +75,13 @@ final class ProviderTopologyCollector
                 $connection,
                 $cursor,
                 min($manifest->pageLimit, max(1, $maximum - count($evidence))),
+            );
+            $this->assertCollectionScopeStillUsable(
+                $siteId,
+                $provider,
+                $siteConfigId,
+                $connectionId,
+                $externalSiteId,
             );
             if ($page->partial || $page->retryAfterSeconds !== null) {
                 throw new ProviderTopologyDeferred($page->retryAfterSeconds ?? $manifest->minimumIntervalSeconds);
@@ -86,6 +105,35 @@ final class ProviderTopologyCollector
         } while ($cursor !== null);
 
         return $evidence;
+    }
+
+    private function assertCollectionScopeStillUsable(
+        int $siteId,
+        string $provider,
+        int $siteConfigId,
+        int $connectionId,
+        string $externalSiteId,
+    ): void {
+        $connectionUsable = IntegrationProviderConnection::query()
+            ->whereKey($connectionId)
+            ->forProvider($provider)
+            ->connected()
+            ->exists();
+        $siteScopeUsable = IntegrationSiteConfig::query()
+            ->whereKey($siteConfigId)
+            ->forProvider($provider)
+            ->active()
+            ->where('site_id', $siteId)
+            ->where('mapped_external_site_id', $externalSiteId)
+            ->whereHas('site', fn ($query) => $query
+                ->where('is_active', true)
+                ->where(fn ($siteQuery) => $siteQuery->whereNull('archived')->orWhere('archived', false))
+                ->whereNull('archived_at'))
+            ->exists();
+
+        if (! $connectionUsable || ! $siteScopeUsable) {
+            throw new UnexpectedValueException('Provider topology Site scope became unavailable during collection.');
+        }
     }
 
     /**

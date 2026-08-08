@@ -7,6 +7,7 @@ use App\Domain\Monitoring\Data\MetricSample;
 use App\Domain\Monitoring\Data\TimeSeriesPoint;
 use App\Domain\Monitoring\Exceptions\TimeSeriesUnavailable;
 use App\Domain\Monitoring\Models\MetricCurrentSummary;
+use App\Domain\Monitoring\Models\MetricRollupCoverage;
 use App\Domain\Monitoring\Models\MetricSeries;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\SecurityDevices\Models\Device;
@@ -180,8 +181,70 @@ final class MetricIngestService
         );
 
         try {
-            $this->store->writePoints([$point]);
-        } catch (Throwable $exception) {
+            return DB::transaction(function () use (
+                $series,
+                $point,
+                $value,
+                $statistics,
+                $observedAt,
+                $idempotencyKey,
+            ): MetricCurrentSummary {
+                // Serialise the external write with coverage advancement and
+                // retention deletion for this one canonical source series.
+                $lockedSeries = MetricSeries::query()->lockForUpdate()->findOrFail($series->id);
+                $current = MetricCurrentSummary::query()
+                    ->where('series_id', $series->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($current !== null
+                    && hash_equals((string) $current->last_idempotency_key, $idempotencyKey)) {
+                    return $current;
+                }
+
+                $this->invalidateCoveredBucket($lockedSeries, $observedAt);
+                try {
+                    $this->store->writePoints([$point]);
+                } catch (Throwable $exception) {
+                    if ($exception instanceof TimeSeriesUnavailable) {
+                        throw $exception;
+                    }
+
+                    throw new TimeSeriesUnavailable(
+                        'Time-series storage is unavailable.',
+                        previous: $exception,
+                    );
+                }
+
+                $lockedSeries->first_point_at = $lockedSeries->first_point_at === null
+                    || $observedAt->lessThan($lockedSeries->first_point_at)
+                        ? $observedAt
+                        : $lockedSeries->first_point_at;
+                $lockedSeries->last_point_at = $lockedSeries->last_point_at === null
+                    || $observedAt->greaterThan($lockedSeries->last_point_at)
+                        ? $observedAt
+                        : $lockedSeries->last_point_at;
+                $lockedSeries->save();
+
+                $attributes = [
+                    'sample_count' => ($current?->sample_count ?? 0) + 1,
+                    'last_idempotency_key' => $idempotencyKey,
+                    'storage_state' => 'available',
+                    'storage_checked_at' => now(),
+                ];
+                if ($current?->observed_at === null
+                    || $observedAt->greaterThanOrEqualTo($current->observed_at)) {
+                    $attributes['value'] = $value;
+                    $attributes['statistics'] = $statistics === [] ? null : $statistics;
+                    $attributes['observed_at'] = $observedAt;
+                }
+
+                return MetricCurrentSummary::query()->updateOrCreate(
+                    ['series_id' => $series->id],
+                    $attributes,
+                );
+            }, 3);
+        } catch (TimeSeriesUnavailable $exception) {
             MetricCurrentSummary::query()->updateOrCreate(
                 ['series_id' => $series->id],
                 [
@@ -190,57 +253,34 @@ final class MetricIngestService
                 ],
             );
 
-            if ($exception instanceof TimeSeriesUnavailable) {
-                throw $exception;
-            }
-
-            throw new TimeSeriesUnavailable('Time-series storage is unavailable.', previous: $exception);
+            throw $exception;
         }
+    }
 
-        return DB::transaction(function () use (
-            $series,
-            $value,
-            $statistics,
-            $observedAt,
-            $idempotencyKey,
-        ): MetricCurrentSummary {
-            $lockedSeries = MetricSeries::query()->lockForUpdate()->findOrFail($series->id);
-            $current = MetricCurrentSummary::query()
-                ->where('series_id', $series->id)
-                ->lockForUpdate()
-                ->first();
+    private function invalidateCoveredBucket(MetricSeries $source, CarbonImmutable $observedAt): void
+    {
+        MetricRollupCoverage::query()
+            ->where('source_series_id', $source->id)
+            ->where('covered_until', '>', $observedAt)
+            ->lockForUpdate()
+            ->get()
+            ->each(function (MetricRollupCoverage $coverage) use ($observedAt): void {
+                $bucketStart = $coverage->target_tier === 'hourly'
+                    ? $observedAt->startOfHour()
+                    : $observedAt->startOfDay();
 
-            if ($current !== null && hash_equals((string) $current->last_idempotency_key, $idempotencyKey)) {
-                return $current;
-            }
+                if (! $bucketStart->greaterThan($coverage->covered_from)) {
+                    // One interval row cannot represent a hole at its beginning.
+                    // Rebuild from the source's first bucket on the next run.
+                    $coverage->delete();
 
-            $lockedSeries->first_point_at = $lockedSeries->first_point_at === null
-                || $observedAt->lessThan($lockedSeries->first_point_at)
-                    ? $observedAt
-                    : $lockedSeries->first_point_at;
-            $lockedSeries->last_point_at = $lockedSeries->last_point_at === null
-                || $observedAt->greaterThan($lockedSeries->last_point_at)
-                    ? $observedAt
-                    : $lockedSeries->last_point_at;
-            $lockedSeries->save();
+                    return;
+                }
 
-            $attributes = [
-                'sample_count' => ($current?->sample_count ?? 0) + 1,
-                'last_idempotency_key' => $idempotencyKey,
-                'storage_state' => 'available',
-                'storage_checked_at' => now(),
-            ];
-            if ($current?->observed_at === null || $observedAt->greaterThanOrEqualTo($current->observed_at)) {
-                $attributes['value'] = $value;
-                $attributes['statistics'] = $statistics === [] ? null : $statistics;
-                $attributes['observed_at'] = $observedAt;
-            }
-
-            return MetricCurrentSummary::query()->updateOrCreate(
-                ['series_id' => $series->id],
-                $attributes,
-            );
-        }, 3);
+                $coverage->forceFill([
+                    'covered_until' => $bucketStart,
+                ])->save();
+            });
     }
 
     /** @param array<string, mixed> $identity */

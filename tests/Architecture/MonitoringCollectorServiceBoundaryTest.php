@@ -54,8 +54,15 @@ it('installs the collector timer only after fail-closed runtime and identity che
         'PHP_MAJOR_VERSION !== 8 || PHP_MINOR_VERSION !== 4',
         '["curl", "json", "openssl", "sockets", "sodium"]',
         'vendor/autoload.php',
-        "--shell /usr/sbin/nologin",
+        '--shell /usr/sbin/nologin',
         'collector identity is missing;',
+        '"client_certificate_fingerprint"',
+        'openssl_x509_fingerprint($certificate, "sha256")',
+        'openssl_pkey_get_private($privateKeyPem)',
+        'openssl_x509_check_private_key($certificate, $privateKey)',
+        '"oblivion-collector-".$identity["collector_id"]',
+        '$now < $parsed["validFrom_time_t"]',
+        '$now >= $parsed["validTo_time_t"]',
         'chmod 0600 "$IDENTITY_FILE"',
         'systemctl daemon-reload',
         'systemctl enable --now oblivion-monitoring-collector.timer',
@@ -64,5 +71,63 @@ it('installs the collector timer only after fail-closed runtime and identity che
         'OBLIVION_COLLECTOR_ENROLMENT_TOKEN',
         'composer install',
         'DB_',
+    );
+});
+
+it('ships a value-free pinned HTTPS response-contract probe', function () {
+    $application = (string) file_get_contents(base_path('collector/src/CollectorApplication.php'));
+    $https = (string) file_get_contents(base_path('collector/src/Http/HttpsCentralApi.php'));
+    $readme = (string) file_get_contents(base_path('collector/README.md'));
+    $runbook = (string) file_get_contents(base_path('docs/runbooks/monitoring/collector-outage-and-revocation.md'));
+
+    expect($application)->toContain(
+        "'verify-transport' => \$this->verifyTransport(\$options)",
+        "['active', 'revoked']",
+        "['samples'] ?? '5'",
+        'json_encode($evidence, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)',
+        'openssl_x509_check_private_key($certificate, $privateKey)',
+        'sodium_memzero($secretKey)',
+    );
+
+    expect($https)->toContain(
+        "'after_sequence' => 'transport-evidence-only'",
+        '$replay = $this->send($method, $path, $body, $headers, true)',
+        "assertEvidenceResponse(\$first, 422, 'Collector request is invalid.')",
+        "assertEvidenceResponse(\$replay, 401, 'Collector authentication failed.')",
+        "assertEvidenceResponse(\$first, 401, 'Collector authentication failed.')",
+        "'state' => 'response_contract_matched'",
+        "'expected_identity_state' => \$expectedIdentityState",
+        "'pinned_https_contract' => 'matched'",
+        "'initial_response' => \$expectedIdentityState === 'active'",
+        "'replay_attempt' => \$expectedIdentityState === 'active'",
+        'CURLOPT_SSL_VERIFYPEER => true',
+        'CURLOPT_SSL_VERIFYHOST => 2',
+        'CURLOPT_PINNEDPUBLICKEY => $this->tlsPublicKeyPin',
+        'CURLOPT_PROTOCOLS => CURLPROTO_HTTPS',
+        '$options[CURLOPT_SSLCERT] = $this->clientCertificateFile',
+        '$options[CURLOPT_SSLKEY] = $this->clientPrivateKeyFile',
+    );
+
+    expect($readme)->toContain(
+        'bounded deployment-evidence probe',
+        'short-lived nonce',
+        'reservations in the configured replay store',
+        'does not issue configuration',
+        'run checks, upload observations',
+        'does not by itself prove',
+        'shared Redis',
+    );
+
+    expect($runbook)->toContain(
+        '## Deployed acceptance sequence',
+        '--expect=active',
+        '--expect=revoked',
+        '--samples=5',
+        'same shared Redis',
+        'accepted/replayed pair crossed different',
+        'proves replay rejection only',
+        'does not prove why authentication was denied',
+        'credentialed remote protocol',
+        'exact revoked collector UUID',
     );
 });

@@ -47,6 +47,7 @@ function PaletteHarness() {
 
     return (
         <>
+            {/* eslint-disable-next-line no-restricted-syntax -- native test-harness opener keeps shared Button styling out of the focus-restoration contract */}
             <button type="button" onClick={() => setOpen(true)}>
                 Find sections
             </button>

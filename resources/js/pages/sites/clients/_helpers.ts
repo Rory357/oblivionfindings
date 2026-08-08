@@ -4,7 +4,11 @@ export function getClientDisplayName(c: {
     preferred_name?: string | null;
 }): string {
     const full = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim();
-    if (c.preferred_name && c.preferred_name.trim() && c.preferred_name !== c.first_name) {
+    if (
+        c.preferred_name &&
+        c.preferred_name.trim() &&
+        c.preferred_name !== c.first_name
+    ) {
         return `${c.preferred_name} (${full})`;
     }
     return full;
@@ -16,10 +20,13 @@ export function getClientInitials(c: {
 }): string {
     const f = (c.first_name?.[0] ?? '').toUpperCase();
     const l = (c.last_name?.[0] ?? '').toUpperCase();
-    return (f + l) || '?';
+    return f + l || '?';
 }
 
-const STATUS_STYLES: Record<string, { label: string; cls: string; ring: string }> = {
+const STATUS_STYLES: Record<
+    string,
+    { label: string; cls: string; ring: string }
+> = {
     active: {
         label: 'Active',
         cls: 'border-status-success/30 bg-status-success-bg text-status-success',

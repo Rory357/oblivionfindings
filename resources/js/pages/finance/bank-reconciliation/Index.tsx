@@ -1,14 +1,34 @@
-import { Head, Link, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import { BankingTabsFooter, formatMoney } from '@/components/finance';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, FileCheck, CheckCircle, Clock, ListChecks, Scale } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    CheckCircle,
+    Clock,
+    FileCheck,
+    ListChecks,
+    Plus,
+    Scale,
+} from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 
 interface Reconciliation {
@@ -50,15 +70,27 @@ interface Props {
 const statusBadge = (status: string) => {
     switch (status) {
         case 'completed':
-            return <Badge className="bg-status-success-bg text-status-success border-status-success/30">Completed</Badge>;
+            return (
+                <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
+                    Completed
+                </Badge>
+            );
         case 'in_progress':
-            return <Badge className="bg-status-info-bg text-status-info border-status-info/30">In Progress</Badge>;
+            return (
+                <Badge className="border-status-info/30 bg-status-info-bg text-status-info">
+                    In Progress
+                </Badge>
+            );
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
 };
 
-export default function ReconciliationIndex({ reconciliations, bankAccounts, filters }: Props) {
+export default function ReconciliationIndex({
+    reconciliations,
+    bankAccounts,
+    filters,
+}: Props) {
     const applyFilters = useCallback(
         (newFilters: Partial<Filters>) => {
             router.get(
@@ -76,8 +108,17 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
     ];
 
     const totalCount = reconciliations.total;
-    const completedCount = useMemo(() => reconciliations.data.filter((r) => r.status === 'completed').length, [reconciliations.data]);
-    const inProgressCount = useMemo(() => reconciliations.data.filter((r) => r.status === 'in_progress').length, [reconciliations.data]);
+    const completedCount = useMemo(
+        () =>
+            reconciliations.data.filter((r) => r.status === 'completed').length,
+        [reconciliations.data],
+    );
+    const inProgressCount = useMemo(
+        () =>
+            reconciliations.data.filter((r) => r.status === 'in_progress')
+                .length,
+        [reconciliations.data],
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -85,7 +126,8 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Scale}
                         title="Bank Reconciliation"
                         description="Reconcile bank statements against your ledger"
@@ -96,8 +138,10 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                         ]}
                         actions={
                             <Button asChild size="sm">
-                                <Link href={'/finance/bank-reconciliation/create'}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
+                                <Link
+                                    href={'/finance/bank-reconciliation/create'}
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
                                     New Reconciliation
                                 </Link>
                             </Button>
@@ -108,7 +152,7 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
             >
                 {/* KPI Cards */}
                 {totalCount > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
                         <Card>
                             <CardContent className="pt-6">
                                 <div className="flex items-center gap-3">
@@ -116,8 +160,12 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                                         <ListChecks className="h-5 w-5 text-status-info" />
                                     </div>
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Total Reconciliations</p>
-                                        <p className="text-2xl font-semibold">{totalCount}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            Total Reconciliations
+                                        </p>
+                                        <p className="text-2xl font-semibold">
+                                            {totalCount}
+                                        </p>
                                     </div>
                                 </div>
                             </CardContent>
@@ -129,8 +177,12 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                                         <CheckCircle className="h-5 w-5 text-status-success" />
                                     </div>
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Completed (this page)</p>
-                                        <p className="text-2xl font-semibold">{completedCount}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            Completed (this page)
+                                        </p>
+                                        <p className="text-2xl font-semibold">
+                                            {completedCount}
+                                        </p>
                                     </div>
                                 </div>
                             </CardContent>
@@ -142,8 +194,12 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                                         <Clock className="h-5 w-5 text-status-warning" />
                                     </div>
                                     <div>
-                                        <p className="text-sm text-muted-foreground">In Progress (this page)</p>
-                                        <p className="text-2xl font-semibold">{inProgressCount}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            In Progress (this page)
+                                        </p>
+                                        <p className="text-2xl font-semibold">
+                                            {inProgressCount}
+                                        </p>
                                     </div>
                                 </div>
                             </CardContent>
@@ -154,20 +210,28 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                 {/* Filters */}
                 <Card className="mb-6">
                     <CardContent className="pt-6">
-                        <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex flex-col gap-4 sm:flex-row">
                             <Select
                                 value={filters.bank_account_id || 'all'}
                                 onValueChange={(value) =>
-                                    applyFilters({ bank_account_id: value === 'all' ? '' : value })
+                                    applyFilters({
+                                        bank_account_id:
+                                            value === 'all' ? '' : value,
+                                    })
                                 }
                             >
                                 <SelectTrigger className="w-[220px]">
                                     <SelectValue placeholder="All Bank Accounts" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Bank Accounts</SelectItem>
+                                    <SelectItem value="all">
+                                        All Bank Accounts
+                                    </SelectItem>
                                     {bankAccounts.map((account) => (
-                                        <SelectItem key={account.id} value={String(account.id)}>
+                                        <SelectItem
+                                            key={account.id}
+                                            value={String(account.id)}
+                                        >
                                             {account.name}
                                         </SelectItem>
                                     ))}
@@ -176,16 +240,24 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                             <Select
                                 value={filters.status || 'all'}
                                 onValueChange={(value) =>
-                                    applyFilters({ status: value === 'all' ? '' : value })
+                                    applyFilters({
+                                        status: value === 'all' ? '' : value,
+                                    })
                                 }
                             >
                                 <SelectTrigger className="w-[180px]">
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Statuses</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                    <SelectItem value="completed">Completed</SelectItem>
+                                    <SelectItem value="all">
+                                        All Statuses
+                                    </SelectItem>
+                                    <SelectItem value="in_progress">
+                                        In Progress
+                                    </SelectItem>
+                                    <SelectItem value="completed">
+                                        Completed
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -197,14 +269,20 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                     <CardContent className="p-0">
                         {reconciliations.data.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <FileCheck className="h-12 w-12 text-muted-foreground/40 mb-4" />
-                                <h3 className="text-lg font-medium text-foreground mb-1">No reconciliations</h3>
-                                <p className="text-muted-foreground mb-4">
+                                <FileCheck className="mb-4 h-12 w-12 text-muted-foreground/40" />
+                                <h3 className="mb-1 text-lg font-medium text-foreground">
+                                    No reconciliations
+                                </h3>
+                                <p className="mb-4 text-muted-foreground">
                                     Start your first bank reconciliation.
                                 </p>
                                 <Button asChild>
-                                    <Link href={'/finance/bank-reconciliation/create'}>
-                                        <Plus className="w-4 h-4 mr-2" />
+                                    <Link
+                                        href={
+                                            '/finance/bank-reconciliation/create'
+                                        }
+                                    >
+                                        <Plus className="mr-2 h-4 w-4" />
                                         New Reconciliation
                                     </Link>
                                 </Button>
@@ -215,8 +293,12 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                                     <TableRow>
                                         <TableHead>Bank Account</TableHead>
                                         <TableHead>Statement Date</TableHead>
-                                        <TableHead className="text-right">Statement Balance</TableHead>
-                                        <TableHead className="text-right">Calculated Balance</TableHead>
+                                        <TableHead className="text-right">
+                                            Statement Balance
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Calculated Balance
+                                        </TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead>Completed At</TableHead>
                                         <TableHead></TableHead>
@@ -228,21 +310,39 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                                             <TableCell className="font-medium">
                                                 {recon.bank_account?.name}
                                             </TableCell>
-                                            <TableCell>{recon.statement_date}</TableCell>
-                                            <TableCell className="text-right font-mono tabular-nums">
-                                                {formatMoney(recon.statement_balance)}
+                                            <TableCell>
+                                                {recon.statement_date}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {recon.calculated_balance ? formatMoney(recon.calculated_balance) : '-'}
+                                                {formatMoney(
+                                                    recon.statement_balance,
+                                                )}
                                             </TableCell>
-                                            <TableCell>{statusBadge(recon.status)}</TableCell>
+                                            <TableCell className="text-right font-mono tabular-nums">
+                                                {recon.calculated_balance
+                                                    ? formatMoney(
+                                                          recon.calculated_balance,
+                                                      )
+                                                    : '-'}
+                                            </TableCell>
+                                            <TableCell>
+                                                {statusBadge(recon.status)}
+                                            </TableCell>
                                             <TableCell className="text-muted-foreground">
                                                 {recon.completed_at || '-'}
                                             </TableCell>
                                             <TableCell>
-                                                <Link href={`/finance/bank-reconciliation/${recon.id}`}>
-                                                    <Button variant="ghost" size="sm">
-                                                        {recon.status === 'in_progress' ? 'Continue' : 'View'}
+                                                <Link
+                                                    href={`/finance/bank-reconciliation/${recon.id}`}
+                                                >
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                    >
+                                                        {recon.status ===
+                                                        'in_progress'
+                                                            ? 'Continue'
+                                                            : 'View'}
                                                     </Button>
                                                 </Link>
                                             </TableCell>
@@ -256,21 +356,35 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
 
                 {/* Pagination */}
                 {reconciliations.last_page > 1 && (
-                    <div className="flex items-center justify-between mt-4">
+                    <div className="mt-4 flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {(reconciliations.current_page - 1) * reconciliations.per_page + 1} to{' '}
-                            {Math.min(reconciliations.current_page * reconciliations.per_page, reconciliations.total)} of{' '}
-                            {reconciliations.total} reconciliations
+                            Showing{' '}
+                            {(reconciliations.current_page - 1) *
+                                reconciliations.per_page +
+                                1}{' '}
+                            to{' '}
+                            {Math.min(
+                                reconciliations.current_page *
+                                    reconciliations.per_page,
+                                reconciliations.total,
+                            )}{' '}
+                            of {reconciliations.total} reconciliations
                         </p>
                         <div className="flex gap-1">
                             {reconciliations.links.map((link, i) => (
                                 <Button
                                     key={i}
-                                    variant={link.active ? 'default' : 'outline'}
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
                                     size="sm"
                                     disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                    onClick={() =>
+                                        link.url && router.get(link.url)
+                                    }
+                                    dangerouslySetInnerHTML={{
+                                        __html: link.label,
+                                    }}
                                 />
                             ))}
                         </div>

@@ -895,7 +895,9 @@ export default function SiteCalendar({
     useEffect(() => {
         if (!canCreateHere || typeof window === 'undefined') return;
 
-        const action = new URLSearchParams(window.location.search).get('action');
+        const action = new URLSearchParams(window.location.search).get(
+            'action',
+        );
         if (action === 'create' || action === 'add') openCreate();
     }, [canCreateHere, openCreate]);
 

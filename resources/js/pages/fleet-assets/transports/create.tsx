@@ -15,13 +15,13 @@ import {
     WizardStepPane,
     type WizardStep,
 } from '@/components/wizard/shell';
+import { toDatetimeLocal } from '@/lib/datetime';
 import {
     emptyMedicationScanCapture,
     hasVerifiedMedicationScan,
     type MedicationScanCapture,
     type MedicationScanVerification,
 } from '@/lib/medication-scan';
-import { toDatetimeLocal } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { router, useForm } from '@inertiajs/react';
 import {
@@ -91,10 +91,30 @@ export type TransportVehicleOption = {
 };
 
 const transportSteps = [
-    { key: 'resident', label: 'Resident & destination', blurb: 'Trip type, resident, and route', icon: MapPin },
-    { key: 'vehicle', label: 'Vehicle & staff', blurb: 'Confirm vehicle and worker', icon: Car },
-    { key: 'medication', label: 'Medication & accessibility', blurb: 'Medication transit checks', icon: Pill },
-    { key: 'review', label: 'Review', blurb: 'Notes and final confirmation', icon: ClipboardCheck },
+    {
+        key: 'resident',
+        label: 'Resident & destination',
+        blurb: 'Trip type, resident, and route',
+        icon: MapPin,
+    },
+    {
+        key: 'vehicle',
+        label: 'Vehicle & staff',
+        blurb: 'Confirm vehicle and worker',
+        icon: Car,
+    },
+    {
+        key: 'medication',
+        label: 'Medication & accessibility',
+        blurb: 'Medication transit checks',
+        icon: Pill,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Notes and final confirmation',
+        icon: ClipboardCheck,
+    },
 ] as const satisfies readonly WizardStep[];
 
 const TRANSPORT_TYPES = [
@@ -160,9 +180,15 @@ export function TransportWizard({
     onClose,
 }: Props & { open: boolean; onClose: () => void }) {
     const safeVehicles = vehicles ?? [];
-    const safeRecentResidents = useMemo(() => recent_residents ?? [], [recent_residents]);
+    const safeRecentResidents = useMemo(
+        () => recent_residents ?? [],
+        [recent_residents],
+    );
     const safeClients = clients ?? [];
-    const safeMedications = useMemo(() => client_medications ?? [], [client_medications]);
+    const safeMedications = useMemo(
+        () => client_medications ?? [],
+        [client_medications],
+    );
     const safeShifts = useMemo(() => shifts ?? [], [shifts]);
 
     const form = useForm({
@@ -224,7 +250,7 @@ export function TransportWizard({
         if (!form.data.pickup_location && selectedShift.location) {
             form.setData('pickup_location', selectedShift.location);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Inertia form helpers are intentionally used to hydrate dependent fields from the selected shift.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Inertia form helpers are intentionally used to hydrate dependent fields from the selected shift.
     }, [selectedShift]);
 
     useEffect(() => {
@@ -265,25 +291,28 @@ export function TransportWizard({
             .slice(0, 8);
     }, [form.data.resident_name, safeRecentResidents]);
 
-    const handleClientChange = useCallback((clientId: string) => {
-        form.setData('client_id', clientId);
-        form.setData('shift_id', '');
-        // Reload page with client_id to fetch medications
-        router.visit('/fleet-assets/transports', {
-            data: { new: 1, client_id: clientId || null },
-            preserveState: true,
-            preserveScroll: true,
-            only: [
-                'client_medications',
-                'clients',
-                'vehicles',
-                'recent_residents',
-                'auth_user',
-                'shifts',
-                'selected_shift_id',
-            ],
-        });
-    }, [form]);
+    const handleClientChange = useCallback(
+        (clientId: string) => {
+            form.setData('client_id', clientId);
+            form.setData('shift_id', '');
+            // Reload page with client_id to fetch medications
+            router.visit('/fleet-assets/transports', {
+                data: { new: 1, client_id: clientId || null },
+                preserveState: true,
+                preserveScroll: true,
+                only: [
+                    'client_medications',
+                    'clients',
+                    'vehicles',
+                    'recent_residents',
+                    'auth_user',
+                    'shifts',
+                    'selected_shift_id',
+                ],
+            });
+        },
+        [form],
+    );
 
     const handleShiftChange = useCallback(
         (shiftId: string) => {
@@ -330,24 +359,27 @@ export function TransportWizard({
         [form, safeShifts],
     );
 
-    const handleMedToggle = useCallback((med: ClientMedication) => {
-        setSelectedMedIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(med.id)) {
-                next.delete(med.id);
-                form.clearErrors('medications');
-                setScanCaptures((current) => {
-                    const updated = { ...current };
-                    delete updated[med.id];
+    const handleMedToggle = useCallback(
+        (med: ClientMedication) => {
+            setSelectedMedIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(med.id)) {
+                    next.delete(med.id);
+                    form.clearErrors('medications');
+                    setScanCaptures((current) => {
+                        const updated = { ...current };
+                        delete updated[med.id];
 
-                    return updated;
-                });
-            } else {
-                next.add(med.id);
-            }
-            return next;
-        });
-    }, [form]);
+                        return updated;
+                    });
+                } else {
+                    next.add(med.id);
+                }
+                return next;
+            });
+        },
+        [form],
+    );
 
     const submitTransport = useCallback(
         (mode: 'transport' | 'pack') => {
@@ -367,7 +399,7 @@ export function TransportWizard({
                                   scanCaptures[m.id] ??
                                       emptyMedicationScanCapture(),
                               )
-                                  ? scanCaptures[m.id]?.scanSource ?? 'manual'
+                                  ? (scanCaptures[m.id]?.scanSource ?? 'manual')
                                   : null,
                               scan_verified: hasVerifiedMedicationScan(
                                   scanCaptures[m.id] ??
@@ -377,7 +409,7 @@ export function TransportWizard({
                                   scanCaptures[m.id] ??
                                       emptyMedicationScanCapture(),
                               )
-                                  ? scanCaptures[m.id]?.matchSource ?? null
+                                  ? (scanCaptures[m.id]?.matchSource ?? null)
                                   : null,
                           }))
                     : [];
@@ -431,7 +463,14 @@ export function TransportWizard({
                 },
             });
         },
-        [form, onClose, safeMedications, scanCaptures, selectedMedIds, witnessNames],
+        [
+            form,
+            onClose,
+            safeMedications,
+            scanCaptures,
+            selectedMedIds,
+            witnessNames,
+        ],
     );
 
     const handleSubmit = useCallback(
@@ -465,12 +504,19 @@ export function TransportWizard({
             footerEnd={
                 <>
                     {stepIndex > 0 ? (
-                        <Button type="button" variant="outline" onClick={() => setStepIndex(stepIndex - 1)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setStepIndex(stepIndex - 1)}
+                        >
                             <ArrowLeft className="mr-2 h-4 w-4" /> Back
                         </Button>
                     ) : null}
                     {stepIndex < transportSteps.length - 1 ? (
-                        <Button type="button" onClick={() => setStepIndex(stepIndex + 1)}>
+                        <Button
+                            type="button"
+                            onClick={() => setStepIndex(stepIndex + 1)}
+                        >
                             Continue
                         </Button>
                     ) : null}
@@ -481,396 +527,460 @@ export function TransportWizard({
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {stepIndex === 0 ? (
                         <>
-                    {/* Transport Type */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Transport Type *</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                {TRANSPORT_TYPES.map((type) => {
-                                    const IconComp = type.icon;
-                                    return (
-                                        <Button
-                                            key={type.value}
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() =>
-                                                form.setData(
-                                                    'transport_type',
-                                                    type.value,
-                                                )
-                                            }
-                                            className={cn(
-                                                'h-auto flex-col gap-2 whitespace-normal rounded-xl border-2 px-4 py-5 transition-all',
-                                                form.data.transport_type ===
-                                                    type.value
-                                                    ? `${type.color} shadow-md`
-                                                    : 'border-transparent bg-muted/30 text-muted-foreground hover:border-muted-foreground/20 hover:bg-muted/60',
-                                            )}
-                                        >
-                                            <IconComp className="h-7 w-7" />
-                                            <span className="font-semibold">
-                                                {type.label}
-                                            </span>
-                                        </Button>
-                                    );
-                                })}
-                            </div>
-                            {form.errors.transport_type && (
-                                <p className="mt-2 text-xs text-destructive">
-                                    {form.errors.transport_type}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Trip Details - 2 column */}
-                    <div className="grid gap-6 lg:grid-cols-2">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Vehicle & Resident</CardTitle>
-                            </CardHeader>
-                            <CardContent className="grid gap-4">
-                                <div>
-                                    <label className="text-sm font-medium">
-                                        Vehicle *
-                                    </label>
-                                    <Select
-                                        value={form.data.asset_id}
-                                        onValueChange={(v) =>
-                                            form.setData('asset_id', v)
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select vehicle" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {safeVehicles.map((v) => (
-                                                <SelectItem
-                                                    key={v.id}
-                                                    value={String(v.id)}
+                            {/* Transport Type */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Transport Type *</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                        {TRANSPORT_TYPES.map((type) => {
+                                            const IconComp = type.icon;
+                                            return (
+                                                <Button
+                                                    key={type.value}
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        form.setData(
+                                                            'transport_type',
+                                                            type.value,
+                                                        )
+                                                    }
+                                                    className={cn(
+                                                        'h-auto flex-col gap-2 rounded-xl border-2 px-4 py-5 whitespace-normal transition-all',
+                                                        form.data
+                                                            .transport_type ===
+                                                            type.value
+                                                            ? `${type.color} shadow-md`
+                                                            : 'border-transparent bg-muted/30 text-muted-foreground hover:border-muted-foreground/20 hover:bg-muted/60',
+                                                    )}
                                                 >
-                                                    {v.name}
-                                                    {v.asset_tag
-                                                        ? ` (${v.asset_tag})`
-                                                        : ''}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {form.errors.asset_id && (
-                                        <p className="mt-1 text-xs text-destructive">
-                                            {form.errors.asset_id}
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* Linked Client (for medication lookup) */}
-                                {safeShifts.length > 0 && (
-                                    <div>
-                                        <label className="text-sm font-medium">
-                                            Link to Shift
-                                        </label>
-                                        <Select
-                                            value={form.data.shift_id || 'none'}
-                                            onValueChange={(value) =>
-                                                handleShiftChange(
-                                                    value === 'none'
-                                                        ? ''
-                                                        : value,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select linked shift (optional)" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">
-                                                    No linked shift
-                                                </SelectItem>
-                                                {safeShifts.map((shift) => (
-                                                    <SelectItem
-                                                        key={shift.id}
-                                                        value={String(shift.id)}
-                                                    >
-                                                        #{shift.id} ·{' '}
-                                                        {shift.client_name ??
-                                                            'No resident'}{' '}
-                                                        ·{' '}
-                                                        {shift.starts_at
-                                                            ? new Date(
-                                                                  shift.starts_at,
-                                                              ).toLocaleString(
-                                                                  'en-NZ',
-                                                                  {
-                                                                      weekday:
-                                                                          'short',
-                                                                      day: 'numeric',
-                                                                      month: 'short',
-                                                                      hour: '2-digit',
-                                                                      minute: '2-digit',
-                                                                  },
-                                                              )
-                                                            : 'No time'}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-
-                                {safeClients.length > 0 && (
-                                    <div>
-                                        <label className="text-sm font-medium">
-                                            Link to Resident (for medications)
-                                        </label>
-                                        <Select
-                                            value={form.data.client_id}
-                                            onValueChange={handleClientChange}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select resident (optional)" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {safeClients.map((c) => (
-                                                    <SelectItem
-                                                        key={c.id}
-                                                        value={String(c.id)}
-                                                    >
-                                                        {c.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-
-                                {selectedShift && (
-                                    <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30">
-                                        <p className="font-medium text-status-info dark:text-status-info">
-                                            Linked shift #{selectedShift.id}
-                                        </p>
-                                        <p className="mt-1 text-xs text-status-info dark:text-status-info">
-                                            {(
-                                                selectedShift.shift_type ??
-                                                'standard'
-                                            ).replace(/_/g, ' ')}
-                                            {selectedShift.service_context
-                                                ? ` · ${selectedShift.service_context}`
-                                                : ''}
-                                            {selectedShift.location
-                                                ? ` · ${selectedShift.location}`
-                                                : ''}
-                                        </p>
-                                        <p className="text-xs text-status-info dark:text-status-info">
-                                            {selectedShift.client_name ??
-                                                'No resident'}
-                                            {selectedShift.staff_name
-                                                ? ` · ${selectedShift.staff_name}`
-                                                : ''}
-                                        </p>
-                                    </div>
-                                )}
-
-                                <div className="relative">
-                                    <label className="text-sm font-medium">
-                                        Resident Name *
-                                    </label>
-                                    <Input
-                                        value={form.data.resident_name}
-                                        onChange={(e) => {
-                                            form.setData(
-                                                'resident_name',
-                                                e.target.value,
+                                                    <IconComp className="h-7 w-7" />
+                                                    <span className="font-semibold">
+                                                        {type.label}
+                                                    </span>
+                                                </Button>
                                             );
-                                            setShowSuggestions(true);
-                                        }}
-                                        onFocus={() => setShowSuggestions(true)}
-                                        onBlur={() =>
-                                            setTimeout(
-                                                () => setShowSuggestions(false),
-                                                200,
-                                            )
-                                        }
-                                        placeholder="Enter resident name"
-                                        autoComplete="off"
-                                    />
-                                    {showSuggestions &&
-                                        filteredResidents.length > 0 && (
-                                            <menu className="absolute z-10 mt-1 w-full rounded-md border bg-background p-0 shadow-lg">
-                                                {filteredResidents.map(
-                                                    (name) => (
-                                                        <button
-                                                            key={name}
-                                                            type="button"
-                                                            className="w-full px-3 py-2 text-left text-sm first:rounded-t-md last:rounded-b-md hover:bg-muted/50"
-                                                            onMouseDown={(
-                                                                e,
-                                                            ) => {
-                                                                e.preventDefault();
-                                                                form.setData(
-                                                                    'resident_name',
-                                                                    name,
-                                                                );
-                                                                setShowSuggestions(
-                                                                    false,
-                                                                );
-                                                            }}
+                                        })}
+                                    </div>
+                                    {form.errors.transport_type && (
+                                        <p className="mt-2 text-xs text-destructive">
+                                            {form.errors.transport_type}
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Trip Details - 2 column */}
+                            <div className="grid gap-6 lg:grid-cols-2">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>
+                                            Vehicle & Resident
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="grid gap-4">
+                                        <div>
+                                            <label className="text-sm font-medium">
+                                                Vehicle *
+                                            </label>
+                                            <Select
+                                                value={form.data.asset_id}
+                                                onValueChange={(v) =>
+                                                    form.setData('asset_id', v)
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select vehicle" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {safeVehicles.map((v) => (
+                                                        <SelectItem
+                                                            key={v.id}
+                                                            value={String(v.id)}
                                                         >
-                                                            {name}
-                                                        </button>
-                                                    ),
-                                                )}
-                                            </menu>
+                                                            {v.name}
+                                                            {v.asset_tag
+                                                                ? ` (${v.asset_tag})`
+                                                                : ''}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            {form.errors.asset_id && (
+                                                <p className="mt-1 text-xs text-destructive">
+                                                    {form.errors.asset_id}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Linked Client (for medication lookup) */}
+                                        {safeShifts.length > 0 && (
+                                            <div>
+                                                <label className="text-sm font-medium">
+                                                    Link to Shift
+                                                </label>
+                                                <Select
+                                                    value={
+                                                        form.data.shift_id ||
+                                                        'none'
+                                                    }
+                                                    onValueChange={(value) =>
+                                                        handleShiftChange(
+                                                            value === 'none'
+                                                                ? ''
+                                                                : value,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select linked shift (optional)" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">
+                                                            No linked shift
+                                                        </SelectItem>
+                                                        {safeShifts.map(
+                                                            (shift) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        shift.id
+                                                                    }
+                                                                    value={String(
+                                                                        shift.id,
+                                                                    )}
+                                                                >
+                                                                    #{shift.id}{' '}
+                                                                    ·{' '}
+                                                                    {shift.client_name ??
+                                                                        'No resident'}{' '}
+                                                                    ·{' '}
+                                                                    {shift.starts_at
+                                                                        ? new Date(
+                                                                              shift.starts_at,
+                                                                          ).toLocaleString(
+                                                                              'en-NZ',
+                                                                              {
+                                                                                  weekday:
+                                                                                      'short',
+                                                                                  day: 'numeric',
+                                                                                  month: 'short',
+                                                                                  hour: '2-digit',
+                                                                                  minute: '2-digit',
+                                                                              },
+                                                                          )
+                                                                        : 'No time'}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
                                         )}
-                                    {form.errors.resident_name && (
-                                        <p className="mt-1 text-xs text-destructive">
-                                            {form.errors.resident_name}
-                                        </p>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Timing & Location</CardTitle>
-                            </CardHeader>
-                            <CardContent className="grid gap-4">
-                                <div>
-                                    <label className="text-sm font-medium">
-                                        Departure Time *
-                                    </label>
-                                    <Input
-                                        type="datetime-local"
-                                        value={form.data.departed_at}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'departed_at',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    {form.errors.departed_at && (
-                                        <p className="mt-1 text-xs text-destructive">
-                                            {form.errors.departed_at}
-                                        </p>
-                                    )}
-                                </div>
+                                        {safeClients.length > 0 && (
+                                            <div>
+                                                <label className="text-sm font-medium">
+                                                    Link to Resident (for
+                                                    medications)
+                                                </label>
+                                                <Select
+                                                    value={form.data.client_id}
+                                                    onValueChange={
+                                                        handleClientChange
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select resident (optional)" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {safeClients.map(
+                                                            (c) => (
+                                                                <SelectItem
+                                                                    key={c.id}
+                                                                    value={String(
+                                                                        c.id,
+                                                                    )}
+                                                                >
+                                                                    {c.name}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
 
-                                <div>
-                                    <label className="text-sm font-medium">
-                                        Passengers
-                                    </label>
-                                    <Input
-                                        type="number"
-                                        min="1"
-                                        max="20"
-                                        value={form.data.passengers_count}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'passengers_count',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    {form.errors.passengers_count && (
-                                        <p className="mt-1 text-xs text-destructive">
-                                            {form.errors.passengers_count}
-                                        </p>
-                                    )}
-                                </div>
+                                        {selectedShift && (
+                                            <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30">
+                                                <p className="font-medium text-status-info dark:text-status-info">
+                                                    Linked shift #
+                                                    {selectedShift.id}
+                                                </p>
+                                                <p className="mt-1 text-xs text-status-info dark:text-status-info">
+                                                    {(
+                                                        selectedShift.shift_type ??
+                                                        'standard'
+                                                    ).replace(/_/g, ' ')}
+                                                    {selectedShift.service_context
+                                                        ? ` · ${selectedShift.service_context}`
+                                                        : ''}
+                                                    {selectedShift.location
+                                                        ? ` · ${selectedShift.location}`
+                                                        : ''}
+                                                </p>
+                                                <p className="text-xs text-status-info dark:text-status-info">
+                                                    {selectedShift.client_name ??
+                                                        'No resident'}
+                                                    {selectedShift.staff_name
+                                                        ? ` · ${selectedShift.staff_name}`
+                                                        : ''}
+                                                </p>
+                                            </div>
+                                        )}
 
-                                <div>
-                                    <label className="text-sm font-medium">
-                                        Pickup Location
-                                    </label>
-                                    <Input
-                                        value={form.data.pickup_location}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'pickup_location',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="Where are you picking up?"
-                                    />
-                                    {form.errors.pickup_location && (
-                                        <p className="mt-1 text-xs text-destructive">
-                                            {form.errors.pickup_location}
-                                        </p>
-                                    )}
-                                </div>
+                                        <div className="relative">
+                                            <label className="text-sm font-medium">
+                                                Resident Name *
+                                            </label>
+                                            <Input
+                                                value={form.data.resident_name}
+                                                onChange={(e) => {
+                                                    form.setData(
+                                                        'resident_name',
+                                                        e.target.value,
+                                                    );
+                                                    setShowSuggestions(true);
+                                                }}
+                                                onFocus={() =>
+                                                    setShowSuggestions(true)
+                                                }
+                                                onBlur={() =>
+                                                    setTimeout(
+                                                        () =>
+                                                            setShowSuggestions(
+                                                                false,
+                                                            ),
+                                                        200,
+                                                    )
+                                                }
+                                                placeholder="Enter resident name"
+                                                autoComplete="off"
+                                            />
+                                            {showSuggestions &&
+                                                filteredResidents.length >
+                                                    0 && (
+                                                    <menu className="absolute z-10 mt-1 w-full rounded-md border bg-background p-0 shadow-lg">
+                                                        {filteredResidents.map(
+                                                            (name) => (
+                                                                <button
+                                                                    key={name}
+                                                                    type="button"
+                                                                    className="w-full px-3 py-2 text-left text-sm first:rounded-t-md last:rounded-b-md hover:bg-muted/50"
+                                                                    onMouseDown={(
+                                                                        e,
+                                                                    ) => {
+                                                                        e.preventDefault();
+                                                                        form.setData(
+                                                                            'resident_name',
+                                                                            name,
+                                                                        );
+                                                                        setShowSuggestions(
+                                                                            false,
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    {name}
+                                                                </button>
+                                                            ),
+                                                        )}
+                                                    </menu>
+                                                )}
+                                            {form.errors.resident_name && (
+                                                <p className="mt-1 text-xs text-destructive">
+                                                    {form.errors.resident_name}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
 
-                                <div>
-                                    <label className="text-sm font-medium">
-                                        Dropoff Location
-                                    </label>
-                                    <Input
-                                        value={form.data.dropoff_location}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'dropoff_location',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="Where are you dropping off?"
-                                    />
-                                    {form.errors.dropoff_location && (
-                                        <p className="mt-1 text-xs text-destructive">
-                                            {form.errors.dropoff_location}
-                                        </p>
-                                    )}
-                                </div>
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Timing & Location</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="grid gap-4">
+                                        <div>
+                                            <label className="text-sm font-medium">
+                                                Departure Time *
+                                            </label>
+                                            <Input
+                                                type="datetime-local"
+                                                value={form.data.departed_at}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'departed_at',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            {form.errors.departed_at && (
+                                                <p className="mt-1 text-xs text-destructive">
+                                                    {form.errors.departed_at}
+                                                </p>
+                                            )}
+                                        </div>
 
-                                <div>
-                                    <label className="text-sm font-medium">
-                                        Supervisor
-                                    </label>
-                                    <Input
-                                        value={form.data.supervisor_name}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'supervisor_name',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="Supervising staff member"
-                                    />
-                                    {form.errors.supervisor_name && (
-                                        <p className="mt-1 text-xs text-destructive">
-                                            {form.errors.supervisor_name}
-                                        </p>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                    {/* end 2-col grid */}
+                                        <div>
+                                            <label className="text-sm font-medium">
+                                                Passengers
+                                            </label>
+                                            <Input
+                                                type="number"
+                                                min="1"
+                                                max="20"
+                                                value={
+                                                    form.data.passengers_count
+                                                }
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'passengers_count',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            {form.errors.passengers_count && (
+                                                <p className="mt-1 text-xs text-destructive">
+                                                    {
+                                                        form.errors
+                                                            .passengers_count
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="text-sm font-medium">
+                                                Pickup Location
+                                            </label>
+                                            <Input
+                                                value={
+                                                    form.data.pickup_location
+                                                }
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'pickup_location',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="Where are you picking up?"
+                                            />
+                                            {form.errors.pickup_location && (
+                                                <p className="mt-1 text-xs text-destructive">
+                                                    {
+                                                        form.errors
+                                                            .pickup_location
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="text-sm font-medium">
+                                                Dropoff Location
+                                            </label>
+                                            <Input
+                                                value={
+                                                    form.data.dropoff_location
+                                                }
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'dropoff_location',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="Where are you dropping off?"
+                                            />
+                                            {form.errors.dropoff_location && (
+                                                <p className="mt-1 text-xs text-destructive">
+                                                    {
+                                                        form.errors
+                                                            .dropoff_location
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="text-sm font-medium">
+                                                Supervisor
+                                            </label>
+                                            <Input
+                                                value={
+                                                    form.data.supervisor_name
+                                                }
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'supervisor_name',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="Supervising staff member"
+                                            />
+                                            {form.errors.supervisor_name && (
+                                                <p className="mt-1 text-xs text-destructive">
+                                                    {
+                                                        form.errors
+                                                            .supervisor_name
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                            {/* end 2-col grid */}
                         </>
                     ) : null}
 
                     {stepIndex === 1 ? (
                         <Card>
                             <CardHeader>
-                                <CardTitle>Vehicle & staff confirmation</CardTitle>
+                                <CardTitle>
+                                    Vehicle & staff confirmation
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="grid gap-3 sm:grid-cols-2">
                                 <div className="rounded-lg border bg-muted/20 p-3">
-                                    <div className="text-xs text-muted-foreground">Vehicle</div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Vehicle
+                                    </div>
                                     <div className="mt-1 text-sm font-semibold">
-                                        {safeVehicles.find((vehicle) => String(vehicle.id) === form.data.asset_id)?.name ?? 'Return to the previous step to select a vehicle'}
+                                        {safeVehicles.find(
+                                            (vehicle) =>
+                                                String(vehicle.id) ===
+                                                form.data.asset_id,
+                                        )?.name ??
+                                            'Return to the previous step to select a vehicle'}
                                     </div>
                                 </div>
                                 <div className="rounded-lg border bg-muted/20 p-3">
-                                    <div className="text-xs text-muted-foreground">Worker</div>
-                                    <div className="mt-1 text-sm font-semibold">{auth_user?.name ?? 'Current user'}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Worker
+                                    </div>
+                                    <div className="mt-1 text-sm font-semibold">
+                                        {auth_user?.name ?? 'Current user'}
+                                    </div>
                                 </div>
                                 <div className="rounded-lg border bg-muted/20 p-3 sm:col-span-2">
-                                    <div className="text-xs text-muted-foreground">Linked shift</div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Linked shift
+                                    </div>
                                     <div className="mt-1 text-sm font-semibold">
-                                        {selectedShift ? `Shift #${selectedShift.id}${selectedShift.staff_name ? ` · ${selectedShift.staff_name}` : ''}` : 'No shift linked'}
+                                        {selectedShift
+                                            ? `Shift #${selectedShift.id}${selectedShift.staff_name ? ` · ${selectedShift.staff_name}` : ''}`
+                                            : 'No shift linked'}
                                     </div>
                                 </div>
                             </CardContent>
@@ -984,7 +1094,9 @@ export function TransportWizard({
                                                                         med.id
                                                                     ] ?? ''
                                                                 }
-                                                                onChange={(e) => {
+                                                                onChange={(
+                                                                    e,
+                                                                ) => {
                                                                     form.clearErrors(
                                                                         'medications',
                                                                     );
@@ -1010,7 +1122,8 @@ export function TransportWizard({
                                                     <div className="mt-3 ml-7">
                                                         <MedicationScanVerificationPanel
                                                             clientId={
-                                                                form.data.client_id
+                                                                form.data
+                                                                    .client_id
                                                                     ? Number(
                                                                           form
                                                                               .data
@@ -1063,8 +1176,8 @@ export function TransportWizard({
                                         You can create the transport first and
                                         continue medication packing from the
                                         transport detail screen, or pack the
-                                        selected medications immediately as
-                                        part of this submit.
+                                        selected medications immediately as part
+                                        of this submit.
                                     </p>
                                 )}
                                 {form.errors.medications && (
@@ -1078,77 +1191,95 @@ export function TransportWizard({
 
                     {stepIndex === 2 && safeMedications.length === 0 ? (
                         <Card>
-                            <CardHeader><CardTitle>Medication & accessibility</CardTitle></CardHeader>
+                            <CardHeader>
+                                <CardTitle>
+                                    Medication & accessibility
+                                </CardTitle>
+                            </CardHeader>
                             <CardContent className="text-sm text-muted-foreground">
-                                No active transport medications are available for the selected resident. Continue without packing medication, or return to select a linked client.
+                                No active transport medications are available
+                                for the selected resident. Continue without
+                                packing medication, or return to select a linked
+                                client.
                             </CardContent>
                         </Card>
                     ) : null}
 
                     {stepIndex === 3 ? (
                         <>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Notes</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <textarea
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                                rows={3}
-                                value={form.data.notes}
-                                onChange={(e) =>
-                                    form.setData('notes', e.target.value)
-                                }
-                                placeholder="Any additional notes about this transport..."
-                            />
-                            {form.errors.notes && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {form.errors.notes}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Notes</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <textarea
+                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        rows={3}
+                                        value={form.data.notes}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'notes',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Any additional notes about this transport..."
+                                    />
+                                    {form.errors.notes && (
+                                        <p className="mt-1 text-xs text-destructive">
+                                            {form.errors.notes}
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
 
-                    {/* Driver Info */}
-                    <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                        Driver will be set to:{' '}
-                        <span className="font-medium text-foreground">
-                            {auth_user?.name ?? 'Current user'}
-                        </span>
-                    </div>
+                            {/* Driver Info */}
+                            <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                                Driver will be set to:{' '}
+                                <span className="font-medium text-foreground">
+                                    {auth_user?.name ?? 'Current user'}
+                                </span>
+                            </div>
 
-                    <div className="flex items-center gap-2">
-                        <Button type="submit" disabled={form.processing}>
-                            {form.processing ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <Save className="mr-2 h-4 w-4" />
-                            )}
-                            {submitMode === 'pack'
-                                ? 'Creating Transport...'
-                                : selectedMedIds.size > 0
-                                  ? 'Create Transport Only'
-                                  : 'Log Transport'}
-                        </Button>
-                        {selectedMedIds.size > 0 && (
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                disabled={form.processing}
-                                onClick={() => submitTransport('pack')}
-                            >
-                                {form.processing && submitMode === 'pack' ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Pill className="mr-2 h-4 w-4" />
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    type="submit"
+                                    disabled={form.processing}
+                                >
+                                    {form.processing ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Save className="mr-2 h-4 w-4" />
+                                    )}
+                                    {submitMode === 'pack'
+                                        ? 'Creating Transport...'
+                                        : selectedMedIds.size > 0
+                                          ? 'Create Transport Only'
+                                          : 'Log Transport'}
+                                </Button>
+                                {selectedMedIds.size > 0 && (
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        disabled={form.processing}
+                                        onClick={() => submitTransport('pack')}
+                                    >
+                                        {form.processing &&
+                                        submitMode === 'pack' ? (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Pill className="mr-2 h-4 w-4" />
+                                        )}
+                                        Create and Pack Selected Medications
+                                    </Button>
                                 )}
-                                Create and Pack Selected Medications
-                            </Button>
-                        )}
-                        <Button type="button" variant="outline" onClick={onClose}>
-                            Cancel
-                        </Button>
-                    </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={onClose}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
                         </>
                     ) : null}
                 </form>

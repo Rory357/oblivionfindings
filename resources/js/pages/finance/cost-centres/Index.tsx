@@ -1,21 +1,14 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, router } from '@inertiajs/react';
-import { ConfirmDialog, LedgerTabsFooter, useRowContextMenu, type RowCtxItem } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    ConfirmDialog,
+    LedgerTabsFooter,
+    useRowContextMenu,
+    type RowCtxItem,
+} from '@/components/finance';
+import { PageHero, PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -25,7 +18,19 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Building2, Plus, Pencil, Trash2, Layers } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Building2, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type CostCentre = {
@@ -72,7 +77,9 @@ function CreateCostCentreDialog() {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Create Cost Centre</DialogTitle>
-                    <DialogDescription>Add a new cost centre for tracking expenses.</DialogDescription>
+                    <DialogDescription>
+                        Add a new cost centre for tracking expenses.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -81,21 +88,33 @@ function CreateCostCentreDialog() {
                             <Input
                                 id="cc-code"
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
+                                onChange={(e) =>
+                                    setData('code', e.target.value)
+                                }
                                 placeholder="e.g. CC001"
                                 maxLength={20}
                             />
-                            {errors.code && <p className="text-sm text-destructive">{errors.code}</p>}
+                            {errors.code && (
+                                <p className="text-sm text-destructive">
+                                    {errors.code}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="cc-name">Name *</Label>
                             <Input
                                 id="cc-name"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                                 placeholder="e.g. Administration"
                             />
-                            {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                            {errors.name && (
+                                <p className="text-sm text-destructive">
+                                    {errors.name}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="space-y-1.5">
@@ -106,18 +125,32 @@ function CreateCostCentreDialog() {
                             onChange={(e) => setData('type', e.target.value)}
                             placeholder="e.g. Department, Site, Programme"
                         />
-                        {errors.type && <p className="text-sm text-destructive">{errors.type}</p>}
+                        {errors.type && (
+                            <p className="text-sm text-destructive">
+                                {errors.type}
+                            </p>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         <Checkbox
                             id="cc-active"
                             checked={data.is_active}
-                            onCheckedChange={(checked) => setData('is_active', checked === true)}
+                            onCheckedChange={(checked) =>
+                                setData('is_active', checked === true)
+                            }
                         />
-                        <Label htmlFor="cc-active" className="font-normal">Active</Label>
+                        <Label htmlFor="cc-active" className="font-normal">
+                            Active
+                        </Label>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Creating...' : 'Create'}
                         </Button>
@@ -154,7 +187,9 @@ function EditCostCentreDialog({ costCentre }: { costCentre: CostCentre }) {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Edit Cost Centre</DialogTitle>
-                    <DialogDescription>Update cost centre details.</DialogDescription>
+                    <DialogDescription>
+                        Update cost centre details.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -163,19 +198,31 @@ function EditCostCentreDialog({ costCentre }: { costCentre: CostCentre }) {
                             <Input
                                 id="edit-cc-code"
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
+                                onChange={(e) =>
+                                    setData('code', e.target.value)
+                                }
                                 maxLength={20}
                             />
-                            {errors.code && <p className="text-sm text-destructive">{errors.code}</p>}
+                            {errors.code && (
+                                <p className="text-sm text-destructive">
+                                    {errors.code}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="edit-cc-name">Name *</Label>
                             <Input
                                 id="edit-cc-name"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                             />
-                            {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                            {errors.name && (
+                                <p className="text-sm text-destructive">
+                                    {errors.name}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="space-y-1.5">
@@ -190,12 +237,22 @@ function EditCostCentreDialog({ costCentre }: { costCentre: CostCentre }) {
                         <Checkbox
                             id="edit-cc-active"
                             checked={data.is_active}
-                            onCheckedChange={(checked) => setData('is_active', checked === true)}
+                            onCheckedChange={(checked) =>
+                                setData('is_active', checked === true)
+                            }
                         />
-                        <Label htmlFor="edit-cc-active" className="font-normal">Active</Label>
+                        <Label htmlFor="edit-cc-active" className="font-normal">
+                            Active
+                        </Label>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Saving...' : 'Save Changes'}
                         </Button>
@@ -229,7 +286,13 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
     // Right-click row menu — mirrors the row's existing inline action.
     const rowMenu = useRowContextMenu();
     const rowMenuItems = (cc: CostCentre): RowCtxItem[] => [
-        { kind: 'item', label: 'Delete', icon: Trash2, tone: 'critical', onSelect: () => setDeleteTarget(cc) },
+        {
+            kind: 'item',
+            label: 'Delete',
+            icon: Trash2,
+            tone: 'critical',
+            onSelect: () => setDeleteTarget(cc),
+        },
     ];
 
     return (
@@ -238,7 +301,8 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         footer={<LedgerTabsFooter active="cost-centres" />}
                         icon={Layers}
                         title="Cost Centres"
@@ -266,21 +330,37 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
                                     <TableHead>Name</TableHead>
                                     <TableHead>Type</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="text-right">
+                                        Actions
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {costCentres.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                                            No cost centres defined yet. Create your first cost centre to get started.
+                                        <TableCell
+                                            colSpan={5}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            No cost centres defined yet. Create
+                                            your first cost centre to get
+                                            started.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     costCentres.map((cc) => (
-                                        <TableRow key={cc.id} onContextMenu={rowMenu.open(rowMenuItems(cc))}>
-                                            <TableCell className="font-mono text-sm">{cc.code}</TableCell>
-                                            <TableCell className="font-medium">{cc.name}</TableCell>
+                                        <TableRow
+                                            key={cc.id}
+                                            onContextMenu={rowMenu.open(
+                                                rowMenuItems(cc),
+                                            )}
+                                        >
+                                            <TableCell className="font-mono text-sm">
+                                                {cc.code}
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {cc.name}
+                                            </TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
                                                 {cc.type || '-'}
                                             </TableCell>
@@ -289,21 +369,27 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
                                                     variant="outline"
                                                     className={
                                                         cc.is_active
-                                                            ? 'bg-status-success-bg text-status-success border-status-success/30'
-                                                            : 'bg-muted-foreground/10 text-muted-foreground border-border/30'
+                                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                                            : 'border-border/30 bg-muted-foreground/10 text-muted-foreground'
                                                     }
                                                 >
-                                                    {cc.is_active ? 'Active' : 'Inactive'}
+                                                    {cc.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <EditCostCentreDialog costCentre={cc} />
+                                                    <EditCostCentreDialog
+                                                        costCentre={cc}
+                                                    />
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         aria-label={`Delete ${cc.name}`}
-                                                        onClick={() => setDeleteTarget(cc)}
+                                                        onClick={() =>
+                                                            setDeleteTarget(cc)
+                                                        }
                                                     >
                                                         <Trash2 className="h-4 w-4 text-destructive" />
                                                     </Button>

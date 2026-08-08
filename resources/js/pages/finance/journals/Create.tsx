@@ -1,12 +1,16 @@
-import { Head, useForm } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -16,10 +20,12 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2 } from 'lucide-react';
-import { PageHero, PageLayout } from '@/components/page';
-import { formatMoney } from '@/components/finance/money';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { PageProps } from '@/types';
+import { Head, useForm } from '@inertiajs/react';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface Account {
     id: number;
@@ -76,7 +82,13 @@ const emptyLine = (): JournalLine => ({
     tax_amount: '',
 });
 
-export default function JournalsCreate({ auth, accounts, costCentres, fundingStreams, taxRates }: Props) {
+export default function JournalsCreate({
+    auth,
+    accounts,
+    costCentres,
+    fundingStreams,
+    taxRates,
+}: Props) {
     const { data, setData, post, processing, errors } = useForm<{
         journal_date: string;
         type: string;
@@ -93,13 +105,23 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
         post_immediately: false,
     });
 
-    const totalDebits = data.lines.reduce((sum, l) => sum + (parseFloat(l.debit) || 0), 0);
-    const totalCredits = data.lines.reduce((sum, l) => sum + (parseFloat(l.credit) || 0), 0);
+    const totalDebits = data.lines.reduce(
+        (sum, l) => sum + (parseFloat(l.debit) || 0),
+        0,
+    );
+    const totalCredits = data.lines.reduce(
+        (sum, l) => sum + (parseFloat(l.credit) || 0),
+        0,
+    );
     const difference = Math.round((totalDebits - totalCredits) * 100) / 100;
     const isBalanced = difference === 0 && totalDebits > 0;
     const postingError = (errors as Record<string, string | undefined>).posting;
 
-    const updateLine = (index: number, field: keyof JournalLine, value: string) => {
+    const updateLine = (
+        index: number,
+        field: keyof JournalLine,
+        value: string,
+    ) => {
         const updated = [...data.lines];
         updated[index] = { ...updated[index], [field]: value };
         setData('lines', updated);
@@ -111,7 +133,10 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
 
     const removeLine = (index: number) => {
         if (data.lines.length <= 2) return;
-        setData('lines', data.lines.filter((_, i) => i !== index));
+        setData(
+            'lines',
+            data.lines.filter((_, i) => i !== index),
+        );
     };
 
     const handleSubmit = (postImmediately: boolean) => {
@@ -135,7 +160,8 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/journals"
                         title="New Journal Entry"
@@ -144,46 +170,73 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                 }
             >
                 {postingError && (
-                    <div className="mb-4 rounded-md bg-status-critical-bg border border-status-critical/30 p-4">
-                        <p className="text-sm text-status-critical">{postingError}</p>
+                    <div className="mb-4 rounded-md border border-status-critical/30 bg-status-critical-bg p-4">
+                        <p className="text-sm text-status-critical">
+                            {postingError}
+                        </p>
                     </div>
                 )}
 
-                <form onSubmit={(e) => { e.preventDefault(); handleSubmit(false); }}>
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSubmit(false);
+                    }}
+                >
                     {/* Header Fields */}
                     <Card className="mb-6">
                         <CardHeader>
                             <CardTitle>Journal Details</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                 <div>
                                     <Label htmlFor="journal_date">Date</Label>
                                     <Input
                                         id="journal_date"
                                         type="date"
                                         value={data.journal_date}
-                                        onChange={(e) => setData('journal_date', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'journal_date',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                     {errors.journal_date && (
-                                        <p className="text-sm text-status-critical mt-1">{errors.journal_date}</p>
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {errors.journal_date}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div>
                                     <Label htmlFor="type">Type</Label>
-                                    <Select value={data.type} onValueChange={(v) => setData('type', v)}>
+                                    <Select
+                                        value={data.type}
+                                        onValueChange={(v) =>
+                                            setData('type', v)
+                                        }
+                                    >
                                         <SelectTrigger id="type">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="standard">Standard</SelectItem>
-                                            <SelectItem value="adjustment">Adjustment</SelectItem>
-                                            <SelectItem value="opening">Opening</SelectItem>
+                                            <SelectItem value="standard">
+                                                Standard
+                                            </SelectItem>
+                                            <SelectItem value="adjustment">
+                                                Adjustment
+                                            </SelectItem>
+                                            <SelectItem value="opening">
+                                                Opening
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                     {errors.type && (
-                                        <p className="text-sm text-status-critical mt-1">{errors.type}</p>
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {errors.type}
+                                        </p>
                                     )}
                                 </div>
 
@@ -192,25 +245,38 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                     <Input
                                         id="reference"
                                         value={data.reference}
-                                        onChange={(e) => setData('reference', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('reference', e.target.value)
+                                        }
                                         placeholder="Optional reference"
                                     />
                                     {errors.reference && (
-                                        <p className="text-sm text-status-critical mt-1">{errors.reference}</p>
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {errors.reference}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="sm:col-span-2 lg:col-span-1">
-                                    <Label htmlFor="description">Description</Label>
+                                    <Label htmlFor="description">
+                                        Description
+                                    </Label>
                                     <Textarea
                                         id="description"
                                         value={data.description}
-                                        onChange={(e) => setData('description', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'description',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Journal description"
                                         rows={1}
                                     />
                                     {errors.description && (
-                                        <p className="text-sm text-status-critical mt-1">{errors.description}</p>
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {errors.description}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -221,24 +287,43 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                     <Card className="mb-6">
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Line Items</CardTitle>
-                            <Button type="button" size="sm" variant="outline" onClick={addLine}>
-                                <Plus className="w-4 h-4 mr-1" />
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={addLine}
+                            >
+                                <Plus className="mr-1 h-4 w-4" />
                                 Add Line
                             </Button>
                         </CardHeader>
                         <CardContent className="p-0">
                             {errors.lines && (
-                                <p className="text-sm text-status-critical px-6 py-2">{errors.lines}</p>
+                                <p className="px-6 py-2 text-sm text-status-critical">
+                                    {errors.lines}
+                                </p>
                             )}
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="min-w-[200px]">Account</TableHead>
-                                        <TableHead className="min-w-[150px]">Description</TableHead>
-                                        <TableHead className="w-[130px]">Debit ($)</TableHead>
-                                        <TableHead className="w-[130px]">Credit ($)</TableHead>
-                                        <TableHead className="min-w-[150px]">Cost Centre</TableHead>
-                                        <TableHead className="min-w-[150px]">Funding Stream</TableHead>
+                                        <TableHead className="min-w-[200px]">
+                                            Account
+                                        </TableHead>
+                                        <TableHead className="min-w-[150px]">
+                                            Description
+                                        </TableHead>
+                                        <TableHead className="w-[130px]">
+                                            Debit ($)
+                                        </TableHead>
+                                        <TableHead className="w-[130px]">
+                                            Credit ($)
+                                        </TableHead>
+                                        <TableHead className="min-w-[150px]">
+                                            Cost Centre
+                                        </TableHead>
+                                        <TableHead className="min-w-[150px]">
+                                            Funding Stream
+                                        </TableHead>
                                         <TableHead className="w-[50px]" />
                                     </TableRow>
                                 </TableHeader>
@@ -248,29 +333,53 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                             <TableCell>
                                                 <Select
                                                     value={line.account_id}
-                                                    onValueChange={(v) => updateLine(index, 'account_id', v)}
+                                                    onValueChange={(v) =>
+                                                        updateLine(
+                                                            index,
+                                                            'account_id',
+                                                            v,
+                                                        )
+                                                    }
                                                 >
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="Select account" />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {accounts.map((acc) => (
-                                                            <SelectItem key={acc.id} value={String(acc.id)}>
-                                                                {acc.code} - {acc.name}
+                                                            <SelectItem
+                                                                key={acc.id}
+                                                                value={String(
+                                                                    acc.id,
+                                                                )}
+                                                            >
+                                                                {acc.code} -{' '}
+                                                                {acc.name}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                                {errors[`lines.${index}.account_id` as keyof typeof errors] && (
-                                                    <p className="text-xs text-status-critical mt-1">
-                                                        {errors[`lines.${index}.account_id` as keyof typeof errors]}
+                                                {errors[
+                                                    `lines.${index}.account_id` as keyof typeof errors
+                                                ] && (
+                                                    <p className="mt-1 text-xs text-status-critical">
+                                                        {
+                                                            errors[
+                                                                `lines.${index}.account_id` as keyof typeof errors
+                                                            ]
+                                                        }
                                                     </p>
                                                 )}
                                             </TableCell>
                                             <TableCell>
                                                 <Input
                                                     value={line.description}
-                                                    onChange={(e) => updateLine(index, 'description', e.target.value)}
+                                                    onChange={(e) =>
+                                                        updateLine(
+                                                            index,
+                                                            'description',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                     placeholder="Line description"
                                                 />
                                             </TableCell>
@@ -280,7 +389,13 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                                     step="0.01"
                                                     min="0"
                                                     value={line.debit}
-                                                    onChange={(e) => updateLine(index, 'debit', e.target.value)}
+                                                    onChange={(e) =>
+                                                        updateLine(
+                                                            index,
+                                                            'debit',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                     placeholder="0.00"
                                                     className="text-right font-mono"
                                                 />
@@ -291,7 +406,13 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                                     step="0.01"
                                                     min="0"
                                                     value={line.credit}
-                                                    onChange={(e) => updateLine(index, 'credit', e.target.value)}
+                                                    onChange={(e) =>
+                                                        updateLine(
+                                                            index,
+                                                            'credit',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                     placeholder="0.00"
                                                     className="text-right font-mono"
                                                 />
@@ -299,34 +420,64 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                             <TableCell>
                                                 <Select
                                                     value={line.cost_centre_id}
-                                                    onValueChange={(v) => updateLine(index, 'cost_centre_id', v)}
+                                                    onValueChange={(v) =>
+                                                        updateLine(
+                                                            index,
+                                                            'cost_centre_id',
+                                                            v,
+                                                        )
+                                                    }
                                                 >
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="None" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {costCentres.map((cc) => (
-                                                            <SelectItem key={cc.id} value={String(cc.id)}>
-                                                                {cc.code} - {cc.name}
-                                                            </SelectItem>
-                                                        ))}
+                                                        {costCentres.map(
+                                                            (cc) => (
+                                                                <SelectItem
+                                                                    key={cc.id}
+                                                                    value={String(
+                                                                        cc.id,
+                                                                    )}
+                                                                >
+                                                                    {cc.code} -{' '}
+                                                                    {cc.name}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
                                                     </SelectContent>
                                                 </Select>
                                             </TableCell>
                                             <TableCell>
                                                 <Select
-                                                    value={line.funding_stream_id}
-                                                    onValueChange={(v) => updateLine(index, 'funding_stream_id', v)}
+                                                    value={
+                                                        line.funding_stream_id
+                                                    }
+                                                    onValueChange={(v) =>
+                                                        updateLine(
+                                                            index,
+                                                            'funding_stream_id',
+                                                            v,
+                                                        )
+                                                    }
                                                 >
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="None" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {fundingStreams.map((fs) => (
-                                                            <SelectItem key={fs.id} value={String(fs.id)}>
-                                                                {fs.code} - {fs.name}
-                                                            </SelectItem>
-                                                        ))}
+                                                        {fundingStreams.map(
+                                                            (fs) => (
+                                                                <SelectItem
+                                                                    key={fs.id}
+                                                                    value={String(
+                                                                        fs.id,
+                                                                    )}
+                                                                >
+                                                                    {fs.code} -{' '}
+                                                                    {fs.name}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
                                                     </SelectContent>
                                                 </Select>
                                             </TableCell>
@@ -335,11 +486,15 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    onClick={() => removeLine(index)}
-                                                    disabled={data.lines.length <= 2}
+                                                    onClick={() =>
+                                                        removeLine(index)
+                                                    }
+                                                    disabled={
+                                                        data.lines.length <= 2
+                                                    }
                                                     className="text-muted-foreground hover:text-status-critical"
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
@@ -347,7 +502,10 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                 </TableBody>
                                 <TableFooter>
                                     <TableRow>
-                                        <TableCell colSpan={2} className="text-right font-semibold">
+                                        <TableCell
+                                            colSpan={2}
+                                            className="text-right font-semibold"
+                                        >
                                             Totals
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-semibold">
@@ -359,25 +517,37 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                         <TableCell colSpan={3} />
                                     </TableRow>
                                     <TableRow>
-                                        <TableCell colSpan={2} className="text-right font-semibold">
+                                        <TableCell
+                                            colSpan={2}
+                                            className="text-right font-semibold"
+                                        >
                                             Difference
                                         </TableCell>
                                         <TableCell
                                             colSpan={2}
                                             className={cn(
                                                 'text-right font-mono font-semibold',
-                                                difference !== 0 ? 'text-status-critical' : 'text-status-success',
+                                                difference !== 0
+                                                    ? 'text-status-critical'
+                                                    : 'text-status-success',
                                             )}
                                         >
                                             {formatMoney(Math.abs(difference))}
                                             {difference !== 0 && (
                                                 <span className="ml-2 text-xs">
-                                                    ({difference > 0 ? 'Debits exceed' : 'Credits exceed'})
+                                                    (
+                                                    {difference > 0
+                                                        ? 'Debits exceed'
+                                                        : 'Credits exceed'}
+                                                    )
                                                 </span>
                                             )}
-                                            {difference === 0 && totalDebits > 0 && (
-                                                <span className="ml-2 text-xs">Balanced</span>
-                                            )}
+                                            {difference === 0 &&
+                                                totalDebits > 0 && (
+                                                    <span className="ml-2 text-xs">
+                                                        Balanced
+                                                    </span>
+                                                )}
                                         </TableCell>
                                         <TableCell colSpan={3} />
                                     </TableRow>
@@ -387,7 +557,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                     </Card>
 
                     {/* Submit Buttons */}
-                    <div className="flex items-center gap-3 justify-end">
+                    <div className="flex items-center justify-end gap-3">
                         <Button
                             type="submit"
                             variant="outline"

@@ -3,7 +3,7 @@
  * Add-entry CTA (custom layout surfaces, not shadcn <Button> cases). Colours stay
  * token-based. */
 import { History, Plus, Search } from 'lucide-react';
-import { type MouseEvent, useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
@@ -33,10 +33,13 @@ const NONE = '__none__';
 
 const FLAG_TONE: Record<string, string> = {
     Sleepover: 'border-primary/30 bg-primary/10 text-primary',
-    'Break fail': 'border-status-warning/30 bg-status-warning-bg text-status-warning',
-    Overtime: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    'Break fail':
+        'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    Overtime:
+        'border-status-warning/30 bg-status-warning-bg text-status-warning',
     Manual: 'border-border bg-muted text-muted-foreground',
-    'On behalf': 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    'On behalf':
+        'border-status-warning/30 bg-status-warning-bg text-status-warning',
     Unlinked: 'border-border bg-muted text-muted-foreground',
     Mileage: 'border-status-info/30 bg-status-info-bg text-status-info',
     PH: 'border-status-info/30 bg-status-info-bg text-status-info',
@@ -81,7 +84,10 @@ export function EntriesPane({
     useEffect(() => setSearchValue(filters.q ?? ''), [filters.q]);
 
     const hasFilters =
-        !!filters.status || !!filters.pay_type || !!filters.site_id || !!filters.q;
+        !!filters.status ||
+        !!filters.pay_type ||
+        !!filters.site_id ||
+        !!filters.q;
 
     return (
         <div className="flex flex-col gap-3.5">
@@ -117,8 +123,8 @@ export function EntriesPane({
                     </div>
                 ) : null}
 
-                <div className="relative min-w-[180px] max-w-[300px] flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <div className="relative max-w-[300px] min-w-[180px] flex-1">
+                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                         type="text"
                         aria-label="Search staff or note"
@@ -129,15 +135,20 @@ export function EntriesPane({
                             e.key === 'Enter' &&
                             onFilter('q', searchValue.trim() || null)
                         }
-                        className="h-9 w-full rounded-[9px] border border-border bg-card pl-9 pr-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="h-9 w-full rounded-[9px] border border-border bg-card pr-3 pl-9 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     />
                 </div>
 
                 <Select
                     value={filters.status ?? NONE}
-                    onValueChange={(v) => onFilter('status', v === NONE ? null : v)}
+                    onValueChange={(v) =>
+                        onFilter('status', v === NONE ? null : v)
+                    }
                 >
-                    <SelectTrigger className="h-9 w-32 text-xs" aria-label="Status filter">
+                    <SelectTrigger
+                        className="h-9 w-32 text-xs"
+                        aria-label="Status filter"
+                    >
                         <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
@@ -151,9 +162,14 @@ export function EntriesPane({
 
                 <Select
                     value={filters.pay_type ?? NONE}
-                    onValueChange={(v) => onFilter('pay_type', v === NONE ? null : v)}
+                    onValueChange={(v) =>
+                        onFilter('pay_type', v === NONE ? null : v)
+                    }
                 >
-                    <SelectTrigger className="h-9 w-32 text-xs" aria-label="Pay type filter">
+                    <SelectTrigger
+                        className="h-9 w-32 text-xs"
+                        aria-label="Pay type filter"
+                    >
                         <SelectValue placeholder="All pay types" />
                     </SelectTrigger>
                     <SelectContent>
@@ -169,9 +185,14 @@ export function EntriesPane({
                 {sites.length > 0 ? (
                     <Select
                         value={filters.site_id ?? NONE}
-                        onValueChange={(v) => onFilter('site_id', v === NONE ? null : v)}
+                        onValueChange={(v) =>
+                            onFilter('site_id', v === NONE ? null : v)
+                        }
                     >
-                        <SelectTrigger className="h-9 w-32 text-xs" aria-label="Site filter">
+                        <SelectTrigger
+                            className="h-9 w-32 text-xs"
+                            aria-label="Site filter"
+                        >
                             <SelectValue placeholder="All sites" />
                         </SelectTrigger>
                         <SelectContent>
@@ -201,7 +222,7 @@ export function EntriesPane({
 
             {/* table */}
             <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                <div className="grid grid-cols-[1.4fr_1fr_1fr_0.9fr_1.3fr] gap-3 border-b border-border px-[18px] py-2.5 text-[10.5px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                <div className="grid grid-cols-[1.4fr_1fr_1fr_0.9fr_1.3fr] gap-3 border-b border-border px-[18px] py-2.5 text-[10.5px] font-bold tracking-[0.06em] text-muted-foreground uppercase">
                     <span>Staff</span>
                     <span>Date</span>
                     <span>Clock in / out</span>
@@ -214,7 +235,9 @@ export function EntriesPane({
                         <span className="grid h-[46px] w-[46px] place-items-center rounded-[14px] bg-muted text-muted-foreground">
                             <Search className="h-[22px] w-[22px]" />
                         </span>
-                        <div className="text-[14px] font-bold">No entries match</div>
+                        <div className="text-[14px] font-bold">
+                            No entries match
+                        </div>
                         <div className="text-[12.5px] text-muted-foreground">
                             Try clearing a filter or widening the date range.
                         </div>
@@ -249,12 +272,16 @@ export function EntriesPane({
                                             {e.user_name}
                                         </div>
                                         <div className="truncate text-[11.5px] text-muted-foreground">
-                                            {e.site_name ?? e.client_name ?? '—'}
+                                            {e.site_name ??
+                                                e.client_name ??
+                                                '—'}
                                         </div>
                                     </div>
                                 </div>
                                 <div className="text-[12.5px]">
-                                    <div className="font-semibold">{e.entry_date}</div>
+                                    <div className="font-semibold">
+                                        {e.entry_date}
+                                    </div>
                                     {flags.length > 0 ? (
                                         <div className="mt-1 flex flex-wrap gap-1">
                                             {flags.map((f) => (
@@ -273,7 +300,8 @@ export function EntriesPane({
                                     ) : null}
                                 </div>
                                 <div className="text-[12.5px] tabular-nums">
-                                    {e.clock_in_short} – {e.clock_out_short ?? '·'}
+                                    {e.clock_in_short} –{' '}
+                                    {e.clock_out_short ?? '·'}
                                     {e.break_minutes > 0 ? (
                                         <div className="text-[11px] text-muted-foreground">
                                             {e.break_minutes}m break
@@ -281,7 +309,9 @@ export function EntriesPane({
                                     ) : null}
                                 </div>
                                 <div className="text-[13px] font-bold tabular-nums">
-                                    {e.total_hours != null ? `${e.total_hours}h` : '—'}
+                                    {e.total_hours != null
+                                        ? `${e.total_hours}h`
+                                        : '—'}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-1.5">
                                     {e.pay_type !== 'standard' ? (

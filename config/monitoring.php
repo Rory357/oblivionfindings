@@ -189,7 +189,16 @@ return [
             'max_datagram_bytes' => 65_507,
         ],
     ],
-    'retention' => ['raw_days' => 14, 'hourly_days' => 180, 'daily_days' => 1825],
+    'retention' => [
+        'raw_days' => 14,
+        'hourly_days' => 180,
+        'daily_days' => 1825,
+        // Each external-store read is time-bounded. Repeated windows let a
+        // newly deployed worker catch up without claiming unexamined history.
+        'downsample_raw_window_hours' => 24,
+        'downsample_hourly_window_days' => 31,
+        'downsample_max_windows_per_series' => 32,
+    ],
     'storage' => [
         'timeseries' => [
             'driver' => 'influxdb',

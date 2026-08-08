@@ -47,7 +47,9 @@ export function ChecklistDrawer({
 }) {
     if (!open) return null;
 
-    const av = data ? avatarStyle(data.name) : { background: 'var(--muted)', color: 'var(--muted-foreground)' };
+    const av = data
+        ? avatarStyle(data.name)
+        : { background: 'var(--muted)', color: 'var(--muted-foreground)' };
 
     return (
         <div
@@ -85,21 +87,33 @@ export function ChecklistDrawer({
                     {data && (
                         <>
                             <div className="mt-3.5 flex items-center gap-3">
-                                <span className="grid h-11 w-11 flex-none place-items-center rounded-full text-[15px] font-bold" style={av}>
+                                <span
+                                    className="grid h-11 w-11 flex-none place-items-center rounded-full text-[15px] font-bold"
+                                    style={av}
+                                >
                                     {initials(data.name)}
                                 </span>
                                 <div className="min-w-0">
-                                    <div className="text-base font-bold">{data.name}</div>
+                                    <div className="text-base font-bold">
+                                        {data.name}
+                                    </div>
                                     <div className="truncate text-xs text-muted-foreground">
-                                        {[data.role, data.site].filter(Boolean).join(' · ') || '—'}
+                                        {[data.role, data.site]
+                                            .filter(Boolean)
+                                            .join(' · ') || '—'}
                                     </div>
                                 </div>
                             </div>
                             <div className="mt-3.5 flex items-center gap-2.5">
                                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                                    <div className="h-full rounded-full bg-primary" style={{ width: `${data.pct}%` }} />
+                                    <div
+                                        className="h-full rounded-full bg-primary"
+                                        style={{ width: `${data.pct}%` }}
+                                    />
                                 </div>
-                                <span className="text-xs font-bold">{data.pct}%</span>
+                                <span className="text-xs font-bold">
+                                    {data.pct}%
+                                </span>
                             </div>
                         </>
                     )}
@@ -109,17 +123,27 @@ export function ChecklistDrawer({
                     {loading || !data ? (
                         <div className="space-y-2 px-2 py-3">
                             {Array.from({ length: 6 }).map((_, i) => (
-                                <div key={i} className="h-10 animate-pulse rounded-lg bg-muted" />
+                                <div
+                                    key={i}
+                                    className="h-10 animate-pulse rounded-lg bg-muted"
+                                />
                             ))}
                         </div>
                     ) : (
                         data.tasks.map((t) => (
-                            <div key={t.id} className="flex items-center gap-3 rounded-[10px] px-2.5 py-2.5 hover:bg-muted">
+                            <div
+                                key={t.id}
+                                className="flex items-center gap-3 rounded-[10px] px-2.5 py-2.5 hover:bg-muted"
+                            >
                                 <button
                                     type="button"
                                     disabled={!canManage}
                                     onClick={() => onToggleTask(t)}
-                                    aria-label={t.is_completed ? 'Reopen task' : 'Complete task'}
+                                    aria-label={
+                                        t.is_completed
+                                            ? 'Reopen task'
+                                            : 'Complete task'
+                                    }
                                     className={`grid h-5 w-5 flex-none place-items-center rounded-md border-[1.5px] ${
                                         t.is_completed
                                             ? 'border-primary bg-primary text-primary-foreground'
@@ -128,21 +152,31 @@ export function ChecklistDrawer({
                                               : 'border-border'
                                     } ${canManage ? 'cursor-pointer' : 'cursor-default'}`}
                                 >
-                                    {t.is_completed && <Check className="h-3 w-3" strokeWidth={3} />}
+                                    {t.is_completed && (
+                                        <Check
+                                            className="h-3 w-3"
+                                            strokeWidth={3}
+                                        />
+                                    )}
                                 </button>
                                 <div className="min-w-0 flex-1">
                                     <div
                                         className={`text-[12.5px] font-medium ${
-                                            t.is_completed ? 'text-muted-foreground line-through' : ''
+                                            t.is_completed
+                                                ? 'text-muted-foreground line-through'
+                                                : ''
                                         }`}
                                     >
                                         {t.title}
                                     </div>
                                     <div className="truncate text-[10.5px] text-muted-foreground">
-                                        {t.category} · {t.assignee ?? 'Unassigned'}
+                                        {t.category} ·{' '}
+                                        {t.assignee ?? 'Unassigned'}
                                     </div>
                                 </div>
-                                {t.is_overdue && <span className="h-1.5 w-1.5 flex-none rounded-full bg-status-critical" />}
+                                {t.is_overdue && (
+                                    <span className="h-1.5 w-1.5 flex-none rounded-full bg-status-critical" />
+                                )}
                             </div>
                         ))
                     )}

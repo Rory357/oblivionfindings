@@ -1,6 +1,9 @@
 import type { TimesheetAllocationMethod } from './types';
 
-export function splitHoursEvenly(totalHours: number, rowCount: number): string[] {
+export function splitHoursEvenly(
+    totalHours: number,
+    rowCount: number,
+): string[] {
     if (rowCount <= 0) {
         return [];
     }

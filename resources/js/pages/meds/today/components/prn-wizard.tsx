@@ -5,6 +5,16 @@
  * Chrome follows the Add Client dialog contract via MedsWizardDialog. Submits
  * to the existing POST /meds/today/prn endpoint (EnhancedMarService), with the
  * same offline queue behaviour the original quick sheet had. */
+import {
+    CdBadge,
+    ClientAvatar,
+    ClientSummaryCard,
+} from '@/components/meds/board-bits';
+import {
+    MedsWizardDialog,
+    SummaryRow,
+    type MedsWizardStep,
+} from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,16 +27,6 @@ import {
     SelectInput,
     StepHead,
 } from '@/components/wizard/primitives';
-import {
-    CdBadge,
-    ClientAvatar,
-    ClientSummaryCard,
-} from '@/components/meds/board-bits';
-import {
-    MedsWizardDialog,
-    SummaryRow,
-    type MedsWizardStep,
-} from '@/components/meds/wizard-shell';
 import { submitOffline } from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
 import { router, useForm } from '@inertiajs/react';
@@ -163,12 +163,10 @@ export function PrnWizard({
             if (!form.data.dose_given.trim())
                 e.dose_given = 'Enter the dose given';
             if (med?.is_controlled && form.data.quantity_administered === '')
-                e.quantity_administered =
-                    'Record how many units were given';
+                e.quantity_administered = 'Record how many units were given';
             if (!form.data.time) e.time = 'Enter the time';
             if (med?.requires_witness && !form.data.witnessed_by)
-                e.witnessed_by =
-                    'A witness is required for this medication';
+                e.witnessed_by = 'A witness is required for this medication';
             if (
                 med?.requires_witness &&
                 form.data.witnessed_by &&
@@ -288,13 +286,21 @@ export function PrnWizard({
                 <>
                     <div>
                         {stepIndex > 0 ? (
-                            <Button type="button" variant="ghost" onClick={back}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={back}
+                            >
                                 <ChevronLeft className="h-4 w-4" /> Back
                             </Button>
                         ) : null}
                     </div>
                     <div className="flex items-center gap-2.5">
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
                             Cancel
                         </Button>
                         {isReview ? (
@@ -332,7 +338,7 @@ export function PrnWizard({
             {stepIndex === 0 ? (
                 <div
                     key="choose"
-                    className="animate-in fade-in slide-in-from-right-2 duration-300"
+                    className="animate-in duration-300 fade-in slide-in-from-right-2"
                 >
                     <StepHead
                         icon={Zap}
@@ -369,7 +375,9 @@ export function PrnWizard({
                                         <span className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                                             {m.client_name} — {m.name}{' '}
                                             {m.dose ?? ''}
-                                            {m.is_controlled ? <CdBadge /> : null}
+                                            {m.is_controlled ? (
+                                                <CdBadge />
+                                            ) : null}
                                         </span>
                                         <span className="mt-0.5 block text-xs text-muted-foreground">
                                             {[
@@ -404,9 +412,11 @@ export function PrnWizard({
                     {med?.interval_blocked ? (
                         <div className="mt-4">
                             <InfoCard icon={AlertTriangle} tone="warn">
-                                <strong>Minimum interval not yet reached.</strong>{' '}
-                                {med.name} was last given {med.last_given_label};
-                                the {med.min_hours_between} hour minimum means
+                                <strong>
+                                    Minimum interval not yet reached.
+                                </strong>{' '}
+                                {med.name} was last given {med.last_given_label}
+                                ; the {med.min_hours_between} hour minimum means
                                 the next dose is from{' '}
                                 <strong>{med.next_allowed_label}</strong>.
                                 Continue only with team-leader approval.
@@ -417,9 +427,9 @@ export function PrnWizard({
                         <div className="mt-4">
                             <InfoCard icon={AlertTriangle} tone="crit">
                                 Already given {med.given_last_24h} of{' '}
-                                {med.max_per_day} in the last 24 hours. Don&rsquo;t
-                                give another dose without checking with your
-                                supervisor first.
+                                {med.max_per_day} in the last 24 hours.
+                                Don&rsquo;t give another dose without checking
+                                with your supervisor first.
                             </InfoCard>
                         </div>
                     ) : null}
@@ -429,7 +439,7 @@ export function PrnWizard({
             {stepIndex === 1 && med ? (
                 <div
                     key="reason"
-                    className="animate-in fade-in slide-in-from-right-2 duration-300"
+                    className="animate-in duration-300 fade-in slide-in-from-right-2"
                 >
                     <StepHead
                         icon={Stethoscope}
@@ -441,7 +451,11 @@ export function PrnWizard({
                         }
                     />
                     <div className="grid gap-4">
-                        <Field label="Reason" required error={err('reasons') ?? err('reason')}>
+                        <Field
+                            label="Reason"
+                            required
+                            error={err('reasons') ?? err('reason')}
+                        >
                             <ChipMulti
                                 values={reasons}
                                 onChange={setReasons}
@@ -498,7 +512,7 @@ export function PrnWizard({
             {stepIndex === 2 && med ? (
                 <div
                     key="dose"
-                    className="animate-in fade-in slide-in-from-right-2 duration-300"
+                    className="animate-in duration-300 fade-in slide-in-from-right-2"
                 >
                     <StepHead
                         icon={Clock}
@@ -510,7 +524,11 @@ export function PrnWizard({
                             <Field
                                 label="Dose given"
                                 required
-                                hint={med.dose ? `prescribed ${med.dose}` : undefined}
+                                hint={
+                                    med.dose
+                                        ? `prescribed ${med.dose}`
+                                        : undefined
+                                }
                                 error={err('dose_given')}
                             >
                                 <Input
@@ -630,8 +648,8 @@ export function PrnWizard({
                         ) : null}
                         <InfoCard icon={Info}>
                             A follow-up reminder appears on your board until the
-                            effect of this dose is recorded — aim to check within
-                            the hour.
+                            effect of this dose is recorded — aim to check
+                            within the hour.
                         </InfoCard>
                     </div>
                 </div>
@@ -640,7 +658,7 @@ export function PrnWizard({
             {isReview && med ? (
                 <div
                     key="review"
-                    className="animate-in fade-in slide-in-from-right-2 duration-300"
+                    className="animate-in duration-300 fade-in slide-in-from-right-2"
                 >
                     <StepHead
                         icon={FileText}
@@ -657,11 +675,16 @@ export function PrnWizard({
                                 label="Medication"
                                 value={`${med.name} — ${form.data.dose_given || (med.dose ?? '')}`}
                             />
-                            <SummaryRow label="Route" value={med.route ?? '—'} />
+                            <SummaryRow
+                                label="Route"
+                                value={med.route ?? '—'}
+                            />
                             <SummaryRow
                                 label="Reason"
                                 value={reasonText || '—'}
-                                tone={severity === 'severe' ? 'crit' : undefined}
+                                tone={
+                                    severity === 'severe' ? 'crit' : undefined
+                                }
                             />
                             <SummaryRow
                                 label="Time given"
@@ -691,7 +714,8 @@ export function PrnWizard({
                         ) : null}
                         <InfoCard icon={Shield}>
                             PRN entries appear on the MAR and the PRN register,
-                            and a follow-up effect check is queued on your board.
+                            and a follow-up effect check is queued on your
+                            board.
                         </InfoCard>
                     </div>
                 </div>

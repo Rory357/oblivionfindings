@@ -402,7 +402,8 @@ export default function Schedule({
                                                                 </div>
                                                                 <div>
                                                                     <p className="text-sm font-medium">
-                                                                        Respite stay
+                                                                        Respite
+                                                                        stay
                                                                     </p>
                                                                     {stay.starts_at &&
                                                                         stay.ends_at && (

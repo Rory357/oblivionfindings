@@ -26,7 +26,14 @@ export function Donut({
     return (
         <div className="relative" style={{ width: size, height: size }}>
             <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-                <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    fill="none"
+                    stroke={track}
+                    strokeWidth={stroke}
+                />
                 <circle
                     cx={size / 2}
                     cy={size / 2}
@@ -42,12 +49,23 @@ export function Donut({
                 />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="font-bold leading-none tabular-nums" style={{ fontSize: size * 0.26 }}>
+                <div
+                    className="leading-none font-bold tabular-nums"
+                    style={{ fontSize: size * 0.26 }}
+                >
                     {value}
                     <span style={{ fontSize: size * 0.14 }}>{valueSuffix}</span>
                 </div>
-                {label ? <div className="mt-1 text-[11px] font-medium text-muted-foreground">{label}</div> : null}
-                {sub ? <div className="text-[10px] text-muted-foreground/80">{sub}</div> : null}
+                {label ? (
+                    <div className="mt-1 text-[11px] font-medium text-muted-foreground">
+                        {label}
+                    </div>
+                ) : null}
+                {sub ? (
+                    <div className="text-[10px] text-muted-foreground/80">
+                        {sub}
+                    </div>
+                ) : null}
             </div>
         </div>
     );
@@ -80,7 +98,14 @@ export function SegmentDonut({
     return (
         <div className="relative" style={{ width: size, height: size }}>
             <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-                <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--muted)" strokeWidth={stroke} />
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    fill="none"
+                    stroke="var(--muted)"
+                    strokeWidth={stroke}
+                />
                 {segments.map((seg) => {
                     const frac = seg.value / total;
                     const dash = frac * c;
@@ -106,8 +131,10 @@ export function SegmentDonut({
                 })}
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-2xl font-bold leading-none tabular-nums">{centerValue}</div>
-                <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="text-2xl leading-none font-bold tabular-nums">
+                    {centerValue}
+                </div>
+                <div className="mt-0.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                     {centerLabel}
                 </div>
             </div>
@@ -131,8 +158,12 @@ export function Sparkline({
     const id = useId();
     const max = Math.max(...series, 1);
     const step = series.length > 1 ? w / (series.length - 1) : w;
-    const pts = series.map((v, i) => [i * step, h - (v / max) * (h - 6) - 3] as const);
-    const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+    const pts = series.map(
+        (v, i) => [i * step, h - (v / max) * (h - 6) - 3] as const,
+    );
+    const line = pts
+        .map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`)
+        .join(' ');
     const area = `${line} L ${w} ${h} L 0 ${h} Z`;
     return (
         <svg
@@ -145,15 +176,31 @@ export function Sparkline({
             {fill ? (
                 <defs>
                     <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={color} stopOpacity={0.28} />
+                        <stop
+                            offset="0%"
+                            stopColor={color}
+                            stopOpacity={0.28}
+                        />
                         <stop offset="100%" stopColor={color} stopOpacity={0} />
                     </linearGradient>
                 </defs>
             ) : null}
             {fill ? <path d={area} fill={`url(#${id})`} /> : null}
-            <path d={line} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+            <path
+                d={line}
+                fill="none"
+                stroke={color}
+                strokeWidth={2.5}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+            />
             {pts.length ? (
-                <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r={3.5} fill={color} />
+                <circle
+                    cx={pts[pts.length - 1][0]}
+                    cy={pts[pts.length - 1][1]}
+                    r={3.5}
+                    fill={color}
+                />
             ) : null}
         </svg>
     );
@@ -174,11 +221,26 @@ export function MiniRing({
     const c = 2 * Math.PI * r;
     const off = c * (1 - value / 100);
     const col =
-        color || (value >= 95 ? 'var(--status-success)' : value >= 85 ? 'var(--primary)' : 'var(--status-warning)');
+        color ||
+        (value >= 95
+            ? 'var(--status-success)'
+            : value >= 85
+              ? 'var(--primary)'
+              : 'var(--status-warning)');
     return (
-        <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <div
+            className="relative shrink-0"
+            style={{ width: size, height: size }}
+        >
             <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-                <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--muted)" strokeWidth={stroke} />
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    fill="none"
+                    stroke="var(--muted)"
+                    strokeWidth={stroke}
+                />
                 <circle
                     cx={size / 2}
                     cy={size / 2}
@@ -199,14 +261,29 @@ export function MiniRing({
     );
 }
 
-export function LegendDot({ color, label, value }: { color: string; label: string; value?: ReactNode }) {
+export function LegendDot({
+    color,
+    label,
+    value,
+}: {
+    color: string;
+    label: string;
+    value?: ReactNode;
+}) {
     return (
         <div className="flex items-center justify-between gap-2 text-xs">
             <span className="flex min-w-0 items-center gap-1.5">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: color }} />
+                <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                    style={{ background: color }}
+                />
                 <span className="truncate text-muted-foreground">{label}</span>
             </span>
-            {value != null ? <span className="shrink-0 font-semibold tabular-nums">{value}</span> : null}
+            {value != null ? (
+                <span className="shrink-0 font-semibold tabular-nums">
+                    {value}
+                </span>
+            ) : null}
         </div>
     );
 }

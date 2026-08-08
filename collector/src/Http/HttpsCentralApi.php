@@ -2,6 +2,7 @@
 
 namespace Oblivion\Collector\Http;
 
+use Closure;
 use JsonException;
 use Oblivion\Collector\Contracts\CentralApi;
 use Oblivion\Collector\Exceptions\CentralApiFailure;
@@ -18,6 +19,8 @@ final readonly class HttpsCentralApi implements CentralApi
         private ?string $requestSigningSecretKey = null,
         private ?string $clientCertificateFile = null,
         private ?string $clientPrivateKeyFile = null,
+        /** @var null|Closure(string, string, string, list<string>, bool): array{transport_ok: bool, status: int, body: string} */
+        private ?Closure $testTransport = null,
     ) {
         $parts = parse_url($baseUrl);
         if (! is_array($parts)
@@ -27,6 +30,7 @@ final readonly class HttpsCentralApi implements CentralApi
             || isset($parts['pass'])
             || isset($parts['query'])
             || isset($parts['fragment'])
+            || ! in_array((string) ($parts['path'] ?? ''), ['', '/'], true)
         ) {
             throw new CentralApiFailure('Collector central URL must be a clean HTTPS origin.');
         }
@@ -108,6 +112,52 @@ final readonly class HttpsCentralApi implements CentralApi
         ]);
     }
 
+    /** @return array{state: string, expected_identity_state: string, pinned_https_contract: string, initial_response: string, replay_attempt: string, samples: int} */
+    public function verifyTransport(string $collectorId, string $expectedIdentityState, int $samples = 5): array
+    {
+        if (preg_match('/\A[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/i', $collectorId) !== 1
+            || ! in_array($expectedIdentityState, ['active', 'revoked'], true)
+            || $samples < 1
+            || $samples > 20) {
+            throw new CentralApiFailure('Collector transport evidence scope is invalid.');
+        }
+
+        $method = 'POST';
+        $path = '/api/monitoring/collectors/configuration';
+        $body = json_encode([
+            'collector_id' => $collectorId,
+            // Authentication must succeed before the controller rejects this
+            // deliberately non-integer checkpoint. No configuration is issued.
+            'after_sequence' => 'transport-evidence-only',
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        foreach (range(1, $samples) as $_sample) {
+            $headers = $this->requestHeaders($method, $path, $body);
+            $first = $this->send($method, $path, $body, $headers, true);
+            if ($expectedIdentityState === 'revoked') {
+                $this->assertEvidenceResponse($first, 401, 'Collector authentication failed.');
+
+                continue;
+            }
+
+            $this->assertEvidenceResponse($first, 422, 'Collector request is invalid.');
+            $replay = $this->send($method, $path, $body, $headers, true);
+            $this->assertEvidenceResponse($replay, 401, 'Collector authentication failed.');
+        }
+
+        return [
+            'state' => 'response_contract_matched',
+            'expected_identity_state' => $expectedIdentityState,
+            'pinned_https_contract' => 'matched',
+            'initial_response' => $expectedIdentityState === 'active'
+                ? 'validation_rejected'
+                : 'authentication_denied',
+            'replay_attempt' => $expectedIdentityState === 'active'
+                ? 'authentication_denied'
+                : 'not_exercised',
+            'samples' => $samples,
+        ];
+    }
+
     /** @param array<string, mixed> $payload @return array<string, mixed> */
     private function request(string $method, string $path, array $payload, ?string $oneTimeToken = null): array
     {
@@ -115,22 +165,65 @@ final readonly class HttpsCentralApi implements CentralApi
         if (strlen($body) > 2_097_152) {
             throw new CentralApiFailure('Collector request exceeds its size limit.');
         }
-        $timestamp = gmdate(DATE_ATOM);
+        $headers = $this->requestHeaders($method, $path, $body, $oneTimeToken);
+        $result = $this->send($method, $path, $body, $headers, $oneTimeToken === null);
+        if (! $result['transport_ok'] || $result['status'] < 200 || $result['status'] >= 300) {
+            throw new CentralApiFailure('Central HTTPS request failed with a bounded transport outcome: '.($result['status'] ?: 'unavailable').'.');
+        }
+
+        try {
+            $decoded = json_decode($result['body'], true, 32, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new CentralApiFailure('Central HTTPS response is invalid.', previous: $exception);
+        }
+        if (! is_array($decoded) || array_is_list($decoded)) {
+            throw new CentralApiFailure('Central HTTPS response is invalid.');
+        }
+
+        return $decoded;
+    }
+
+    /** @return list<string> */
+    private function requestHeaders(
+        string $method,
+        string $path,
+        string $body,
+        ?string $oneTimeToken = null,
+    ): array {
         $headers = ['Accept: application/json', 'Content-Type: application/json'];
         if ($oneTimeToken !== null) {
             $headers[] = 'Authorization: Bearer '.$oneTimeToken;
-        } else {
-            if ($this->requestSigningSecretKey === null) {
-                throw new CentralApiFailure('Collector request signing key is unavailable.');
+
+            return $headers;
+        }
+        if ($this->requestSigningSecretKey === null) {
+            throw new CentralApiFailure('Collector request signing key is unavailable.');
+        }
+        $timestamp = gmdate(DATE_ATOM);
+        $nonce = bin2hex(random_bytes(24));
+        $signature = sodium_crypto_sign_detached(
+            $method."\n".$path."\n".$timestamp."\n".$nonce."\n".hash('sha256', $body),
+            $this->requestSigningSecretKey,
+        );
+        $headers[] = 'X-Oblivion-Collector-Timestamp: '.$timestamp;
+        $headers[] = 'X-Oblivion-Collector-Nonce: '.$nonce;
+        $headers[] = 'X-Oblivion-Collector-Signature: '.base64_encode($signature);
+
+        return $headers;
+    }
+
+    /** @param list<string> $headers @return array{transport_ok: bool, status: int, body: string} */
+    private function send(string $method, string $path, string $body, array $headers, bool $useMtls): array
+    {
+        if ($this->testTransport !== null) {
+            $result = ($this->testTransport)($method, $path, $body, $headers, $useMtls);
+            if (! is_bool($result['transport_ok'] ?? null)
+                || ! is_int($result['status'] ?? null)
+                || ! is_string($result['body'] ?? null)) {
+                throw new CentralApiFailure('Collector test transport returned an invalid bounded outcome.');
             }
-            $nonce = bin2hex(random_bytes(24));
-            $signature = sodium_crypto_sign_detached(
-                $method."\n".$path."\n".$timestamp."\n".$nonce."\n".hash('sha256', $body),
-                $this->requestSigningSecretKey,
-            );
-            $headers[] = 'X-Oblivion-Collector-Timestamp: '.$timestamp;
-            $headers[] = 'X-Oblivion-Collector-Nonce: '.$nonce;
-            $headers[] = 'X-Oblivion-Collector-Signature: '.base64_encode($signature);
+
+            return $result;
         }
 
         $response = '';
@@ -161,7 +254,7 @@ final readonly class HttpsCentralApi implements CentralApi
                 return strlen($chunk);
             },
         ];
-        if ($oneTimeToken === null) {
+        if ($useMtls) {
             $options[CURLOPT_SSLCERT] = $this->clientCertificateFile;
             $options[CURLOPT_SSLKEY] = $this->clientPrivateKeyFile;
         }
@@ -169,19 +262,30 @@ final readonly class HttpsCentralApi implements CentralApi
         $success = curl_exec($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         curl_close($handle);
-        if ($success === false || $status < 200 || $status >= 300) {
-            throw new CentralApiFailure('Central HTTPS request failed with a bounded transport outcome: '.($status ?: 'unavailable').'.');
-        }
 
+        return [
+            'transport_ok' => $success !== false,
+            'status' => $status,
+            'body' => $response,
+        ];
+    }
+
+    /** @param array{transport_ok: bool, status: int, body: string} $result */
+    private function assertEvidenceResponse(array $result, int $expectedStatus, string $expectedMessage): void
+    {
+        if (! $result['transport_ok'] || $result['status'] !== $expectedStatus) {
+            throw new CentralApiFailure('Collector transport evidence response was not the expected fail-closed outcome.');
+        }
         try {
-            $decoded = json_decode($response, true, 32, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($result['body'], true, 8, JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
-            throw new CentralApiFailure('Central HTTPS response is invalid.', previous: $exception);
+            throw new CentralApiFailure('Collector transport evidence response was invalid.', previous: $exception);
         }
-        if (! is_array($decoded) || array_is_list($decoded)) {
-            throw new CentralApiFailure('Central HTTPS response is invalid.');
+        if (! is_array($decoded)
+            || array_is_list($decoded)
+            || ($decoded['message'] ?? null) !== $expectedMessage
+            || array_diff(array_keys($decoded), ['message']) !== []) {
+            throw new CentralApiFailure('Collector transport evidence response did not match the expected response contract.');
         }
-
-        return $decoded;
     }
 }

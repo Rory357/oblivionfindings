@@ -48,7 +48,13 @@ import {
  * layered above this dialog; row peeks / context menus portal above it too.
  */
 
-type FilterKey = 'all' | 'open' | 'live' | 'scheduled' | 'completed' | 'cancelled';
+type FilterKey =
+    | 'all'
+    | 'open'
+    | 'live'
+    | 'scheduled'
+    | 'completed'
+    | 'cancelled';
 
 const FILTERS: Array<{
     key: FilterKey;
@@ -219,8 +225,10 @@ function DayShiftRow({
     const ref = useRef<HTMLDivElement | null>(null);
     const m = calendarStatusMeta(s);
     const rect = () => ref.current!.getBoundingClientRect();
-    const unstaffedLabel = s.status === 'draft' ? 'Draft — no staff' : 'Unassigned';
-    const unstaffedSub = s.status === 'draft' ? 'Not yet published' : 'Needs cover';
+    const unstaffedLabel =
+        s.status === 'draft' ? 'Draft — no staff' : 'Unassigned';
+    const unstaffedSub =
+        s.status === 'draft' ? 'Not yet published' : 'Needs cover';
     const subLine = [s.siteName, s.context].filter(Boolean).join(' · ');
 
     return (
@@ -315,7 +323,8 @@ function DayShiftRow({
                             <span
                                 className={cn(
                                     'truncate text-[12.5px] font-semibold',
-                                    s.status !== 'draft' && 'text-status-critical',
+                                    s.status !== 'draft' &&
+                                        'text-status-critical',
                                 )}
                             >
                                 {unstaffedLabel}
@@ -449,11 +458,7 @@ export function DayDetailDialog({
             const el = contentRef.current;
             if (!el) return;
             const active = document.activeElement;
-            if (
-                active &&
-                active !== document.body &&
-                !el.contains(active)
-            ) {
+            if (active && active !== document.body && !el.contains(active)) {
                 return;
             }
             if (
@@ -656,8 +661,9 @@ export function DayDetailDialog({
                     <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
                         <div className="min-w-0 truncate text-[12.5px] text-muted-foreground">
                             <b className="text-foreground">{dateLabel}</b> ·{' '}
-                            {active.length} shift{active.length === 1 ? '' : 's'}{' '}
-                            · {fmtHours(hours)} planned
+                            {active.length} shift
+                            {active.length === 1 ? '' : 's'} · {fmtHours(hours)}{' '}
+                            planned
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                             <span className="hidden items-center gap-1 rounded-md border border-border px-1.5 py-1 text-[10.5px] text-muted-foreground sm:inline-flex">
@@ -692,7 +698,9 @@ export function DayDetailDialog({
                             <div className="mb-4 rounded-xl border border-status-critical/25 bg-status-critical-bg/50 p-3">
                                 <div className="flex items-center gap-2 text-[12.5px] font-bold text-status-critical">
                                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                    Site coverage {gaps.length === 1 ? 'gap' : 'gaps'} on this day
+                                    Site coverage{' '}
+                                    {gaps.length === 1 ? 'gap' : 'gaps'} on this
+                                    day
                                 </div>
                                 <div className="mt-2 flex flex-col gap-1.5">
                                     {gaps.map((g) => (

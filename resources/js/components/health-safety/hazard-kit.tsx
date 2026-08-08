@@ -8,7 +8,10 @@
  * is needed client-side for the live create-wizard preview + the clickable
  * matrix; the server stays authoritative on save (it recomputes via the
  * calculator). Keep the two in lockstep. */
-import { TONE_BG, type Tone } from '@/pages/health-safety/components/register-row-kit';
+import {
+    TONE_BG,
+    type Tone,
+} from '@/pages/health-safety/components/register-row-kit';
 import {
     AlertTriangle,
     CheckCircle2,
@@ -40,7 +43,12 @@ export const HAZARD_LABELS: Record<string, string> = {
 
 export type HazardSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type HazardRisk = 'low' | 'medium' | 'high' | 'extreme';
-export type HazardStatus = 'open' | 'in_progress' | 'mitigated' | 'closed' | 'reopened';
+export type HazardStatus =
+    | 'open'
+    | 'in_progress'
+    | 'mitigated'
+    | 'closed'
+    | 'reopened';
 
 export const SEV: Record<string, { label: string; tone: Tone }> = {
     low: { label: 'Low', tone: 'success' },
@@ -49,7 +57,12 @@ export const SEV: Record<string, { label: string; tone: Tone }> = {
     critical: { label: 'Critical', tone: 'critical' },
 };
 
-export const SEVERITY_ORDER: HazardSeverity[] = ['low', 'medium', 'high', 'critical'];
+export const SEVERITY_ORDER: HazardSeverity[] = [
+    'low',
+    'medium',
+    'high',
+    'critical',
+];
 
 export const LIKELIHOOD_LABELS: Record<string, string> = {
     rare: 'Rare',
@@ -59,7 +72,13 @@ export const LIKELIHOOD_LABELS: Record<string, string> = {
     almost_certain: 'Almost certain',
 };
 
-export const LIKELIHOOD_ORDER = ['rare', 'unlikely', 'possible', 'likely', 'almost_certain'];
+export const LIKELIHOOD_ORDER = [
+    'rare',
+    'unlikely',
+    'possible',
+    'likely',
+    'almost_certain',
+];
 
 export const RISK: Record<string, { label: string; tone: Tone }> = {
     low: { label: 'Low', tone: 'success' },
@@ -69,29 +88,100 @@ export const RISK: Record<string, { label: string; tone: Tone }> = {
 };
 
 /** Status chip styling — tones beyond the 4-value register Tone (info/live/primary). */
-export const STATUS: Record<string, { label: string; icon: LucideIcon; chip: string; dot: string; tone: 'info' | 'warning' | 'success' | 'neutral' | 'critical' }> = {
-    open: { label: 'Open', icon: AlertTriangle, chip: 'bg-status-info-bg text-status-info', dot: 'bg-status-info', tone: 'info' },
-    in_progress: { label: 'In progress', icon: Clock, chip: 'bg-live-bg text-live', dot: 'bg-live', tone: 'info' },
-    mitigated: { label: 'Mitigated', icon: ShieldCheck, chip: 'bg-primary/10 text-primary', dot: 'bg-primary', tone: 'neutral' },
-    closed: { label: 'Closed', icon: CheckCircle2, chip: 'bg-status-success-bg text-status-success', dot: 'bg-status-success', tone: 'success' },
-    reopened: { label: 'Reopened', icon: AlertTriangle, chip: 'bg-status-warning-bg text-status-warning', dot: 'bg-status-warning', tone: 'warning' },
+export const STATUS: Record<
+    string,
+    {
+        label: string;
+        icon: LucideIcon;
+        chip: string;
+        dot: string;
+        tone: 'info' | 'warning' | 'success' | 'neutral' | 'critical';
+    }
+> = {
+    open: {
+        label: 'Open',
+        icon: AlertTriangle,
+        chip: 'bg-status-info-bg text-status-info',
+        dot: 'bg-status-info',
+        tone: 'info',
+    },
+    in_progress: {
+        label: 'In progress',
+        icon: Clock,
+        chip: 'bg-live-bg text-live',
+        dot: 'bg-live',
+        tone: 'info',
+    },
+    mitigated: {
+        label: 'Mitigated',
+        icon: ShieldCheck,
+        chip: 'bg-primary/10 text-primary',
+        dot: 'bg-primary',
+        tone: 'neutral',
+    },
+    closed: {
+        label: 'Closed',
+        icon: CheckCircle2,
+        chip: 'bg-status-success-bg text-status-success',
+        dot: 'bg-status-success',
+        tone: 'success',
+    },
+    reopened: {
+        label: 'Reopened',
+        icon: AlertTriangle,
+        chip: 'bg-status-warning-bg text-status-warning',
+        dot: 'bg-status-warning',
+        tone: 'warning',
+    },
 };
 
 /** Mirror of SiteHazardRiskCalculator::MATRIX (severity rows × likelihood cols). */
 export const RISK_MATRIX: Record<HazardSeverity, Record<string, HazardRisk>> = {
-    low: { rare: 'low', unlikely: 'low', possible: 'medium', likely: 'medium', almost_certain: 'high' },
-    medium: { rare: 'low', unlikely: 'medium', possible: 'medium', likely: 'high', almost_certain: 'high' },
-    high: { rare: 'medium', unlikely: 'medium', possible: 'high', likely: 'high', almost_certain: 'extreme' },
-    critical: { rare: 'high', unlikely: 'high', possible: 'extreme', likely: 'extreme', almost_certain: 'extreme' },
+    low: {
+        rare: 'low',
+        unlikely: 'low',
+        possible: 'medium',
+        likely: 'medium',
+        almost_certain: 'high',
+    },
+    medium: {
+        rare: 'low',
+        unlikely: 'medium',
+        possible: 'medium',
+        likely: 'high',
+        almost_certain: 'high',
+    },
+    high: {
+        rare: 'medium',
+        unlikely: 'medium',
+        possible: 'high',
+        likely: 'high',
+        almost_certain: 'extreme',
+    },
+    critical: {
+        rare: 'high',
+        unlikely: 'high',
+        possible: 'extreme',
+        likely: 'extreme',
+        almost_certain: 'extreme',
+    },
 };
 
-export function riskOf(severity?: string | null, likelihood?: string | null): HazardRisk | null {
+export function riskOf(
+    severity?: string | null,
+    likelihood?: string | null,
+): HazardRisk | null {
     if (!severity || !likelihood) return null;
     return RISK_MATRIX[severity as HazardSeverity]?.[likelihood] ?? null;
 }
 
 /** Mirror of SiteHazardRiskCalculator::suggestedDueDays(). */
-export const SUGGESTED_DUE_DAYS: Record<HazardRisk, number> = { extreme: 1, high: 7, medium: 30, low: 90 };
+export const SUGGESTED_DUE_DAYS: Record<HazardRisk, number> = {
+    extreme: 1,
+    high: 7,
+    medium: 30,
+    low: 90,
+};
 
 export function requiresOfficer(rating?: string | null): boolean {
     return rating === 'high' || rating === 'extreme';
@@ -99,11 +189,31 @@ export function requiresOfficer(rating?: string | null): boolean {
 
 /** NZ HSWA 2015 hierarchy of controls (1–6). */
 export const CONTROL_LEVELS: { key: string; label: string; desc: string }[] = [
-    { key: 'elimination', label: 'Elimination', desc: 'Remove the hazard completely' },
-    { key: 'substitution', label: 'Substitution', desc: 'Replace with something safer' },
-    { key: 'isolation', label: 'Isolation', desc: 'Separate people from the hazard' },
-    { key: 'engineering', label: 'Engineering', desc: 'Guards, barriers, physical controls' },
-    { key: 'administrative', label: 'Administrative', desc: 'Procedures, training, signage' },
+    {
+        key: 'elimination',
+        label: 'Elimination',
+        desc: 'Remove the hazard completely',
+    },
+    {
+        key: 'substitution',
+        label: 'Substitution',
+        desc: 'Replace with something safer',
+    },
+    {
+        key: 'isolation',
+        label: 'Isolation',
+        desc: 'Separate people from the hazard',
+    },
+    {
+        key: 'engineering',
+        label: 'Engineering',
+        desc: 'Guards, barriers, physical controls',
+    },
+    {
+        key: 'administrative',
+        label: 'Administrative',
+        desc: 'Procedures, training, signage',
+    },
     { key: 'ppe', label: 'PPE', desc: 'Personal protective equipment' },
 ];
 
@@ -123,9 +233,14 @@ export function controlLabel(key: string): string {
     return CONTROL_LEVELS.find((c) => c.key === key)?.label ?? key;
 }
 
-export function hazardLabelOf(h: { hazard_type?: string | null; hazard_label?: string | null; custom_hazard_type?: string | null }): string {
+export function hazardLabelOf(h: {
+    hazard_type?: string | null;
+    hazard_label?: string | null;
+    custom_hazard_type?: string | null;
+}): string {
     if (h.custom_hazard_type) return h.custom_hazard_type;
-    if (h.hazard_type && HAZARD_LABELS[h.hazard_type]) return HAZARD_LABELS[h.hazard_type];
+    if (h.hazard_type && HAZARD_LABELS[h.hazard_type])
+        return HAZARD_LABELS[h.hazard_type];
     return h.hazard_label ?? h.hazard_type ?? 'Hazard';
 }
 
@@ -195,7 +310,12 @@ export type HazardDetail = {
     can: HazardCan;
 };
 
-export type HazardCan = { manage: boolean; assign: boolean; close: boolean; create?: boolean };
+export type HazardCan = {
+    manage: boolean;
+    assign: boolean;
+    close: boolean;
+    create?: boolean;
+};
 
 export type HazardRow = {
     id: number;
@@ -217,16 +337,34 @@ export type HazardRow = {
     created_at: string | null;
     worksafe: boolean;
     open_action_count: number;
-    flags: { overdue: boolean; due_soon: boolean; unassigned: boolean; awaiting_closure: boolean };
+    flags: {
+        overdue: boolean;
+        due_soon: boolean;
+        unassigned: boolean;
+        awaiting_closure: boolean;
+    };
 };
 
-export type HazardSectionKey = 'overview' | 'risk' | 'actions' | 'evidence' | 'history';
-export type HazardActionKey = 'assign' | 'start' | 'mitigate' | 'add_action' | 'review' | 'close';
+export type HazardSectionKey =
+    | 'overview'
+    | 'risk'
+    | 'actions'
+    | 'evidence'
+    | 'history';
+export type HazardActionKey =
+    | 'assign'
+    | 'start'
+    | 'mitigate'
+    | 'add_action'
+    | 'review'
+    | 'close';
 
 /* ---------------------------------------------------------------- helpers */
 
 export function storageUrl(path: string): string {
-    return path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}`;
+    return path.startsWith('http') || path.startsWith('/')
+        ? path
+        : `/storage/${path}`;
 }
 
 export function siteTypeLabel(type?: string | null): string {
@@ -242,14 +380,21 @@ export function fmtWhen(iso?: string | null): { main: string; title: string } {
     const d = new Date(iso.replace(' ', 'T'));
     if (Number.isNaN(d.getTime())) return { main: '—', title: '' };
     const now = new Date();
-    const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
-    const days = Math.round((startOf(now).getTime() - startOf(d).getTime()) / 86400000);
-    const time = d.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+    const startOf = (x: Date) =>
+        new Date(x.getFullYear(), x.getMonth(), x.getDate());
+    const days = Math.round(
+        (startOf(now).getTime() - startOf(d).getTime()) / 86400000,
+    );
+    const time = d.toLocaleTimeString('en-NZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
     let label: string;
     if (days <= 0) label = `Today ${time}`;
     else if (days === 1) label = `Yesterday ${time}`;
     else if (days < 7) label = `${days}d ago ${time}`;
-    else label = `${d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })} ${time}`;
+    else
+        label = `${d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })} ${time}`;
     return { main: label, title: d.toLocaleString('en-NZ') };
 }
 
@@ -257,7 +402,11 @@ export function fmtDay(iso?: string | null): string {
     if (!iso) return '—';
     const d = new Date(iso.replace(' ', 'T'));
     if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    return d.toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
 export function fmtDueShort(iso?: string | null): string {
@@ -271,13 +420,27 @@ export function fmtDueShort(iso?: string | null): string {
 
 export function SeverityChip({ severity }: { severity: string }) {
     const s = SEV[severity] ?? SEV.low;
-    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[s.tone]}`}>{s.label}</span>;
+    return (
+        <span
+            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[s.tone]}`}
+        >
+            {s.label}
+        </span>
+    );
 }
 
-export function RiskChip({ rating, suffix = false }: { rating: string; suffix?: boolean }) {
+export function RiskChip({
+    rating,
+    suffix = false,
+}: {
+    rating: string;
+    suffix?: boolean;
+}) {
     const r = RISK[rating] ?? RISK.low;
     return (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[r.tone]}`}>
+        <span
+            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[r.tone]}`}
+        >
             {r.label}
             {suffix ? ' risk' : ''}
         </span>
@@ -288,7 +451,9 @@ export function StatusChip({ status }: { status: string }) {
     const s = STATUS[status] ?? STATUS.open;
     const Icon = s.icon;
     return (
-        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${s.chip}`}>
+        <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${s.chip}`}
+        >
             <Icon className="h-3 w-3" /> {s.label}
         </span>
     );
@@ -316,31 +481,49 @@ export function HazardRiskMatrix({
     onPick?: (severity: HazardSeverity, likelihood: string) => void;
 }) {
     const rows: HazardSeverity[] = ['critical', 'high', 'medium', 'low'];
-    const cellBase = 'flex h-8 items-center justify-center rounded-md text-[10px] font-semibold transition-colors';
+    const cellBase =
+        'flex h-8 items-center justify-center rounded-md text-[10px] font-semibold transition-colors';
 
     return (
         <div className="overflow-x-auto">
-            <div className="inline-grid min-w-[420px] gap-1" style={{ gridTemplateColumns: 'auto repeat(5, minmax(0, 1fr))' }}>
+            <div
+                className="inline-grid min-w-[420px] gap-1"
+                style={{
+                    gridTemplateColumns: 'auto repeat(5, minmax(0, 1fr))',
+                }}
+            >
                 <div />
                 {LIKELIHOOD_ORDER.map((lik) => (
-                    <div key={lik} className="px-1 text-center text-[10px] font-medium text-muted-foreground">
+                    <div
+                        key={lik}
+                        className="px-1 text-center text-[10px] font-medium text-muted-foreground"
+                    >
                         {LIKELIHOOD_LABELS[lik]}
                     </div>
                 ))}
 
                 {rows.map((sev) => (
                     <div key={sev} className="contents">
-                        <div className="flex items-center pr-2 text-right text-[10px] font-medium text-muted-foreground">{SEV[sev].label}</div>
+                        <div className="flex items-center pr-2 text-right text-[10px] font-medium text-muted-foreground">
+                            {SEV[sev].label}
+                        </div>
                         {LIKELIHOOD_ORDER.map((lik) => {
                             const rating = RISK_MATRIX[sev][lik];
-                            const isCurrent = severity === sev && likelihood === lik;
-                            const isResidual = residualSeverity === sev && residualLikelihood === lik;
+                            const isCurrent =
+                                severity === sev && likelihood === lik;
+                            const isResidual =
+                                residualSeverity === sev &&
+                                residualLikelihood === lik;
                             const cls = [
                                 cellBase,
                                 TONE_BG[RISK[rating].tone],
                                 isCurrent ? 'ring-2 ring-foreground' : '',
-                                isResidual && !isCurrent ? 'ring-2 ring-dashed ring-status-info' : '',
-                                onPick ? 'cursor-pointer hover:ring-2 hover:ring-ring' : '',
+                                isResidual && !isCurrent
+                                    ? 'ring-2 ring-dashed ring-status-info'
+                                    : '',
+                                onPick
+                                    ? 'cursor-pointer hover:ring-2 hover:ring-ring'
+                                    : '',
                             ].join(' ');
 
                             if (onPick) {
@@ -360,7 +543,11 @@ export function HazardRiskMatrix({
                             }
 
                             return (
-                                <div key={lik} className={cls} title={`${SEV[sev].label} × ${LIKELIHOOD_LABELS[lik]} — ${RISK[rating].label} risk`}>
+                                <div
+                                    key={lik}
+                                    className={cls}
+                                    title={`${SEV[sev].label} × ${LIKELIHOOD_LABELS[lik]} — ${RISK[rating].label} risk`}
+                                >
                                     {RISK[rating].label}
                                 </div>
                             );

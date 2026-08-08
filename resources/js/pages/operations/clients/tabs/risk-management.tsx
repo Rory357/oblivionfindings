@@ -1,4 +1,17 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+    ApplicableProceduresPanel,
+    type ApplicableProcedure,
+} from '@/components/health-safety/applicable-procedures-panel';
+import { HazardDetailDialog } from '@/components/health-safety/hazard-detail-dialog';
+import {
+    RISK,
+    RiskChip,
+    StatusChip,
+    fmtDueShort,
+    type HazardDetail,
+} from '@/components/health-safety/hazard-kit';
+import { ShiftContextMenu, type ShiftCtxState } from '@/components/rostering';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,10 +24,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { ApplicableProceduresPanel, type ApplicableProcedure } from '@/components/health-safety/applicable-procedures-panel';
-import { HazardDetailDialog } from '@/components/health-safety/hazard-detail-dialog';
-import { RISK, RiskChip, StatusChip, fmtDueShort, type HazardDetail } from '@/components/health-safety/hazard-kit';
-import { ShiftContextMenu, type ShiftCtxState } from '@/components/rostering';
 import { router } from '@inertiajs/react';
 import {
     AlertOctagon,
@@ -144,9 +153,22 @@ export function RiskManagementTab({
 
     const registerSiteId = homeSiteId ?? homeHazards[0]?.site_id ?? null;
     const [hazardCtx, setHazardCtx] = useState<ShiftCtxState | null>(null);
-    const openHazard = (id: number) => router.reload({ only: ['homeHazardDetail'], data: { hazard: id }, preserveScroll: true, preserveState: true });
-    const closeHazard = () => router.reload({ only: ['homeHazardDetail'], data: { hazard: '' }, preserveScroll: true, preserveState: true });
-    const openHazardInRegister = (h: HomeHazardRow) => router.visit(`/compliance/hazards?site_id=${h.site_id}&hazard=${h.id}`);
+    const openHazard = (id: number) =>
+        router.reload({
+            only: ['homeHazardDetail'],
+            data: { hazard: id },
+            preserveScroll: true,
+            preserveState: true,
+        });
+    const closeHazard = () =>
+        router.reload({
+            only: ['homeHazardDetail'],
+            data: { hazard: '' },
+            preserveScroll: true,
+            preserveState: true,
+        });
+    const openHazardInRegister = (h: HomeHazardRow) =>
+        router.visit(`/compliance/hazards?site_id=${h.site_id}&hazard=${h.id}`);
     const openHazardCtx = (e: ReactMouseEvent, h: HomeHazardRow) => {
         e.preventDefault();
         setHazardCtx({
@@ -155,10 +177,28 @@ export function RiskManagementTab({
             tag: (h.risk_rating ?? 'low').toUpperCase(),
             meta: `${h.reference_number} · read-only`,
             items: [
-                { icon: <Eye className="h-3.5 w-3.5" />, label: 'View hazard', sub: 'read-only', tone: 'primary', onClick: () => openHazard(h.id) },
+                {
+                    icon: <Eye className="h-3.5 w-3.5" />,
+                    label: 'View hazard',
+                    sub: 'read-only',
+                    tone: 'primary',
+                    onClick: () => openHazard(h.id),
+                },
                 { sep: true },
-                { icon: <ExternalLink className="h-3.5 w-3.5" />, label: 'Open in register', sub: '/compliance/hazards', onClick: () => openHazardInRegister(h) },
-                { icon: <Copy className="h-3.5 w-3.5" />, label: 'Copy link', onClick: () => navigator.clipboard?.writeText(`${window.location.origin}/compliance/hazards?site_id=${h.site_id}&hazard=${h.id}`) },
+                {
+                    icon: <ExternalLink className="h-3.5 w-3.5" />,
+                    label: 'Open in register',
+                    sub: '/compliance/hazards',
+                    onClick: () => openHazardInRegister(h),
+                },
+                {
+                    icon: <Copy className="h-3.5 w-3.5" />,
+                    label: 'Copy link',
+                    onClick: () =>
+                        navigator.clipboard?.writeText(
+                            `${window.location.origin}/compliance/hazards?site_id=${h.site_id}&hazard=${h.id}`,
+                        ),
+                },
             ],
         });
     };
@@ -168,7 +208,9 @@ export function RiskManagementTab({
     >('active');
     const [severityFilter, setSeverityFilter] = useState<string>('all');
     const [deletingId, setDeletingId] = useState<number | null>(null);
-    const [riskToDelete, setRiskToDelete] = useState<ClientRiskItem | null>(null);
+    const [riskToDelete, setRiskToDelete] = useState<ClientRiskItem | null>(
+        null,
+    );
 
     const filtered = useMemo(() => {
         return list
@@ -264,7 +306,11 @@ export function RiskManagementTab({
             {homeProcedures.length > 0 ? (
                 <ApplicableProceduresPanel
                     procedures={homeProcedures}
-                    subtitle={homeName ? `Procedures governing care at ${homeName} (and organisation-wide)` : 'Procedures governing care at this home'}
+                    subtitle={
+                        homeName
+                            ? `Procedures governing care at ${homeName} (and organisation-wide)`
+                            : 'Procedures governing care at this home'
+                    }
                 />
             ) : null}
 
@@ -274,49 +320,92 @@ export function RiskManagementTab({
                     <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
                         <div>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <ShieldAlert className="h-4 w-4 text-primary" /> Site / environmental hazards
-                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Read-only</span>
+                                <ShieldAlert className="h-4 w-4 text-primary" />{' '}
+                                Site / environmental hazards
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                    Read-only
+                                </span>
                             </CardTitle>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                Hazards logged at {homeName} — managed by the H&amp;S team, shown here for context. Actions deep-link to the register.
+                                Hazards logged at {homeName} — managed by the
+                                H&amp;S team, shown here for context. Actions
+                                deep-link to the register.
                             </p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => router.visit(`/compliance/hazards${registerSiteId ? `?site_id=${registerSiteId}` : ''}`)}>
-                            <ExternalLink className="mr-1.5 h-4 w-4" /> Open register
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                                router.visit(
+                                    `/compliance/hazards${registerSiteId ? `?site_id=${registerSiteId}` : ''}`,
+                                )
+                            }
+                        >
+                            <ExternalLink className="mr-1.5 h-4 w-4" /> Open
+                            register
                         </Button>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-2">
                         {homeHazards.length === 0 ? (
-                            <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">No open hazards at this home.</div>
+                            <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+                                No open hazards at this home.
+                            </div>
                         ) : (
                             homeHazards.map((h) => {
-                                const tone = RISK[h.risk_rating]?.tone ?? 'neutral';
-                                const dot = tone === 'critical' ? 'bg-status-critical' : tone === 'warning' ? 'bg-status-warning' : tone === 'success' ? 'bg-status-success' : 'bg-muted-foreground';
+                                const tone =
+                                    RISK[h.risk_rating]?.tone ?? 'neutral';
+                                const dot =
+                                    tone === 'critical'
+                                        ? 'bg-status-critical'
+                                        : tone === 'warning'
+                                          ? 'bg-status-warning'
+                                          : tone === 'success'
+                                            ? 'bg-status-success'
+                                            : 'bg-muted-foreground';
                                 return (
                                     <div
                                         key={h.id}
                                         onClick={() => openHazard(h.id)}
-                                        onContextMenu={(e) => openHazardCtx(e, h)}
+                                        onContextMenu={(e) =>
+                                            openHazardCtx(e, h)
+                                        }
                                         tabIndex={0}
                                         aria-label={`View hazard ${h.reference_number}`}
                                         onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
+                                            if (
+                                                e.key === 'Enter' ||
+                                                e.key === ' '
+                                            ) {
                                                 e.preventDefault();
                                                 openHazard(h.id);
                                             }
                                         }}
                                         className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/45 focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                                     >
-                                        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
+                                        <span
+                                            className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`}
+                                        />
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-semibold text-foreground">{h.hazard_label}</p>
+                                            <p className="truncate text-sm font-semibold text-foreground">
+                                                {h.hazard_label}
+                                            </p>
                                             <p className="truncate text-xs text-muted-foreground">
-                                                {h.reference_number} · {h.description}
+                                                {h.reference_number} ·{' '}
+                                                {h.description}
                                             </p>
                                         </div>
                                         <RiskChip rating={h.risk_rating} />
                                         <StatusChip status={h.status} />
-                                        <span className={cn('hidden text-xs whitespace-nowrap sm:inline', h.overdue ? 'font-bold text-status-critical' : 'text-muted-foreground')}>Due {fmtDueShort(h.due_date)}</span>
+                                        <span
+                                            className={cn(
+                                                'hidden text-xs whitespace-nowrap sm:inline',
+                                                h.overdue
+                                                    ? 'font-bold text-status-critical'
+                                                    : 'text-muted-foreground',
+                                            )}
+                                        >
+                                            Due {fmtDueShort(h.due_date)}
+                                        </span>
                                         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
                                     </div>
                                 );
@@ -478,7 +567,11 @@ export function RiskManagementTab({
                                                             deletingId ===
                                                             risk.id
                                                         }
-                                                        onClick={() => setRiskToDelete(risk)}
+                                                        onClick={() =>
+                                                            setRiskToDelete(
+                                                                risk,
+                                                            )
+                                                        }
                                                         aria-label={`Remove ${risk.label ?? 'unlabelled risk'}`}
                                                     >
                                                         <Trash2 className="h-3 w-3" />
@@ -504,10 +597,22 @@ export function RiskManagementTab({
                 </div>
             )}
 
-            {hazardCtx ? <ShiftContextMenu ctx={hazardCtx} onClose={() => setHazardCtx(null)} /> : null}
+            {hazardCtx ? (
+                <ShiftContextMenu
+                    ctx={hazardCtx}
+                    onClose={() => setHazardCtx(null)}
+                />
+            ) : null}
 
             {homeHazardDetail ? (
-                <HazardDetailDialog key={homeHazardDetail.id} detail={homeHazardDetail} open onClose={closeHazard} readOnly registerHref="/compliance/hazards" />
+                <HazardDetailDialog
+                    key={homeHazardDetail.id}
+                    detail={homeHazardDetail}
+                    open
+                    onClose={closeHazard}
+                    readOnly
+                    registerHref="/compliance/hazards"
+                />
             ) : null}
             <ConfirmDialog
                 open={riskToDelete !== null}

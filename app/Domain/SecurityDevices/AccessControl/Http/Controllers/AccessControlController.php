@@ -41,13 +41,16 @@ class AccessControlController extends Controller
     ): RedirectResponse {
         try {
             $service->issueCredential($request->user(), $request->validated());
-        } catch (QueryException) {
+        } catch (QueryException $exception) {
+            if (! $this->isDuplicateCredentialReference($exception)) {
+                throw $exception;
+            }
             throw ValidationException::withMessages([
                 'reference_key' => 'That provider reference is already registered at this Site.',
             ]);
         }
 
-        return back()->with('success', 'Physical access credential issued.');
+        return back()->with('success', 'Credential issue requested. Access remains unconfirmed until provider reconciliation succeeds.');
     }
 
     public function updateSchedule(
@@ -90,7 +93,7 @@ class AccessControlController extends Controller
         ]);
         $service->revokeCredential($request->user(), $accessCredential, $data['reason']);
 
-        return back()->with('success', 'Physical access credential revoked.');
+        return back()->with('success', 'Credential revocation requested. Revocation remains unconfirmed until provider reconciliation succeeds.');
     }
 
     private function isDuplicateScheduleName(QueryException $exception): bool
@@ -100,5 +103,14 @@ class AccessControlController extends Controller
         return str_contains($message, 'access_schedules_site_name_unique')
             || (str_contains($message, 'access_control_schedules.site_id')
                 && str_contains($message, 'access_control_schedules.name'));
+    }
+
+    private function isDuplicateCredentialReference(QueryException $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'access_credentials_site_reference_unique')
+            || (str_contains($message, 'access_control_credentials.site_id')
+                && str_contains($message, 'access_control_credentials.reference_key'));
     }
 }

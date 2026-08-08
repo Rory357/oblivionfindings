@@ -1,9 +1,29 @@
 import type { LucideIcon } from 'lucide-react';
-import { Cookie, CupSoda, EggFried, Moon, Soup, UtensilsCrossed } from 'lucide-react';
+import {
+    Cookie,
+    CupSoda,
+    EggFried,
+    Moon,
+    Soup,
+    UtensilsCrossed,
+} from 'lucide-react';
 
-export type MealSlot = 'breakfast' | 'morning_tea' | 'lunch' | 'afternoon_tea' | 'dinner' | 'supper';
+export type MealSlot =
+    | 'breakfast'
+    | 'morning_tea'
+    | 'lunch'
+    | 'afternoon_tea'
+    | 'dinner'
+    | 'supper';
 
-export const MEAL_SLOTS: MealSlot[] = ['breakfast', 'morning_tea', 'lunch', 'afternoon_tea', 'dinner', 'supper'];
+export const MEAL_SLOTS: MealSlot[] = [
+    'breakfast',
+    'morning_tea',
+    'lunch',
+    'afternoon_tea',
+    'dinner',
+    'supper',
+];
 
 export const SLOT_LABEL: Record<MealSlot, string> = {
     breakfast: 'Breakfast',
@@ -35,7 +55,12 @@ export const SLOT_ICON: Record<MealSlot, LucideIcon> = {
 /** The three "core" meals counted for plan-completeness. */
 export const CORE_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 
-export type RecipeTag = { id: number; label: string; kind: 'allergen' | 'dietary'; severity?: string };
+export type RecipeTag = {
+    id: number;
+    label: string;
+    kind: 'allergen' | 'dietary';
+    severity?: string;
+};
 
 export type RecipeIngredient = {
     product_id: number | null;
@@ -86,7 +111,12 @@ export type Resident = {
     fluids: string | null;
 };
 
-export type WeekTemplateMeal = { day: number; slot: MealSlot; recipe_id: number; servings: number };
+export type WeekTemplateMeal = {
+    day: number;
+    slot: MealSlot;
+    recipe_id: number;
+    servings: number;
+};
 
 export type WeekTemplate = {
     id: number;
@@ -136,7 +166,12 @@ export type PlanEntry = {
     allergen_override_reason: string | null;
     allergen_override_at: string | null;
     allergen_override_by?: { id: number; name: string } | null;
-    recipe?: { id: number; name: string; slug: string; serves_default: number } | null;
+    recipe?: {
+        id: number;
+        name: string;
+        slug: string;
+        serves_default: number;
+    } | null;
 };
 
 export type InventoryItem = {
@@ -175,7 +210,13 @@ export type ShoppingListItem = {
     estimated_cost_cents: number | null;
     is_checked: boolean;
     notes: string | null;
-    product?: { id: number; name: string; default_unit: string; category?: string | null; currency?: string | null } | null;
+    product?: {
+        id: number;
+        name: string;
+        default_unit: string;
+        category?: string | null;
+        currency?: string | null;
+    } | null;
 };
 
 export type ShoppingList = {
@@ -236,25 +277,37 @@ export function isoWeekNo(d: Date): number {
     const dayNum = date.getUTCDay() || 7;
     date.setUTCDate(date.getUTCDate() + 4 - dayNum);
     const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-    return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+    return Math.ceil(
+        ((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+    );
 }
 
 /* ── formatters ───────────────────────────────────────────────────────── */
 
-export function formatMoneyFromCents(cents: number | null | undefined, currency = 'NZD'): string {
+export function formatMoneyFromCents(
+    cents: number | null | undefined,
+    currency = 'NZD',
+): string {
     if (cents === null || cents === undefined) return '—';
     try {
-        return new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(cents / 100);
+        return new Intl.NumberFormat('en-NZ', {
+            style: 'currency',
+            currency,
+        }).format(cents / 100);
     } catch {
         return `${currency} ${(cents / 100).toFixed(2)}`;
     }
 }
 
-export function formatQty(qty: number | string | null | undefined, unit: string | null): string {
+export function formatQty(
+    qty: number | string | null | undefined,
+    unit: string | null,
+): string {
     if (qty === null || qty === undefined) return '—';
     const n = typeof qty === 'string' ? parseFloat(qty) : qty;
     if (Number.isNaN(n)) return '—';
-    const stripped = n % 1 === 0 ? n.toFixed(0) : n.toFixed(2).replace(/\.?0+$/, '');
+    const stripped =
+        n % 1 === 0 ? n.toFixed(0) : n.toFixed(2).replace(/\.?0+$/, '');
     return unit ? `${stripped} ${unit}` : stripped;
 }
 
@@ -284,8 +337,10 @@ export function mealCostCents(entry: PlanEntry, recipes: RecipeMap): number {
 }
 
 export function entryDisplayName(entry: PlanEntry, recipes: RecipeMap): string {
-    if (entry.source_type === 'takeaway') return entry.takeaway_vendor || 'Takeaway';
-    if (entry.source_type === 'ad_hoc') return entry.ad_hoc_name || 'Ad-hoc meal';
+    if (entry.source_type === 'takeaway')
+        return entry.takeaway_vendor || 'Takeaway';
+    if (entry.source_type === 'ad_hoc')
+        return entry.ad_hoc_name || 'Ad-hoc meal';
     const r = entry.recipe_id != null ? recipes.get(entry.recipe_id) : null;
     return r?.name ?? entry.recipe?.name ?? 'Meal';
 }
@@ -295,26 +350,43 @@ export type ConflictResult = {
     soft: { resident: Resident; matches: string[] }[];
 };
 
-export function conflictsFor(entry: PlanEntry, residents: Resident[], recipes: RecipeMap): ConflictResult {
+export function conflictsFor(
+    entry: PlanEntry,
+    residents: Resident[],
+    recipes: RecipeMap,
+): ConflictResult {
     const empty: ConflictResult = { hard: [], soft: [] };
     if (entry.source_type !== 'recipe' || entry.recipe_id == null) return empty;
     const recipe = recipes.get(entry.recipe_id);
     if (!recipe) return empty;
     const ids = entry.client_ids ?? [];
     const allergenIds = new Set(recipe.allergen_tag_ids ?? []);
-    const productIds = new Set(recipe.ingredients.map((i) => i.product_id).filter((x): x is number => x != null));
+    const productIds = new Set(
+        recipe.ingredients
+            .map((i) => i.product_id)
+            .filter((x): x is number => x != null),
+    );
     const hard: ConflictResult['hard'] = [];
     const soft: ConflictResult['soft'] = [];
     for (const cid of ids) {
         const r = residents.find((x) => x.id === cid);
         if (!r) continue;
-        const allergenHits = r.allergen_tag_ids.filter((t) => allergenIds.has(t));
+        const allergenHits = r.allergen_tag_ids.filter((t) =>
+            allergenIds.has(t),
+        );
         if (allergenHits.length) {
-            const labels = r.allergens.filter((_, idx) => allergenIds.has(r.allergen_tag_ids[idx]));
-            hard.push({ resident: r, matches: labels.length ? labels : r.allergens });
+            const labels = r.allergens.filter((_, idx) =>
+                allergenIds.has(r.allergen_tag_ids[idx]),
+            );
+            hard.push({
+                resident: r,
+                matches: labels.length ? labels : r.allergens,
+            });
             continue;
         }
-        const dislikeHits = r.dislike_product_ids.filter((p) => productIds.has(p));
+        const dislikeHits = r.dislike_product_ids.filter((p) =>
+            productIds.has(p),
+        );
         if (dislikeHits.length) soft.push({ resident: r, matches: r.dislikes });
     }
     return { hard, soft };
@@ -335,27 +407,49 @@ export function firstName(name: string): string {
 }
 
 /** Selected residents on a texture-modified diet (IDDSI < 7). */
-export function textureResidentsFor(residents: Resident[], clientIds: number[]): Resident[] {
-    return residents.filter((r) => clientIds.includes(r.id) && r.texture != null && r.texture.level < 7);
+export function textureResidentsFor(
+    residents: Resident[],
+    clientIds: number[],
+): Resident[] {
+    return residents.filter(
+        (r) =>
+            clientIds.includes(r.id) &&
+            r.texture != null &&
+            r.texture.level < 7,
+    );
 }
 
 /** Selected residents who need thickened/modified fluids. */
-export function fluidsResidentsFor(residents: Resident[], clientIds: number[]): Resident[] {
+export function fluidsResidentsFor(
+    residents: Resident[],
+    clientIds: number[],
+): Resident[] {
     return residents.filter((r) => clientIds.includes(r.id) && !!r.fluids);
 }
 
 /** Selected residents with any recorded allergen (used for ad-hoc/takeaway reminders). */
-export function allergenResidentsFor(residents: Resident[], clientIds: number[]): Resident[] {
-    return residents.filter((r) => clientIds.includes(r.id) && r.allergens.length > 0);
+export function allergenResidentsFor(
+    residents: Resident[],
+    clientIds: number[],
+): Resident[] {
+    return residents.filter(
+        (r) => clientIds.includes(r.id) && r.allergens.length > 0,
+    );
 }
 
 /** Texture-modified assignees on a saved entry (drives the MealCard texture pill). */
-export function entryTextureResidents(entry: PlanEntry, residents: Resident[]): Resident[] {
+export function entryTextureResidents(
+    entry: PlanEntry,
+    residents: Resident[],
+): Resident[] {
     return textureResidentsFor(residents, entry.client_ids ?? []);
 }
 
 /** Allergic assignees on a saved ad-hoc/takeaway entry (drives the "Check allergens" pill). */
-export function entryAllergenResidents(entry: PlanEntry, residents: Resident[]): Resident[] {
+export function entryAllergenResidents(
+    entry: PlanEntry,
+    residents: Resident[],
+): Resident[] {
     return allergenResidentsFor(residents, entry.client_ids ?? []);
 }
 
@@ -366,9 +460,15 @@ export type DietaryMismatch = { resident: Resident; requirements: string[] };
  * (kind=dietary, e.g. halal/vegetarian) the recipe doesn't carry. Advisory only —
  * tag presence isn't an authoritative rule (a blocking gate is Deferred).
  */
-export function dietaryMismatchesFor(recipe: RecipeFull | undefined | null, residents: Resident[], clientIds: number[]): DietaryMismatch[] {
+export function dietaryMismatchesFor(
+    recipe: RecipeFull | undefined | null,
+    residents: Resident[],
+    clientIds: number[],
+): DietaryMismatch[] {
     if (!recipe) return [];
-    const recipeDietaryIds = new Set(recipe.tags.filter((t) => t.kind === 'dietary').map((t) => t.id));
+    const recipeDietaryIds = new Set(
+        recipe.tags.filter((t) => t.kind === 'dietary').map((t) => t.id),
+    );
     const out: DietaryMismatch[] = [];
     for (const r of residents) {
         if (!clientIds.includes(r.id)) continue;
@@ -382,20 +482,40 @@ export function dietaryMismatchesFor(recipe: RecipeFull | undefined | null, resi
 }
 
 /** Same heuristic for a saved entry (drives the MealCard "Diet check" pill). */
-export function dietaryMismatches(entry: PlanEntry, residents: Resident[], recipes: RecipeMap): DietaryMismatch[] {
+export function dietaryMismatches(
+    entry: PlanEntry,
+    residents: Resident[],
+    recipes: RecipeMap,
+): DietaryMismatch[] {
     if (entry.source_type !== 'recipe' || entry.recipe_id == null) return [];
-    return dietaryMismatchesFor(recipes.get(entry.recipe_id), residents, entry.client_ids ?? []);
+    return dietaryMismatchesFor(
+        recipes.get(entry.recipe_id),
+        residents,
+        entry.client_ids ?? [],
+    );
 }
 
 /** True when a selected resident matches a CRITICAL-severity allergen tag on the recipe (P2-8). */
-export function entryHasCriticalAllergen(entry: PlanEntry, residents: Resident[], recipes: RecipeMap): boolean {
+export function entryHasCriticalAllergen(
+    entry: PlanEntry,
+    residents: Resident[],
+    recipes: RecipeMap,
+): boolean {
     if (entry.source_type !== 'recipe' || entry.recipe_id == null) return false;
     const recipe = recipes.get(entry.recipe_id);
     if (!recipe) return false;
-    const criticalIds = new Set(recipe.tags.filter((t) => t.kind === 'allergen' && t.severity === 'critical').map((t) => t.id));
+    const criticalIds = new Set(
+        recipe.tags
+            .filter((t) => t.kind === 'allergen' && t.severity === 'critical')
+            .map((t) => t.id),
+    );
     if (criticalIds.size === 0) return false;
     const ids = entry.client_ids ?? [];
-    return residents.some((r) => ids.includes(r.id) && r.allergen_tag_ids.some((t) => criticalIds.has(t)));
+    return residents.some(
+        (r) =>
+            ids.includes(r.id) &&
+            r.allergen_tag_ids.some((t) => criticalIds.has(t)),
+    );
 }
 
 export function residentRelation(
@@ -409,16 +529,27 @@ export function residentRelation(
         const recipe = recipes.get(entry.recipe_id);
         if (recipe) {
             const allergenIds = new Set(recipe.allergen_tag_ids ?? []);
-            const productIds = new Set(recipe.ingredients.map((i) => i.product_id).filter((x): x is number => x != null));
-            if (resident.allergen_tag_ids.some((t) => allergenIds.has(t))) clash = 'allergen';
-            else if (resident.dislike_product_ids.some((p) => productIds.has(p))) clash = 'dislike';
+            const productIds = new Set(
+                recipe.ingredients
+                    .map((i) => i.product_id)
+                    .filter((x): x is number => x != null),
+            );
+            if (resident.allergen_tag_ids.some((t) => allergenIds.has(t)))
+                clash = 'allergen';
+            else if (
+                resident.dislike_product_ids.some((p) => productIds.has(p))
+            )
+                clash = 'dislike';
         }
     }
     return { involved, clash };
 }
 
 /** A stable, pleasant avatar colour from a hue. */
-export function hueStyle(hue: number): { backgroundColor: string; color: string } {
+export function hueStyle(hue: number): {
+    backgroundColor: string;
+    color: string;
+} {
     return {
         backgroundColor: `oklch(0.92 0.06 ${hue})`,
         color: `oklch(0.40 0.13 ${hue})`,

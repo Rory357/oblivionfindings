@@ -52,17 +52,25 @@ function downloadDoc(id: number) {
     a.remove();
 }
 
-export default function MyDocuments({ myHr, pendingSignatures, documents }: Props) {
+export default function MyDocuments({
+    myHr,
+    pendingSignatures,
+    documents,
+}: Props) {
     const [signing, setSigning] = useState<PendingSignature | null>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
     const folders = useMemo(() => {
         const map = new Map<string, number>();
         for (const d of documents) {
-            const key = d.folder ?? (d.category ? labelize(d.category) : 'Other');
+            const key =
+                d.folder ?? (d.category ? labelize(d.category) : 'Other');
             map.set(key, (map.get(key) ?? 0) + 1);
         }
-        return Array.from(map.entries()).map(([name, count]) => ({ name, count }));
+        return Array.from(map.entries()).map(([name, count]) => ({
+            name,
+            count,
+        }));
     }, [documents]);
 
     function openCtx(e: React.MouseEvent, d: Doc) {
@@ -159,7 +167,8 @@ export default function MyDocuments({ myHr, pendingSignatures, documents }: Prop
                                             {labelize(f.name)}
                                         </div>
                                         <div className="text-[11.5px] text-muted-foreground">
-                                            {f.count} document{f.count === 1 ? '' : 's'}
+                                            {f.count} document
+                                            {f.count === 1 ? '' : 's'}
                                         </div>
                                     </Card>
                                 );
@@ -170,16 +179,18 @@ export default function MyDocuments({ myHr, pendingSignatures, documents }: Prop
 
                 {/* All documents */}
                 <Card className="overflow-hidden p-0">
-                    <div className="px-[18px] pb-2 pt-4 text-sm font-bold">
+                    <div className="px-[18px] pt-4 pb-2 text-sm font-bold">
                         All documents
                     </div>
                     {documents.length === 0 ? (
                         <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
                             <FileText className="h-8 w-8 text-muted-foreground/40" />
-                            <div className="text-sm font-semibold">No documents yet</div>
+                            <div className="text-sm font-semibold">
+                                No documents yet
+                            </div>
                             <p className="max-w-sm text-[13px] text-muted-foreground">
-                                Your contracts, certificates and letters from HR will appear
-                                here.
+                                Your contracts, certificates and letters from HR
+                                will appear here.
                             </p>
                         </div>
                     ) : (
@@ -200,17 +211,28 @@ export default function MyDocuments({ myHr, pendingSignatures, documents }: Prop
                                                 {d.title ?? d.original_name}
                                             </div>
                                             <div className="text-[11.5px] text-muted-foreground">
-                                                {d.folder ?? labelize(d.category ?? 'Document')}{' '}
-                                                · added {formatDocDate(d.created_at)}
+                                                {d.folder ??
+                                                    labelize(
+                                                        d.category ??
+                                                            'Document',
+                                                    )}{' '}
+                                                · added{' '}
+                                                {formatDocDate(d.created_at)}
                                             </div>
                                         </div>
                                         {d.signed_by_employee ? (
-                                            <StatusBadge variant="success" size="sm">
+                                            <StatusBadge
+                                                variant="success"
+                                                size="sm"
+                                            >
                                                 Signed
                                             </StatusBadge>
                                         ) : null}
                                         {exp ? (
-                                            <StatusBadge variant={exp.variant} size="sm">
+                                            <StatusBadge
+                                                variant={exp.variant}
+                                                size="sm"
+                                            >
                                                 {exp.label}
                                             </StatusBadge>
                                         ) : null}
@@ -222,8 +244,13 @@ export default function MyDocuments({ myHr, pendingSignatures, documents }: Prop
                 </Card>
             </div>
 
-            <MyHrEsignDialog signature={signing} onClose={() => setSigning(null)} />
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+            <MyHrEsignDialog
+                signature={signing}
+                onClose={() => setSigning(null)}
+            />
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
         </MyHrShell>
     );
 }

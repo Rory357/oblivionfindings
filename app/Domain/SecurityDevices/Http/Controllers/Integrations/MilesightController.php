@@ -18,7 +18,9 @@ use App\Services\Integration\Contracts\InventoryDiscoveryCapability;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Integration\IntegrationSecretManager;
 use App\Support\SafeOperationalData;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 /**
@@ -469,17 +471,33 @@ class MilesightController extends Controller
             'This Milesight application is already mapped to another Site.',
         );
 
-        IntegrationSiteConfig::query()->updateOrCreate(
-            ['site_id' => $site->id, 'provider' => self::PROVIDER],
-            [
-                'mapped_external_site_id' => (string) $application['external_id'],
-                'mapped_external_site_name' => (string) ($application['name'] ?? 'Milesight application'),
-                'status' => IntegrationSiteConfig::STATUS_HYBRID,
-                'is_active' => true,
-            ],
-        );
+        try {
+            IntegrationSiteConfig::query()->updateOrCreate(
+                ['site_id' => $site->id, 'provider' => self::PROVIDER],
+                [
+                    'mapped_external_site_id' => (string) $application['external_id'],
+                    'mapped_external_site_name' => (string) ($application['name'] ?? 'Milesight application'),
+                    'status' => IntegrationSiteConfig::STATUS_HYBRID,
+                    'is_active' => true,
+                ],
+            );
+        } catch (QueryException $exception) {
+            if (! $this->isExternalSiteIdentityConflict($exception)) {
+                throw $exception;
+            }
+
+            throw ValidationException::withMessages([
+                'mapping_token' => 'This Milesight application was mapped to another Site. Refresh the mappings and try again.',
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Milesight application mapping saved.');
+    }
+
+    private function isExternalSiteIdentityConflict(QueryException $exception): bool
+    {
+        return (int) ($exception->errorInfo[1] ?? 0) === 1062
+            && str_contains($exception->getMessage(), 'integration_provider_external_site_unique');
     }
 
     public function removeApplicationMapping(Request $request, IntegrationSiteConfig $siteConfig)

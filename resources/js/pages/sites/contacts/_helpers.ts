@@ -114,7 +114,10 @@ const FALLBACK_TYPE: ContactTypeDef = {
 
 export function getContactType(type?: string | null): ContactTypeDef {
     if (!type) return FALLBACK_TYPE;
-    const normalised = type.toLowerCase().trim().replace(/[\s-]+/g, '_');
+    const normalised = type
+        .toLowerCase()
+        .trim()
+        .replace(/[\s-]+/g, '_');
     return (
         CONTACT_TYPES.find((t) => t.key === normalised) ?? {
             ...FALLBACK_TYPE,

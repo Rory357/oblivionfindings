@@ -10,7 +10,7 @@ return new class extends Migration
     /** @var array<string, string> */
     private const PERMISSIONS = [
         'securityDevices.accessControl.view' => 'View physical access credentials, schedules, and history',
-        'securityDevices.accessControl.manage' => 'Issue and revoke physical access credentials and manage schedules',
+        'securityDevices.accessControl.manage' => 'Manage provider-backed physical access credential requests and schedules',
     ];
 
     /** @var array<string, list<string>> */
@@ -26,7 +26,7 @@ return new class extends Migration
     {
         Schema::create('access_control_schedules', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
+            $table->foreignId('site_id')->constrained('sites')->restrictOnDelete();
             $table->string('name', 120);
             $table->string('timezone', 64)->default('Pacific/Auckland');
             $table->json('days');
@@ -42,14 +42,14 @@ return new class extends Migration
 
         Schema::create('access_control_credentials', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
+            $table->foreignId('site_id')->constrained('sites')->restrictOnDelete();
             $table->foreignId('access_schedule_id')->constrained('access_control_schedules')->restrictOnDelete();
             $table->string('label', 120);
             $table->string('holder_type', 20);
             $table->unsignedBigInteger('holder_id');
             // Safe provider alias/fingerprint only. Card numbers, PINs and secret material never belong here.
             $table->string('reference_key', 191);
-            $table->string('status', 20)->default('active');
+            $table->string('status', 20)->default('pending_issue');
             $table->timestamp('valid_from')->nullable();
             $table->timestamp('valid_until')->nullable();
             $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
@@ -107,14 +107,15 @@ return new class extends Migration
 
     public function down(): void
     {
-        if (Schema::hasTable('permissions')) {
-            $permissionIds = DB::table('permissions')->whereIn('key', array_keys(self::PERMISSIONS))->pluck('id');
-            if (Schema::hasTable('role_permission')) {
-                DB::table('role_permission')->whereIn('permission_id', $permissionIds)->delete();
-            }
-            DB::table('permissions')->whereIn('id', $permissionIds)->delete();
+        if ((Schema::hasTable('access_control_credentials') && DB::table('access_control_credentials')->exists())
+            || (Schema::hasTable('access_control_schedules') && DB::table('access_control_schedules')->exists())) {
+            throw new RuntimeException(
+                'Cannot remove Access Control tables while credential or schedule evidence exists.',
+            );
         }
 
+        // Permissions are canonically owned by the shared permission seeder. This migration may
+        // only have observed pre-existing rows through insertOrIgnore, so rollback must not delete them.
         Schema::dropIfExists('access_control_credential_device');
         Schema::dropIfExists('access_control_credentials');
         Schema::dropIfExists('access_control_schedules');

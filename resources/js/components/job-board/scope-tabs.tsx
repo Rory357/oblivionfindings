@@ -9,8 +9,8 @@ import {
 
 import { cn } from '@/lib/utils';
 
-import type { JobBoardScope } from './types';
 import { Button as GuardrailButton } from '@/components/ui/button';
+import type { JobBoardScope } from './types';
 
 interface ScopeTabsProps {
     scope: JobBoardScope;
@@ -79,7 +79,8 @@ export function ScopeTabs({
                 const Icon = tab.icon;
                 const isActive = scope === tab.id;
                 return (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         key={tab.id}
                         type="button"
                         role="tab"
@@ -87,7 +88,7 @@ export function ScopeTabs({
                         aria-selected={isActive}
                         onClick={() => onScopeChange(tab.id)}
                         className={cn(
-                            'inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors',
+                            'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors',
                             isActive
                                 ? 'bg-accent text-[var(--brand-deep,var(--primary))]'
                                 : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',

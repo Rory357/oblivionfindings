@@ -61,14 +61,16 @@ export function OperationsHero({
 
     const title: ReactNode = (
         <span>
-            <span className="mb-2 flex items-center justify-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/80 md:justify-start">
+            <span className="mb-2 flex items-center justify-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase md:justify-start">
                 <PulseDot />
                 Live operations · refreshed just now
             </span>
             <span className="block">
-                <span className="font-normal text-primary-foreground/80">Kia ora {firstName},</span>{' '}
+                <span className="font-normal text-primary-foreground/80">
+                    Kia ora {firstName},
+                </span>{' '}
                 ops at a glance —{' '}
-                <span className="whitespace-nowrap border-b-2 border-primary-foreground/40 pb-0.5">
+                <span className="border-b-2 border-primary-foreground/40 pb-0.5 whitespace-nowrap">
                     {todayLabel}
                 </span>
             </span>
@@ -77,10 +79,15 @@ export function OperationsHero({
 
     const description: ReactNode = (
         <span>
-            <span className="font-semibold tabular-nums text-primary-foreground">{activeClients}</span>{' '}
+            <span className="font-semibold text-primary-foreground tabular-nums">
+                {activeClients}
+            </span>{' '}
             active clients across{' '}
-            <span className="font-semibold tabular-nums text-primary-foreground">{hero.sites_count}</span>{' '}
-            sites. Day is running on target — a few items need your attention below.
+            <span className="font-semibold text-primary-foreground tabular-nums">
+                {hero.sites_count}
+            </span>{' '}
+            sites. Day is running on target — a few items need your attention
+            below.
         </span>
     );
 
@@ -125,7 +132,8 @@ export function OperationsHero({
                         className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                     >
                         <Link href="/operations/shifts?create=1">
-                            <CalendarPlus className="mr-1 h-3.5 w-3.5" /> Create shift
+                            <CalendarPlus className="mr-1 h-3.5 w-3.5" /> Create
+                            shift
                         </Link>
                     </Button>
                     <Button
@@ -135,7 +143,8 @@ export function OperationsHero({
                         className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
                     >
                         <Link href="/operations/rostering">
-                            <CalendarDays className="mr-1 h-3.5 w-3.5" /> Open roster
+                            <CalendarDays className="mr-1 h-3.5 w-3.5" /> Open
+                            roster
                         </Link>
                     </Button>
                     <Button
@@ -145,7 +154,8 @@ export function OperationsHero({
                         className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
                     >
                         <Link href="/operations/timesheets/approvals">
-                            <ClipboardCheck className="mr-1 h-3.5 w-3.5" /> Approve queue
+                            <ClipboardCheck className="mr-1 h-3.5 w-3.5" />{' '}
+                            Approve queue
                         </Link>
                     </Button>
                     <Button
@@ -161,7 +171,8 @@ export function OperationsHero({
             footer={
                 <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex flex-wrap items-center gap-1.5">
-                        <Button unstyled
+                        <Button
+                            unstyled
                             type="button"
                             onClick={() => onWeekChange(week.prev)}
                             className={cn(
@@ -172,7 +183,8 @@ export function OperationsHero({
                             <ChevronLeft className="h-3.5 w-3.5" />
                             Week {week.prev_number} · {week.prev_label}
                         </Button>
-                        <Button unstyled
+                        <Button
+                            unstyled
                             ref={pickerBtnRef}
                             type="button"
                             onClick={() => setPickerOpen((v) => !v)}
@@ -181,10 +193,12 @@ export function OperationsHero({
                             className="inline-flex items-center gap-1.5 rounded-full border border-primary-foreground/35 bg-primary-foreground/20 px-3.5 py-1.5 text-[12px] font-semibold text-primary-foreground hover:bg-primary-foreground/30"
                         >
                             <CalendarRange className="h-3.5 w-3.5" />
-                            Week {week.number} · {week.start_label} → {week.end_label} · pick week
+                            Week {week.number} · {week.start_label} →{' '}
+                            {week.end_label} · pick week
                             <ChevronDown className="h-3 w-3" />
                         </Button>
-                        <Button unstyled
+                        <Button
+                            unstyled
                             type="button"
                             onClick={() => onWeekChange(week.next)}
                             className="inline-flex items-center gap-1 rounded-full border border-primary-foreground/20 bg-primary-foreground/10 px-3.5 py-1.5 text-[12px] font-semibold text-primary-foreground hover:bg-primary-foreground/20"
@@ -192,9 +206,12 @@ export function OperationsHero({
                             Week {week.next_number} · {week.next_label}
                             <ChevronRight className="h-3.5 w-3.5" />
                         </Button>
-                        <Button unstyled
+                        <Button
+                            unstyled
                             type="button"
-                            onClick={() => onWeekChange(ymdLocal(startOfWeek(new Date())))}
+                            onClick={() =>
+                                onWeekChange(ymdLocal(startOfWeek(new Date())))
+                            }
                             className="inline-flex items-center gap-1.5 rounded-full border border-primary-foreground/20 px-3.5 py-1.5 text-[12px] font-medium text-primary-foreground/85 hover:bg-primary-foreground/10"
                         >
                             <Zap className="h-3.5 w-3.5" /> Jump to today

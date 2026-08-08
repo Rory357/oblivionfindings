@@ -1,5 +1,13 @@
 import { router } from '@inertiajs/react';
-import { Briefcase, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react';
+import {
+    Briefcase,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
+    Users,
+    X,
+} from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -66,8 +74,8 @@ export function DepartmentsPane({
                 dept_q: next.q ?? filters.q ?? undefined,
                 dept_status:
                     next.status !== undefined
-                        ? next.status ?? undefined
-                        : filters.status ?? undefined,
+                        ? (next.status ?? undefined)
+                        : (filters.status ?? undefined),
             },
             { preserveState: true, replace: true },
         );

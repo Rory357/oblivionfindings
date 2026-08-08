@@ -10,11 +10,9 @@ import {
 } from 'lucide-react';
 import { useMemo } from 'react';
 
-import { cn } from '@/lib/utils';
-
+import { Button as GuardrailButton } from '@/components/ui/button';
 import { EmptyState, type CardHandlers } from './cards-view';
 import {
-    type Handover,
     HueAvatar,
     StatusPill,
     cardCounts,
@@ -22,8 +20,8 @@ import {
     fmtShiftRange,
     handoverDate,
     moodEmoji,
+    type Handover,
 } from './shared';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 export function ListView({
     handovers,
@@ -180,7 +178,8 @@ export function ListView({
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {h.status === 'draft' && h.can_submit ? (
-                                    <GuardrailButton unstyled
+                                    <GuardrailButton
+                                        unstyled
                                         type="button"
                                         onClick={() => onSubmit(h)}
                                         className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold transition-colors hover:bg-accent"
@@ -190,7 +189,8 @@ export function ListView({
                                 ) : null}
                                 {h.status === 'submitted' &&
                                 h.can_acknowledge ? (
-                                    <GuardrailButton unstyled
+                                    <GuardrailButton
+                                        unstyled
                                         type="button"
                                         onClick={() => onAcknowledge(h)}
                                         className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
@@ -199,7 +199,8 @@ export function ListView({
                                         Ack
                                     </GuardrailButton>
                                 ) : null}
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={() => onOpen(h)}
                                     className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

@@ -1,11 +1,11 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { PageHero } from '@/components/page';
+import PageShell from '@/components/page-shell';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { Users, Home, UserPlus, Clock, BarChart3, Gauge } from 'lucide-react';
+import { BarChart3, Clock, Gauge, Home, UserPlus, Users } from 'lucide-react';
 
 type Room = {
     id: number;
@@ -32,7 +32,13 @@ type Props = {
     rooms?: Room[];
 };
 
-function DonutChart({ percentage, size = 120 }: { percentage: number; size?: number }) {
+function DonutChart({
+    percentage,
+    size = 120,
+}: {
+    percentage: number;
+    size?: number;
+}) {
     const strokeWidth = 10;
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
@@ -84,14 +90,20 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
     const currentOccupancy = site.current_occupancy ?? 0;
     const waitlistCount = site.waitlist_count ?? 0;
     const availableSpaces = Math.max(0, totalCapacity - currentOccupancy);
-    const occupancyPercent = totalCapacity > 0 ? Math.round((currentOccupancy / totalCapacity) * 100) : 0;
+    const occupancyPercent =
+        totalCapacity > 0
+            ? Math.round((currentOccupancy / totalCapacity) * 100)
+            : 0;
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Sites', href: '/sites' },
                 { title: site.name, href: `/sites/${site.id}` },
-                { title: 'Capacity & Occupancy', href: `/sites/${site.id}/capacity` },
+                {
+                    title: 'Capacity & Occupancy',
+                    href: `/sites/${site.id}/capacity`,
+                },
             ]}
         >
             <Head title={`${site.name} — Capacity & Occupancy`} />
@@ -117,11 +129,15 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
                                 <div className="rounded-lg bg-status-info p-2">
-                                    <Home className="w-5 h-5 text-status-info" />
+                                    <Home className="h-5 w-5 text-status-info" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-muted-foreground">Total Capacity</div>
-                                    <div className="text-2xl font-bold">{totalCapacity || '—'}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Total Capacity
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {totalCapacity || '—'}
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
@@ -130,11 +146,15 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
                                 <div className="rounded-lg bg-status-success p-2">
-                                    <Users className="w-5 h-5 text-status-success" />
+                                    <Users className="h-5 w-5 text-status-success" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-muted-foreground">Current Occupancy</div>
-                                    <div className="text-2xl font-bold">{currentOccupancy}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Current Occupancy
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {currentOccupancy}
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
@@ -143,11 +163,15 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
                                 <div className="rounded-lg bg-primary/10 p-2">
-                                    <UserPlus className="w-5 h-5 text-primary" />
+                                    <UserPlus className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-muted-foreground">Available Spaces</div>
-                                    <div className="text-2xl font-bold">{availableSpaces}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Available Spaces
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {availableSpaces}
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
@@ -156,11 +180,15 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
                                 <div className="rounded-lg bg-status-warning p-2">
-                                    <Clock className="w-5 h-5 text-status-warning" />
+                                    <Clock className="h-5 w-5 text-status-warning" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-muted-foreground">Waitlist</div>
-                                    <div className="text-2xl font-bold">{waitlistCount}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Waitlist
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {waitlistCount}
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
@@ -175,11 +203,16 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                         </CardHeader>
                         <CardContent className="flex items-center justify-center py-6">
                             {totalCapacity > 0 ? (
-                                <DonutChart percentage={occupancyPercent} size={160} />
+                                <DonutChart
+                                    percentage={occupancyPercent}
+                                    size={160}
+                                />
                             ) : (
                                 <div className="text-center text-muted-foreground">
-                                    <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                    <p className="text-sm">Set total capacity to see occupancy rate</p>
+                                    <BarChart3 className="mx-auto mb-2 h-12 w-12 opacity-50" />
+                                    <p className="text-sm">
+                                        Set total capacity to see occupancy rate
+                                    </p>
                                 </div>
                             )}
                         </CardContent>
@@ -190,16 +223,26 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Rooms</CardTitle>
                             <Badge variant="outline">
-                                {rooms.filter((r) => !r.assigned_client).length} vacant
+                                {rooms.filter((r) => !r.assigned_client).length}{' '}
+                                vacant
                             </Badge>
                         </CardHeader>
                         <CardContent>
                             {rooms.length === 0 ? (
-                                <div className="text-center py-8 text-muted-foreground">
-                                    <Home className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                                    <p className="text-sm">No rooms configured for this site</p>
-                                    <Button asChild variant="outline" size="sm" className="mt-3">
-                                        <Link href={`/sites/${site.id}/rooms`}>Manage Rooms</Link>
+                                <div className="py-8 text-center text-muted-foreground">
+                                    <Home className="mx-auto mb-2 h-10 w-10 opacity-50" />
+                                    <p className="text-sm">
+                                        No rooms configured for this site
+                                    </p>
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        size="sm"
+                                        className="mt-3"
+                                    >
+                                        <Link href={`/sites/${site.id}/rooms`}>
+                                            Manage Rooms
+                                        </Link>
                                     </Button>
                                 </div>
                             ) : (
@@ -210,9 +253,11 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                                             className="flex items-center justify-between rounded-lg border p-3"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <Home className="w-4 h-4 text-muted-foreground" />
+                                                <Home className="h-4 w-4 text-muted-foreground" />
                                                 <div>
-                                                    <div className="font-medium text-sm">{room.name}</div>
+                                                    <div className="text-sm font-medium">
+                                                        {room.name}
+                                                    </div>
                                                     <div className="text-xs text-muted-foreground">
                                                         {room.assigned_client
                                                             ? `${room.assigned_client.first_name} ${room.assigned_client.last_name}`
@@ -222,16 +267,31 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 {room.assigned_client ? (
-                                                    <Badge variant="outline" className="border-status-success/30 text-status-success bg-status-success">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-status-success/30 bg-status-success text-status-success"
+                                                    >
                                                         Occupied
                                                     </Badge>
                                                 ) : (
                                                     <>
-                                                        <Badge variant="outline" className="border-border/30 text-muted-foreground">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-border/30 text-muted-foreground"
+                                                        >
                                                             Vacant
                                                         </Badge>
-                                                        <Button variant="ghost" size="sm" className="text-xs" asChild>
-                                                            <Link href={`/sites/${site.id}/rooms`}>Assign Client</Link>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-xs"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/sites/${site.id}/rooms`}
+                                                            >
+                                                                Assign Client
+                                                            </Link>
                                                         </Button>
                                                     </>
                                                 )}
@@ -248,16 +308,21 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <BarChart3 className="w-5 h-5" />
+                            <BarChart3 className="h-5 w-5" />
                             Occupancy Trend
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-center justify-center py-12 text-muted-foreground">
                             <div className="text-center">
-                                <BarChart3 className="w-16 h-16 mx-auto mb-3 opacity-30" />
-                                <p className="text-sm">Occupancy trend chart coming soon</p>
-                                <p className="text-xs text-muted-foreground mt-1">Historical occupancy data will be displayed here</p>
+                                <BarChart3 className="mx-auto mb-3 h-16 w-16 opacity-30" />
+                                <p className="text-sm">
+                                    Occupancy trend chart coming soon
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Historical occupancy data will be displayed
+                                    here
+                                </p>
                             </div>
                         </div>
                     </CardContent>

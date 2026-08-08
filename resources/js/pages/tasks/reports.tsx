@@ -53,12 +53,30 @@ const SEVERITY_COLOR: Record<TaskSeverity, string> = {
     info: 'var(--chart-5)',
 };
 
-const SEVERITY_ORDER: TaskSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
+const SEVERITY_ORDER: TaskSeverity[] = [
+    'critical',
+    'high',
+    'medium',
+    'low',
+    'info',
+];
 
 const AGING_SEGMENTS = [
-    { key: 'fresh' as const, label: '0–7 days', color: 'var(--status-success)' },
-    { key: 'aging' as const, label: '8–30 days', color: 'var(--status-warning)' },
-    { key: 'stale' as const, label: '31+ days', color: 'var(--status-critical)' },
+    {
+        key: 'fresh' as const,
+        label: '0–7 days',
+        color: 'var(--status-success)',
+    },
+    {
+        key: 'aging' as const,
+        label: '8–30 days',
+        color: 'var(--status-warning)',
+    },
+    {
+        key: 'stale' as const,
+        label: '31+ days',
+        color: 'var(--status-critical)',
+    },
 ];
 
 function pct(part: number, whole: number): number {
@@ -70,7 +88,11 @@ function pct(part: number, whole: number): number {
 /*  (title + subtitle header, aria-labelled figure, sr-only table).    */
 /* ------------------------------------------------------------------ */
 
-type SrTable = { caption: string; columns: string[]; rows: (string | number)[][] };
+type SrTable = {
+    caption: string;
+    columns: string[];
+    rows: (string | number)[][];
+};
 
 function ReportCard({
     title,
@@ -90,8 +112,14 @@ function ReportCard({
     return (
         <Card className={cn('rounded-xl shadow-sm', className)}>
             <CardHeader className="pb-1">
-                <CardTitle className="text-sm font-bold tracking-tight">{title}</CardTitle>
-                {subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p> : null}
+                <CardTitle className="text-sm font-bold tracking-tight">
+                    {title}
+                </CardTitle>
+                {subtitle ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        {subtitle}
+                    </p>
+                ) : null}
             </CardHeader>
             <CardContent className="pt-2">
                 <figure className="m-0" role="group" aria-label={aria}>
@@ -126,7 +154,10 @@ function ReportCard({
 function LegendDot({ color, label }: { color: string; label: string }) {
     return (
         <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+            <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: color }}
+            />
             {label}
         </span>
     );
@@ -161,9 +192,20 @@ function StatTile({
     return (
         <Card className="rounded-xl shadow-sm">
             <CardContent className="p-4">
-                <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
-                <p className={cn('mt-1 text-2xl font-bold tabular-nums', toneClass)}>{value}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{caption}</p>
+                <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                    {label}
+                </p>
+                <p
+                    className={cn(
+                        'mt-1 text-2xl font-bold tabular-nums',
+                        toneClass,
+                    )}
+                >
+                    {value}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                    {caption}
+                </p>
             </CardContent>
         </Card>
     );
@@ -173,11 +215,22 @@ function StatTile({
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function TaskReports({ totals, modules, severity, closure }: Props) {
+export default function TaskReports({
+    totals,
+    modules,
+    severity,
+    closure,
+}: Props) {
     const openModules = modules.filter((m) => m.open > 0);
     const maxOpen = Math.max(1, ...openModules.map((m) => m.open));
-    const severityTotal = SEVERITY_ORDER.reduce((s, k) => s + (severity[k] ?? 0), 0);
-    const maxSeverity = Math.max(1, ...SEVERITY_ORDER.map((k) => severity[k] ?? 0));
+    const severityTotal = SEVERITY_ORDER.reduce(
+        (s, k) => s + (severity[k] ?? 0),
+        0,
+    );
+    const maxSeverity = Math.max(
+        1,
+        ...SEVERITY_ORDER.map((k) => severity[k] ?? 0),
+    );
     const net = closure.opened30 - closure.closed30;
 
     return (
@@ -196,12 +249,18 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                         <div className="flex items-start gap-4">
                             <HeroMedallion icon={BarChart3} />
                             <div className="min-w-0 flex-1">
-                                <HeroStatusPill>Reports · computed live from the queue</HeroStatusPill>
-                                <h1 className="mt-2 text-2xl font-bold tracking-tight md:text-[28px]">Task Reports</h1>
+                                <HeroStatusPill>
+                                    Reports · computed live from the queue
+                                </HeroStatusPill>
+                                <h1 className="mt-2 text-2xl font-bold tracking-tight md:text-[28px]">
+                                    Task Reports
+                                </h1>
                                 <p className="mt-1 max-w-2xl text-sm text-primary-foreground/80">
-                                    How the company-wide work queue is trending — open and overdue load per
-                                    module, how long items have been sitting, severity mix and rough 30-day
-                                    throughput. Same permission scoping as the queue itself.
+                                    How the company-wide work queue is trending
+                                    — open and overdue load per module, how long
+                                    items have been sitting, severity mix and
+                                    rough 30-day throughput. Same permission
+                                    scoping as the queue itself.
                                 </p>
                             </div>
                         </div>
@@ -218,7 +277,11 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
 
                 {/* ── Closure / totals summary tiles ── */}
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatTile label="Open now" value={totals.open} caption="across every module you can see" />
+                    <StatTile
+                        label="Open now"
+                        value={totals.open}
+                        caption="across every module you can see"
+                    />
                     <StatTile
                         label="Overdue"
                         value={totals.overdue}
@@ -228,7 +291,11 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                     <StatTile
                         label="Opened · last 30 days"
                         value={closure.opened30}
-                        caption={net > 0 ? `inflow outpacing closures by ${net}` : 'inflow in the last month'}
+                        caption={
+                            net > 0
+                                ? `inflow outpacing closures by ${net}`
+                                : 'inflow in the last month'
+                        }
                         tone={net > 0 ? 'warning' : 'neutral'}
                     />
                     <StatTile
@@ -250,7 +317,11 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                         table={{
                             caption: 'Open and overdue items per module',
                             columns: ['Module', 'Open', 'Overdue'],
-                            rows: openModules.map((m) => [m.label, m.open, m.overdue]),
+                            rows: openModules.map((m) => [
+                                m.label,
+                                m.open,
+                                m.overdue,
+                            ]),
                         }}
                     >
                         {openModules.length === 0 ? (
@@ -258,34 +329,59 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                         ) : (
                             <div className="space-y-2" aria-hidden="true">
                                 {openModules.map((m) => (
-                                    <div key={m.key} className="flex items-center gap-3">
-                                        <span className="w-44 shrink-0 truncate text-xs font-medium text-foreground">{m.label}</span>
+                                    <div
+                                        key={m.key}
+                                        className="flex items-center gap-3"
+                                    >
+                                        <span className="w-44 shrink-0 truncate text-xs font-medium text-foreground">
+                                            {m.label}
+                                        </span>
                                         <div className="h-4 flex-1 overflow-hidden rounded-md bg-muted">
                                             <div
                                                 className="flex h-full overflow-hidden rounded-md"
-                                                style={{ width: `${pct(m.open, maxOpen)}%` }}
+                                                style={{
+                                                    width: `${pct(m.open, maxOpen)}%`,
+                                                }}
                                             >
                                                 <div
                                                     className="h-full"
                                                     style={{
                                                         width: `${pct(m.overdue, m.open)}%`,
-                                                        backgroundColor: 'var(--status-critical)',
+                                                        backgroundColor:
+                                                            'var(--status-critical)',
                                                     }}
                                                 />
-                                                <div className="h-full flex-1" style={{ backgroundColor: 'var(--primary)' }} />
+                                                <div
+                                                    className="h-full flex-1"
+                                                    style={{
+                                                        backgroundColor:
+                                                            'var(--primary)',
+                                                    }}
+                                                />
                                             </div>
                                         </div>
-                                        <span className="w-24 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                                            <span className="font-semibold text-foreground">{m.open}</span>
+                                        <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                                            <span className="font-semibold text-foreground">
+                                                {m.open}
+                                            </span>
                                             {m.overdue > 0 ? (
-                                                <span className="font-semibold text-status-critical"> · {m.overdue} late</span>
+                                                <span className="font-semibold text-status-critical">
+                                                    {' '}
+                                                    · {m.overdue} late
+                                                </span>
                                             ) : null}
                                         </span>
                                     </div>
                                 ))}
                                 <div className="flex flex-wrap gap-3 border-t border-border pt-2">
-                                    <LegendDot color="var(--status-critical)" label="Overdue" />
-                                    <LegendDot color="var(--primary)" label="On track" />
+                                    <LegendDot
+                                        color="var(--status-critical)"
+                                        label="Overdue"
+                                    />
+                                    <LegendDot
+                                        color="var(--primary)"
+                                        label="On track"
+                                    />
                                 </div>
                             </div>
                         )}
@@ -298,8 +394,18 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                         aria="Stacked bar chart of open item age buckets per module"
                         table={{
                             caption: 'Open items per module by age bucket',
-                            columns: ['Module', '0–7 days', '8–30 days', '31+ days'],
-                            rows: openModules.map((m) => [m.label, m.aging.fresh, m.aging.aging, m.aging.stale]),
+                            columns: [
+                                'Module',
+                                '0–7 days',
+                                '8–30 days',
+                                '31+ days',
+                            ],
+                            rows: openModules.map((m) => [
+                                m.label,
+                                m.aging.fresh,
+                                m.aging.aging,
+                                m.aging.stale,
+                            ]),
                         }}
                     >
                         {openModules.length === 0 ? (
@@ -307,32 +413,48 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                         ) : (
                             <div className="space-y-2" aria-hidden="true">
                                 {openModules.map((m) => {
-                                    const counted = m.aging.fresh + m.aging.aging + m.aging.stale;
+                                    const counted =
+                                        m.aging.fresh +
+                                        m.aging.aging +
+                                        m.aging.stale;
                                     return (
-                                        <div key={m.key} className="flex items-center gap-3">
-                                            <span className="w-36 shrink-0 truncate text-xs font-medium text-foreground">{m.label}</span>
+                                        <div
+                                            key={m.key}
+                                            className="flex items-center gap-3"
+                                        >
+                                            <span className="w-36 shrink-0 truncate text-xs font-medium text-foreground">
+                                                {m.label}
+                                            </span>
                                             <div className="h-4 flex-1 overflow-hidden rounded-md bg-muted">
                                                 {counted > 0 ? (
                                                     <div
                                                         className="flex h-full overflow-hidden rounded-md"
-                                                        style={{ width: `${pct(counted, maxOpen)}%` }}
+                                                        style={{
+                                                            width: `${pct(counted, maxOpen)}%`,
+                                                        }}
                                                     >
-                                                        {AGING_SEGMENTS.map((seg) =>
-                                                            m.aging[seg.key] > 0 ? (
-                                                                <div
-                                                                    key={seg.key}
-                                                                    className="h-full"
-                                                                    style={{
-                                                                        width: `${pct(m.aging[seg.key], counted)}%`,
-                                                                        backgroundColor: seg.color,
-                                                                    }}
-                                                                />
-                                                            ) : null,
+                                                        {AGING_SEGMENTS.map(
+                                                            (seg) =>
+                                                                m.aging[
+                                                                    seg.key
+                                                                ] > 0 ? (
+                                                                    <div
+                                                                        key={
+                                                                            seg.key
+                                                                        }
+                                                                        className="h-full"
+                                                                        style={{
+                                                                            width: `${pct(m.aging[seg.key], counted)}%`,
+                                                                            backgroundColor:
+                                                                                seg.color,
+                                                                        }}
+                                                                    />
+                                                                ) : null,
                                                         )}
                                                     </div>
                                                 ) : null}
                                             </div>
-                                            <span className="w-12 shrink-0 text-right text-xs font-semibold tabular-nums text-foreground">
+                                            <span className="w-12 shrink-0 text-right text-xs font-semibold text-foreground tabular-nums">
                                                 {counted}
                                             </span>
                                         </div>
@@ -340,7 +462,11 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                                 })}
                                 <div className="flex flex-wrap gap-3 border-t border-border pt-2">
                                     {AGING_SEGMENTS.map((seg) => (
-                                        <LegendDot key={seg.key} color={seg.color} label={seg.label} />
+                                        <LegendDot
+                                            key={seg.key}
+                                            color={seg.color}
+                                            label={seg.label}
+                                        />
                                     ))}
                                 </div>
                             </div>
@@ -369,21 +495,32 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                                 {SEVERITY_ORDER.map((k) => {
                                     const count = severity[k] ?? 0;
                                     return (
-                                        <div key={k} className="flex items-center gap-3">
-                                            <span className="w-20 shrink-0 truncate text-xs font-medium capitalize text-foreground">{k}</span>
+                                        <div
+                                            key={k}
+                                            className="flex items-center gap-3"
+                                        >
+                                            <span className="w-20 shrink-0 truncate text-xs font-medium text-foreground capitalize">
+                                                {k}
+                                            </span>
                                             <div className="h-4 flex-1 overflow-hidden rounded-md bg-muted">
                                                 <div
                                                     className="h-full rounded-md"
                                                     style={{
                                                         width: `${pct(count, maxSeverity)}%`,
-                                                        backgroundColor: SEVERITY_COLOR[k],
+                                                        backgroundColor:
+                                                            SEVERITY_COLOR[k],
                                                     }}
                                                 />
                                             </div>
-                                            <span className="w-20 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                                                <span className="font-semibold text-foreground">{count}</span>
+                                            <span className="w-20 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                                                <span className="font-semibold text-foreground">
+                                                    {count}
+                                                </span>
                                                 {' · '}
-                                                {Math.round(pct(count, severityTotal))}%
+                                                {Math.round(
+                                                    pct(count, severityTotal),
+                                                )}
+                                                %
                                             </span>
                                         </div>
                                     );
@@ -396,11 +533,14 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                 {/* ── Per-module table ── */}
                 <Card className="rounded-xl shadow-sm">
                     <CardHeader className="pb-1">
-                        <CardTitle className="text-sm font-bold tracking-tight">Module breakdown</CardTitle>
+                        <CardTitle className="text-sm font-bold tracking-tight">
+                            Module breakdown
+                        </CardTitle>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                            Open and overdue counts per module, with age buckets measured from each item's
-                            creation date. Items without a recorded creation date are excluded from the age
-                            buckets.
+                            Open and overdue counts per module, with age buckets
+                            measured from each item's creation date. Items
+                            without a recorded creation date are excluded from
+                            the age buckets.
                         </p>
                     </CardHeader>
                     <CardContent className="p-0 pt-2">
@@ -408,40 +548,71 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                             <table className="w-full text-[13px]">
                                 <thead>
                                     <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                                        <th className="px-4 py-2.5 font-semibold">Module</th>
-                                        <th className="px-3 py-2.5 text-right font-semibold">Open</th>
-                                        <th className="px-3 py-2.5 text-right font-semibold">Overdue</th>
-                                        <th className="px-3 py-2.5 text-right font-semibold">0–7d</th>
-                                        <th className="px-3 py-2.5 text-right font-semibold">8–30d</th>
-                                        <th className="px-3 py-2.5 text-right font-semibold">31d+</th>
+                                        <th className="px-4 py-2.5 font-semibold">
+                                            Module
+                                        </th>
+                                        <th className="px-3 py-2.5 text-right font-semibold">
+                                            Open
+                                        </th>
+                                        <th className="px-3 py-2.5 text-right font-semibold">
+                                            Overdue
+                                        </th>
+                                        <th className="px-3 py-2.5 text-right font-semibold">
+                                            0–7d
+                                        </th>
+                                        <th className="px-3 py-2.5 text-right font-semibold">
+                                            8–30d
+                                        </th>
+                                        <th className="px-3 py-2.5 text-right font-semibold">
+                                            31d+
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {modules.length === 0 ? (
                                         <tr>
-                                            <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
-                                                No task data across your modules yet.
+                                            <td
+                                                colSpan={6}
+                                                className="px-4 py-6 text-center text-muted-foreground"
+                                            >
+                                                No task data across your modules
+                                                yet.
                                             </td>
                                         </tr>
                                     ) : (
                                         modules.map((m) => (
-                                            <tr key={m.key} className="border-b border-border last:border-0">
-                                                <td className="px-4 py-2.5 font-medium whitespace-nowrap">{m.label}</td>
-                                                <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{m.open}</td>
+                                            <tr
+                                                key={m.key}
+                                                className="border-b border-border last:border-0"
+                                            >
+                                                <td className="px-4 py-2.5 font-medium whitespace-nowrap">
+                                                    {m.label}
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right font-semibold tabular-nums">
+                                                    {m.open}
+                                                </td>
                                                 <td
                                                     className={cn(
                                                         'px-3 py-2.5 text-right tabular-nums',
-                                                        m.overdue > 0 ? 'font-semibold text-status-critical' : 'text-muted-foreground',
+                                                        m.overdue > 0
+                                                            ? 'font-semibold text-status-critical'
+                                                            : 'text-muted-foreground',
                                                     )}
                                                 >
                                                     {m.overdue}
                                                 </td>
-                                                <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{m.aging.fresh}</td>
-                                                <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{m.aging.aging}</td>
+                                                <td className="px-3 py-2.5 text-right text-muted-foreground tabular-nums">
+                                                    {m.aging.fresh}
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right text-muted-foreground tabular-nums">
+                                                    {m.aging.aging}
+                                                </td>
                                                 <td
                                                     className={cn(
                                                         'px-3 py-2.5 text-right tabular-nums',
-                                                        m.aging.stale > 0 ? 'font-semibold text-status-warning' : 'text-muted-foreground',
+                                                        m.aging.stale > 0
+                                                            ? 'font-semibold text-status-warning'
+                                                            : 'text-muted-foreground',
                                                     )}
                                                 >
                                                     {m.aging.stale}
@@ -456,10 +627,11 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                 </Card>
 
                 <p className="text-xs text-muted-foreground">
-                    Throughput caveat: both 30-day figures count items by the date they were <em>created</em>{' '}
-                    (the queue doesn't track close dates), and modules only surface recently-completed
-                    items, so "closed" understates true closures — read these as rough throughput, not an
-                    exact ledger.
+                    Throughput caveat: both 30-day figures count items by the
+                    date they were <em>created</em> (the queue doesn't track
+                    close dates), and modules only surface recently-completed
+                    items, so "closed" understates true closures — read these as
+                    rough throughput, not an exact ledger.
                 </p>
             </div>
         </AppLayout>

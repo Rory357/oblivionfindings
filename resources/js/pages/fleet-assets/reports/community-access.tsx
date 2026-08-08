@@ -1,14 +1,26 @@
+import {
+    FLEET_COLORS,
+    HalfMoonGauge,
+    HorizontalBarChart,
+    MiniBarChart,
+} from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { HalfMoonGauge, HorizontalBarChart, MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
 import PageShell from '@/components/page-shell';
-import { CompactHeroStat, FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/fleet-utils';
+import {
+    CompactHeroStat,
+    FleetCompactHero,
+} from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, router } from '@inertiajs/react';
 import { Calendar, Download, Users } from 'lucide-react';
 
@@ -48,13 +60,28 @@ type Props = {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function CommunityAccess({ by_resident: rawResident, weekly_trend: rawTrend, days, stats: rawStats }: Props) {
+export default function CommunityAccess({
+    by_resident: rawResident,
+    weekly_trend: rawTrend,
+    days,
+    stats: rawStats,
+}: Props) {
     const byResident = rawResident ?? [];
     const weeklyTrend = rawTrend ?? [];
-    const stats = rawStats ?? { total_outings: 0, residents_participating: 0, avg_hours_per_resident: 0, total_hours: 0, access_target_pct: 0 };
+    const stats = rawStats ?? {
+        total_outings: 0,
+        residents_participating: 0,
+        avg_hours_per_resident: 0,
+        total_hours: 0,
+        access_target_pct: 0,
+    };
 
     const handlePeriodChange = (value: string) => {
-        router.get('/fleet-assets/reports/community-access', { days: value }, { preserveState: true });
+        router.get(
+            '/fleet-assets/reports/community-access',
+            { days: value },
+            { preserveState: true },
+        );
     };
 
     const handleExport = () => {
@@ -62,18 +89,22 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
     };
 
     // Gauge color based on target percentage
-    const gaugeColor = stats.access_target_pct >= 80
-        ? FLEET_COLORS.success
-        : stats.access_target_pct >= 50
-        ? FLEET_COLORS.warning
-        : FLEET_COLORS.danger;
+    const gaugeColor =
+        stats.access_target_pct >= 80
+            ? FLEET_COLORS.success
+            : stats.access_target_pct >= 50
+              ? FLEET_COLORS.warning
+              : FLEET_COLORS.danger;
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Reports', href: '/fleet-assets/reports' },
-                { title: 'Community Access', href: '/fleet-assets/reports/community-access' },
+                {
+                    title: 'Community Access',
+                    href: '/fleet-assets/reports/community-access',
+                },
             ]}
         >
             <Head title="Community Access Analytics" />
@@ -88,29 +119,55 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
                             <CompactHeroStat
                                 label="Outings"
                                 value={String(stats.total_outings)}
-                                tone={stats.total_outings > 0 ? 'success' : 'neutral'}
+                                tone={
+                                    stats.total_outings > 0
+                                        ? 'success'
+                                        : 'neutral'
+                                }
                             />
-                            <CompactHeroStat label="Residents" value={String(stats.residents_participating)} tone="neutral" />
-                            <CompactHeroStat label="Avg hrs / resident" value={String(stats.avg_hours_per_resident)} tone="neutral" />
-                            <CompactHeroStat label="Community hrs" value={String(stats.total_hours)} tone="neutral" />
+                            <CompactHeroStat
+                                label="Residents"
+                                value={String(stats.residents_participating)}
+                                tone="neutral"
+                            />
+                            <CompactHeroStat
+                                label="Avg hrs / resident"
+                                value={String(stats.avg_hours_per_resident)}
+                                tone="neutral"
+                            />
+                            <CompactHeroStat
+                                label="Community hrs"
+                                value={String(stats.total_hours)}
+                                tone="neutral"
+                            />
                         </>
                     }
                 />
                 <p className="text-sm text-muted-foreground">
-                    Track resident community participation, outings, and transport usage for MSD/MOH compliance.
+                    Track resident community participation, outings, and
+                    transport usage for MSD/MOH compliance.
                 </p>
 
                 {/* Period Selector + Export */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Calendar className="h-5 w-5 text-muted-foreground" />
-                        <Select value={String(days)} onValueChange={handlePeriodChange}>
-                            <SelectTrigger className="w-48"><SelectValue placeholder="Select period" /></SelectTrigger>
+                        <Select
+                            value={String(days)}
+                            onValueChange={handlePeriodChange}
+                        >
+                            <SelectTrigger className="w-48">
+                                <SelectValue placeholder="Select period" />
+                            </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="30">Last 30 days</SelectItem>
                                 <SelectItem value="90">Last 90 days</SelectItem>
-                                <SelectItem value="180">Last 6 months</SelectItem>
-                                <SelectItem value="365">Last 12 months</SelectItem>
+                                <SelectItem value="180">
+                                    Last 6 months
+                                </SelectItem>
+                                <SelectItem value="365">
+                                    Last 12 months
+                                </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -124,7 +181,9 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
                     {/* Access Target Gauge */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-sm">Community Access Target</CardTitle>
+                            <CardTitle className="text-sm">
+                                Community Access Target
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="flex flex-col items-center pt-0">
                             <HalfMoonGauge
@@ -139,7 +198,9 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
                     {/* Outings per Resident Bar Chart */}
                     <Card className="lg:col-span-2">
                         <CardHeader>
-                            <CardTitle className="text-sm">Outings per Resident</CardTitle>
+                            <CardTitle className="text-sm">
+                                Outings per Resident
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {byResident.length > 0 ? (
@@ -147,15 +208,20 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
                                     items={byResident
                                         .sort((a, b) => b.outings - a.outings)
                                         .slice(0, 12)
-                                        .map(r => ({
+                                        .map((r) => ({
                                             label: r.name,
                                             value: r.outings,
-                                            color: r.outings === 0 ? FLEET_COLORS.danger : undefined,
+                                            color:
+                                                r.outings === 0
+                                                    ? FLEET_COLORS.danger
+                                                    : undefined,
                                         }))}
                                     color={FLEET_COLORS.primary}
                                 />
                             ) : (
-                                <p className="py-4 text-center text-sm text-muted-foreground">No data available.</p>
+                                <p className="py-4 text-center text-sm text-muted-foreground">
+                                    No data available.
+                                </p>
                             )}
                         </CardContent>
                     </Card>
@@ -165,10 +231,16 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
                 {weeklyTrend.length > 0 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-sm">Outings per Week</CardTitle>
+                            <CardTitle className="text-sm">
+                                Outings per Week
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <MiniBarChart data={weeklyTrend} color={FLEET_COLORS.primary} height={140} />
+                            <MiniBarChart
+                                data={weeklyTrend}
+                                color={FLEET_COLORS.primary}
+                                height={140}
+                            />
                         </CardContent>
                     </Card>
                 )}
@@ -177,47 +249,87 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
                 {byResident.length > 0 ? (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Resident Community Participation</CardTitle>
+                            <CardTitle className="text-base">
+                                Resident Community Participation
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
+                            <div
+                                data-fleet-narrow-strategy="horizontal-scroll"
+                                className="overflow-x-auto"
+                            >
                                 <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
-                                            <th className="px-3 py-2 text-left font-medium">Resident</th>
-                                            <th className="px-3 py-2 text-left font-medium">House</th>
-                                            <th className="px-3 py-2 text-right font-medium">Outings</th>
-                                            <th className="px-3 py-2 text-right font-medium">Transport Trips</th>
-                                            <th className="px-3 py-2 text-right font-medium">Total Hours</th>
-                                            <th className="px-3 py-2 text-right font-medium">Last Outing</th>
+                                        <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
+                                            <th className="px-3 py-2 text-left font-medium">
+                                                Resident
+                                            </th>
+                                            <th className="px-3 py-2 text-left font-medium">
+                                                House
+                                            </th>
+                                            <th className="px-3 py-2 text-right font-medium">
+                                                Outings
+                                            </th>
+                                            <th className="px-3 py-2 text-right font-medium">
+                                                Transport Trips
+                                            </th>
+                                            <th className="px-3 py-2 text-right font-medium">
+                                                Total Hours
+                                            </th>
+                                            <th className="px-3 py-2 text-right font-medium">
+                                                Last Outing
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {byResident.map((r) => (
                                             <tr
                                                 key={r.id}
-                                                className={`border-b last:border-b-0 transition-colors hover:bg-muted/30 ${
-                                                    r.outings === 0 ? 'bg-status-critical-bg' : ''
+                                                className={`border-b transition-colors last:border-b-0 hover:bg-muted/30 ${
+                                                    r.outings === 0
+                                                        ? 'bg-status-critical-bg'
+                                                        : ''
                                                 }`}
                                             >
                                                 <td className="px-3 py-2">
                                                     <div className="flex items-center gap-2">
                                                         {r.outings === 0 && (
-                                                            <span className="h-2 w-2 rounded-full bg-status-critical shrink-0" title="No outings in period" />
+                                                            <span
+                                                                className="h-2 w-2 shrink-0 rounded-full bg-status-critical"
+                                                                title="No outings in period"
+                                                            />
                                                         )}
-                                                        <span className="font-medium">{r.name}</span>
+                                                        <span className="font-medium">
+                                                            {r.name}
+                                                        </span>
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-2 text-muted-foreground">{r.house || '---'}</td>
+                                                <td className="px-3 py-2 text-muted-foreground">
+                                                    {r.house || '---'}
+                                                </td>
                                                 <td className="px-3 py-2 text-right tabular-nums">
-                                                    <span className={r.outings === 0 ? 'text-status-critical dark:text-status-critical font-semibold' : ''}>
+                                                    <span
+                                                        className={
+                                                            r.outings === 0
+                                                                ? 'font-semibold text-status-critical dark:text-status-critical'
+                                                                : ''
+                                                        }
+                                                    >
                                                         {r.outings}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-2 text-right tabular-nums">{r.transport_trips}</td>
-                                                <td className="px-3 py-2 text-right tabular-nums">{r.total_hours}</td>
+                                                <td className="px-3 py-2 text-right tabular-nums">
+                                                    {r.transport_trips}
+                                                </td>
+                                                <td className="px-3 py-2 text-right tabular-nums">
+                                                    {r.total_hours}
+                                                </td>
                                                 <td className="px-3 py-2 text-right text-muted-foreground">
-                                                    {r.last_outing ? formatDate(r.last_outing) : 'Never'}
+                                                    {r.last_outing
+                                                        ? formatDate(
+                                                              r.last_outing,
+                                                          )
+                                                        : 'Never'}
                                                 </td>
                                             </tr>
                                         ))}

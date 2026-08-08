@@ -92,8 +92,16 @@ class VehiclePageContractTest extends TestCase
 
     public function test_vehicle_update_persists_accessibility_fields(): void
     {
-        $user = $this->makeFleetUser(['fleet.manage']);
+        $user = $this->makeFleetUser(['fleet.viewAny', 'fleet.manage']);
         $site = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+        ]);
         $vehicle = Asset::factory()->vehicle()->forSite($site)->create([
             'has_wheelchair_ramp' => false,
             'seating_capacity' => null,

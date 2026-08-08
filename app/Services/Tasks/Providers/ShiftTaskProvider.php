@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use App\Services\UserSiteAccessService;
 
 class ShiftTaskProvider implements HasModelClass, TaskProvider
 {
@@ -45,8 +46,13 @@ class ShiftTaskProvider implements HasModelClass, TaskProvider
             ->whereHas('shift', function ($q) use ($user) {
                 // Today/future plus the recent past week — ancient shift tasks
                 // are noise, not actionable work.
-                $q->where('organization_id', $user->organization_id)
-                    ->where('starts_at', '>=', now()->subDays(7))
+                app(UserSiteAccessService::class)->applyShiftScope(
+                    $q,
+                    $user,
+                    ['reports.viewAny'],
+                );
+
+                $q->where('starts_at', '>=', now()->subDays(7))
                     ->where('status', '!=', 'cancelled');
 
                 // Schedulers (shifts.manageAny) see every shift's tasks; other

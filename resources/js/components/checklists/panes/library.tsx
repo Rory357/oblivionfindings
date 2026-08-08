@@ -3,26 +3,38 @@ import {
     Camera,
     LayoutGrid,
     ListChecks,
-    type LucideIcon,
     Pencil,
     PenLine,
     RefreshCw,
     Sparkles,
     Star,
     TriangleAlert,
+    type LucideIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { AssignChecklistButton } from '../assign-checklist';
 import { catBgVar, catColorVar } from '../category';
-import { freqLabel, typeLabel, useChecklistConfig, type PaneCtx } from '../context';
+import {
+    freqLabel,
+    typeLabel,
+    useChecklistConfig,
+    type PaneCtx,
+} from '../context';
 import { categoryIcon } from '../icons';
-import { CategoryIcon, Dropdown, Empty, StatusBadge, ViewToggle, type ChecklistView } from '../primitives';
+import {
+    CategoryIcon,
+    Dropdown,
+    Empty,
+    StatusBadge,
+    ViewToggle,
+    type ChecklistView,
+} from '../primitives';
 import type { ChecklistTemplate } from '../types';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 function FlagChips({ t }: { t: ChecklistTemplate }) {
     return (
@@ -48,7 +60,13 @@ function FlagChips({ t }: { t: ChecklistTemplate }) {
     );
 }
 
-function TemplateActions({ t, templates }: { t: ChecklistTemplate; templates: ChecklistTemplate[] }) {
+function TemplateActions({
+    t,
+    templates,
+}: {
+    t: ChecklistTemplate;
+    templates: ChecklistTemplate[];
+}) {
     const { can, openBuilder } = useChecklistConfig();
     return (
         <div className="flex items-center gap-1">
@@ -63,12 +81,23 @@ function TemplateActions({ t, templates }: { t: ChecklistTemplate; templates: Ch
                     <Pencil className="h-3.5 w-3.5" />
                 </Button>
             ) : null}
-            <AssignChecklistButton templates={templates} templateId={t.id} label="Assign" variant="outline" />
+            <AssignChecklistButton
+                templates={templates}
+                templateId={t.id}
+                label="Assign"
+                variant="outline"
+            />
         </div>
     );
 }
 
-function TemplateCard({ t, templates }: { t: ChecklistTemplate; templates: ChecklistTemplate[] }) {
+function TemplateCard({
+    t,
+    templates,
+}: {
+    t: ChecklistTemplate;
+    templates: ChecklistTemplate[];
+}) {
     const cfg = useChecklistConfig();
     const tone = t.category ? cfg.categoryMap[t.category]?.tone : undefined;
     return (
@@ -78,15 +107,23 @@ function TemplateCard({ t, templates }: { t: ChecklistTemplate; templates: Check
                 t.spotlight && 'ring-1 ring-primary/30',
             )}
         >
-            <div className="h-1 w-full" style={{ background: catColorVar(tone) }} />
+            <div
+                className="h-1 w-full"
+                style={{ background: catColorVar(tone) }}
+            />
             <div className="flex flex-1 flex-col p-4">
                 <div className="flex items-start gap-3">
                     <CategoryIcon category={t.category} box={40} size={20} />
                     <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
-                            <h4 className="text-sm font-semibold leading-snug">{t.name}</h4>
+                            <h4 className="text-sm leading-snug font-semibold">
+                                {t.name}
+                            </h4>
                             {t.spotlight ? (
-                                <span title="Core checklist" className="shrink-0 text-primary">
+                                <span
+                                    title="Core checklist"
+                                    className="shrink-0 text-primary"
+                                >
                                     <Star className="h-3.5 w-3.5" />
                                 </span>
                             ) : null}
@@ -100,7 +137,9 @@ function TemplateCard({ t, templates }: { t: ChecklistTemplate; templates: Check
                     </div>
                 </div>
                 {t.description ? (
-                    <p className="mt-2.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{t.description}</p>
+                    <p className="mt-2.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                        {t.description}
+                    </p>
                 ) : null}
                 {t.flags.hazard || t.flags.photo || t.flags.sign ? (
                     <div className="mt-3 flex flex-wrap gap-1.5">
@@ -125,24 +164,44 @@ function TemplateCard({ t, templates }: { t: ChecklistTemplate; templates: Check
     );
 }
 
-function TemplateRow({ t, templates }: { t: ChecklistTemplate; templates: ChecklistTemplate[] }) {
+function TemplateRow({
+    t,
+    templates,
+}: {
+    t: ChecklistTemplate;
+    templates: ChecklistTemplate[];
+}) {
     const cfg = useChecklistConfig();
     const tone = t.category ? cfg.categoryMap[t.category]?.tone : undefined;
     return (
         <div className="group flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-accent/40">
-            <span className="h-9 w-1 shrink-0 rounded-full" style={{ background: catColorVar(tone) }} />
+            <span
+                className="h-9 w-1 shrink-0 rounded-full"
+                style={{ background: catColorVar(tone) }}
+            />
             <CategoryIcon category={t.category} box={34} size={17} />
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-semibold">{t.name}</span>
-                    {t.spotlight ? <Star className="h-3 w-3 shrink-0 text-primary" /> : null}
+                    <span className="truncate text-sm font-semibold">
+                        {t.name}
+                    </span>
+                    {t.spotlight ? (
+                        <Star className="h-3 w-3 shrink-0 text-primary" />
+                    ) : null}
                 </div>
-                {t.description ? <p className="truncate text-xs text-muted-foreground">{t.description}</p> : null}
+                {t.description ? (
+                    <p className="truncate text-xs text-muted-foreground">
+                        {t.description}
+                    </p>
+                ) : null}
             </div>
             <div className="hidden shrink-0 items-center gap-1.5 md:flex">
                 <FlagChips t={t} />
             </div>
-            <StatusBadge tone="neutral" className="hidden shrink-0 lg:inline-flex">
+            <StatusBadge
+                tone="neutral"
+                className="hidden shrink-0 lg:inline-flex"
+            >
                 {freqLabel(cfg, t.frequency)}
             </StatusBadge>
             <span className="hidden w-14 shrink-0 items-center gap-1 text-xs text-muted-foreground xl:flex">
@@ -154,7 +213,13 @@ function TemplateRow({ t, templates }: { t: ChecklistTemplate; templates: Checkl
     );
 }
 
-export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplate: () => void }) {
+export function LibraryPane({
+    ctx,
+    onNewTemplate,
+}: {
+    ctx: PaneCtx;
+    onNewTemplate: () => void;
+}) {
     const cfg = useChecklistConfig();
     const [freq, setFreq] = useState('all');
     const [view, setView] = useState<ChecklistView>('board');
@@ -169,11 +234,17 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
                 : cfg.scope.site.type
             : null;
     const scopedTemplates = siteType
-        ? ctx.templates.filter((t) => t.applicable_to_type === 'all' || t.applicable_to_type === siteType)
+        ? ctx.templates.filter(
+              (t) =>
+                  t.applicable_to_type === 'all' ||
+                  t.applicable_to_type === siteType,
+          )
         : ctx.templates;
 
     const templates = scopedTemplates.filter((t) => {
-        const catLabel = t.category ? cfg.categoryMap[t.category]?.label ?? '' : '';
+        const catLabel = t.category
+            ? (cfg.categoryMap[t.category]?.label ?? '')
+            : '';
         const matchQ =
             !q ||
             t.name.toLowerCase().includes(q) ||
@@ -186,12 +257,18 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
 
     const sections = cfg.categories
         .filter((c) => ctx.cat === 'all' || c.key === ctx.cat)
-        .map((c) => ({ ...c, items: templates.filter((t) => t.category === c.key) }))
+        .map((c) => ({
+            ...c,
+            items: templates.filter((t) => t.category === c.key),
+        }))
         .filter((c) => c.items.length > 0);
 
     const freqOptions = [
         { value: 'all', label: 'Any frequency' },
-        ...Object.entries(cfg.freqLabels).map(([value, label]) => ({ value, label })),
+        ...Object.entries(cfg.freqLabels).map(([value, label]) => ({
+            value,
+            label,
+        })),
     ];
 
     const chip = (
@@ -203,7 +280,8 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
         Icon: LucideIcon,
         dot?: string,
     ): ReactNode => (
-        <Button unstyled
+        <Button
+            unstyled
             key={key}
             type="button"
             onClick={onClick}
@@ -213,17 +291,35 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
                     ? 'border-transparent text-primary-foreground shadow-sm'
                     : 'border-border bg-card text-muted-foreground hover:bg-accent',
             )}
-            style={active && dot ? { background: dot } : active ? { background: 'var(--primary)' } : undefined}
+            style={
+                active && dot
+                    ? { background: dot }
+                    : active
+                      ? { background: 'var(--primary)' }
+                      : undefined
+            }
         >
-            <Icon className="h-3.5 w-3.5 shrink-0" style={!active && dot ? { color: dot } : undefined} />
+            <Icon
+                className="h-3.5 w-3.5 shrink-0"
+                style={!active && dot ? { color: dot } : undefined}
+            />
             {label}
-            <span className={cn('rounded px-1 text-[10px] tabular-nums', active ? 'bg-white/20' : 'bg-muted')}>{count}</span>
+            <span
+                className={cn(
+                    'rounded px-1 text-[10px] tabular-nums',
+                    active ? 'bg-white/20' : 'bg-muted',
+                )}
+            >
+                {count}
+            </span>
         </Button>
     );
 
     const knownKeys = new Set(cfg.categories.map((c) => c.key));
     const uncategorised =
-        ctx.cat === 'all' ? templates.filter((t) => !t.category || !knownKeys.has(t.category)) : [];
+        ctx.cat === 'all'
+            ? templates.filter((t) => !t.category || !knownKeys.has(t.category))
+            : [];
     const nothing = sections.length === 0 && uncategorised.length === 0;
 
     const grid = (rows: ChecklistTemplate[]) =>
@@ -234,7 +330,10 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
                 ))}
             </div>
         ) : (
-            <GuardrailCard unstyled className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <GuardrailCard
+                unstyled
+                className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+            >
                 {rows.map((t) => (
                     <TemplateRow key={t.id} t={t} templates={ctx.templates} />
                 ))}
@@ -245,7 +344,12 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
         <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                    <Dropdown value={freq} onChange={setFreq} options={freqOptions} className="w-36" />
+                    <Dropdown
+                        value={freq}
+                        onChange={setFreq}
+                        options={freqOptions}
+                        className="w-36"
+                    />
                     <span className="text-sm text-muted-foreground">
                         {q
                             ? `${templates.length} results for “${ctx.query}”`
@@ -264,13 +368,21 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
             </div>
 
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                {chip('all', 'All', ctx.cat === 'all', scopedTemplates.length, () => ctx.setCat('all'), LayoutGrid)}
+                {chip(
+                    'all',
+                    'All',
+                    ctx.cat === 'all',
+                    scopedTemplates.length,
+                    () => ctx.setCat('all'),
+                    LayoutGrid,
+                )}
                 {cfg.categories.map((c) =>
                     chip(
                         c.key,
                         c.label,
                         ctx.cat === c.key,
-                        scopedTemplates.filter((t) => t.category === c.key).length,
+                        scopedTemplates.filter((t) => t.category === c.key)
+                            .length,
                         () => ctx.setCat(c.key),
                         categoryIcon(c.icon),
                         catColorVar(c.tone),
@@ -279,8 +391,14 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
             </div>
 
             {nothing ? (
-                <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-2 shadow-sm">
-                    <Empty Icon={Sparkles} title="No templates match your filters." />
+                <GuardrailCard
+                    unstyled
+                    className="rounded-xl border border-border bg-card p-2 shadow-sm"
+                >
+                    <Empty
+                        Icon={Sparkles}
+                        title="No templates match your filters."
+                    />
                 </GuardrailCard>
             ) : (
                 <>
@@ -290,17 +408,35 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
                                 className="flex items-center gap-3 rounded-xl border border-border p-3"
                                 style={{ background: catBgVar(c.tone) }}
                             >
-                                <CategoryIcon category={c.key} box={40} size={20} />
+                                <CategoryIcon
+                                    category={c.key}
+                                    box={40}
+                                    size={20}
+                                />
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
-                                        <h3 className="text-sm font-semibold" style={{ color: catColorVar(c.tone) }}>
+                                        <h3
+                                            className="text-sm font-semibold"
+                                            style={{
+                                                color: catColorVar(c.tone),
+                                            }}
+                                        >
                                             {c.label}
                                         </h3>
-                                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground">
-                                            {c.items.length} {c.items.length === 1 ? 'checklist' : 'checklists'}
+                                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-semibold text-foreground tabular-nums">
+                                            {c.items.length}{' '}
+                                            {c.items.length === 1
+                                                ? 'checklist'
+                                                : 'checklists'}
                                         </span>
                                     </div>
-                                    <p className="mt-0.5 text-xs" style={{ color: catColorVar(c.tone), opacity: 0.85 }}>
+                                    <p
+                                        className="mt-0.5 text-xs"
+                                        style={{
+                                            color: catColorVar(c.tone),
+                                            opacity: 0.85,
+                                        }}
+                                    >
                                         {c.blurb}
                                     </p>
                                 </div>
@@ -312,16 +448,26 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
                     {uncategorised.length > 0 ? (
                         <div className="space-y-3">
                             <div className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted/40 p-3">
-                                <CategoryIcon category={null} box={40} size={20} />
+                                <CategoryIcon
+                                    category={null}
+                                    box={40}
+                                    size={20}
+                                />
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
-                                        <h3 className="text-sm font-semibold text-muted-foreground">Uncategorised</h3>
-                                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground">
-                                            {uncategorised.length} {uncategorised.length === 1 ? 'checklist' : 'checklists'}
+                                        <h3 className="text-sm font-semibold text-muted-foreground">
+                                            Uncategorised
+                                        </h3>
+                                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-semibold text-foreground tabular-nums">
+                                            {uncategorised.length}{' '}
+                                            {uncategorised.length === 1
+                                                ? 'checklist'
+                                                : 'checklists'}
                                         </span>
                                     </div>
                                     <p className="mt-0.5 text-xs text-muted-foreground">
-                                        Edit a template and pick a category to file it under the right group.
+                                        Edit a template and pick a category to
+                                        file it under the right group.
                                     </p>
                                 </div>
                             </div>

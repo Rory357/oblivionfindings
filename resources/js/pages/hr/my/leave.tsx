@@ -4,7 +4,6 @@ import { router } from '@inertiajs/react';
 import {
     Baby,
     CalendarDays,
-    CalendarRange,
     Copy,
     Eye,
     Flower2,
@@ -17,11 +16,7 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import {
-    MyHrShell,
-    hueFromId,
-    type MyHrShellData,
-} from '@/components/hr';
+import { MyHrShell, hueFromId, type MyHrShellData } from '@/components/hr';
 import { LeaveRequestDialog } from '@/components/hr/leave-request-dialog';
 import {
     ShiftContextMenu,
@@ -107,8 +102,7 @@ function fmtRange(start: string, end: string): string {
         month: 'short',
         year: 'numeric',
     };
-    if (start === end)
-        return new Date(start).toLocaleDateString('en-NZ', opts);
+    if (start === end) return new Date(start).toLocaleDateString('en-NZ', opts);
     const s = new Date(start);
     const e = new Date(end);
     const sameMonth =
@@ -125,13 +119,17 @@ function avatarStyle(id: number) {
 
 function BalanceRing({ balance }: { balance: LeaveBalance }) {
     const total = balance.entitlement_hours || 0;
-    const remaining = balance.remaining_hours ?? Math.max(0, total - balance.taken_hours);
+    const remaining =
+        balance.remaining_hours ?? Math.max(0, total - balance.taken_hours);
     const pct = total > 0 ? remaining / total : 0;
     const c = 2 * Math.PI * 34;
     return (
         <Card className="flex items-center gap-4 p-[18px]">
             <div className="relative h-[84px] w-[84px] shrink-0">
-                <svg viewBox="0 0 84 84" className="h-[84px] w-[84px] -rotate-90">
+                <svg
+                    viewBox="0 0 84 84"
+                    className="h-[84px] w-[84px] -rotate-90"
+                >
                     <circle
                         cx="42"
                         cy="42"
@@ -154,10 +152,12 @@ function BalanceRing({ balance }: { balance: LeaveBalance }) {
                     />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-lg font-bold leading-none">
+                    <span className="text-lg leading-none font-bold">
                         {remaining.toFixed(0)}h
                     </span>
-                    <span className="text-[9px] text-muted-foreground">left</span>
+                    <span className="text-[9px] text-muted-foreground">
+                        left
+                    </span>
                 </div>
             </div>
             <div>
@@ -165,7 +165,8 @@ function BalanceRing({ balance }: { balance: LeaveBalance }) {
                     {titleCase(balance.leave_type)}
                 </div>
                 <div className="mt-0.5 text-[11.5px] text-muted-foreground">
-                    {balance.taken_hours.toFixed(0)}h used · {total.toFixed(0)}h total
+                    {balance.taken_hours.toFixed(0)}h used · {total.toFixed(0)}h
+                    total
                 </div>
                 <div className="mt-1.5 text-[11px] font-semibold text-primary">
                     {Math.round(pct * 100)}% left
@@ -273,7 +274,9 @@ export default function MyLeave({
                 {/* Header */}
                 <div className="flex items-center gap-3">
                     <div>
-                        <h2 className="text-[17px] font-bold">Leave &amp; time off</h2>
+                        <h2 className="text-[17px] font-bold">
+                            Leave &amp; time off
+                        </h2>
                         <p className="mt-0.5 text-[12.5px] text-muted-foreground">
                             Balances, who’s out, and your requests
                         </p>
@@ -301,7 +304,9 @@ export default function MyLeave({
                 <Card className="p-[18px]">
                     <div className="mb-3.5 flex items-center gap-2">
                         <Users className="h-4 w-4 text-status-info" />
-                        <h3 className="text-sm font-bold">Who’s out — this week</h3>
+                        <h3 className="text-sm font-bold">
+                            Who’s out — this week
+                        </h3>
                     </div>
                     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
                         {whosOutWeek.map((d) => (
@@ -315,7 +320,7 @@ export default function MyLeave({
                                 <div className="text-[11px] font-bold text-muted-foreground">
                                     {d.day}
                                 </div>
-                                <div className="text-lg font-bold leading-tight">
+                                <div className="text-lg leading-tight font-bold">
                                     {d.date}
                                 </div>
                                 <div className="mt-2.5 flex flex-col gap-1.5">
@@ -337,7 +342,7 @@ export default function MyLeave({
 
                 {/* My requests */}
                 <Card className="overflow-hidden p-0">
-                    <div className="px-[18px] pb-2 pt-4 text-sm font-bold">
+                    <div className="px-[18px] pt-4 pb-2 text-sm font-bold">
                         My requests
                     </div>
                     {requests.data.length === 0 ? (
@@ -347,14 +352,15 @@ export default function MyLeave({
                                 No leave requests yet
                             </div>
                             <p className="max-w-sm text-[13px] text-muted-foreground">
-                                Tap “Request leave” to book time off — it goes to your
-                                manager for approval.
+                                Tap “Request leave” to book time off — it goes
+                                to your manager for approval.
                             </p>
                         </div>
                     ) : (
                         <div className="px-2 pb-2">
                             {requests.data.map((r) => {
-                                const Icon = TYPE_ICON[r.leave_type] ?? CalendarDays;
+                                const Icon =
+                                    TYPE_ICON[r.leave_type] ?? CalendarDays;
                                 const days = r.hours / 8;
                                 return (
                                     <div
@@ -370,7 +376,11 @@ export default function MyLeave({
                                                 {titleCase(r.leave_type)}
                                             </div>
                                             <div className="text-[11.5px] text-muted-foreground">
-                                                {fmtRange(r.start_date, r.end_date)} ·{' '}
+                                                {fmtRange(
+                                                    r.start_date,
+                                                    r.end_date,
+                                                )}{' '}
+                                                ·{' '}
                                                 {Number.isInteger(days)
                                                     ? `${days} day${days === 1 ? '' : 's'}`
                                                     : `${r.hours}h`}
@@ -378,7 +388,8 @@ export default function MyLeave({
                                         </div>
                                         <StatusBadge
                                             variant={
-                                                STATUS_VARIANT[r.status] ?? 'neutral'
+                                                STATUS_VARIANT[r.status] ??
+                                                'neutral'
                                             }
                                         >
                                             {titleCase(r.status)}
@@ -408,7 +419,9 @@ export default function MyLeave({
                 initial={wizardInitial}
                 onSubmitted={() => setWizardOpen(false)}
             />
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
 
             <AlertDialog
                 open={cancelTarget !== null}
@@ -418,7 +431,9 @@ export default function MyLeave({
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Cancel this leave request?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            Cancel this leave request?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
                             {cancelTarget
                                 ? `${titleCase(cancelTarget.leave_type)} · ${fmtRange(cancelTarget.start_date, cancelTarget.end_date)} · ${cancelTarget.hours}h. `

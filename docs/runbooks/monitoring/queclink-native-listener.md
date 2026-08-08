@@ -15,9 +15,18 @@ Run these commands from the application release directory. The first two checks 
 ```bash
 php artisan queclink:install --check
 php artisan queclink:status --json
+php artisan queclink:status --evidence-json --max-frame-age=900
 ```
 
 `queclink:status --json` includes the configured public hostname for an authorised operator. Do not copy its complete output into an incident or release record; retain only the service state, port, bounded Device counts, frame count, and last-frame time.
+
+The `--evidence-json` check is the release-safe proof. It exits non-zero unless
+the systemd listener is active and at least one genuinely paired canonical
+Device resolves to one active Site and has a parsed inbound frame inside the
+approved freshness window. Its output contains aggregate counts, reason codes
+and timestamps only—never an IMEI, Site/Device ID, endpoint, credential or raw
+frame. Use a tighter window when the approved tracker heartbeat contract
+requires it; never use a value below 60 seconds or above one day.
 
 The normal approved Linux/systemd deployment path is:
 
@@ -87,7 +96,7 @@ After correcting the approved network, port, runtime or dependency fault, recove
 ```bash
 sudo systemctl restart oblivion-queclink.service
 systemctl is-active oblivion-queclink.service
-php artisan queclink:status --json
+php artisan queclink:status --evidence-json --max-frame-age=900
 ```
 
 If the unit or port contract changed, run the approved `sudo -E php artisan queclink:install` path instead of hand-editing the unit. Allow the tracker to reconnect and accept authentic buffered reports in their original order. Let the scheduled governed lifecycle expire requests whose evidence window elapsed; it must not repeat their action. Reconcile fresh state, then create a new governed request only when the action is still required and all current checks pass.
@@ -112,6 +121,6 @@ For a lost, replaced, wrongly assigned, or deliberately re-enrolled tracker:
 
 ## Closure evidence
 
-Record the release version, approved change/incident, Site and canonical Device references, supported family, service state, approved port, start/stop/recovery times, bounded connected/pending/frame counts, first authentic heartbeat/location times, governed command UUID, final reconciliation outcome, credential-reference version/test state, and pairing audit IDs.
+Record the release version, approved change/incident, Site and canonical Device references in the governed release record, supported family, approved port, start/stop/recovery times, the value-free `--evidence-json` result, first authentic heartbeat/location times, governed command UUID, final reconciliation outcome, credential-reference version/test state, and pairing audit IDs.
 
 Do not attach complete status JSON, listener journals, browser network payloads, raw history, or screenshots containing identifiers or endpoint settings. Close with explicit confirmation that no cloud API was used, no raw command was replayed, no duplicate Device was created, and Site/privacy boundaries remained intact.

@@ -42,7 +42,12 @@ export function SparklineChart({
         .map((v, i) => `${i * step},${height - ((v - min) / range) * height}`)
         .join(' ');
     return (
-        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="shrink-0">
+        <svg
+            width={width}
+            height={height}
+            viewBox={`0 0 ${width} ${height}`}
+            className="shrink-0"
+        >
             <polyline
                 fill="none"
                 stroke={color}
@@ -82,7 +87,10 @@ export function DonutChart({
 
     if (total === 0) {
         return (
-            <div className="flex flex-col items-center justify-center" style={{ width: size, height: size }}>
+            <div
+                className="flex flex-col items-center justify-center"
+                style={{ width: size, height: size }}
+            >
                 <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
                     <circle
                         cx={size / 2}
@@ -161,7 +169,11 @@ export function DonutChart({
                             textAnchor="middle"
                             dominantBaseline="central"
                             className="fill-muted-foreground"
-                            style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                            style={{
+                                fontSize: 9,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                            }}
                         >
                             {centerLabel}
                         </text>
@@ -185,23 +197,36 @@ export function BarChart({
 }) {
     if (!data || data.length === 0) return null;
     const max = Math.max(...data.map((d) => d.value), 1);
-    const barWidth = Math.min(40, Math.max(16, Math.floor(280 / data.length) - 8));
+    const barWidth = Math.min(
+        40,
+        Math.max(16, Math.floor(280 / data.length) - 8),
+    );
 
     return (
-        <div className="flex items-end justify-between gap-1" style={{ height }}>
+        <div
+            className="flex items-end justify-between gap-1"
+            style={{ height }}
+        >
             {data.map((d, i) => (
                 <div key={i} className="flex flex-col items-center gap-1">
-                    <span className="text-[9px] tabular-nums text-muted-foreground">{d.value}</span>
+                    <span className="text-[9px] text-muted-foreground tabular-nums">
+                        {d.value}
+                    </span>
                     <div
                         className="rounded-t transition-all duration-300"
                         style={{
                             width: barWidth,
-                            height: Math.max(4, (d.value / max) * (height - 28)),
+                            height: Math.max(
+                                4,
+                                (d.value / max) * (height - 28),
+                            ),
                             backgroundColor: barColor,
                             opacity: 0.85,
                         }}
                     />
-                    <span className="text-[9px] text-muted-foreground">{d.label}</span>
+                    <span className="text-[9px] text-muted-foreground">
+                        {d.label}
+                    </span>
                 </div>
             ))}
         </div>

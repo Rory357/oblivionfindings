@@ -78,7 +78,6 @@ class DraftTimesheetServiceTest extends TestCase
         $worker = User::factory()->create(['name' => 'Sam Worker']);
 
         $session = HrAttendanceSession::query()->create([
-            'tenant_id' => 1,
             'user_id' => $worker->id,
             'shift_id' => null,
             'site_id' => $site->id,
@@ -152,7 +151,6 @@ class DraftTimesheetServiceTest extends TestCase
     private function closedAttendance(Shift $shift, User $worker, int $breakMinutes): HrAttendanceSession
     {
         return HrAttendanceSession::query()->create([
-            'tenant_id' => 1,
             'user_id' => $worker->id,
             'shift_id' => $shift->id,
             'site_id' => $shift->site_id,

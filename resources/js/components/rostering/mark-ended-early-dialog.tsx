@@ -82,26 +82,19 @@ export function MarkEndedEarlyDialog({
                         className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
                     />
                     <div className="text-xs text-muted-foreground">
-                        Minimum {MIN_LENGTH} characters. Recorded on the
-                        shift timeline and the final progress note.
+                        Minimum {MIN_LENGTH} characters. Recorded on the shift
+                        timeline and the final progress note.
                     </div>
                     {shift.staff || shift.client ? (
                         <div className="text-xs text-muted-foreground">
-                            {shift.staff
-                                ? `Staff: ${shift.staff}`
-                                : null}
+                            {shift.staff ? `Staff: ${shift.staff}` : null}
                             {shift.staff && shift.client ? ' · ' : ''}
-                            {shift.client
-                                ? `Client: ${shift.client}`
-                                : null}
+                            {shift.client ? `Client: ${shift.client}` : null}
                         </div>
                     ) : null}
                 </div>
                 <DialogFooter>
-                    <Button
-                        variant="ghost"
-                        onClick={() => onOpenChange(false)}
-                    >
+                    <Button variant="ghost" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
                     <Button

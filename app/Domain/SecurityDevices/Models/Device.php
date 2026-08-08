@@ -6,7 +6,6 @@ use App\Domain\Monitoring\Discovery\Models\DeviceIdentityEvidence;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryCandidate;
 use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
-use App\Domain\SecurityDevices\AccessControl\Models\AccessControlCredential;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
@@ -159,12 +158,22 @@ class Device extends Model
 
     public function parentRelationships(): HasMany
     {
-        return $this->hasMany(DeviceRelationship::class, 'child_device_id');
+        return $this->hasMany(DeviceRelationship::class, 'child_device_id')->active();
     }
 
     public function childRelationships(): HasMany
     {
-        return $this->hasMany(DeviceRelationship::class, 'parent_device_id');
+        return $this->hasMany(DeviceRelationship::class, 'parent_device_id')->active();
+    }
+
+    public function relationshipHistoryAsChild(): HasMany
+    {
+        return $this->hasMany(DeviceRelationship::class, 'child_device_id')->unlinked();
+    }
+
+    public function relationshipHistoryAsParent(): HasMany
+    {
+        return $this->hasMany(DeviceRelationship::class, 'parent_device_id')->unlinked();
     }
 
     public function groups(): BelongsToMany
@@ -210,13 +219,12 @@ class Device extends Model
 
     public function documents(): HasMany
     {
-        return $this->hasMany(DeviceDocument::class);
+        return $this->hasMany(DeviceDocument::class)->available();
     }
 
-    public function accessControlCredentials(): BelongsToMany
+    public function documentHistory(): HasMany
     {
-        return $this->belongsToMany(AccessControlCredential::class, 'access_control_credential_device', 'device_id', 'access_credential_id')
-            ->withTimestamps();
+        return $this->hasMany(DeviceDocument::class)->history();
     }
 
     // ── Scopes ────────────────────────────────────────────────────

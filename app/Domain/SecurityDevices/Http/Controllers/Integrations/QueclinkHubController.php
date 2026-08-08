@@ -26,8 +26,10 @@ use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkPreset;
 use App\Models\Queclink\QueclinkRawFrame;
 use App\Models\Site;
+use App\Models\SiteHouseRoom;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\ConsentValidationService;
 use App\Services\Queclink\CommandBuilder;
 use App\Services\Queclink\ConfigurationSnapshotService;
@@ -157,11 +159,20 @@ class QueclinkHubController extends Controller
                     ])->values(),
             ],
             'presets' => fn (): Collection => QueclinkPreset::query()
+                ->active()
                 ->with('configurationProfile')
                 ->orderByDesc('is_system')
                 ->orderBy('name')
                 ->get()
                 ->map(fn (QueclinkPreset $preset) => $this->serialisePreset($preset))
+                ->values(),
+            'retiredPresets' => fn (): Collection => QueclinkPreset::query()
+                ->retired()
+                ->with(['configurationProfile', 'retiredBy:id,name'])
+                ->orderByDesc('retired_at')
+                ->limit(100)
+                ->get()
+                ->map(fn (QueclinkPreset $preset) => $this->serialiseRetiredPreset($preset))
                 ->values(),
             'can' => [
                 'manage' => true,
@@ -268,7 +279,7 @@ class QueclinkHubController extends Controller
                 $this->deviceLinks->link($device, $asset, (int) $request->user()->id);
             }
 
-            $this->deviceAssignments->assign(
+            $assignment = $this->deviceAssignments->assign(
                 device: $device,
                 assignableType: $pairingType,
                 assignableId: $targetId,
@@ -281,12 +292,14 @@ class QueclinkHubController extends Controller
                 'status' => QueclinkDevice::STATUS_PAIRED,
                 'pending_pairing_type' => null,
                 'device_id' => $device->id,
+                'binding_uuid' => (string) Str::uuid(),
             ]);
 
             $this->logAudit($request, $lockedDevice, 'claim', null, null, [
                 'pairing_type' => $pairingType,
                 'target_id' => $targetId,
                 'device_id' => $device->id,
+                'device_assignment_id' => $assignment->id,
                 'consent_id' => $consentId,
             ]);
 
@@ -396,6 +409,7 @@ class QueclinkHubController extends Controller
             $lockedDevice->update([
                 'status' => QueclinkDevice::STATUS_PENDING,
                 'device_id' => null,
+                'binding_uuid' => null,
             ]);
 
             $this->logAudit($request, $lockedDevice, 'release', null, null, [
@@ -536,7 +550,7 @@ class QueclinkHubController extends Controller
         abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
         abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
 
-        $preset = QueclinkPreset::query()->where('slug', 'resident-safety')->firstOrFail();
+        $preset = QueclinkPreset::query()->active()->where('slug', 'resident-safety')->firstOrFail();
 
         return $this->configurationApplyHandoff($queclinkDevice, $this->profileForPreset($preset));
     }
@@ -631,11 +645,60 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $this->queclinkAccess->assertPreset($request->user(), $preset);
-        abort_if($preset->is_system, 422, 'Built-in presets cannot be deleted.');
-        $name = $preset->name;
-        $preset->delete();
+        abort_if($preset->is_system, 422, 'Built-in presets cannot be retired.');
 
-        return back()->with('success', "Preset \"{$name}\" deleted.");
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:500', 'not_regex:/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/'],
+        ]);
+        $actor = $request->user();
+
+        $name = DB::transaction(function () use ($actor, $preset, $validated): string {
+            $locked = QueclinkPreset::query()
+                ->whereKey($preset->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->queclinkAccess->assertPreset($actor, $locked);
+            abort_if($locked->is_system, 422, 'Built-in presets cannot be retired.');
+
+            $profile = DeviceConfigurationProfile::query()
+                ->whereKey($locked->device_configuration_profile_id)
+                ->lockForUpdate()
+                ->first();
+            abort_unless(
+                $profile instanceof DeviceConfigurationProfile,
+                409,
+                'This preset has no governed configuration profile. Repair its retained evidence before retrying.',
+            );
+            abort_unless(
+                $profile->status === DeviceConfigurationProfile::STATUS_ACTIVE,
+                409,
+                'This preset configuration is already retired. Reconcile its retained preset evidence before retrying.',
+            );
+
+            $activeVersions = DeviceConfigurationProfile::query()
+                ->where('profile_key', $profile->profile_key)
+                ->where('status', DeviceConfigurationProfile::STATUS_ACTIVE)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            foreach ($activeVersions as $activeVersion) {
+                $activeVersion->retire();
+            }
+            $locked->retireGoverned((int) $actor->id, $validated['reason']);
+
+            AuditLogger::logOrFail('security_devices.queclink.preset.retired', $locked, [
+                'actor_id' => (int) $actor->id,
+                'application_scope' => 'single_application',
+                'reason' => trim($validated['reason']),
+                'profile_version' => (int) $profile->version,
+                'profile_status' => DeviceConfigurationProfile::STATUS_RETIRED,
+                'profile_versions_retired' => $activeVersions->count(),
+            ]);
+
+            return $locked->name;
+        }, 3);
+
+        return back()->with('success', "Preset \"{$name}\" retired. Its governed history remains available for audit.");
     }
 
     public function updateSectionConfiguration(UpdateSectionRequest $request, QueclinkDevice $queclinkDevice, string $section)
@@ -691,8 +754,8 @@ class QueclinkHubController extends Controller
         $profile = null;
         if (in_array($action, ['resident_safety_profile', 'apply_preset'], true)) {
             $preset = $action === 'resident_safety_profile'
-                ? QueclinkPreset::query()->where('slug', 'resident-safety')->first()
-                : QueclinkPreset::query()->find((int) ($validated['preset_id'] ?? 0));
+                ? QueclinkPreset::query()->active()->where('slug', 'resident-safety')->first()
+                : QueclinkPreset::query()->active()->find((int) ($validated['preset_id'] ?? 0));
 
             if (! $preset || $preset->sectionPayloads() === [] || $preset->target_category === 'vehicle_tracker') {
                 throw ValidationException::withMessages([
@@ -1075,6 +1138,17 @@ class QueclinkHubController extends Controller
         ];
     }
 
+    /** @return array<string, mixed> */
+    private function serialiseRetiredPreset(QueclinkPreset $preset): array
+    {
+        return [
+            ...$this->serialisePreset($preset),
+            'retired_at' => $preset->retired_at?->toIso8601String(),
+            'retired_by' => $preset->retiredBy?->name,
+            'retirement_reason' => $preset->retirement_reason,
+        ];
+    }
+
     private function uniquePresetSlug(string $name): string
     {
         $base = Str::slug($name) ?: 'preset';
@@ -1144,6 +1218,7 @@ class QueclinkHubController extends Controller
 
         return DB::transaction(function () use ($preset): DeviceConfigurationProfile {
             $locked = QueclinkPreset::query()->lockForUpdate()->findOrFail($preset->id);
+            abort_if($locked->isRetired(), 404);
             $profile = $locked->configurationProfile()->first();
             if ($profile) {
                 return $profile;
@@ -1306,7 +1381,7 @@ class QueclinkHubController extends Controller
         }
 
         return $asset->site_id
-            ?? ($asset->room_id ? SiteRoom::query()->whereKey($asset->room_id)->value('site_id') : null)
+            ?? ($asset->room_id ? SiteHouseRoom::query()->whereKey($asset->room_id)->value('site_id') : null)
             ?? $asset->home_site_id
             ?? ($asset->client_id ? Client::query()->whereKey($asset->client_id)->value('site_id') : null);
     }

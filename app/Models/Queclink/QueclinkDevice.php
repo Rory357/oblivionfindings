@@ -34,6 +34,7 @@ class QueclinkDevice extends Model
     protected $fillable = [
         'imei',
         'device_id',
+        'binding_uuid',
         'model_hint',
         'protocol_version',
         'firmware_version',
@@ -47,6 +48,10 @@ class QueclinkDevice extends Model
         'last_frame_at',
         'last_count_number',
         'notes',
+    ];
+
+    protected $hidden = [
+        'binding_uuid',
     ];
 
     protected $casts = [

@@ -35,7 +35,11 @@ export function IncidentsTab({ incidents }: { incidents: any[] }) {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {(
                     [
-                        ['Recent incidents', incidents.length, 'text-status-warning'],
+                        [
+                            'Recent incidents',
+                            incidents.length,
+                            'text-status-warning',
+                        ],
                         ['Last 30 days', last30, 'text-status-info'],
                         [
                             'Open',
@@ -54,9 +58,16 @@ export function IncidentsTab({ incidents }: { incidents: any[] }) {
                     ] as [string, number, string][]
                 ).map(([label, value, tone]) => (
                     /* eslint-disable-next-line no-restricted-syntax -- MiniStat tile per the profile pattern language */
-                    <div key={label} className="rounded-xl border bg-card px-4 py-3">
-                        <div className={`text-xl font-bold ${tone}`}>{value}</div>
-                        <div className="text-xs text-muted-foreground">{label}</div>
+                    <div
+                        key={label}
+                        className="rounded-xl border bg-card px-4 py-3"
+                    >
+                        <div className={`text-xl font-bold ${tone}`}>
+                            {value}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                            {label}
+                        </div>
                     </div>
                 ))}
             </div>
@@ -80,7 +91,9 @@ export function IncidentsTab({ incidents }: { incidents: any[] }) {
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
                                             <span className="text-sm font-semibold capitalize">
-                                                {inc.title ?? inc.type ?? 'Incident'}
+                                                {inc.title ??
+                                                    inc.type ??
+                                                    'Incident'}
                                             </span>
                                             <Badge
                                                 className={`border-0 capitalize ${SEV_TILE[sev] ?? 'bg-muted text-muted-foreground'}`}
@@ -90,11 +103,15 @@ export function IncidentsTab({ incidents }: { incidents: any[] }) {
                                             <Badge
                                                 className={`border-0 capitalize ${closed ? 'bg-status-success-bg text-status-success' : 'bg-status-warning-bg text-status-warning'}`}
                                             >
-                                                {String(inc.status ?? 'open').replace(/_/g, ' ')}
+                                                {String(
+                                                    inc.status ?? 'open',
+                                                ).replace(/_/g, ' ')}
                                             </Badge>
                                             <span className="ml-auto text-[11px] text-muted-foreground">
                                                 {inc.occurred_at
-                                                    ? formatDateTimeLong(inc.occurred_at)
+                                                    ? formatDateTimeLong(
+                                                          inc.occurred_at,
+                                                      )
                                                     : ''}
                                                 {inc.reporter?.name
                                                     ? ` · ${inc.reporter.name}`
@@ -109,7 +126,8 @@ export function IncidentsTab({ incidents }: { incidents: any[] }) {
                                         {inc.immediate_action_taken ? (
                                             <div className="mt-2 rounded-lg bg-muted/40 p-3">
                                                 <div className="mb-0.5 flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                                                    <Check className="h-3 w-3" /> Actions taken
+                                                    <Check className="h-3 w-3" />{' '}
+                                                    Actions taken
                                                 </div>
                                                 <p className="text-sm leading-relaxed text-foreground/85">
                                                     {inc.immediate_action_taken}
@@ -117,8 +135,14 @@ export function IncidentsTab({ incidents }: { incidents: any[] }) {
                                             </div>
                                         ) : null}
                                         <div className="mt-2">
-                                            <Button size="sm" variant="outline" asChild>
-                                                <Link href={`/incidents/${inc.id}`}>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={`/incidents/${inc.id}`}
+                                                >
                                                     Open incident
                                                 </Link>
                                             </Button>
@@ -135,7 +159,9 @@ export function IncidentsTab({ incidents }: { incidents: any[] }) {
                         <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
                             <AlertTriangle className="h-[22px] w-[22px]" />
                         </div>
-                        <p className="text-sm font-medium">No incidents recorded</p>
+                        <p className="text-sm font-medium">
+                            No incidents recorded
+                        </p>
                         <p className="mt-1 max-w-xs text-center text-xs text-muted-foreground">
                             Log an incident from the button above — it appears
                             here and on the timeline.

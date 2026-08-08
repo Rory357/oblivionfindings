@@ -41,7 +41,8 @@ final class TaskTenBoundaryTimeSeriesStore implements TimeSeriesStore
         return collect($this->points)->filter(
             fn (TimeSeriesPoint $point): bool => $point->externalKey === $externalKey
                 && $point->tier === $tier
-                && $point->observedAt->betweenIncluded($from, $to),
+                && $point->observedAt->greaterThanOrEqualTo($from)
+                && $point->observedAt->lessThan($to),
         )->values()->all();
     }
 

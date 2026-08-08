@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItProvisioningWorkflow;
 use App\Models\ItTicket;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -106,6 +107,44 @@ test('the /it hub is gated on it permissions', function () {
             ->has('myTickets')
             ->where('can.view', true)
             ->has('can.manage'));
+});
+
+test('the IT hub exposes workflow template management only to IT managers', function () {
+    $readOnlyAgent = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    $readOnlyAgent->roles()->attach(
+        Role::query()->where('name', 'support_worker')->firstOrFail(),
+    );
+    $readOnlyAgent->permissionOverrides()->attach(
+        Permission::query()->where('key', 'it.view')->firstOrFail(),
+        ['allowed' => true],
+    );
+    itProfile($this->site, $readOnlyAgent, true);
+
+    $manager = User::factory()->create([
+        'role' => 'it_manager',
+        'approved_at' => now(),
+    ]);
+    $manager->roles()->attach(
+        Role::query()->where('name', 'it_manager')->firstOrFail(),
+    );
+    itProfile($this->site, $manager, true);
+
+    $this->actingAs($readOnlyAgent)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('can.view', true)
+            ->where('can.manage', false));
+
+    $this->actingAs($manager)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('can.view', true)
+            ->where('can.manage', true));
 });
 
 test('generating a checklist raises provisioning requests for non-equipment IT tasks', function () {

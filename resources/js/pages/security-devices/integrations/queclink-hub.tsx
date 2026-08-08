@@ -1,5 +1,6 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero, PageLayout } from '@/components/page';
+import { ReasonDialog } from '@/components/reason-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,11 +45,13 @@ import {
 } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTime } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
+    Archive,
     ArrowDownLeft,
     ArrowUpRight,
     BookMarked,
@@ -159,7 +162,15 @@ type Preset = {
     target_category: string;
     is_system: boolean;
     sections: string[];
+    profile_version?: number | null;
+    payload_hash?: string | null;
     created_at: string | null;
+};
+
+type RetiredPreset = Preset & {
+    retired_at: string | null;
+    retired_by: string | null;
+    retirement_reason: string | null;
 };
 
 type DevicePagination = {
@@ -203,6 +214,7 @@ type Props = {
         clients: Target[];
     };
     presets: Preset[];
+    retiredPresets?: RetiredPreset[];
     can: { manage: boolean };
 };
 
@@ -299,6 +311,7 @@ export default function QueclinkHub({
     siteCredentials,
     targets,
     presets,
+    retiredPresets = [],
     can,
 }: Props) {
     const [deviceSearch, setDeviceSearch] = useState(devices.search ?? '');
@@ -479,6 +492,7 @@ export default function QueclinkHub({
                                 devices={devices.paired}
                                 listener={listener}
                                 presets={presets}
+                                retiredPresets={retiredPresets}
                                 can={can}
                             />
                         </TabsContent>
@@ -1944,12 +1958,14 @@ function BulkActionDialog({
 
 function PresetsCard({
     presets,
+    retiredPresets,
     target,
     can,
     serverForm,
     globalForm,
 }: {
     presets: Preset[];
+    retiredPresets: RetiredPreset[];
     target: Device | null;
     can: Props['can'];
     serverForm: ServerSettingsForm;
@@ -1957,6 +1973,7 @@ function PresetsCard({
 }) {
     const [saveOpen, setSaveOpen] = useState(false);
     const [confirm, setConfirm] = useState<Preset | null>(null);
+    const [retiring, setRetiring] = useState<Preset | null>(null);
 
     const applyPreset = (preset: Preset) => {
         if (!target) return;
@@ -1967,10 +1984,15 @@ function PresetsCard({
         );
     };
 
-    const deletePreset = (preset: Preset) => {
+    const retirePreset = (preset: Preset, reason: string, done: () => void) => {
         router.delete(
             `/security-devices/integrations/queclink/presets/${preset.id}`,
-            { preserveScroll: true },
+            {
+                data: { reason },
+                preserveScroll: true,
+                onSuccess: () => setRetiring(null),
+                onFinish: done,
+            },
         );
     };
 
@@ -2051,8 +2073,8 @@ function PresetsCard({
                                             size="icon"
                                             className="h-7 w-7 text-muted-foreground hover:text-destructive"
                                             disabled={!can.manage}
-                                            onClick={() => deletePreset(preset)}
-                                            aria-label={`Delete ${preset.name}`}
+                                            onClick={() => setRetiring(preset)}
+                                            aria-label={`Retire ${preset.name}`}
                                         >
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
@@ -2084,6 +2106,73 @@ function PresetsCard({
                         ))}
                     </div>
                 )}
+
+                {retiredPresets.length > 0 ? (
+                    <div className="mt-6 space-y-3 border-t pt-5">
+                        <div className="flex items-start gap-2">
+                            <Archive
+                                className="mt-0.5 h-4 w-4 text-muted-foreground"
+                                aria-hidden="true"
+                            />
+                            <div>
+                                <p className="text-sm font-medium">
+                                    Retired preset history
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Retired profiles cannot be selected or
+                                    executed. Their immutable version, actor and
+                                    reason remain available here.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            {retiredPresets.map((preset) => (
+                                <div
+                                    key={preset.id}
+                                    className="rounded-md border bg-muted/20 p-3 text-sm"
+                                >
+                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                        <div>
+                                            <p className="font-medium">
+                                                {preset.name}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Retired{' '}
+                                                {formatDateTime(
+                                                    preset.retired_at,
+                                                )}
+                                                {preset.retired_by
+                                                    ? ` · ${preset.retired_by}`
+                                                    : ''}
+                                                {preset.profile_version
+                                                    ? ` · Profile v${preset.profile_version}`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                        <Badge
+                                            variant="outline"
+                                            className="gap-1.5"
+                                        >
+                                            <Archive
+                                                className="h-3.5 w-3.5"
+                                                aria-hidden="true"
+                                            />
+                                            Retired
+                                        </Badge>
+                                    </div>
+                                    {preset.retirement_reason ? (
+                                        <p className="mt-2 rounded-md bg-background px-3 py-2 text-xs">
+                                            <span className="font-medium">
+                                                Reason:{' '}
+                                            </span>
+                                            {preset.retirement_reason}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
             </CardContent>
 
             {confirm && (
@@ -2138,6 +2227,23 @@ function PresetsCard({
                     onClose={() => setSaveOpen(false)}
                 />
             )}
+
+            <ReasonDialog
+                open={retiring !== null}
+                onClose={() => setRetiring(null)}
+                onConfirm={(reason, done) => {
+                    if (retiring) retirePreset(retiring, reason, done);
+                }}
+                title="Retire configuration preset?"
+                description={
+                    retiring
+                        ? `Retire “${retiring.name}” so it can no longer be selected or executed? Its immutable configuration versions and reasoned history will be retained.`
+                        : ''
+                }
+                label="Reason for retiring this preset"
+                placeholder="For example: replaced by the approved current configuration baseline."
+                confirmLabel="Retire preset"
+            />
         </Card>
     );
 }
@@ -2905,11 +3011,13 @@ export function DeviceSettingsTab({
     devices,
     listener,
     presets,
+    retiredPresets = [],
     can,
 }: {
     devices: Device[];
     listener: Props['listener'];
     presets: Preset[];
+    retiredPresets?: RetiredPreset[];
     can: Props['can'];
 }) {
     const [targetId, setTargetId] = useState<string>(
@@ -3097,6 +3205,7 @@ export function DeviceSettingsTab({
 
             <PresetsCard
                 presets={presets}
+                retiredPresets={retiredPresets}
                 target={target}
                 can={can}
                 serverForm={serverForm}

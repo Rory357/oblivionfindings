@@ -1,18 +1,32 @@
-import { Head, router } from '@inertiajs/react';
-import { PageProps, type BreadcrumbItem } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import { ReportsTabsFooter } from '@/components/finance';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Printer, CheckCircle, AlertTriangle, Landmark, HandCoins, Scale } from 'lucide-react';
-import { useState, useMemo } from 'react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { chartColor } from '@/components/finance/chart-palette';
 import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { PageProps, type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    CheckCircle,
+    HandCoins,
+    Landmark,
+    Printer,
+    Scale,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface AccountRow {
     account_code: string;
@@ -43,7 +57,15 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Balance Sheet' },
 ];
 
-function SectionTable({ title, rows, total }: { title: string; rows: AccountRow[]; total: number }) {
+function SectionTable({
+    title,
+    rows,
+    total,
+}: {
+    title: string;
+    rows: AccountRow[];
+    total: number;
+}) {
     return (
         <>
             <TableRow className="bg-muted/50">
@@ -53,9 +75,13 @@ function SectionTable({ title, rows, total }: { title: string; rows: AccountRow[
             </TableRow>
             {rows.map((row, idx) => (
                 <TableRow key={`${title}-${idx}`}>
-                    <TableCell className="font-mono text-sm">{row.account_code || '-'}</TableCell>
+                    <TableCell className="font-mono text-sm">
+                        {row.account_code || '-'}
+                    </TableCell>
                     <TableCell>{row.account_name}</TableCell>
-                    <TableCell className="text-right">{formatMoney(row.balance)}</TableCell>
+                    <TableCell className="text-right">
+                        {formatMoney(row.balance)}
+                    </TableCell>
                 </TableRow>
             ))}
             {rows.length === 0 && (
@@ -67,7 +93,9 @@ function SectionTable({ title, rows, total }: { title: string; rows: AccountRow[
             )}
             <TableRow className="border-t font-semibold">
                 <TableCell colSpan={2}>Total {title}</TableCell>
-                <TableCell className="text-right">{formatMoney(total)}</TableCell>
+                <TableCell className="text-right">
+                    {formatMoney(total)}
+                </TableCell>
             </TableRow>
         </>
     );
@@ -77,7 +105,11 @@ export default function BalanceSheet({ report, filters }: Props) {
     const [asOfDate, setAsOfDate] = useState(filters.as_of_date);
 
     const applyFilter = () => {
-        router.get('/finance/reports/balance-sheet', { as_of_date: asOfDate }, { preserveState: true });
+        router.get(
+            '/finance/reports/balance-sheet',
+            { as_of_date: asOfDate },
+            { preserveState: true },
+        );
     };
 
     const pieData = useMemo(() => {
@@ -94,17 +126,32 @@ export default function BalanceSheet({ report, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Scale}
                         title="Balance Sheet"
                         description="Financial position showing assets, liabilities, and equity."
                         stats={[
-                            { label: 'Assets', value: formatMoney(report.total_assets) },
-                            { label: 'Liabilities', value: formatMoney(report.total_liabilities) },
-                            { label: 'Equity', value: formatMoney(report.total_equity) },
+                            {
+                                label: 'Assets',
+                                value: formatMoney(report.total_assets),
+                            },
+                            {
+                                label: 'Liabilities',
+                                value: formatMoney(report.total_liabilities),
+                            },
+                            {
+                                label: 'Equity',
+                                value: formatMoney(report.total_equity),
+                            },
                         ]}
                         actions={
-                            <Button variant="outline" size="sm" onClick={() => window.print()} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.print()}
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
                                 <Printer className="mr-1 h-4 w-4" />
                                 Print
                             </Button>
@@ -121,7 +168,9 @@ export default function BalanceSheet({ report, filters }: Props) {
                                 <Landmark className="h-5 w-5 text-status-info dark:text-status-info" />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Total Assets</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Total Assets
+                                </p>
                                 <p className="text-2xl font-bold text-status-info dark:text-status-info">
                                     {formatMoney(report.total_assets)}
                                 </p>
@@ -134,7 +183,9 @@ export default function BalanceSheet({ report, filters }: Props) {
                                 <HandCoins className="h-5 w-5 text-status-critical dark:text-status-critical" />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Total Liabilities</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Total Liabilities
+                                </p>
                                 <p className="text-2xl font-bold text-status-critical dark:text-status-critical">
                                     {formatMoney(report.total_liabilities)}
                                 </p>
@@ -147,7 +198,9 @@ export default function BalanceSheet({ report, filters }: Props) {
                                 <Scale className="h-5 w-5 text-status-warning dark:text-status-warning" />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">Total Equity</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Total Equity
+                                </p>
                                 <p className="text-2xl font-bold text-status-warning dark:text-status-warning">
                                     {formatMoney(report.total_equity)}
                                 </p>
@@ -160,7 +213,9 @@ export default function BalanceSheet({ report, filters }: Props) {
                 <Card>
                     <CardContent className="flex items-end gap-4 pt-6">
                         <div>
-                            <label className="mb-1 block text-sm font-medium">As of Date</label>
+                            <label className="mb-1 block text-sm font-medium">
+                                As of Date
+                            </label>
                             <Input
                                 type="date"
                                 value={asOfDate}
@@ -176,7 +231,9 @@ export default function BalanceSheet({ report, filters }: Props) {
                 {pieData.length > 0 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Composition Overview</CardTitle>
+                            <CardTitle className="text-base">
+                                Composition Overview
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="h-64">
@@ -195,22 +252,32 @@ export default function BalanceSheet({ report, filters }: Props) {
                                             }
                                         >
                                             {pieData.map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill={chartColor(index)} />
+                                                <Cell
+                                                    key={`cell-${index}`}
+                                                    fill={chartColor(index)}
+                                                />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value?: number) => formatMoney(value ?? 0)} />
+                                        <Tooltip
+                                            formatter={(value?: number) =>
+                                                formatMoney(value ?? 0)
+                                            }
+                                        />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
                             <div className="mt-3 flex items-center justify-center gap-6 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1.5">
-                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-info" /> Assets
+                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-info" />{' '}
+                                    Assets
                                 </span>
                                 <span className="flex items-center gap-1.5">
-                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-critical" /> Liabilities
+                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-critical" />{' '}
+                                    Liabilities
                                 </span>
                                 <span className="flex items-center gap-1.5">
-                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-warning" /> Equity
+                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-warning" />{' '}
+                                    Equity
                                 </span>
                             </div>
                         </CardContent>
@@ -222,14 +289,20 @@ export default function BalanceSheet({ report, filters }: Props) {
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>
                             Balance Sheet as at{' '}
-                            {new Date(report.as_of_date).toLocaleDateString('en-NZ', {
-                                day: '2-digit',
-                                month: 'long',
-                                year: 'numeric',
-                            })}
+                            {new Date(report.as_of_date).toLocaleDateString(
+                                'en-NZ',
+                                {
+                                    day: '2-digit',
+                                    month: 'long',
+                                    year: 'numeric',
+                                },
+                            )}
                         </CardTitle>
                         {report.balanced ? (
-                            <Badge variant="outline" className="border-status-success/30 text-status-success dark:text-status-success">
+                            <Badge
+                                variant="outline"
+                                className="border-status-success/30 text-status-success dark:text-status-success"
+                            >
                                 <CheckCircle className="mr-1 h-3 w-3" />
                                 Balanced
                             </Badge>
@@ -244,24 +317,41 @@ export default function BalanceSheet({ report, filters }: Props) {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-32">Account Code</TableHead>
+                                    <TableHead className="w-32">
+                                        Account Code
+                                    </TableHead>
                                     <TableHead>Account Name</TableHead>
-                                    <TableHead className="text-right">Balance</TableHead>
+                                    <TableHead className="text-right">
+                                        Balance
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                <SectionTable title="Assets" rows={report.assets} total={report.total_assets} />
+                                <SectionTable
+                                    title="Assets"
+                                    rows={report.assets}
+                                    total={report.total_assets}
+                                />
                                 <SectionTable
                                     title="Liabilities"
                                     rows={report.liabilities}
                                     total={report.total_liabilities}
                                 />
-                                <SectionTable title="Equity" rows={report.equity} total={report.total_equity} />
+                                <SectionTable
+                                    title="Equity"
+                                    rows={report.equity}
+                                    total={report.total_equity}
+                                />
 
                                 <TableRow className="border-t-2 text-lg font-bold">
-                                    <TableCell colSpan={2}>Total Liabilities + Equity</TableCell>
+                                    <TableCell colSpan={2}>
+                                        Total Liabilities + Equity
+                                    </TableCell>
                                     <TableCell className="text-right">
-                                        {formatMoney(report.total_liabilities + report.total_equity)}
+                                        {formatMoney(
+                                            report.total_liabilities +
+                                                report.total_equity,
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             </TableBody>

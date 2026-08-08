@@ -34,7 +34,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             ['key' => 'securityDevices.events.view', 'description' => 'View device events and alerts', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.cctv.media.view', 'description' => 'Open authorised CCTV media links', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.accessControl.view', 'description' => 'View physical access credentials, schedules, and history', 'group' => 'security_devices', 'module' => 'Security & Devices'],
-            ['key' => 'securityDevices.accessControl.manage', 'description' => 'Issue and revoke physical access credentials and manage schedules', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.accessControl.manage', 'description' => 'Manage provider-backed physical access credential requests and schedules', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.maintenance.view', 'description' => 'View device maintenance records', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.maintenance.manage', 'description' => 'Create and manage device maintenance', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.integrations.view', 'description' => 'View integration status and synced devices', 'group' => 'security_devices', 'module' => 'Security & Devices'],

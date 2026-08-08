@@ -28,7 +28,12 @@ function toneFor(type: string): string {
     }
 }
 
-export default function AttentionBar({ alerts, onReview, onManage, canManage }: Props) {
+export default function AttentionBar({
+    alerts,
+    onReview,
+    onManage,
+    canManage,
+}: Props) {
     if (alerts.length === 0) {
         return null;
     }
@@ -43,7 +48,10 @@ export default function AttentionBar({ alerts, onReview, onManage, canManage }: 
                 {alerts.map((alert) => (
                     <span
                         key={alert.id}
-                        className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', toneFor(alert.type))}
+                        className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium',
+                            toneFor(alert.type),
+                        )}
                         title={alert.detail ?? undefined}
                     >
                         <span className="h-1.5 w-1.5 rounded-full bg-current" />

@@ -24,11 +24,20 @@ type Props = {
     completed: boolean;
 };
 
-export default function ReferenceQuestionnaire({ token, refereeName, candidateName, questions, completed }: Props) {
+export default function ReferenceQuestionnaire({
+    token,
+    refereeName,
+    candidateName,
+    questions,
+    completed,
+}: Props) {
     const [answers, setAnswers] = useState<Record<string, string>>({});
-    const form = useForm<{ responses: Record<string, string> }>({ responses: {} });
+    const form = useForm<{ responses: Record<string, string> }>({
+        responses: {},
+    });
 
-    const setAnswer = (key: string, value: string) => setAnswers((a) => ({ ...a, [key]: value }));
+    const setAnswer = (key: string, value: string) =>
+        setAnswers((a) => ({ ...a, [key]: value }));
 
     const submit = () => {
         form.transform(() => ({ responses: answers }));
@@ -50,9 +59,12 @@ export default function ReferenceQuestionnaire({ token, refereeName, candidateNa
                     <Card>
                         <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
                             <CheckCircle2 className="h-10 w-10 text-status-success" />
-                            <h2 className="text-lg font-bold">Thank you, {refereeName}</h2>
+                            <h2 className="text-lg font-bold">
+                                Thank you, {refereeName}
+                            </h2>
                             <p className="max-w-md text-sm text-muted-foreground">
-                                Your reference for {candidateName} has been submitted. There's nothing more to do.
+                                Your reference for {candidateName} has been
+                                submitted. There's nothing more to do.
                             </p>
                         </CardContent>
                     </Card>
@@ -61,26 +73,35 @@ export default function ReferenceQuestionnaire({ token, refereeName, candidateNa
                         <CardHeader>
                             <CardTitle>Kia ora {refereeName}</CardTitle>
                             <p className="text-sm text-muted-foreground">
-                                {candidateName} has listed you as a referee. Please answer the questions below — it takes a couple of minutes.
+                                {candidateName} has listed you as a referee.
+                                Please answer the questions below — it takes a
+                                couple of minutes.
                             </p>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-6">
                             {questions.map((q) => (
                                 <div key={q.key}>
-                                    <Label className="mb-2 block text-sm font-semibold">{q.label}</Label>
+                                    <Label className="mb-2 block text-sm font-semibold">
+                                        {q.label}
+                                    </Label>
                                     {q.type === 'text' ? (
                                         <Textarea
                                             value={answers[q.key] ?? ''}
-                                            onChange={(e) => setAnswer(q.key, e.target.value)}
+                                            onChange={(e) =>
+                                                setAnswer(q.key, e.target.value)
+                                            }
                                             rows={3}
                                         />
                                     ) : q.type === 'choice' ? (
                                         <div className="flex flex-wrap gap-2">
                                             {(q.options ?? []).map((opt) => (
-                                                <Button unstyled
+                                                <Button
+                                                    unstyled
                                                     key={opt}
                                                     type="button"
-                                                    onClick={() => setAnswer(q.key, opt)}
+                                                    onClick={() =>
+                                                        setAnswer(q.key, opt)
+                                                    }
                                                     className={cn(
                                                         'rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
                                                         answers[q.key] === opt
@@ -95,13 +116,20 @@ export default function ReferenceQuestionnaire({ token, refereeName, candidateNa
                                     ) : (
                                         <div className="flex gap-2">
                                             {[1, 2, 3, 4, 5].map((n) => (
-                                                <Button unstyled
+                                                <Button
+                                                    unstyled
                                                     key={n}
                                                     type="button"
-                                                    onClick={() => setAnswer(q.key, String(n))}
+                                                    onClick={() =>
+                                                        setAnswer(
+                                                            q.key,
+                                                            String(n),
+                                                        )
+                                                    }
                                                     className={cn(
                                                         'h-10 w-10 rounded-lg border text-sm font-bold transition-colors',
-                                                        answers[q.key] === String(n)
+                                                        answers[q.key] ===
+                                                            String(n)
                                                             ? 'border-primary bg-primary text-primary-foreground'
                                                             : 'border-border bg-card hover:border-primary/50',
                                                     )}
@@ -114,7 +142,11 @@ export default function ReferenceQuestionnaire({ token, refereeName, candidateNa
                                 </div>
                             ))}
 
-                            <Button onClick={submit} disabled={form.processing} className="self-end">
+                            <Button
+                                onClick={submit}
+                                disabled={form.processing}
+                                className="self-end"
+                            >
                                 Submit reference
                             </Button>
                         </CardContent>

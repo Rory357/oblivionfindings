@@ -72,7 +72,10 @@ export default function TodayDashboard({
                         stats={[
                             { label: 'My shifts', value: shifts.length },
                             { label: 'Due meds', value: dueMeds.length },
-                            { label: 'Open incidents', value: openIncidents.length },
+                            {
+                                label: 'Open incidents',
+                                value: openIncidents.length,
+                            },
                         ]}
                     />
                 }

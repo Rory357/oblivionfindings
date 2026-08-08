@@ -97,4 +97,22 @@ class ServiceContext extends Model
 
         return self::query()->whereKey($id)->where('is_active', true)->exists() ? $id : null;
     }
+
+    /**
+     * Returns the active configured default only when it is available to the
+     * selected Site. A null Site can use only an application-wide context.
+     */
+    public static function defaultIdForSite(?int $siteId): ?int
+    {
+        $id = self::defaultId();
+        if ($id === null) {
+            return null;
+        }
+
+        return self::query()
+            ->availableToSite($siteId)
+            ->whereKey($id)
+            ->where('is_active', true)
+            ->exists() ? $id : null;
+    }
 }

@@ -54,7 +54,10 @@ export interface TimelineCategoryEntry {
  * The goal is visual calm: fewer, softer accents. The category should still
  * be distinguishable, but it shouldn't feel like a rainbow of status chips.
  */
-export const TIMELINE_CATEGORY_VOCAB: Record<TimelineCategory, TimelineCategoryEntry> = {
+export const TIMELINE_CATEGORY_VOCAB: Record<
+    TimelineCategory,
+    TimelineCategoryEntry
+> = {
     shift: {
         label: 'Shift',
         dot: 'bg-status-info',
@@ -107,7 +110,11 @@ export const TIMELINE_CATEGORY_ORDER: TimelineCategory[] = [
 ];
 
 function normalize(value: string | null | undefined): string {
-    return (value ?? '').toString().trim().toLowerCase().replace(/[\s-]+/g, '_');
+    return (value ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, '_');
 }
 
 /**
@@ -135,7 +142,11 @@ export function categorizeTimelineType(
     if (!t) return 'other';
 
     if (t === 'incident' || t.startsWith('incident_')) return 'incident';
-    if (t === 'medication' || t.startsWith('medication_') || t.startsWith('med_')) {
+    if (
+        t === 'medication' ||
+        t.startsWith('medication_') ||
+        t.startsWith('med_')
+    ) {
         return 'medication';
     }
     if (t === 'shift' || t.startsWith('shift_')) {

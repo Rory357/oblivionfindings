@@ -6,14 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
-    ReviewCard,
-    ReviewRow,
-    WizardShell,
-    WizardStepPane,
-    WizardSuccessPane,
-    type WizardStep,
-} from '@/components/wizard/shell';
-import {
     ChipMulti,
     Field,
     Segmented,
@@ -21,6 +13,14 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+    type WizardStep,
+} from '@/components/wizard/shell';
 import { router } from '@inertiajs/react';
 import { ClipboardCheck, type LucideIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -87,14 +87,28 @@ function initDefaults(config: WizardConfig): Record<string, unknown> {
     const v: Record<string, unknown> = {};
     for (const s of config.steps) {
         for (const f of s.fields) {
-            v[f.key] = f.default !== undefined ? f.default : f.type === 'chips' ? [] : f.type === 'toggle' ? false : '';
+            v[f.key] =
+                f.default !== undefined
+                    ? f.default
+                    : f.type === 'chips'
+                      ? []
+                      : f.type === 'toggle'
+                        ? false
+                        : '';
         }
     }
     return v;
 }
 
-function optionsFor(f: FieldSpec, ref: RefData): Array<{ value: string; label: string }> {
-    if (f.source) return ref[f.source].map((o) => ({ value: String(o.id), label: o.name }));
+function optionsFor(
+    f: FieldSpec,
+    ref: RefData,
+): Array<{ value: string; label: string }> {
+    if (f.source)
+        return ref[f.source].map((o) => ({
+            value: String(o.id),
+            label: o.name,
+        }));
     return (f.options ?? []).map((o) => ({ value: o.value, label: o.label }));
 }
 
@@ -121,23 +135,78 @@ function FieldInput({
 
     switch (f.type) {
         case 'textarea':
-            return <Textarea value={str} onChange={(e) => onChange(e.target.value)} placeholder={f.placeholder} rows={3} />;
+            return (
+                <Textarea
+                    value={str}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder={f.placeholder}
+                    rows={3}
+                />
+            );
         case 'date':
-            return <Input type="date" value={str} onChange={(e) => onChange(e.target.value)} />;
+            return (
+                <Input
+                    type="date"
+                    value={str}
+                    onChange={(e) => onChange(e.target.value)}
+                />
+            );
         case 'time':
-            return <Input type="time" value={str} onChange={(e) => onChange(e.target.value)} />;
+            return (
+                <Input
+                    type="time"
+                    value={str}
+                    onChange={(e) => onChange(e.target.value)}
+                />
+            );
         case 'datetime':
-            return <Input type="datetime-local" value={str} onChange={(e) => onChange(e.target.value)} />;
+            return (
+                <Input
+                    type="datetime-local"
+                    value={str}
+                    onChange={(e) => onChange(e.target.value)}
+                />
+            );
         case 'number':
-            return <Input type="number" value={str} onChange={(e) => onChange(e.target.value)} placeholder={f.placeholder} />;
+            return (
+                <Input
+                    type="number"
+                    value={str}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder={f.placeholder}
+                />
+            );
         case 'select':
-            return <SelectInput value={str} onChange={onChange} placeholder={f.placeholder ?? 'Select…'} options={opts} />;
+            return (
+                <SelectInput
+                    value={str}
+                    onChange={onChange}
+                    placeholder={f.placeholder ?? 'Select…'}
+                    options={opts}
+                />
+            );
         case 'segmented':
             return <Segmented value={str} onChange={onChange} options={opts} />;
         case 'tiles':
-            return <TilePicker value={str} onChange={onChange} options={opts.map((o) => ({ key: o.value, label: o.label }))} cols={2} />;
+            return (
+                <TilePicker
+                    value={str}
+                    onChange={onChange}
+                    options={opts.map((o) => ({
+                        key: o.value,
+                        label: o.label,
+                    }))}
+                    cols={2}
+                />
+            );
         case 'chips':
-            return <ChipMulti values={(value as string[]) ?? []} onChange={onChange} options={opts.map((o) => o.label)} />;
+            return (
+                <ChipMulti
+                    values={(value as string[]) ?? []}
+                    onChange={onChange}
+                    options={opts.map((o) => o.label)}
+                />
+            );
         case 'toggle':
             return (
                 <Segmented
@@ -150,7 +219,13 @@ function FieldInput({
                 />
             );
         default:
-            return <Input value={str} onChange={(e) => onChange(e.target.value)} placeholder={f.placeholder} />;
+            return (
+                <Input
+                    value={str}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder={f.placeholder}
+                />
+            );
     }
 }
 
@@ -169,9 +244,16 @@ export function HsFormWizard({
     const [submitted, setSubmitted] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [values, setValues] = useState<Record<string, unknown>>(() => initDefaults(config));
+    const [values, setValues] = useState<Record<string, unknown>>(() =>
+        initDefaults(config),
+    );
 
-    const steps: WizardStep[] = config.steps.map((s) => ({ key: s.key, label: s.label, blurb: s.blurb, icon: s.icon }));
+    const steps: WizardStep[] = config.steps.map((s) => ({
+        key: s.key,
+        label: s.label,
+        blurb: s.blurb,
+        icon: s.icon,
+    }));
     const requiredFields = useMemo(
         () => config.steps.flatMap((s) => s.fields).filter((f) => f.required),
         [config],
@@ -179,10 +261,17 @@ export function HsFormWizard({
     const pct =
         requiredFields.length === 0
             ? 100
-            : Math.round((requiredFields.filter((f) => fieldValid(f, values[f.key])).length / requiredFields.length) * 100);
-    const stepValid = (i: number) => config.steps[i].fields.every((f) => fieldValid(f, values[f.key]));
+            : Math.round(
+                  (requiredFields.filter((f) => fieldValid(f, values[f.key]))
+                      .length /
+                      requiredFields.length) *
+                      100,
+              );
+    const stepValid = (i: number) =>
+        config.steps[i].fields.every((f) => fieldValid(f, values[f.key]));
 
-    const set = (k: string, v: unknown) => setValues((prev) => ({ ...prev, [k]: v }));
+    const set = (k: string, v: unknown) =>
+        setValues((prev) => ({ ...prev, [k]: v }));
     const reset = () => {
         setValues(initDefaults(config));
         setErrors({});
@@ -197,20 +286,35 @@ export function HsFormWizard({
     const submit = () => {
         setProcessing(true);
         setErrors({});
-        const payload = { ...(config.transform ? config.transform(values) : values), stay: true };
-        const url = typeof config.endpoint === 'function' ? config.endpoint(values) : config.endpoint;
-        router.post(url, payload as Record<string, string | number | boolean | string[] | null>, {
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: () => setSubmitted(true),
-            onError: (errs) => {
-                setErrors(errs as Record<string, string>);
-                const keys = Object.keys(errs);
-                const idx = config.steps.findIndex((s) => s.fields.some((f) => keys.includes(f.key)));
-                if (idx >= 0) setStep(idx);
+        const payload = {
+            ...(config.transform ? config.transform(values) : values),
+            stay: true,
+        };
+        const url =
+            typeof config.endpoint === 'function'
+                ? config.endpoint(values)
+                : config.endpoint;
+        router.post(
+            url,
+            payload as Record<
+                string,
+                string | number | boolean | string[] | null
+            >,
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => setSubmitted(true),
+                onError: (errs) => {
+                    setErrors(errs as Record<string, string>);
+                    const keys = Object.keys(errs);
+                    const idx = config.steps.findIndex((s) =>
+                        s.fields.some((f) => keys.includes(f.key)),
+                    );
+                    if (idx >= 0) setStep(idx);
+                },
+                onFinish: () => setProcessing(false),
             },
-            onFinish: () => setProcessing(false),
-        });
+        );
     };
 
     const last = step === config.steps.length - 1;
@@ -259,11 +363,17 @@ export function HsFormWizard({
             }
             footerEnd={
                 !last ? (
-                    <Button onClick={() => canContinue && setStep(step + 1)} disabled={!canContinue}>
+                    <Button
+                        onClick={() => canContinue && setStep(step + 1)}
+                        disabled={!canContinue}
+                    >
                         Continue
                     </Button>
                 ) : (
-                    <Button onClick={submit} disabled={processing || !canContinue}>
+                    <Button
+                        onClick={submit}
+                        disabled={processing || !canContinue}
+                    >
                         Save &amp; submit
                     </Button>
                 )
@@ -272,17 +382,30 @@ export function HsFormWizard({
             <WizardStepPane>
                 {current.key === 'review' ? (
                     <>
-                        <StepHead icon={ClipboardCheck} title="Review & submit" blurb="Confirm the details before filing." />
+                        <StepHead
+                            icon={ClipboardCheck}
+                            title="Review & submit"
+                            blurb="Confirm the details before filing."
+                        />
                         <div className="grid gap-4 sm:grid-cols-2">
                             {config.steps
                                 .filter((s) => s.key !== 'review')
                                 .map((s, i) => (
-                                    <ReviewCard key={s.key} icon={s.icon} title={s.label} onEdit={() => setStep(i)}>
+                                    <ReviewCard
+                                        key={s.key}
+                                        icon={s.icon}
+                                        title={s.label}
+                                        onEdit={() => setStep(i)}
+                                    >
                                         {s.fields.map((f) => (
                                             <ReviewRow
                                                 key={f.key}
                                                 label={f.label}
-                                                value={reviewValue(f, values[f.key], refData)}
+                                                value={reviewValue(
+                                                    f,
+                                                    values[f.key],
+                                                    refData,
+                                                )}
                                             />
                                         ))}
                                     </ReviewCard>
@@ -291,7 +414,11 @@ export function HsFormWizard({
                     </>
                 ) : (
                     <>
-                        <StepHead icon={current.icon} title={current.label} blurb={current.blurb} />
+                        <StepHead
+                            icon={current.icon}
+                            title={current.label}
+                            blurb={current.blurb}
+                        />
                         <div className="grid gap-4 sm:grid-cols-2">
                             {current.fields.map((f) => (
                                 <Field
@@ -300,9 +427,19 @@ export function HsFormWizard({
                                     required={f.required}
                                     hint={f.hint}
                                     error={errors[f.key]}
-                                    span={f.span || f.type === 'textarea' || f.type === 'tiles' || f.type === 'chips'}
+                                    span={
+                                        f.span ||
+                                        f.type === 'textarea' ||
+                                        f.type === 'tiles' ||
+                                        f.type === 'chips'
+                                    }
                                 >
-                                    <FieldInput f={f} value={values[f.key]} onChange={(v) => set(f.key, v)} refData={refData} />
+                                    <FieldInput
+                                        f={f}
+                                        value={values[f.key]}
+                                        onChange={(v) => set(f.key, v)}
+                                        refData={refData}
+                                    />
                                 </Field>
                             ))}
                         </div>
@@ -314,7 +451,8 @@ export function HsFormWizard({
 }
 
 function reviewValue(f: FieldSpec, v: unknown, ref: RefData): string {
-    if (v == null || v === '' || (Array.isArray(v) && v.length === 0)) return '';
+    if (v == null || v === '' || (Array.isArray(v) && v.length === 0))
+        return '';
     if (f.type === 'toggle') return v ? 'Yes' : 'No';
     if (f.type === 'chips') return (v as string[]).join(', ');
     if (f.source) {

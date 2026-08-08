@@ -4,26 +4,26 @@ import { useCallback, useMemo, useState } from 'react';
 // kit from one HR entry point so every HR stepper-modal stays visually identical
 // to the reference (resources/js/components/clients/add-client-dialog.tsx).
 export {
-    WizardShell,
-    WizardStepPane,
-    WizardSuccessPane,
-    ReviewCard,
-    ReviewRow,
-} from '@/components/wizard/shell';
-export type { WizardStep } from '@/components/wizard/shell';
-export {
+    ChipMulti,
     Field,
     FieldErr,
+    InfoCard,
+    Ring,
     Segmented,
-    ChipMulti,
-    TilePicker,
     SelectInput,
     StepHead,
     SubHead,
-    InfoCard,
-    Ring,
+    TilePicker,
 } from '@/components/wizard/primitives';
 export type { IconType } from '@/components/wizard/primitives';
+export {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+} from '@/components/wizard/shell';
+export type { WizardStep } from '@/components/wizard/shell';
 
 /**
  * Step state machine for HR wizards built on WizardShell — keeps Back / Continue
@@ -50,9 +50,7 @@ export function useWizard(stepCount: number) {
             isFirst: index === 0,
             isLast: index === stepCount - 1,
             progress:
-                stepCount > 0
-                    ? Math.round(((index + 1) / stepCount) * 100)
-                    : 0,
+                stepCount > 0 ? Math.round(((index + 1) / stepCount) * 100) : 0,
         }),
         [index, goTo, next, back, reset, stepCount],
     );

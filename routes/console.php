@@ -144,6 +144,15 @@ app(Schedule::class)
     ->onOneServer()
     ->withoutOverlapping();
 
+// The Device document row is the durable storage intent. Finish verified
+// staged uploads, reasoned quarantine removals and interrupted private-blob
+// cleanup without relying on the original web request or a queue worker.
+app(Schedule::class)
+    ->command('security-devices:reconcile-document-storage --limit=100')
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
 app(Schedule::class)
     ->job(new DownsampleMetrics)
     ->hourlyAt(10)

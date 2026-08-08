@@ -104,11 +104,107 @@ function reportData({
     };
 }
 
+type ReportData = ReturnType<typeof reportData>;
+
+const outcomeOnlyCases: Array<[string, (data: ReportData) => void]> = [
+    [
+        'successful changes',
+        (data) => {
+            data.change_success.successful = 1;
+        },
+    ],
+    [
+        'recurring problems',
+        (data) => {
+            data.recurring_problems.total = 1;
+        },
+    ],
+    [
+        'skipped automation',
+        (data) => {
+            data.automation_outcomes.skipped = 1;
+        },
+    ],
+    [
+        'affected Devices',
+        (data) => {
+            data.device_reliability.affected_devices = 1;
+        },
+    ],
+];
+
 beforeEach(() => {
     vi.clearAllMocks();
 });
 
 describe('IT reports request truthfulness', () => {
+    it('shows permission-restricted outcomes without inventing zero counts or destinations', async () => {
+        const data = {
+            ...reportData({
+                from: '2026-06-01',
+                to: '2026-06-07',
+                days: 7,
+                open: 0,
+            }),
+            automation_outcomes: {
+                access: 'restricted' as const,
+                succeeded: null,
+                failed: null,
+                skipped: null,
+                href: null,
+            },
+            device_reliability: {
+                access: 'restricted' as const,
+                affected_devices: null,
+                open_incidents: null,
+                recovered: null,
+                href: null,
+            },
+        };
+        vi.mocked(axios.get).mockResolvedValueOnce({ data });
+
+        render(<ItReports />);
+
+        const automation = await screen.findByText('Automation outcomes');
+        const devices = screen.getByText('Device context');
+
+        expect(screen.getAllByText('Restricted')).toHaveLength(2);
+        expect(
+            screen.getByText(
+                'IT management access is required to view application-wide automation outcomes.',
+            ),
+        ).toBeVisible();
+        expect(
+            screen.getByText(
+                'Security & Devices access is required to view canonical Device-linked counts.',
+            ),
+        ).toBeVisible();
+        expect(automation.closest('a')).toBeNull();
+        expect(devices.closest('a')).toBeNull();
+        expect(screen.queryByText('No data to report yet')).toBeNull();
+    });
+
+    it.each(outcomeOnlyCases)(
+        'does not hide %s behind the empty report state',
+        async (_, mutate) => {
+            const data = reportData({
+                from: '2026-06-01',
+                to: '2026-06-07',
+                days: 7,
+                open: 0,
+            });
+            mutate(data);
+            vi.mocked(axios.get).mockResolvedValueOnce({ data });
+
+            render(<ItReports />);
+
+            expect(
+                await screen.findByText('Operational outcomes'),
+            ).toBeVisible();
+            expect(screen.queryByText('No data to report yet')).toBeNull();
+        },
+    );
+
     it('cancels the prior range and ignores an out-of-order response', async () => {
         const thirtyDay = deferred<{ data: ReturnType<typeof reportData> }>();
         const sevenDay = deferred<{ data: ReturnType<typeof reportData> }>();

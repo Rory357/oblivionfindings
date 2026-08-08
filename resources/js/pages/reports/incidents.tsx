@@ -1,17 +1,29 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { AlertOctagon } from 'lucide-react';
 import { useState } from 'react';
 
 type Props = {
     clients: Array<{ id: number; first_name: string; last_name: string }>;
-    filters: { from?: string; to?: string; client_id?: string; severity?: string; reviewed?: string };
+    filters: {
+        from?: string;
+        to?: string;
+        client_id?: string;
+        severity?: string;
+        reviewed?: string;
+    };
 };
 
 export default function IncidentReports({ clients, filters }: Props) {
@@ -33,7 +45,12 @@ export default function IncidentReports({ clients, filters }: Props) {
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Reports', href: '/reports' }, { title: 'Incidents', href: '/reports/incidents' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Reports', href: '/reports' },
+                { title: 'Incidents', href: '/reports/incidents' },
+            ]}
+        >
             <Head title="Incident reports" />
 
             <PageLayout
@@ -52,21 +69,41 @@ export default function IncidentReports({ clients, filters }: Props) {
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                         <div className="space-y-1">
                             <Label>From</Label>
-                            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+                            <Input
+                                type="date"
+                                value={from}
+                                onChange={(e) => setFrom(e.target.value)}
+                            />
                         </div>
                         <div className="space-y-1">
                             <Label>To</Label>
-                            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                            <Input
+                                type="date"
+                                value={to}
+                                onChange={(e) => setTo(e.target.value)}
+                            />
                         </div>
 
                         <div className="space-y-1">
                             <Label>Client</Label>
-                            <Select value={clientId || ANY} onValueChange={(v) => setClientId(v === ANY ? '' : v)}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                            <Select
+                                value={clientId || ANY}
+                                onValueChange={(v) =>
+                                    setClientId(v === ANY ? '' : v)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     {clients.map((c) => (
-                                        <SelectItem key={c.id} value={String(c.id)}>{c.first_name} {c.last_name}</SelectItem>
+                                        <SelectItem
+                                            key={c.id}
+                                            value={String(c.id)}
+                                        >
+                                            {c.first_name} {c.last_name}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -74,12 +111,21 @@ export default function IncidentReports({ clients, filters }: Props) {
 
                         <div className="space-y-1">
                             <Label>Severity</Label>
-                            <Select value={severity || ANY} onValueChange={(v) => setSeverity(v === ANY ? '' : v)}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                            <Select
+                                value={severity || ANY}
+                                onValueChange={(v) =>
+                                    setSeverity(v === ANY ? '' : v)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    {['low','medium','high'].map((s) => (
-                                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    {['low', 'medium', 'high'].map((s) => (
+                                        <SelectItem key={s} value={s}>
+                                            {s}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -87,8 +133,15 @@ export default function IncidentReports({ clients, filters }: Props) {
 
                         <div className="space-y-1">
                             <Label>Reviewed</Label>
-                            <Select value={reviewed || ANY} onValueChange={(v) => setReviewed(v === ANY ? '' : v)}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                            <Select
+                                value={reviewed || ANY}
+                                onValueChange={(v) =>
+                                    setReviewed(v === ANY ? '' : v)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     <SelectItem value="yes">Yes</SelectItem>
@@ -97,7 +150,7 @@ export default function IncidentReports({ clients, filters }: Props) {
                             </Select>
                         </div>
 
-                        <div className="sm:col-span-5 flex justify-end">
+                        <div className="flex justify-end sm:col-span-5">
                             <a href={buildUrl()}>
                                 <Button>Download CSV</Button>
                             </a>

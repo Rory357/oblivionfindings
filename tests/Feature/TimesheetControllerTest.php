@@ -315,14 +315,13 @@ class TimesheetControllerTest extends TestCase
         ]);
     }
 
-    public function test_payroll_lock_uses_employee_profile_tenant_for_edit_blocking(): void
+    public function test_payroll_lock_blocks_employee_timesheet_edits(): void
     {
         $timesheet = $this->makeDraftTimesheet($this->staff, [
             'notes' => 'Locked note',
         ]);
 
         HrPayrollRun::query()->create([
-            'tenant_id' => 1,
             'period_start' => '2026-04-01',
             'period_end' => '2026-04-30',
             'status' => 'locked',
@@ -761,7 +760,6 @@ class TimesheetControllerTest extends TestCase
         HrEmployeeProfile::query()->updateOrCreate(
             ['user_id' => $user->id],
             [
-                'tenant_id' => 1,
                 'employee_number' => 'EMP-TS-'.$user->id,
                 'work_email' => $user->email,
                 'position_title' => 'Operations',
@@ -826,7 +824,6 @@ class TimesheetControllerTest extends TestCase
         ], $overrides));
 
         $attendance = HrAttendanceSession::query()->create([
-            'tenant_id' => 1,
             'user_id' => $staff->id,
             'shift_id' => $shift->id,
             'site_id' => $shift->site_id,

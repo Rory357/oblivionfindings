@@ -1,11 +1,11 @@
 import { PageHero, PageLayout } from '@/components/page';
-import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { Database } from 'lucide-react';
 
@@ -34,11 +34,16 @@ export default function EditRetentionPolicy({ policy }: Props) {
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Privacy', href: '/privacy/dashboard' },
-            { title: 'Retention Policies', href: '/privacy/retention' },
-            { title: policy.policy_name, href: `/privacy/retention/${policy.id}/edit` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Privacy', href: '/privacy/dashboard' },
+                { title: 'Retention Policies', href: '/privacy/retention' },
+                {
+                    title: policy.policy_name,
+                    href: `/privacy/retention/${policy.id}/edit`,
+                },
+            ]}
+        >
             <Head title={`Edit Policy: ${policy.policy_name}`} />
 
             <PageLayout
@@ -65,10 +70,14 @@ export default function EditRetentionPolicy({ policy }: Props) {
                                 <Input
                                     id="policy_name"
                                     value={data.policy_name}
-                                    onChange={(e) => setData('policy_name', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('policy_name', e.target.value)
+                                    }
                                 />
                                 {errors.policy_name && (
-                                    <p className="text-xs text-status-critical">{errors.policy_name}</p>
+                                    <p className="text-xs text-status-critical">
+                                        {errors.policy_name}
+                                    </p>
                                 )}
                             </div>
 
@@ -77,45 +86,68 @@ export default function EditRetentionPolicy({ policy }: Props) {
                                 <Textarea
                                     id="description"
                                     value={data.description}
-                                    onChange={(e) => setData('description', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('description', e.target.value)
+                                    }
                                     rows={2}
                                 />
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-3">
                                 <div className="space-y-2">
-                                    <Label htmlFor="retention_period_years">Retention (Years)</Label>
+                                    <Label htmlFor="retention_period_years">
+                                        Retention (Years)
+                                    </Label>
                                     <Input
                                         id="retention_period_years"
                                         type="number"
                                         min="1"
                                         max="100"
                                         value={data.retention_period_years}
-                                        onChange={(e) => setData('retention_period_years', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'retention_period_years',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="archive_after_years">Archive After (Years)</Label>
+                                    <Label htmlFor="archive_after_years">
+                                        Archive After (Years)
+                                    </Label>
                                     <Input
                                         id="archive_after_years"
                                         type="number"
                                         min="1"
                                         max="100"
                                         value={data.archive_after_years}
-                                        onChange={(e) => setData('archive_after_years', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'archive_after_years',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="hard_delete_after_years">Delete After (Years)</Label>
+                                    <Label htmlFor="hard_delete_after_years">
+                                        Delete After (Years)
+                                    </Label>
                                     <Input
                                         id="hard_delete_after_years"
                                         type="number"
                                         min="1"
                                         max="100"
                                         value={data.hard_delete_after_years}
-                                        onChange={(e) => setData('hard_delete_after_years', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'hard_delete_after_years',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                             </div>
@@ -125,16 +157,25 @@ export default function EditRetentionPolicy({ policy }: Props) {
                                 <Input
                                     id="legal_basis"
                                     value={data.legal_basis}
-                                    onChange={(e) => setData('legal_basis', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('legal_basis', e.target.value)
+                                    }
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="business_justification">Business Justification</Label>
+                                <Label htmlFor="business_justification">
+                                    Business Justification
+                                </Label>
                                 <Textarea
                                     id="business_justification"
                                     value={data.business_justification}
-                                    onChange={(e) => setData('business_justification', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'business_justification',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={2}
                                 />
                             </div>
@@ -144,9 +185,17 @@ export default function EditRetentionPolicy({ policy }: Props) {
                                     <Checkbox
                                         id="applies_to_soft_deleted"
                                         checked={data.applies_to_soft_deleted}
-                                        onCheckedChange={(checked) => setData('applies_to_soft_deleted', checked as boolean)}
+                                        onCheckedChange={(checked) =>
+                                            setData(
+                                                'applies_to_soft_deleted',
+                                                checked as boolean,
+                                            )
+                                        }
                                     />
-                                    <Label htmlFor="applies_to_soft_deleted" className="text-sm font-normal">
+                                    <Label
+                                        htmlFor="applies_to_soft_deleted"
+                                        className="text-sm font-normal"
+                                    >
                                         Applies to soft-deleted records
                                     </Label>
                                 </div>
@@ -155,9 +204,17 @@ export default function EditRetentionPolicy({ policy }: Props) {
                                     <Checkbox
                                         id="legal_hold_exemption"
                                         checked={data.legal_hold_exemption}
-                                        onCheckedChange={(checked) => setData('legal_hold_exemption', checked as boolean)}
+                                        onCheckedChange={(checked) =>
+                                            setData(
+                                                'legal_hold_exemption',
+                                                checked as boolean,
+                                            )
+                                        }
                                     />
-                                    <Label htmlFor="legal_hold_exemption" className="text-sm font-normal">
+                                    <Label
+                                        htmlFor="legal_hold_exemption"
+                                        className="text-sm font-normal"
+                                    >
                                         Exempt records under legal hold
                                     </Label>
                                 </div>
@@ -166,9 +223,17 @@ export default function EditRetentionPolicy({ policy }: Props) {
                                     <Checkbox
                                         id="active_case_exemption"
                                         checked={data.active_case_exemption}
-                                        onCheckedChange={(checked) => setData('active_case_exemption', checked as boolean)}
+                                        onCheckedChange={(checked) =>
+                                            setData(
+                                                'active_case_exemption',
+                                                checked as boolean,
+                                            )
+                                        }
                                     />
-                                    <Label htmlFor="active_case_exemption" className="text-sm font-normal">
+                                    <Label
+                                        htmlFor="active_case_exemption"
+                                        className="text-sm font-normal"
+                                    >
                                         Exempt active cases
                                     </Label>
                                 </div>
@@ -177,16 +242,28 @@ export default function EditRetentionPolicy({ policy }: Props) {
                                     <Checkbox
                                         id="active"
                                         checked={data.active}
-                                        onCheckedChange={(checked) => setData('active', checked as boolean)}
+                                        onCheckedChange={(checked) =>
+                                            setData(
+                                                'active',
+                                                checked as boolean,
+                                            )
+                                        }
                                     />
-                                    <Label htmlFor="active" className="text-sm font-normal">
+                                    <Label
+                                        htmlFor="active"
+                                        className="text-sm font-normal"
+                                    >
                                         Policy is active
                                     </Label>
                                 </div>
                             </div>
 
                             <div className="flex justify-end gap-2 pt-4">
-                                <Button type="button" variant="outline" onClick={() => window.history.back()}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => window.history.back()}
+                                >
                                     Cancel
                                 </Button>
                                 <Button type="submit" disabled={processing}>

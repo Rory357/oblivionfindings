@@ -137,8 +137,20 @@ export default function PayslipsIndex({
     }
 
     const payslipContextItems = (payslip: Payslip): RowCtxItem[] => [
-        { kind: 'item', label: 'View payslip', icon: FileText, onSelect: () => router.visit(`/hr/payroll/payslips/${payslip.id}`) },
-        { kind: 'item', label: 'Download payslip', icon: Download, onSelect: () => { window.location.href = `/hr/payroll/payslips/${payslip.id}/download`; } },
+        {
+            kind: 'item',
+            label: 'View payslip',
+            icon: FileText,
+            onSelect: () => router.visit(`/hr/payroll/payslips/${payslip.id}`),
+        },
+        {
+            kind: 'item',
+            label: 'Download payslip',
+            icon: Download,
+            onSelect: () => {
+                window.location.href = `/hr/payroll/payslips/${payslip.id}/download`;
+            },
+        },
     ];
 
     return (
@@ -151,7 +163,11 @@ export default function PayslipsIndex({
                         counts={statusCounts}
                         actions={
                             can.generate ? (
-                                <Button onClick={() => setShowGenerate(!showGenerate)}>
+                                <Button
+                                    onClick={() =>
+                                        setShowGenerate(!showGenerate)
+                                    }
+                                >
                                     <Plus className="mr-2 h-4 w-4" />
                                     Generate Payslips
                                 </Button>
@@ -296,145 +312,228 @@ export default function PayslipsIndex({
                 <Card>
                     <CardContent className="p-0">
                         <div data-payroll-desktop className="hidden md:block">
-                        <table className="w-full text-sm">
-                            <thead className="border-b bg-muted/50">
-                                <tr>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Employee
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Period
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Status
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Gross
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        PAYE
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Net Pay
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {payslips.data.map((payslip) => {
-                                    const config =
-                                        statusConfig[payslip.status] ||
-                                        statusConfig.draft;
-                                    return (
-                                        <tr
-                                            key={payslip.id}
-                                            className="hover:bg-muted/30"
-                                            onContextMenu={openPayslipContext(payslipContextItems(payslip))}
-                                        >
-                                            <td className="px-4 py-3">
-                                                <div className="font-medium">
-                                                    {payslip.user?.name ?? '-'}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">
-                                                    {payslip.employee_profile
-                                                        ?.employee_number ?? ''}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-muted-foreground">
-                                                {payslip.pay_period_start}{' '}
-                                                &mdash; {payslip.pay_period_end}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <Badge
-                                                    variant="outline"
-                                                    className={config.className}
-                                                >
-                                                    {config.label}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-medium">
-                                                {formatCurrency(
-                                                    payslip.gross_pay,
+                            <table className="w-full text-sm">
+                                <thead className="border-b bg-muted/50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Employee
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Period
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Status
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Gross
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            PAYE
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Net Pay
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {payslips.data.map((payslip) => {
+                                        const config =
+                                            statusConfig[payslip.status] ||
+                                            statusConfig.draft;
+                                        return (
+                                            <tr
+                                                key={payslip.id}
+                                                className="hover:bg-muted/30"
+                                                onContextMenu={openPayslipContext(
+                                                    payslipContextItems(
+                                                        payslip,
+                                                    ),
                                                 )}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-muted-foreground">
-                                                {formatCurrency(payslip.paye)}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-medium">
-                                                {formatCurrency(
-                                                    payslip.net_pay,
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        asChild
-                                                    >
-                                                        <Link
-                                                            href={`/hr/payroll/payslips/${payslip.id}`}
-                                                        >
-                                                            <FileText className="mr-1 h-3 w-3" />
-                                                            View
-                                                        </Link>
-                                                    </Button>
-                                                    <Button
+                                            >
+                                                <td className="px-4 py-3">
+                                                    <div className="font-medium">
+                                                        {payslip.user?.name ??
+                                                            '-'}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {payslip
+                                                            .employee_profile
+                                                            ?.employee_number ??
+                                                            ''}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-muted-foreground">
+                                                    {payslip.pay_period_start}{' '}
+                                                    &mdash;{' '}
+                                                    {payslip.pay_period_end}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <Badge
                                                         variant="outline"
-                                                        size="sm"
-                                                        asChild
+                                                        className={
+                                                            config.className
+                                                        }
                                                     >
-                                                        <Link
-                                                            href={`/hr/payroll/payslips/${payslip.id}/download`}
+                                                        {config.label}
+                                                    </Badge>
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-medium">
+                                                    {formatCurrency(
+                                                        payslip.gross_pay,
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-muted-foreground">
+                                                    {formatCurrency(
+                                                        payslip.paye,
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-medium">
+                                                    {formatCurrency(
+                                                        payslip.net_pay,
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            asChild
                                                         >
-                                                            <Download className="mr-1 h-3 w-3" />
-                                                        </Link>
-                                                    </Button>
-                                                </div>
+                                                            <Link
+                                                                href={`/hr/payroll/payslips/${payslip.id}`}
+                                                            >
+                                                                <FileText className="mr-1 h-3 w-3" />
+                                                                View
+                                                            </Link>
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/hr/payroll/payslips/${payslip.id}/download`}
+                                                            >
+                                                                <Download className="mr-1 h-3 w-3" />
+                                                            </Link>
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {payslips.data.length === 0 && (
+                                        <tr>
+                                            <td
+                                                colSpan={7}
+                                                className="px-4 py-8 text-center text-muted-foreground"
+                                            >
+                                                No payslips found.
                                             </td>
                                         </tr>
-                                    );
-                                })}
-                                {payslips.data.length === 0 && (
-                                    <tr>
-                                        <td
-                                            colSpan={7}
-                                            className="px-4 py-8 text-center text-muted-foreground"
-                                        >
-                                            No payslips found.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                         <div data-payroll-mobile className="divide-y md:hidden">
                             {payslips.data.map((payslip) => {
-                                const config = statusConfig[payslip.status] || statusConfig.draft;
+                                const config =
+                                    statusConfig[payslip.status] ||
+                                    statusConfig.draft;
                                 return (
-                                    <article key={payslip.id} className="space-y-3 p-4" onContextMenu={openPayslipContext(payslipContextItems(payslip))}>
+                                    <article
+                                        key={payslip.id}
+                                        className="space-y-3 p-4"
+                                        onContextMenu={openPayslipContext(
+                                            payslipContextItems(payslip),
+                                        )}
+                                    >
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
-                                                <p className="font-semibold">{payslip.user?.name ?? '-'}</p>
-                                                <p className="text-xs text-muted-foreground">{payslip.pay_period_start} — {payslip.pay_period_end}</p>
+                                                <p className="font-semibold">
+                                                    {payslip.user?.name ?? '-'}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {payslip.pay_period_start} —{' '}
+                                                    {payslip.pay_period_end}
+                                                </p>
                                             </div>
-                                            <Badge variant="outline" className={config.className}>{config.label}</Badge>
+                                            <Badge
+                                                variant="outline"
+                                                className={config.className}
+                                            >
+                                                {config.label}
+                                            </Badge>
                                         </div>
                                         <dl className="grid grid-cols-3 gap-2 text-sm">
-                                            <div><dt className="text-xs text-muted-foreground">Gross</dt><dd className="font-medium">{formatCurrency(payslip.gross_pay)}</dd></div>
-                                            <div><dt className="text-xs text-muted-foreground">PAYE</dt><dd>{formatCurrency(payslip.paye)}</dd></div>
-                                            <div><dt className="text-xs text-muted-foreground">Net</dt><dd className="font-medium">{formatCurrency(payslip.net_pay)}</dd></div>
+                                            <div>
+                                                <dt className="text-xs text-muted-foreground">
+                                                    Gross
+                                                </dt>
+                                                <dd className="font-medium">
+                                                    {formatCurrency(
+                                                        payslip.gross_pay,
+                                                    )}
+                                                </dd>
+                                            </div>
+                                            <div>
+                                                <dt className="text-xs text-muted-foreground">
+                                                    PAYE
+                                                </dt>
+                                                <dd>
+                                                    {formatCurrency(
+                                                        payslip.paye,
+                                                    )}
+                                                </dd>
+                                            </div>
+                                            <div>
+                                                <dt className="text-xs text-muted-foreground">
+                                                    Net
+                                                </dt>
+                                                <dd className="font-medium">
+                                                    {formatCurrency(
+                                                        payslip.net_pay,
+                                                    )}
+                                                </dd>
+                                            </div>
                                         </dl>
                                         <div className="flex justify-end gap-2">
-                                            <Button variant="ghost" size="sm" asChild><Link href={`/hr/payroll/payslips/${payslip.id}`}><FileText className="mr-1 h-3 w-3" />View</Link></Button>
-                                            <Button variant="outline" size="sm" asChild><Link href={`/hr/payroll/payslips/${payslip.id}/download`}><Download className="mr-1 h-3 w-3" />Download</Link></Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={`/hr/payroll/payslips/${payslip.id}`}
+                                                >
+                                                    <FileText className="mr-1 h-3 w-3" />
+                                                    View
+                                                </Link>
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={`/hr/payroll/payslips/${payslip.id}/download`}
+                                                >
+                                                    <Download className="mr-1 h-3 w-3" />
+                                                    Download
+                                                </Link>
+                                            </Button>
                                         </div>
                                     </article>
                                 );
                             })}
-                            {payslips.data.length === 0 ? <p className="p-8 text-center text-sm text-muted-foreground">No payslips found.</p> : null}
+                            {payslips.data.length === 0 ? (
+                                <p className="p-8 text-center text-sm text-muted-foreground">
+                                    No payslips found.
+                                </p>
+                            ) : null}
                         </div>
                     </CardContent>
                 </Card>

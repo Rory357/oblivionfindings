@@ -107,7 +107,10 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                         title={dsr.reference_number}
                         description={getRequestTypeLabel(dsr.request_type)}
                     >
-                        <div className="flex flex-wrap gap-2" data-test="privacy-dsr-show">
+                        <div
+                            className="flex flex-wrap gap-2"
+                            data-test="privacy-dsr-show"
+                        >
                             <Badge
                                 className={getStatusColor(dsr.status)}
                                 data-test="privacy-dsr-status"
