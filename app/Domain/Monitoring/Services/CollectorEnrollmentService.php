@@ -169,9 +169,9 @@ final readonly class CollectorEnrollmentService
                 'public_key' => base64_encode($publicKey),
                 'public_key_fingerprint' => $publicKeyFingerprint,
                 'client_certificate_fingerprint' => $certificate->fingerprint,
-                'status' => 'online',
-                'last_seen_at' => now(),
-                'last_heartbeat_at' => now(),
+                'status' => 'pending',
+                'last_seen_at' => null,
+                'last_heartbeat_at' => null,
                 'enrolled_at' => now(),
                 'revoked_at' => null,
             ])->save();

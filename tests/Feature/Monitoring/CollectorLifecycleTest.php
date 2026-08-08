@@ -15,6 +15,7 @@ use App\Domain\Monitoring\Models\MonitoringDeadLetter;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CollectorEnrollmentService;
+use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Data\SecretLeaseRequest;
 use App\Domain\SecurityDevices\Credentials\Enums\CredentialReferenceStatus;
@@ -104,6 +105,7 @@ it('consumes one enrolment token and binds one collector to its approved Site an
     ])->assertCreated();
 
     $collector = MonitoringCollector::query()->where('collector_uuid', $collectorUuid)->sole();
+    $availability = app(MonitoringCollectorAvailabilityService::class);
     expect($response->json('site_id'))->toBe($site->id)
         ->and($response->json('central_signing_public_key'))->toBe(base64_encode(
             sodium_crypto_sign_publickey_from_secretkey(collectorCentralSecretKey()),
@@ -117,7 +119,11 @@ it('consumes one enrolment token and binds one collector to its approved Site an
             'assignable_type' => DeviceAssignment::TARGET_SITE,
             'assignable_id' => $site->id,
         ])->exists())->toBeTrue()
-        ->and($collector->public_key_fingerprint)->toBe(hash('sha256', sodium_crypto_sign_publickey($pair)));
+        ->and($collector->public_key_fingerprint)->toBe(hash('sha256', sodium_crypto_sign_publickey($pair)))
+        ->and($collector->status)->toBe('pending')
+        ->and($collector->last_seen_at)->toBeNull()
+        ->and($collector->last_heartbeat_at)->toBeNull()
+        ->and($availability->isAvailable($collector))->toBeFalse();
     expect($issue->enrollment->token_hash)->toBe(hash('sha256', $issue->plainToken))
         ->and($issue->enrollment->token_hash)->not->toBe($issue->plainToken);
 
@@ -136,10 +142,27 @@ it('consumes one enrolment token and binds one collector to its approved Site an
         'collector_id' => '018f0000-0000-7000-8000-000000000010',
         'collector_public_key' => base64_encode(sodium_crypto_sign_publickey(sodium_crypto_sign_keypair())),
     ])->assertUnprocessable();
+
+    collectorLifecycleSignedPost(
+        $this,
+        '/api/monitoring/collectors/heartbeat',
+        ['collector_id' => $collectorUuid, 'status' => collectorHeartbeatPayload()],
+        [
+            'collector' => $collector,
+            'request_secret_key' => sodium_crypto_sign_secretkey($pair),
+        ],
+        'first-authenticated-heartbeat-1',
+    )->assertOk();
+
+    $collector->refresh();
+    expect($collector->status)->toBe('online')
+        ->and($collector->last_seen_at?->equalTo(CarbonImmutable::now('UTC')))->toBeTrue()
+        ->and($collector->last_heartbeat_at?->equalTo(CarbonImmutable::now('UTC')))->toBeTrue()
+        ->and($availability->isAvailable($collector))->toBeTrue();
 });
 
 it('returns only exact assigned Site Device and protocol scope in a signed configuration', function () {
-    $record = enrolledCollectorRecord();
+    $record = enrolledCollectorRecord($this);
     $profile = MonitoringProfile::factory()->create(['interval_seconds' => 60]);
     $approvedDevice = collectorLifecycleDevice($record['site']);
     $otherSite = collectorLifecycleSite();
@@ -225,7 +248,7 @@ it('returns only exact assigned Site Device and protocol scope in a signed confi
 });
 
 it('delivers credentialed checks only as ciphertext sealed to the enrolled collector identity', function () {
-    $record = enrolledCollectorRecord();
+    $record = enrolledCollectorRecord($this);
     $profile = MonitoringProfile::factory()->create(['interval_seconds' => 60]);
     $device = collectorLifecycleDevice($record['site']);
     $referenceKey = 'vault:monitoring/site-'.$record['site']->id.'/snmp';
@@ -300,7 +323,7 @@ it('delivers credentialed checks only as ciphertext sealed to the enrolled colle
 });
 
 it('requires trusted proxy mTLS identity request signature and a fresh unique nonce', function () {
-    $record = enrolledCollectorRecord();
+    $record = enrolledCollectorRecord($this);
     $heartbeat = collectorHeartbeatPayload();
     $heartbeat['spool_items'] = 3;
     $heartbeat['spool_bytes'] = 4096;
@@ -353,7 +376,7 @@ it('requires trusted proxy mTLS identity request signature and a fresh unique no
 });
 
 it('requires shared Redis replay protection outside the exact local test override', function () {
-    $record = enrolledCollectorRecord();
+    $record = enrolledCollectorRecord($this);
     $payload = [
         'collector_id' => $record['collector']->collector_uuid,
         'status' => collectorHeartbeatPayload(),
@@ -390,7 +413,7 @@ it('requires shared Redis replay protection outside the exact local test overrid
 });
 
 it('derives the collector fingerprint from the verified proxy certificate without proxy scripting', function () {
-    $record = enrolledCollectorRecord();
+    $record = enrolledCollectorRecord($this);
     $certificatePem = collectorLifecycleCertificatePem();
     $certificate = openssl_x509_read($certificatePem);
     $fingerprint = $certificate === false ? false : openssl_x509_fingerprint($certificate, 'sha256');
@@ -420,7 +443,7 @@ it('derives the collector fingerprint from the verified proxy certificate withou
 });
 
 it('ingests contiguous collector observations once and parks an out of order gap visibly', function () {
-    $record = enrolledCollectorRecord();
+    $record = enrolledCollectorRecord($this);
     $device = collectorLifecycleDevice($record['site']);
     $monitor = Monitor::factory()->create([
         'device_id' => $device->id,
@@ -516,7 +539,7 @@ it('ingests contiguous collector observations once and parks an out of order gap
 
 it('delivers and ingests bounded remote discovery work through the authenticated ordered collector path', function () {
     Queue::fake();
-    $record = enrolledCollectorRecord();
+    $record = enrolledCollectorRecord($this);
     $scope = DiscoveryScope::factory()->create([
         'site_id' => $record['site']->id,
         'collector_id' => $record['collector']->id,
@@ -607,7 +630,17 @@ it('delivers and ingests bounded remote discovery work through the authenticated
 });
 
 it('denies every authenticated endpoint after revocation and permits governed re-enrolment', function () {
-    $record = enrolledCollectorRecord();
+    $record = enrolledCollectorRecord($this);
+    $record['collector']->forceFill([
+        'acknowledged_source_sequence' => 7,
+        'highest_seen_source_sequence' => 7,
+        'last_seen_at' => CarbonImmutable::now('UTC'),
+        'last_heartbeat_at' => CarbonImmutable::now('UTC'),
+    ])->save();
+    $record['collector']->checkpoint()->update([
+        'acknowledged_source_sequence' => 7,
+        'highest_seen_source_sequence' => 7,
+    ]);
     app(CollectorEnrollmentService::class)->revoke($record['collector'], $record['actor']->id);
 
     collectorLifecycleSignedPost(
@@ -634,14 +667,51 @@ it('denies every authenticated endpoint after revocation and permits governed re
         'collector_public_key' => base64_encode(sodium_crypto_sign_publickey($newPair)),
     ])->assertCreated();
 
-    expect($record['collector']->fresh()->revoked_at)->toBeNull()
-        ->and($record['collector']->fresh()->status)->toBe('online')
-        ->and($record['collector']->fresh()->public_key_fingerprint)
-        ->toBe(hash('sha256', sodium_crypto_sign_publickey($newPair)));
+    $collector = $record['collector']->fresh('checkpoint');
+    $availability = app(MonitoringCollectorAvailabilityService::class);
+    expect($collector->revoked_at)->toBeNull()
+        ->and($collector->status)->toBe('pending')
+        ->and($collector->last_seen_at)->toBeNull()
+        ->and($collector->last_heartbeat_at)->toBeNull()
+        ->and($availability->isAvailable($collector))->toBeFalse()
+        ->and($collector->public_key_fingerprint)
+        ->toBe(hash('sha256', sodium_crypto_sign_publickey($newPair)))
+        ->and($collector->acknowledged_source_sequence)->toBe(7)
+        ->and($collector->highest_seen_source_sequence)->toBe(7)
+        ->and($collector->checkpoint?->acknowledged_source_sequence)->toBe(7)
+        ->and($collector->checkpoint?->highest_seen_source_sequence)->toBe(7);
+
+    $this->withToken($replacement->plainToken)->postJson('/api/monitoring/collectors/enrol', [
+        'collector_id' => $collector->collector_uuid,
+        'collector_public_key' => base64_encode(sodium_crypto_sign_publickey($newPair)),
+    ])->assertUnprocessable();
+
+    $heartbeat = collectorHeartbeatPayload();
+    $heartbeat['acknowledged_source_sequence'] = 7;
+    $heartbeat['highest_seen_source_sequence'] = 7;
+    collectorLifecycleSignedPost(
+        $this,
+        '/api/monitoring/collectors/heartbeat',
+        ['collector_id' => $collector->collector_uuid, 'status' => $heartbeat],
+        [
+            ...$record,
+            'collector' => $collector,
+            'request_secret_key' => sodium_crypto_sign_secretkey($newPair),
+        ],
+        'replacement-authenticated-heartbeat-1',
+    )->assertOk();
+
+    $collector->refresh();
+    expect($collector->status)->toBe('online')
+        ->and($collector->last_seen_at?->equalTo(CarbonImmutable::now('UTC')))->toBeTrue()
+        ->and($collector->last_heartbeat_at?->equalTo(CarbonImmutable::now('UTC')))->toBeTrue()
+        ->and($availability->isAvailable($collector))->toBeTrue()
+        ->and($collector->acknowledged_source_sequence)->toBe(7)
+        ->and($collector->highest_seen_source_sequence)->toBe(7);
 });
 
 /** @return array{site: Site, actor: User, collector: MonitoringCollector, request_secret_key: string} */
-function enrolledCollectorRecord(): array
+function enrolledCollectorRecord(TestCase $test): array
 {
     $site = collectorLifecycleSite();
     $actor = User::factory()->create();
@@ -653,12 +723,22 @@ function enrolledCollectorRecord(): array
         'collector_public_key' => base64_encode(sodium_crypto_sign_publickey($pair)),
     ])->assertCreated();
 
-    return [
+    $record = [
         'site' => $site,
         'actor' => $actor,
         'collector' => MonitoringCollector::query()->where('collector_uuid', $uuid)->sole(),
         'request_secret_key' => sodium_crypto_sign_secretkey($pair),
     ];
+    collectorLifecycleSignedPost(
+        $test,
+        '/api/monitoring/collectors/heartbeat',
+        ['collector_id' => $uuid, 'status' => collectorHeartbeatPayload()],
+        $record,
+        'fixture-authenticated-heartbeat-1',
+    )->assertOk();
+    $record['collector']->refresh();
+
+    return $record;
 }
 
 function collectorLifecycleSite(): Site

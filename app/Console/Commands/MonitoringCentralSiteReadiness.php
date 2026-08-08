@@ -17,7 +17,7 @@ use App\Models\SiteRoom;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Throwable;
+use UnexpectedValueException;
 
 final class MonitoringCentralSiteReadiness extends Command
 {
@@ -62,16 +62,31 @@ final class MonitoringCentralSiteReadiness extends Command
 
         $siteIds = $sites->pluck('id')->map(fn (mixed $id): int => (int) $id)->values();
         $devices = $this->candidateDevices($siteIds)->get();
-        $sitesByDevice = $devices->mapWithKeys(function (Device $device) use ($siteIds, $siteResolver): array {
+        $sitesByDevice = collect();
+        $resolutionIncomplete = false;
+        foreach ($devices as $device) {
             try {
                 $siteId = $siteResolver->resolve((int) $device->id);
-            } catch (Throwable) {
-                return [];
+            } catch (UnexpectedValueException) {
+                $resolutionIncomplete = true;
+
+                continue;
             }
 
-            return $siteIds->contains($siteId) ? [$device->id => $siteId] : [];
-        });
-        $devices = $devices->whereIn('id', $sitesByDevice->keys())->values();
+            if (! $siteIds->contains($siteId)) {
+                $resolutionIncomplete = true;
+
+                continue;
+            }
+
+            $sitesByDevice->put((int) $device->id, $siteId);
+        }
+        if ($resolutionIncomplete || $sitesByDevice->count() !== $devices->count()) {
+            $this->error('canonical_device_resolution_incomplete');
+
+            return self::FAILURE;
+        }
+
         $monitors = $devices->isEmpty()
             ? collect()
             : Monitor::query()

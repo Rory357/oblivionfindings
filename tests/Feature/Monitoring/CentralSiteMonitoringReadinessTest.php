@@ -11,7 +11,9 @@ use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CentralSiteMonitoringReadinessService;
 use App\Domain\Monitoring\Topology\Models\TopologySnapshot;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\Asset;
 use App\Models\Site;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
@@ -342,6 +344,102 @@ it('provides a failing or passing read-only deployment gate for one Site', funct
         ->assertSuccessful();
 
     expect($result)->not->toBeNull();
+});
+
+it('fails value-free when a configured direct monitor has ambiguous canonical Site provenance', function () {
+    $site = Site::factory()->create(['name' => 'Canonical resolution release Site']);
+    $conflictingSite = Site::factory()->create(['name' => 'Conflicting private Site']);
+    $verifiedDevice = Device::factory()->itInfrastructure()->create([
+        'name' => 'Verified direct gateway',
+        'device_uid' => 'IT-VERIFIED-DIRECT-GATEWAY',
+    ]);
+    $ambiguousDevice = Device::factory()->itInfrastructure()->create([
+        'name' => 'Ambiguous private gateway',
+        'device_uid' => 'IT-AMBIGUOUS-PRIVATE-GATEWAY',
+    ]);
+
+    foreach ([$verifiedDevice, $ambiguousDevice] as $device) {
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now()->subHour(),
+        ]);
+    }
+    $conflictingAsset = Asset::factory()->create([
+        'site_id' => $conflictingSite->id,
+        'home_site_id' => $conflictingSite->id,
+        'status' => 'active',
+    ]);
+    DeviceAssetLink::create([
+        'device_id' => $ambiguousDevice->id,
+        'asset_id' => $conflictingAsset->id,
+        'link_type' => 'primary',
+        'linked_at' => now()->subHour(),
+    ]);
+
+    $verifiedMonitor = Monitor::factory()->create([
+        'device_id' => $verifiedDevice->id,
+        'target' => '10.99.10.1',
+        'config' => ['credential_reference' => 'verified-private-credential'],
+        'current_state' => MonitorState::Healthy,
+        'effective_state' => MonitorState::Healthy,
+        'last_observation_at' => now()->subMinute(),
+    ]);
+    MonitorObservation::factory()->create([
+        'monitor_id' => $verifiedMonitor->id,
+        'source_key' => "runtime:{$verifiedMonitor->id}:canonical-resolution-gate",
+        'state' => MonitorState::Healthy,
+        'observed_at' => now()->subMinute(),
+    ]);
+    Monitor::factory()->create([
+        'device_id' => $ambiguousDevice->id,
+        'target' => '10.99.20.1',
+        'config' => ['credential_reference' => 'ambiguous-private-credential'],
+        'current_state' => MonitorState::Healthy,
+        'effective_state' => MonitorState::Healthy,
+        'last_observation_at' => now()->subMinute(),
+    ]);
+    TopologySnapshot::factory()->create([
+        'site_id' => $site->id,
+        'source' => 'native:snmp',
+        'captured_at' => now()->subMinute(),
+    ]);
+    $scope = DiscoveryScope::factory()->create([
+        'site_id' => $site->id,
+        'collector_id' => null,
+        'status' => 'active',
+    ]);
+    DiscoveryRun::factory()->create([
+        'discovery_scope_id' => $scope->id,
+        'status' => 'completed',
+        'completed_at' => now()->subMinute(),
+    ]);
+    foreach (CentralSiteMonitoringReadinessService::REQUIRED_WORKERS as $component) {
+        MonitoringRuntimeHeartbeat::create([
+            'component' => $component,
+            'queue' => "monitoring-{$component}",
+            'last_dispatched_token' => (string) Str::uuid(),
+            'last_dispatched_at' => now()->subSeconds(20),
+            'last_consumed_token' => (string) Str::uuid(),
+            'last_consumed_dispatch_at' => now()->subSeconds(20),
+            'last_consumed_at' => now()->subSeconds(10),
+        ]);
+    }
+
+    $this->artisan('monitoring:central-site-readiness', [
+        'site' => $site->id,
+        '--json' => true,
+    ])->expectsOutput('canonical_device_resolution_incomplete')
+        ->doesntExpectOutputToContain((string) $site->id)
+        ->doesntExpectOutputToContain((string) $conflictingSite->id)
+        ->doesntExpectOutputToContain('Canonical resolution release Site')
+        ->doesntExpectOutputToContain('Conflicting private Site')
+        ->doesntExpectOutputToContain('IT-AMBIGUOUS-PRIVATE-GATEWAY')
+        ->doesntExpectOutputToContain('Ambiguous private gateway')
+        ->doesntExpectOutputToContain('10.99.20.1')
+        ->doesntExpectOutputToContain('ambiguous-private-credential')
+        ->assertFailed();
 });
 
 it('rejects a non-positive Site identifier before querying readiness', function () {
