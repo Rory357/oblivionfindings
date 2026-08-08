@@ -100,12 +100,15 @@ final class ConfigurationHistoryEvidenceContract
         if ($this->evidenceDirectory($repositoryRoot) === null) {
             $errors[] = 'private_evidence_directory_required';
         }
-        if ($this->attestationPublicKey('MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY') === null
-            || $this->attestationPublicKey('MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY') === null
-            || hash_equals(
-                (string) getenv('MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY'),
-                (string) getenv('MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY'),
-            )) {
+        $productionAttestationKey = $this->attestationPublicKey(
+            'MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY',
+        );
+        $browserAttestationKey = $this->attestationPublicKey(
+            'MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY',
+        );
+        if ($productionAttestationKey === null
+            || $browserAttestationKey === null
+            || hash_equals($productionAttestationKey, $browserAttestationKey)) {
             $errors[] = 'independent_attestation_keys_required';
         }
         if ($this->hmacKey() === null) {

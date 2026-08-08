@@ -827,6 +827,62 @@ it('preserves payloads under legal hold and identifies missing restored pointers
         ->and(MetricCurrentSummary::query()->sole()->storage_state)->toBe('missing');
 });
 
+it('rejects a missing exact series boundary while a middle point remains', function (string $missingBoundary): void {
+    [, , $monitor] = metricRetentionMonitor();
+    $ingest = app(MetricIngestService::class);
+    foreach ([
+        '2026-07-23T11:57:00Z',
+        '2026-07-23T11:58:00Z',
+        '2026-07-23T11:59:00Z',
+    ] as $observedAt) {
+        $ingest->write($monitor, new MetricSample(
+            metric: 'device.boundary-proof',
+            value: 18.4,
+            unit: 'celsius',
+            observedAt: CarbonImmutable::parse($observedAt),
+        ));
+    }
+
+    $series = MetricSeries::query()->where('metric', 'device.boundary-proof')->sole();
+    $seriesPoints = collect($this->store->points)
+        ->where('externalKey', $series->external_key)
+        ->sortBy(fn (TimeSeriesPoint $point): int => $point->observedAt->getTimestamp())
+        ->values();
+    expect(app(RetentionEnforcer::class)->validatePointers())->toBe([]);
+    $missing = $missingBoundary === 'first' ? $seriesPoints->first() : $seriesPoints->last();
+    $middle = $seriesPoints->get(1);
+    $this->store->points = collect($this->store->points)
+        ->reject(fn (TimeSeriesPoint $point): bool => $point->idempotencyKey === $missing->idempotencyKey)
+        ->values()
+        ->all();
+
+    $verification = app(ProductionRetentionEvidenceVerifier::class)->verify(
+        'exact-boundary-pointer-gap',
+        CarbonImmutable::now()->subMinute(),
+        CarbonImmutable::now()->addMinute(),
+        ['held' => []],
+        [
+            'metric_payloads_deleted' => 0,
+            'rollup_coverage_blocked_series' => 0,
+            'rollup_coverage_verified_series' => 0,
+            'occupied_rollup_buckets_verified' => 0,
+            'reconciled_deletion_intents' => 0,
+            'unresolved_deletion_intents' => 0,
+        ],
+    );
+
+    expect($middle)->toBeInstanceOf(TimeSeriesPoint::class)
+        ->and(collect($this->store->points)->contains(
+            fn (TimeSeriesPoint $point): bool => $point->idempotencyKey === $middle->idempotencyKey,
+        ))->toBeTrue()
+        ->and(app(RetentionEnforcer::class)->validatePointers())->toBe([$series->id])
+        ->and($verification['integrity']['timeseries_reference_gap_count'])->toBe(1)
+        ->and($verification['errors'])->toContain('timeseries_reference_gap');
+})->with([
+    'missing first boundary' => 'first',
+    'missing last boundary' => 'last',
+]);
+
 it('returns an explainable forecast and an honest insufficient-data state', function (): void {
     [, , $monitor] = metricRetentionMonitor();
     $service = app(MetricIngestService::class);

@@ -228,6 +228,27 @@ it('admits only exact process-scoped restore endpoints roots and concrete stores
             false,
         ))->toBe([]);
 
+        $sharedAttestationKey = str_repeat('s', SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES);
+        $paddedAttestationKey = base64_encode($sharedAttestationKey);
+        $unpaddedAttestationKey = rtrim($paddedAttestationKey, '=');
+        putenv('MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY='.$paddedAttestationKey);
+        putenv('MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY='.$unpaddedAttestationKey);
+        expect(base64_decode($unpaddedAttestationKey, true))->toBe($sharedAttestationKey)
+            ->and($contract->runtimeErrors(
+                LaravelSnapshotStore::class,
+                InfluxDbTimeSeriesStore::class,
+                base_path(),
+                false,
+            ))->toContain('independent_attestation_keys_required');
+        putenv(
+            'MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY='.
+            $environment['MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY'],
+        );
+        putenv(
+            'MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY='.
+            $environment['MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY'],
+        );
+
         config()->set('monitoring.storage.timeseries.url', 'https://wrong.invalid');
         expect($contract->runtimeErrors(
             LaravelSnapshotStore::class,

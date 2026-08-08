@@ -421,14 +421,7 @@ final class RetentionEnforcer
         MetricSeries::query()->whereNotNull('last_point_at')->orderBy('id')->chunkById(100, function ($batch) use (&$missing): void {
             foreach ($batch as $series) {
                 try {
-                    $exists = $this->timeSeries->exists(
-                        $series->external_key,
-                        $series->retention_tier,
-                        $series->first_point_at === null
-                            ? null
-                            : CarbonImmutable::instance($series->first_point_at)->utc(),
-                        CarbonImmutable::instance($series->last_point_at)->utc()->addMicrosecond(),
-                    );
+                    $exists = $this->hasExactSeriesBoundaryPoints($series);
                     $state = $exists ? 'available' : 'missing';
                 } catch (TimeSeriesUnavailable) {
                     $state = 'unavailable';
@@ -445,6 +438,32 @@ final class RetentionEnforcer
         });
 
         return $missing;
+    }
+
+    public function hasExactSeriesBoundaryPoints(MetricSeries $series): bool
+    {
+        if ($series->first_point_at === null || $series->last_point_at === null) {
+            return false;
+        }
+
+        $first = CarbonImmutable::instance($series->first_point_at)->utc();
+        $last = CarbonImmutable::instance($series->last_point_at)->utc();
+        $boundaries = $first->equalTo($last) ? [$first] : [$first, $last];
+
+        foreach ($boundaries as $boundary) {
+            $points = $this->timeSeries->range(
+                (string) $series->external_key,
+                (string) $series->retention_tier,
+                $boundary,
+                $boundary->addMicrosecond(),
+            );
+            if (count($points) !== 1
+                || ! $this->pointMatchesExactBoundary($points[0], $series, $boundary)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function hasExternalSeriesLegalHold(MetricSeries $series): bool
@@ -691,6 +710,24 @@ final class RetentionEnforcer
             && $point->tier === $series->retention_tier
             && $point->observedAt->greaterThanOrEqualTo($from)
             && $point->observedAt->lessThan($until);
+    }
+
+    private function pointMatchesExactBoundary(
+        mixed $point,
+        MetricSeries $series,
+        CarbonImmutable $boundary,
+    ): bool {
+        return $point instanceof TimeSeriesPoint
+            && $point->externalKey === $series->external_key
+            && $point->seriesId === (int) $series->id
+            && $point->siteId === (int) $series->site_id
+            && $point->deviceId === (int) $series->device_id
+            && $point->monitorId === $series->monitor_id
+            && $point->metric === $series->metric
+            && $point->unit === $series->unit
+            && $point->dimensions === (array) $series->dimensions
+            && $point->tier === $series->retention_tier
+            && $point->observedAt->equalTo($boundary);
     }
 
     private function hasExternalHold(MetricSeries $series): bool

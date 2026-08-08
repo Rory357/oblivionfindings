@@ -387,12 +387,7 @@ final class ProductionRetentionEvidenceVerifier
             ->chunkById(100, function ($batch) use (&$gaps): void {
                 foreach ($batch as $series) {
                     try {
-                        $exists = $this->timeSeries->exists(
-                            (string) $series->external_key,
-                            (string) $series->retention_tier,
-                            CarbonImmutable::instance($series->first_point_at)->utc(),
-                            CarbonImmutable::instance($series->last_point_at)->utc()->addMicrosecond(),
-                        );
+                        $exists = $this->retentionEnforcer->hasExactSeriesBoundaryPoints($series);
                     } catch (Throwable) {
                         $exists = false;
                     }
