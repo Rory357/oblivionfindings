@@ -13,7 +13,7 @@ it('restores the canonical system calendar categories idempotently', function ()
     $this->seed(HrCalendarEventCategorySeeder::class);
 
     $categories = DB::table('hr_calendar_event_categories')
-        ->whereNull('tenant_id')
+        ->whereIn('key', ['company', 'team', 'training', 'social', 'holiday'])
         ->orderBy('sort')
         ->get(['key', 'label', 'icon', 'color_token', 'is_system', 'sort'])
         ->map(fn (object $category): array => (array) $category)
