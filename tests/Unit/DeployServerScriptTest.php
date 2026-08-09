@@ -117,6 +117,51 @@ it('fails closed into the monitoring Supervisor installer unless explicitly skip
         ->toBeLessThan(strpos($script, 'run_app php artisan queue:restart', $installer));
 });
 
+it('proves every monitoring process is stably bound to the exact release after the final queue restart', function () {
+    $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
+
+    foreach ([
+        'oblivion-monitoring-events' => ['4', 'queue:work redis --queue=monitoring-events '],
+        'oblivion-monitoring-checks' => ['8', 'queue:work redis --queue=monitoring-checks '],
+        'oblivion-monitoring-discovery' => ['2', 'queue:work redis --queue=monitoring-discovery '],
+        'oblivion-monitoring-provider' => ['3', 'queue:work redis --queue=monitoring-provider '],
+        'oblivion-monitoring-topology' => ['2', 'queue:work redis --queue=monitoring-topology '],
+        'oblivion-monitoring-maintenance' => ['1', 'queue:work redis --queue=monitoring-maintenance '],
+        'oblivion-monitoring-orchestration' => ['2', 'queue:work redis --queue=monitoring '],
+        'oblivion-monitoring-commands' => ['2', 'queue:work redis --queue=monitoring-commands '],
+        'oblivion-monitoring-snmp-traps' => ['1', 'monitoring:listen-snmp-traps'],
+        'oblivion-monitoring-syslog' => ['1', 'monitoring:listen-syslog'],
+        'oblivion-monitoring-flow' => ['1', 'monitoring:listen-flow'],
+    ] as $program => [$expectedProcesses, $commandMarker]) {
+        expect($script)
+            ->toContain($program, $expectedProcesses, $commandMarker);
+    }
+
+    expect($script)->toContain(
+        'monitoring_runtime_is_release_bound()',
+        'assert_stable_monitoring_runtime()',
+        'supervisorctl -c "$supervisord_config" status "$program:*"',
+        'sudo -n supervisorctl -c "$supervisord_config" status "$program:*"',
+        'release_artisan="$(pwd -P)/artisan"',
+        'ps -ww -p "$pid" -o args=',
+        '[[ "$process_command" == *"$release_artisan $command_marker"* ]]',
+        '"$consecutive_release_bound" -ge 3',
+        'monitoring workers and listeners are not stably RUNNING from this exact release',
+    );
+
+    $skip = strpos($script, 'if [ "$SKIP_MONITORING_SUPERVISOR" -eq 1 ]; then');
+    $queueRestart = strpos($script, 'run_app php artisan queue:restart', $skip);
+    $finalProof = strpos($script, 'assert_stable_monitoring_runtime', $queueRestart);
+    $success = strpos($script, 'Server provisioning complete', $finalProof);
+
+    expect($skip)
+        ->not->toBeFalse()
+        ->and($queueRestart)->toBeGreaterThan($skip)
+        ->and($finalProof)->toBeGreaterThan($queueRestart)
+        ->and($success)->toBeGreaterThan($finalProof)
+        ->and(substr_count($script, 'assert_stable_monitoring_runtime'))->toBe(2);
+});
+
 it('fails closed through stable Queclink readiness even when installation is externally managed', function () {
     $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
 

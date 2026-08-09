@@ -202,7 +202,11 @@ missing Git state, a nested checkout path, tracked or non-ignored untracked
 source dirt, a revision mismatch or any Git inspection failure is ineligible.
 Git inspection explicitly disables repository/system filesystem-monitor and
 untracked-cache configuration so this read-only gate neither executes an
-ambient filesystem-monitor command nor trusts its changed-path result.
+ambient filesystem-monitor command nor trusts its changed-path result. It also
+removes every inherited `GIT_*` process variable, including repository,
+work-tree, index, object-directory and inline-config overrides, before each Git
+command. The protected runner environment therefore cannot redirect the gate
+away from the checkout selected by the verifier's exact `-C` path.
 
 This Git check is deliberately classified as source-checkout identity, not a
 hash of ignored/generated runtime inputs. Composer dependencies, built assets,

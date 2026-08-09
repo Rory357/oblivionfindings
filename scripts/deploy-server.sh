@@ -136,6 +136,121 @@ assert_bounded_seconds "DEPLOY_WEB_DRAIN_SECONDS" "$DEPLOY_WEB_DRAIN_SECONDS" 60
 command -v ps >/dev/null || { echo "✗ deployment refused: ps is required for writer drain verification."; exit 1; }
 command -v awk >/dev/null || { echo "✗ deployment refused: awk is required for writer drain verification."; exit 1; }
 
+MONITORING_PROGRAMS=(
+    oblivion-monitoring-events
+    oblivion-monitoring-checks
+    oblivion-monitoring-discovery
+    oblivion-monitoring-provider
+    oblivion-monitoring-topology
+    oblivion-monitoring-maintenance
+    oblivion-monitoring-orchestration
+    oblivion-monitoring-commands
+    oblivion-monitoring-snmp-traps
+    oblivion-monitoring-syslog
+    oblivion-monitoring-flow
+)
+MONITORING_EXPECTED_PROCESSES=(4 8 2 3 2 1 2 2 1 1 1)
+MONITORING_COMMAND_MARKERS=(
+    'queue:work redis --queue=monitoring-events '
+    'queue:work redis --queue=monitoring-checks '
+    'queue:work redis --queue=monitoring-discovery '
+    'queue:work redis --queue=monitoring-provider '
+    'queue:work redis --queue=monitoring-topology '
+    'queue:work redis --queue=monitoring-maintenance '
+    'queue:work redis --queue=monitoring '
+    'queue:work redis --queue=monitoring-commands '
+    'monitoring:listen-snmp-traps'
+    'monitoring:listen-syslog'
+    'monitoring:listen-flow'
+)
+
+monitoring_supervisor_status() {
+    local supervisord_config="$1"
+    local program="$2"
+    local output
+
+    if output="$(supervisorctl -c "$supervisord_config" status "$program:*" 2>/dev/null)"; then
+        printf '%s\n' "$output"
+        return 0
+    fi
+    if [ "$(id -u)" -ne 0 ] \
+        && command -v sudo >/dev/null \
+        && output="$(sudo -n supervisorctl -c "$supervisord_config" status "$program:*" 2>/dev/null)"; then
+        printf '%s\n' "$output"
+        return 0
+    fi
+
+    return 1
+}
+
+monitoring_runtime_is_release_bound() {
+    local supervisord_config="${MONITORING_SUPERVISORD_CONFIG:-}"
+    local release_artisan
+    local index
+    local program
+    local expected_processes
+    local command_marker
+    local status_output
+    local process_count
+    local pid
+    local process_command
+    local -a process_pids
+
+    command -v supervisorctl >/dev/null 2>&1 || return 1
+    if [ -z "$supervisord_config" ]; then
+        for candidate in /etc/supervisor/supervisord.conf /etc/supervisord.conf; do
+            if [ -f "$candidate" ]; then
+                supervisord_config="$candidate"
+                break
+            fi
+        done
+    fi
+    [ -n "$supervisord_config" ] && [ -f "$supervisord_config" ] || return 1
+
+    release_artisan="$(pwd -P)/artisan"
+    for index in "${!MONITORING_PROGRAMS[@]}"; do
+        program="${MONITORING_PROGRAMS[$index]}"
+        expected_processes="${MONITORING_EXPECTED_PROCESSES[$index]}"
+        command_marker="${MONITORING_COMMAND_MARKERS[$index]}"
+        status_output="$(monitoring_supervisor_status "$supervisord_config" "$program")" || return 1
+        process_count="$(awk 'NF { count++ } END { print count + 0 }' <<< "$status_output")"
+        [ "$process_count" -eq "$expected_processes" ] || return 1
+        awk 'NF < 4 || $2 != "RUNNING" || $3 != "pid" || $4 !~ /^[0-9]+,$/ { exit 1 }' <<< "$status_output" \
+            || return 1
+        mapfile -t process_pids < <(awk '{ gsub(/,/, "", $4); print $4 }' <<< "$status_output")
+        [ "${#process_pids[@]}" -eq "$expected_processes" ] || return 1
+
+        for pid in "${process_pids[@]}"; do
+            process_command="$(ps -ww -p "$pid" -o args= 2>/dev/null)" || return 1
+            [[ "$process_command" == *"$release_artisan $command_marker"* ]] || return 1
+        done
+    done
+
+    return 0
+}
+
+assert_stable_monitoring_runtime() {
+    local deadline=$((SECONDS + DEPLOY_WRITER_DRAIN_TIMEOUT_SECONDS))
+    local consecutive_release_bound=0
+
+    while true; do
+        if monitoring_runtime_is_release_bound; then
+            consecutive_release_bound=$((consecutive_release_bound + 1))
+        else
+            consecutive_release_bound=0
+        fi
+        if [ "$consecutive_release_bound" -ge 3 ]; then
+            return 0
+        fi
+        if [ "$SECONDS" -ge "$deadline" ]; then
+            echo "✗ deployment refused: monitoring workers and listeners are not stably RUNNING from this exact release."
+            return 1
+        fi
+
+        sleep 1
+    done
+}
+
 assert_clean_release_checkout() {
     local checkout_status
     checkout_status="$(run_app git status --porcelain=v1 --untracked-files=all)"
@@ -346,6 +461,9 @@ run_app php artisan queclink:install --check
 
 echo "▶ php artisan queue:restart"
 run_app php artisan queue:restart
+
+echo "▶ verifying monitoring supervision is bound to this exact release"
+assert_stable_monitoring_runtime
 
 echo "▶ final application and lifecycle runtime validation"
 run_app php artisan about --only=environment --json >/dev/null

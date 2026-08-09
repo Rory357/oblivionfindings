@@ -20,6 +20,16 @@ may skip the network fetch/pull only after proving that same binding; it cannot
 authorise an arbitrary clean branch or an artifact-only directory with no Git
 provenance. Record the verified source revision before starting D01-D18.
 
+`--skip-monitoring-supervisor` skips only the configuration installation. It
+does not waive runtime proof. Before reporting deployment success, the deploy
+must observe three consecutive samples of all eight worker groups and all three
+listeners with their exact process counts in `RUNNING` state, and every process
+command must reference the exact deployed `artisan` path and expected isolated
+queue or listener command. This check runs after the final queue restart for
+both installed and externally managed Supervisor configurations; an absent,
+stale, wrong-release, partially restarted, or inaccessible runtime blocks the
+release.
+
 ## Acceptance actors
 
 Create these dedicated acceptance users through the approved release-fixture process. Assign only `RELEASE Site Alpha` unless the row says otherwise. Do not use `admin@test.com`, the `admin` role, impersonation, an application-wide permission override, or a permission change during the run.

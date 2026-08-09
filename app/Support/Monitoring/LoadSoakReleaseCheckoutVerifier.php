@@ -58,7 +58,7 @@ final class LoadSoakReleaseCheckoutVerifier
                     ...$arguments,
                 ],
                 null,
-                ['GIT_OPTIONAL_LOCKS' => '0'],
+                $this->gitProcessEnvironment(),
             );
             $process->setTimeout(10);
             $process->run();
@@ -71,6 +71,48 @@ final class LoadSoakReleaseCheckoutVerifier
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * False values tell Symfony Process not to inherit ambient Git controls.
+     * The release gate must inspect only the repository selected by -C.
+     *
+     * @return array<string, string|false>
+     */
+    private function gitProcessEnvironment(): array
+    {
+        $environment = [];
+        $ambient = getenv();
+        if (is_array($ambient)) {
+            foreach (array_keys($ambient) as $key) {
+                if (is_string($key) && str_starts_with(strtoupper($key), 'GIT_')) {
+                    $environment[$key] = false;
+                }
+            }
+        }
+
+        foreach ([
+            'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+            'GIT_COMMON_DIR',
+            'GIT_CONFIG',
+            'GIT_CONFIG_COUNT',
+            'GIT_CONFIG_GLOBAL',
+            'GIT_CONFIG_KEY_0',
+            'GIT_CONFIG_NOSYSTEM',
+            'GIT_CONFIG_SYSTEM',
+            'GIT_CONFIG_VALUE_0',
+            'GIT_DIR',
+            'GIT_INDEX_FILE',
+            'GIT_OBJECT_DIRECTORY',
+            'GIT_REPLACE_REF_BASE',
+            'GIT_SHALLOW_FILE',
+            'GIT_WORK_TREE',
+        ] as $key) {
+            $environment[$key] = false;
+        }
+        $environment['GIT_OPTIONAL_LOCKS'] = '0';
+
+        return $environment;
     }
 
     private function samePath(string $left, string $right): bool

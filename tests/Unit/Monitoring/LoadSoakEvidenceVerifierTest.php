@@ -621,6 +621,17 @@ it('binds release evidence to the exact clean deployed origin main checkout', fu
         $verifier = new LoadSoakReleaseCheckoutVerifier($gitBinary);
 
         expect($verifier->verify($checkout, $revision))->toBeTrue();
+
+        $previousGitDirectory = getenv('GIT_DIR');
+        try {
+            putenv('GIT_DIR='.$checkout.DIRECTORY_SEPARATOR.'hostile-git-directory');
+            expect($verifier->verify($checkout, $revision))->toBeTrue();
+        } finally {
+            putenv($previousGitDirectory === false
+                ? 'GIT_DIR'
+                : 'GIT_DIR='.$previousGitDirectory);
+        }
+
         $run(['git', 'config', '--unset', 'core.fsmonitor']);
 
         file_put_contents($checkout.DIRECTORY_SEPARATOR.'untracked.txt', "dirty\n");

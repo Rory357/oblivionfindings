@@ -109,6 +109,12 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         ->and($localEvidence)->toBeGreaterThan($deployedProof)
         ->and($runbook)->toContain(
             'This runbook does not close a release from local tests',
+            '`--skip-monitoring-supervisor` skips only the configuration installation',
+            'must observe three consecutive samples of all eight worker groups and all three',
+            'listeners with their exact process counts in `RUNNING` state',
+            'command must reference the exact deployed `artisan` path',
+            'queue or listener command. This check runs after the final queue restart',
+            'stale, wrong-release, partially restarted, or inaccessible runtime blocks the',
             'Local Unit, Feature, Architecture, React, type, lint/format, client-build, SSR-build, and local Dusk results are prerequisite regression evidence only',
             'Never relabel a local Dusk result as deployed browser proof',
             'V10 remains open unless D01-D18 pass at both viewports against the deployed release',
