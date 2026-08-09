@@ -104,7 +104,9 @@ for (const target of authenticatedPages) {
             // The incident wizard is rendered over a dimmed, freshly seeded
             // incident register. Keep the wizard contract explicit above and
             // bound only the expected timestamp/record-text churn behind it.
-            maxDiffPixels: target.name === 'incident-create' ? 100_000 : 0,
+            ...(target.name === 'incident-create'
+                ? { maxDiffPixelRatio: 0.025 }
+                : {}),
         });
     });
 }
