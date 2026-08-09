@@ -14,6 +14,12 @@ This runbook does not close a release from local tests. A release passes only wh
 4. the live protocol/provider observation evidence is complete; and
 5. the separate restore companion evidence is complete.
 
+The deployment must start from the reviewed Git checkout whose clean `HEAD`
+exactly matches `refs/remotes/origin/main`. `deploy-server.sh --skip-git-update`
+may skip the network fetch/pull only after proving that same binding; it cannot
+authorise an arbitrary clean branch or an artifact-only directory with no Git
+provenance. Record the verified source revision before starting D01-D18.
+
 ## Acceptance actors
 
 Create these dedicated acceptance users through the approved release-fixture process. Assign only `RELEASE Site Alpha` unless the row says otherwise. Do not use `admin@test.com`, the `admin` role, impersonation, an application-wide permission override, or a permission change during the run.

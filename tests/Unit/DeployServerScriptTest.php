@@ -8,11 +8,10 @@ it('updates the checkout from origin main before building', function () {
         ->toContain('git pull --ff-only origin main');
 });
 
-it('refuses a dirty or non-exact release before dependencies and assets are built', function () {
+it('refuses a dirty, unbound, or non-exact release before dependencies and assets are built', function () {
     $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
 
     expect($script)->toContain(
-        'if [ -e .git ]; then',
         'elif [ ! -e .git ]; then',
         'git status --porcelain=v1 --untracked-files=all',
         'git rev-parse --verify HEAD',
@@ -20,9 +19,18 @@ it('refuses a dirty or non-exact release before dependencies and assets are buil
         'the release checkout contains tracked or untracked changes',
         'do not mix source with runtime or browser evidence artifacts',
         'the checked-out release does not exactly match origin/main',
+        '--skip-git-update still requires the reviewed Git checkout',
+        'The flag skips the network update only; it cannot bypass exact source-revision verification',
+        'Re-run from the reviewed Git checkout',
     )->not->toContain('[ -d .git ]', '[ ! -d .git ]');
 
-    $firstCleanCheck = strpos($script, "\n    assert_clean_release_checkout\n");
+    $skipBranch = strpos($script, 'if [ "$SKIP_GIT_UPDATE" -eq 1 ]; then');
+    $skipRequiresGit = strpos($script, 'if [ ! -e .git ]; then', $skipBranch);
+    $skipFailure = strpos($script, '--skip-git-update still requires the reviewed Git checkout', $skipRequiresGit);
+    $skipExactReleaseCheck = strpos($script, "\n    assert_origin_main_release\n", $skipFailure);
+    $skipCleanCheck = strpos($script, "\n    assert_clean_release_checkout\n", $skipExactReleaseCheck);
+    $normalBranch = strpos($script, 'elif [ ! -e .git ]; then', $skipCleanCheck);
+    $normalFirstCleanCheck = strpos($script, "\n    assert_clean_release_checkout\n", $normalBranch);
     $fetch = strpos($script, 'run_app git fetch --prune origin');
     $pull = strpos($script, 'run_app git pull --ff-only origin main');
     $exactReleaseCheck = strpos($script, "\n    assert_origin_main_release\n", $pull);
@@ -30,7 +38,14 @@ it('refuses a dirty or non-exact release before dependencies and assets are buil
     $composer = strpos($script, 'run_app composer install');
     $npm = strpos($script, 'run_app npm ci');
 
-    expect($firstCleanCheck)
+    expect($skipBranch)
+        ->not->toBeFalse()
+        ->and($skipRequiresGit)->toBeGreaterThan($skipBranch)
+        ->and($skipFailure)->toBeGreaterThan($skipRequiresGit)
+        ->and($skipExactReleaseCheck)->toBeGreaterThan($skipFailure)
+        ->and($skipCleanCheck)->toBeGreaterThan($skipExactReleaseCheck)
+        ->and($normalBranch)->toBeGreaterThan($skipCleanCheck)
+        ->and($normalFirstCleanCheck)
         ->not->toBeFalse()
         ->toBeLessThan($fetch)
         ->and($exactReleaseCheck)->toBeGreaterThan($pull)

@@ -100,9 +100,14 @@ sent, and every configured direct monitor at each operational Site to have curre
 with no collector. A single healthy monitor cannot conceal another configured
 direct monitor that is stale or has never produced durable evidence. The exact
 opaque direct-monitor roster must remain stable, and by the final sample every
-member of that roster must have produced new durable evidence since the
-observation began; disabling or replacing a check cannot make the observation
-pass. The request explicitly bypasses intermediary caches and rejects
+member of that roster must have produced new durable evidence in both halves of
+an observation covering at least two cycles of the slowest configured check.
+At completion, every member must also remain within its configured interval plus
+the bounded release grace; an early advance followed by a later SD-WAN outage
+therefore cannot pass merely because a longer policy stale window still labels
+old evidence fresh. The opaque roster binds each check's interval, so disabling,
+replacing or slowing a check cannot make the observation pass. The request
+explicitly bypasses intermediary caches and rejects
 stale or replayed health payloads. It prints only aggregate counts and
 timestamps; retain that result with the external watchdog's separately
 captured alert and recovery timeline. Never retain the cookie or the detailed

@@ -202,6 +202,8 @@ check_central_readiness() {
         $siteRoster = [];
         $oldestEvidenceEpochs = [];
         $newestEvidenceEpochs = [];
+        $maximumIntervalEpochs = [];
+        $releaseEvidenceDeadlineEpochs = [];
         foreach ($report["sites"] as $site) {
             if (! is_array($site)) {
                 exit(32);
@@ -212,8 +214,10 @@ check_central_readiness() {
             $stale = $site["stale"] ?? null;
             $neverObserved = $site["never_observed"] ?? null;
             $directMonitorFingerprint = $site["direct_monitor_fingerprint"] ?? null;
+            $maximumIntervalSeconds = $site["direct_monitor_max_interval_seconds"] ?? null;
             $oldestEvidenceRaw = $site["oldest_evidence_at"] ?? null;
             $newestEvidenceRaw = $site["evidence_at"] ?? null;
+            $releaseEvidenceDeadlineRaw = $site["release_evidence_deadline_at"] ?? null;
             if (! is_array($site["site"] ?? null)
                 || ! is_int($site["site"]["id"] ?? null)
                 || $site["site"]["id"] < 1
@@ -230,21 +234,28 @@ check_central_readiness() {
                 || $neverObserved !== 0
                 || ! is_string($directMonitorFingerprint)
                 || preg_match("/\A[a-f0-9]{64}\z/", $directMonitorFingerprint) !== 1
+                || ! is_int($maximumIntervalSeconds)
+                || $maximumIntervalSeconds < 30
                 || ! is_string($oldestEvidenceRaw)
                 || preg_match("/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|\\+00:00)$/D", $oldestEvidenceRaw) !== 1
                 || ! is_string($newestEvidenceRaw)
-                || preg_match("/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|\\+00:00)$/D", $newestEvidenceRaw) !== 1) {
+                || preg_match("/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|\\+00:00)$/D", $newestEvidenceRaw) !== 1
+                || ! is_string($releaseEvidenceDeadlineRaw)
+                || preg_match("/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|\\+00:00)$/D", $releaseEvidenceDeadlineRaw) !== 1) {
                 exit(32);
             }
             try {
                 $oldestEvidenceAt = new DateTimeImmutable($oldestEvidenceRaw);
                 $newestEvidenceAt = new DateTimeImmutable($newestEvidenceRaw);
+                $releaseEvidenceDeadlineAt = new DateTimeImmutable($releaseEvidenceDeadlineRaw);
             } catch (Throwable) {
                 exit(32);
             }
             if ($oldestEvidenceAt->getOffset() !== 0
                 || $newestEvidenceAt->getOffset() !== 0
+                || $releaseEvidenceDeadlineAt->getOffset() !== 0
                 || $oldestEvidenceAt > $newestEvidenceAt
+                || $releaseEvidenceDeadlineAt <= $oldestEvidenceAt
                 || $newestEvidenceAt->getTimestamp() > time() + 5) {
                 exit(32);
             }
@@ -252,6 +263,8 @@ check_central_readiness() {
             $siteRoster[] = $site["site"]["id"].":".$directMonitorFingerprint;
             $oldestEvidenceEpochs[] = $oldestEvidenceAt->getTimestamp();
             $newestEvidenceEpochs[] = $newestEvidenceAt->getTimestamp();
+            $maximumIntervalEpochs[] = $maximumIntervalSeconds;
+            $releaseEvidenceDeadlineEpochs[] = $releaseEvidenceDeadlineAt->getTimestamp();
         }
         sort($siteIds, SORT_NUMERIC);
         sort($siteRoster, SORT_STRING);
@@ -259,7 +272,8 @@ check_central_readiness() {
             exit(33);
         }
         echo count($siteRoster).":".hash("sha256", implode(",", $siteRoster)).":"
-            .min($oldestEvidenceEpochs).":".max($newestEvidenceEpochs);
+            .min($oldestEvidenceEpochs).":".max($newestEvidenceEpochs).":"
+            .max($maximumIntervalEpochs).":".min($releaseEvidenceDeadlineEpochs);
     ' || fail 'one or more Sites lack durable collector-free monitoring evidence.'
 }
 
@@ -267,8 +281,12 @@ started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 verified_sites=''
 verified_monitor_roster_fingerprint=''
 initial_newest_evidence_at=''
+checkpoint_newest_evidence_at=''
 latest_oldest_evidence_at=''
+latest_release_evidence_deadline_at=''
 previous_health_observed_at=''
+observation_seconds=$(( (SAMPLES - 1) * INTERVAL_SECONDS ))
+checkpoint_sample=$(( (SAMPLES + 1) / 2 ))
 
 cd "$APPLICATION_PATH"
 for ((sample = 1; sample <= SAMPLES; sample++)); do
@@ -281,29 +299,41 @@ for ((sample = 1; sample <= SAMPLES; sample++)); do
     fi
     previous_health_observed_at="$sample_health_observed_at"
     sample_readiness="$(check_central_readiness)"
-    [[ "$sample_readiness" =~ ^([0-9]+):([a-f0-9]{64}):([0-9]+):([0-9]+)$ ]] \
+    [[ "$sample_readiness" =~ ^([0-9]+):([a-f0-9]{64}):([0-9]+):([0-9]+):([0-9]+):([0-9]+)$ ]] \
         || fail 'collector-free Site readiness did not return a valid monitor roster and evidence window.'
     sample_sites="${BASH_REMATCH[1]}"
     sample_monitor_roster_fingerprint="${BASH_REMATCH[2]}"
     latest_oldest_evidence_at="${BASH_REMATCH[3]}"
     sample_newest_evidence_at="${BASH_REMATCH[4]}"
+    sample_maximum_interval_seconds="${BASH_REMATCH[5]}"
+    latest_release_evidence_deadline_at="${BASH_REMATCH[6]}"
     if [[ -z "$verified_sites" ]]; then
         verified_sites="$sample_sites"
         verified_monitor_roster_fingerprint="$sample_monitor_roster_fingerprint"
         initial_newest_evidence_at="$sample_newest_evidence_at"
+        [[ "$observation_seconds" -ge $(( sample_maximum_interval_seconds * 2 )) ]] \
+            || fail 'the observation period must cover at least two cycles of the slowest configured direct monitor.'
     elif [[ "$sample_sites" != "$verified_sites" || "$sample_monitor_roster_fingerprint" != "$verified_monitor_roster_fingerprint" ]]; then
         fail 'the operational Site or direct-monitor roster changed during the observation period.'
+    fi
+
+    if [[ "$sample" -eq "$checkpoint_sample" ]]; then
+        [[ "$latest_oldest_evidence_at" -gt "$initial_newest_evidence_at" ]] \
+            || fail 'not every configured direct monitor advanced during the first half of the observation period.'
+        checkpoint_newest_evidence_at="$sample_newest_evidence_at"
     fi
 
     if [[ "$sample" -lt "$SAMPLES" ]]; then
         sleep "$INTERVAL_SECONDS"
     fi
 done
-[[ "$latest_oldest_evidence_at" -gt "$initial_newest_evidence_at" ]] \
-    || fail 'not every configured direct monitor produced newer durable central-runtime evidence during the observation period.'
+[[ -n "$checkpoint_newest_evidence_at" && "$latest_oldest_evidence_at" -gt "$checkpoint_newest_evidence_at" ]] \
+    || fail 'not every configured direct monitor advanced during the second half of the observation period.'
+completed_epoch="$(date -u +'%s')"
+[[ "$latest_release_evidence_deadline_at" -ge "$completed_epoch" ]] \
+    || fail 'one or more direct monitors lack cadence-current evidence at the end of the observation period.'
 
 completed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-observation_seconds=$(( (SAMPLES - 1) * INTERVAL_SECONDS ))
 printf '{"state":"verified","samples":%d,"observation_seconds":%d,"verified_sites":%d,"supervised_programs":%d,"started_at":"%s","completed_at":"%s"}\n' \
     "$SAMPLES" \
     "$observation_seconds" \

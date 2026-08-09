@@ -159,12 +159,16 @@ assert_origin_main_release() {
 
 if [ "$SKIP_GIT_UPDATE" -eq 1 ]; then
     echo "▶ skipping git update (--skip-git-update)"
-    if [ -e .git ]; then
-        assert_clean_release_checkout
+    if [ ! -e .git ]; then
+        echo "✗ deployment refused: --skip-git-update still requires the reviewed Git checkout."
+        echo "  The flag skips the network update only; it cannot bypass exact source-revision verification."
+        exit 1
     fi
+    assert_origin_main_release
+    assert_clean_release_checkout
 elif [ ! -e .git ]; then
     echo "✗ git update requested, but $(pwd) is not a Git checkout."
-    echo "  Re-run from the app root or pass --skip-git-update for artifact-only deployments."
+    echo "  Re-run from the reviewed Git checkout."
     exit 1
 else
     assert_clean_release_checkout

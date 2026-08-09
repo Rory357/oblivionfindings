@@ -42,10 +42,15 @@ it('requires sustained supervised collector-free runtime and independent heartbe
             '$stale !== 0',
             '$neverObserved !== 0',
             '$site["direct_monitor_fingerprint"] ?? null',
+            '$site["direct_monitor_max_interval_seconds"] ?? null',
+            '$site["release_evidence_deadline_at"] ?? null',
             '$site["oldest_evidence_at"] ?? null',
             'verified_monitor_roster_fingerprint',
             'the operational Site or direct-monitor roster changed during the observation period.',
-            'not every configured direct monitor produced newer durable central-runtime evidence during the observation period.',
+            'the observation period must cover at least two cycles of the slowest configured direct monitor.',
+            'not every configured direct monitor advanced during the first half of the observation period.',
+            'not every configured direct monitor advanced during the second half of the observation period.',
+            'one or more direct monitors lack cadence-current evidence at the end of the observation period.',
             'observation_seconds',
         )
         ->not->toContain('echo "$health_json"', 'echo "$readiness_json"', '--location', '--insecure');
@@ -69,6 +74,7 @@ it('rejects cached or replayed runtime health evidence', function () {
         ->toContain(
             'a fresh UTC runtime observation that',
             'every configured direct monitor at each operational Site to have current durable central-runtime evidence',
-            'The request explicitly bypasses intermediary caches and rejects',
+            'The request',
+            'explicitly bypasses intermediary caches and rejects',
         );
 });

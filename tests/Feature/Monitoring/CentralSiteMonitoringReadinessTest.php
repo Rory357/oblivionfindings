@@ -54,6 +54,7 @@ it('reports Site-specific direct path proof without exposing network or credenti
         'assigned_at' => now()->subHour(),
     ]);
     $profile = MonitoringProfile::factory()->create([
+        'interval_seconds' => 60,
         'stale_after_seconds' => 300,
         'is_active' => true,
     ]);
@@ -144,6 +145,8 @@ it('reports Site-specific direct path proof without exposing network or credenti
         ->and($report['runtime']['available'])->toBe(4)
         ->and($report['runtime']['required'])->toBe(4)
         ->and($report['oldest_evidence_at'])->toBe($report['evidence_at'])
+        ->and($report['direct_monitor_max_interval_seconds'])->toBe(60)
+        ->and($report['release_evidence_deadline_at'])->toBe(now()->addMinute()->toIso8601String())
         ->and($report['direct_monitor_fingerprint'])->toMatch('/\A[a-f0-9]{64}\z/')
         ->and($report['topology']['state'])->toBe('current')
         ->and($report['topology']['node_count'])->toBe(2)

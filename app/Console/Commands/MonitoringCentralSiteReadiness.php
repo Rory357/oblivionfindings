@@ -91,7 +91,7 @@ final class MonitoringCentralSiteReadiness extends Command
             ? collect()
             : Monitor::query()
                 ->whereIn('device_id', $devices->pluck('id'))
-                ->with('profile:id,is_active,stale_after_seconds')
+                ->with('profile:id,is_active,interval_seconds,stale_after_seconds')
                 ->get();
         $reports = $readiness->assess(
             $sites,

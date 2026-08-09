@@ -22,6 +22,8 @@ use Illuminate\Support\Collection;
  */
 final class CentralSiteMonitoringReadinessService
 {
+    private const RELEASE_EVIDENCE_GRACE_SECONDS = 60;
+
     /** @var list<string> */
     public const REQUIRED_WORKERS = ['orchestration', 'checks', 'events', 'topology'];
 
@@ -105,9 +107,22 @@ final class CentralSiteMonitoringReadinessService
                     ->filter()
                     ->sort()
                     ->first();
+                $maximumIntervalSeconds = $direct
+                    ->map(fn (Monitor $monitor): int => $this->intervalSeconds($monitor))
+                    ->max() ?? 0;
+                $releaseEvidenceDeadline = $direct
+                    ->map(function (Monitor $monitor) use ($directEvidence): ?CarbonImmutable {
+                        $observedAt = $directEvidence->get($monitor->id);
+
+                        return $observedAt?->addSeconds(
+                            $this->intervalSeconds($monitor) + self::RELEASE_EVIDENCE_GRACE_SECONDS,
+                        );
+                    })
+                    ->filter()
+                    ->sort()
+                    ->first();
                 $directMonitorFingerprint = hash('sha256', $direct
-                    ->pluck('id')
-                    ->map(fn (mixed $id): int => (int) $id)
+                    ->map(fn (Monitor $monitor): string => (int) $monitor->id.':'.$this->intervalSeconds($monitor))
                     ->sort(SORT_NUMERIC)
                     ->values()
                     ->implode(','));
@@ -153,6 +168,8 @@ final class CentralSiteMonitoringReadinessService
                     'attention' => $attention,
                     'evidence_at' => $latestEvidence?->toIso8601String(),
                     'oldest_evidence_at' => $oldestEvidence?->toIso8601String(),
+                    'release_evidence_deadline_at' => $releaseEvidenceDeadline?->toIso8601String(),
+                    'direct_monitor_max_interval_seconds' => $maximumIntervalSeconds,
                     'evidence_age_seconds' => $latestEvidence?->diffInSeconds(now()),
                     'direct_monitor_fingerprint' => $directMonitorFingerprint,
                     'runtime' => $runtime,
@@ -243,6 +260,11 @@ final class CentralSiteMonitoringReadinessService
         return $observedAt->lt(now()->subSeconds($staleAfter))
             ? 'stale'
             : 'fresh';
+    }
+
+    private function intervalSeconds(Monitor $monitor): int
+    {
+        return max(30, (int) ($monitor->profile?->interval_seconds ?? 60));
     }
 
     private function needsAttention(Monitor $monitor): bool
