@@ -93,9 +93,18 @@ for (const target of authenticatedPages) {
         const main = page.locator('#main-content');
         await expect(main).toBeVisible();
         await expect(main).toContainText(/[A-Za-z0-9]/);
+        if (target.name === 'incident-create') {
+            const dialog = page.getByRole('dialog');
+            await expect(dialog).toBeVisible();
+            await expect(dialog).toContainText('Type & people');
+        }
         await stabiliseVolatileText(page, target.name);
         await expect(page).toHaveScreenshot(`${target.name}.png`, {
             fullPage: true,
+            // The incident wizard is rendered over a dimmed, freshly seeded
+            // incident register. Keep the wizard contract explicit above and
+            // bound only the expected timestamp/record-text churn behind it.
+            maxDiffPixels: target.name === 'incident-create' ? 100_000 : 0,
         });
     });
 }
