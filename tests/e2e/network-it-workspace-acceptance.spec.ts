@@ -145,11 +145,20 @@ test.describe('Network & IT specialist workspace', () => {
                 level: 2,
             }),
         ).toBeVisible();
+        const retainedInterface = page.getByRole('article').filter({
+            has: page.getByRole('heading', {
+                name: fixture.interfaceName,
+                level: 3,
+            }),
+        });
+        await expect(retainedInterface).toHaveCount(1);
         await expect(
-            page.getByText('Retained native observation', { exact: true }),
+            retainedInterface.getByText('Retained native observation', {
+                exact: true,
+            }),
         ).toBeVisible();
         await expect(
-            page.getByText('Capacity warning', { exact: true }).first(),
+            retainedInterface.getByText('Capacity warning', { exact: true }),
         ).toBeVisible();
         await expectNoPageOverflow(page);
 

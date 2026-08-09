@@ -64,6 +64,17 @@ appear healthy.
 
 Confirm heartbeat is current, backlog trends to zero, and the collector-reported acknowledged/highest source sequences exactly mirror the central collector/checkpoint pair. An empty writable spool is not recovery evidence when either sequence is behind or ahead: the collector stays unavailable, the existing root path correlation remains active, and downstream monitors remain stale. Confirm gaps/corruption clear, configuration sequence never regresses, and downstream monitors recover only after the exact sequence mirrors and contiguous evidence return. Verify unrelated approved Sites and collectors continued normally.
 
+The single offline root event pins the exact sorted enabled-monitor roster at the
+outage boundary, its count, affected Device count, and a value-free SHA-256
+fingerprint. Those internal monitor IDs are correlation provenance only; never
+substitute targets, protocol configuration, or credentials in the event or
+export them into an evidence attachment. Recovery must fail closed if the
+pinned roster evidence is missing or malformed, a pinned monitor has moved or
+been disabled, or an enabled monitor has been added. Restore the exact roster
+relationship before recovery or escalate the conflicting change; never edit
+the append-only event to force closure. Planned roster changes occur after the
+original correlation has recovered.
+
 ## Deployed acceptance sequence
 
 Complete this sequence against one genuinely remote Site and the approved
@@ -109,8 +120,15 @@ files, request headers, or Redis keys into the evidence record.
    drains in source-sequence order until the collector-reported acknowledged
    and highest source sequences exactly match both central mirrors,
    gaps/corruption are zero, one recovery is recorded, and downstream monitors
-   leave stale state. A zero-item heartbeat with a lagging local checkpoint must
-   keep the same root path correlation open rather than record recovery. Then
+   leave stale state. A zero-item heartbeat with a lagging local checkpoint, or
+   with no newly persisted canonical observation after the outage boundary for
+   every monitor in the pinned outage roster, must keep the same root path
+   correlation open rather than record recovery. Confirm the recovery event
+   reuses the original roster fingerprint and affected counts. Disable, add,
+   or move one monitor during a controlled negative check and confirm recovery
+   remains fail-closed even after every candidate monitor has a post-boundary
+   canonical observation; restore the original roster before completing the
+   acceptance sequence. `checks_executed` alone is not recovery evidence. Then
    restore the timer.
 
 3. The restored signed configuration must contain only the approved Site,

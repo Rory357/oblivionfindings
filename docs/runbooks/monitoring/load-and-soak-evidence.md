@@ -195,9 +195,23 @@ php scripts/monitoring/verify-load-soak-evidence.php \
 
 Release mode exits zero with `status: passed` only when the source contract and
 independently pinned Ed25519 attestation both pass and the fixed protected
-authority record is verified. The output records
+authority record is verified. It also fails unless the verifier itself is
+running from the exact clean deployed source checkout whose `HEAD` and
+`refs/remotes/origin/main` both equal the authority-bound release revision;
+missing Git state, a nested checkout path, tracked or non-ignored untracked
+source dirt, a revision mismatch or any Git inspection failure is ineligible.
+Git inspection explicitly disables repository/system filesystem-monitor and
+untracked-cache configuration so this read-only gate neither executes an
+ambient filesystem-monitor command nor trusts its changed-path result.
+
+This Git check is deliberately classified as source-checkout identity, not a
+hash of ignored/generated runtime inputs. Composer dependencies, built assets,
+runtime configuration and process binaries remain separately governed by the
+deployment/runtime attestation and V10 release manifest; an ignored file is not
+silently relabelled as source evidence by this gate. The output records
 `release_authority_verified: true` and its value-free
-`release_authority_reference`, and binds the source, attestation, authority key,
+`release_authority_reference` plus `release_checkout_verified: true`, and binds
+the source, attestation, authority key,
 run, release, environment, profile, measurement contract and Supervisor
 generation without emitting targets, credentials, payloads, Sites, Devices,
 process references or measurement values.

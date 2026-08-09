@@ -4,6 +4,7 @@
 use App\Support\Monitoring\LoadSoakEvidenceVerifier;
 use App\Support\Monitoring\LoadSoakPlatformAttestationVerifier;
 use App\Support\Monitoring\LoadSoakReleaseAuthorityVerifier;
+use App\Support\Monitoring\LoadSoakReleaseCheckoutVerifier;
 use App\Support\Monitoring\StrictJsonObjectDecoder;
 
 require dirname(__DIR__, 2).'/vendor/autoload.php';
@@ -143,9 +144,17 @@ $attestationResult = $evidence !== null && $attestation !== null
 $contractValid = $verification['status'] === 'contract_valid';
 $attestationValid = $attestationResult['valid'] === true;
 $releaseAuthorityValid = $releaseAuthority['valid'] === true;
+$releaseCheckoutValid = ! $testAuthority
+    && $releaseAuthorityValid
+    && is_string($verification['release_revision'] ?? null)
+    && (new LoadSoakReleaseCheckoutVerifier)->verify(
+        dirname(__DIR__, 2),
+        $verification['release_revision'],
+    );
 $releaseProvenance = $contractValid
     && $attestationValid
     && $releaseAuthorityValid
+    && $releaseCheckoutValid
     && ! $testAuthority;
 $testContractValid = $contractValid && $attestationValid && $testAuthority;
 $status = match (true) {
@@ -173,6 +182,7 @@ $artifact = [
     },
     'release_authority_verified' => $releaseAuthorityValid,
     'release_authority_reference' => $releaseAuthority['authority_reference'],
+    'release_checkout_verified' => $releaseCheckoutValid,
     'status' => $status,
     'source_contract_status' => $verification['status'],
     'platform_attestation_verified' => $attestationValid,
@@ -181,7 +191,8 @@ $artifact = [
     'checks' => $verification['checks'],
     'violations_count' => $verification['violations_count']
         + ($attestationValid ? 0 : 1)
-        + (! $testAuthority && ! $releaseAuthorityValid ? 1 : 0),
+        + (! $testAuthority && ! $releaseAuthorityValid ? 1 : 0)
+        + (! $testAuthority && ! $releaseCheckoutValid ? 1 : 0),
     'run_id' => $verification['run_id'],
     'release_revision' => $verification['release_revision'],
     'environment_fingerprint' => $verification['environment_fingerprint'],
@@ -244,6 +255,7 @@ fwrite(STDOUT, json_encode([
     'artifact_file' => $artifactFile,
     'release_provenance_verified' => $releaseProvenance,
     'release_authority_verified' => $releaseAuthorityValid,
+    'release_checkout_verified' => $releaseCheckoutValid,
     'violations_count' => $artifact['violations_count'],
 ], JSON_UNESCAPED_SLASHES).PHP_EOL);
 

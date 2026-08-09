@@ -3,6 +3,7 @@
 use App\Support\Monitoring\LoadSoakEvidenceVerifier;
 use App\Support\Monitoring\LoadSoakPlatformAttestationVerifier;
 use App\Support\Monitoring\LoadSoakReleaseAuthorityVerifier;
+use App\Support\Monitoring\LoadSoakReleaseCheckoutVerifier;
 use App\Support\Monitoring\StrictJsonObjectDecoder;
 use Symfony\Component\Process\Process;
 
@@ -590,5 +591,73 @@ it('cannot turn a locally generated key and caller environment pin into release 
             unlink($path);
         }
         rmdir($temporary);
+    }
+});
+
+it('binds release evidence to the exact clean deployed origin main checkout', function (): void {
+    $checkout = sys_get_temp_dir().DIRECTORY_SEPARATOR.'oblivion-load-soak-checkout-'.bin2hex(random_bytes(8));
+    mkdir($checkout, 0700, true);
+
+    $run = static function (array $command) use ($checkout): string {
+        $process = new Process($command, $checkout);
+        $process->mustRun();
+
+        return trim($process->getOutput());
+    };
+
+    try {
+        $run(['git', 'init']);
+        $run(['git', 'config', 'user.email', 'release-evidence@example.invalid']);
+        $run(['git', 'config', 'user.name', 'Release Evidence Test']);
+        file_put_contents($checkout.DIRECTORY_SEPARATOR.'release.txt', "first\n");
+        $run(['git', 'add', 'release.txt']);
+        $run(['git', 'commit', '-m', 'first']);
+        $revision = $run(['git', 'rev-parse', 'HEAD']);
+        $run(['git', 'update-ref', 'refs/remotes/origin/main', $revision]);
+        $run(['git', 'config', 'core.fsmonitor', 'untrusted-release-evidence-hook']);
+
+        $verifier = new LoadSoakReleaseCheckoutVerifier('git');
+
+        expect($verifier->verify($checkout, $revision))->toBeTrue();
+        $run(['git', 'config', '--unset', 'core.fsmonitor']);
+
+        file_put_contents($checkout.DIRECTORY_SEPARATOR.'untracked.txt', "dirty\n");
+        expect($verifier->verify($checkout, $revision))->toBeFalse();
+        unlink($checkout.DIRECTORY_SEPARATOR.'untracked.txt');
+
+        file_put_contents($checkout.DIRECTORY_SEPARATOR.'ignored.txt', "ignored runtime state\n");
+        file_put_contents($checkout.DIRECTORY_SEPARATOR.'.gitignore', "ignored.txt\n");
+        $run(['git', 'add', '.gitignore']);
+        $run(['git', 'commit', '-m', 'ignore runtime state']);
+        $revision = $run(['git', 'rev-parse', 'HEAD']);
+        $run(['git', 'update-ref', 'refs/remotes/origin/main', $revision]);
+
+        expect($verifier->verify($checkout, $revision))->toBeTrue();
+        unlink($checkout.DIRECTORY_SEPARATOR.'ignored.txt');
+
+        file_put_contents($checkout.DIRECTORY_SEPARATOR.'release.txt', "second\n");
+        $run(['git', 'add', 'release.txt']);
+        $run(['git', 'commit', '-m', 'second']);
+
+        expect($verifier->verify($checkout, $revision))->toBeFalse();
+    } finally {
+        $remove = static function (string $path) use (&$remove): void {
+            if (is_dir($path) && ! is_link($path)) {
+                foreach (scandir($path) ?: [] as $entry) {
+                    if ($entry !== '.' && $entry !== '..') {
+                        $remove($path.DIRECTORY_SEPARATOR.$entry);
+                    }
+                }
+                rmdir($path);
+
+                return;
+            }
+
+            if (file_exists($path) || is_link($path)) {
+                @chmod($path, 0600);
+                unlink($path);
+            }
+        };
+        $remove($checkout);
     }
 });

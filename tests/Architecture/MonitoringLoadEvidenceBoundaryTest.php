@@ -8,6 +8,7 @@ it('keeps local synthetic monitoring performance artifacts ineligible for V09 cl
     $verifier = (string) file_get_contents($root.'/app/Support/Monitoring/LoadSoakEvidenceVerifier.php');
     $attestation = (string) file_get_contents($root.'/app/Support/Monitoring/LoadSoakPlatformAttestationVerifier.php');
     $releaseAuthority = (string) file_get_contents($root.'/app/Support/Monitoring/LoadSoakReleaseAuthorityVerifier.php');
+    $releaseCheckout = (string) file_get_contents($root.'/app/Support/Monitoring/LoadSoakReleaseCheckoutVerifier.php');
     $strictJson = (string) file_get_contents($root.'/app/Support/Monitoring/StrictJsonObjectDecoder.php');
 
     expect($source)->toContain(
@@ -33,6 +34,9 @@ it('keeps local synthetic monitoring performance artifacts ineligible for V09 cl
         "'release_authority_verified' => \$releaseAuthorityValid",
         "'release_authority_reference' => \$releaseAuthority['authority_reference']",
         '&& $releaseAuthorityValid',
+        '(new LoadSoakReleaseCheckoutVerifier)->verify(',
+        '&& $releaseCheckoutValid',
+        "'release_checkout_verified' => \$releaseCheckoutValid",
         "'release_provenance_verified' => \$releaseProvenance",
         "'v09_release_evidence' => \$releaseProvenance",
         "fopen(\$artifactPath, 'x+b')",
@@ -88,6 +92,31 @@ it('keeps local synthetic monitoring performance artifacts ineligible for V09 cl
         "'supervisor_observation_generation'",
         '$issuedAt >= $createdAt',
         '$verifiedAt <= $expiresAt',
+    );
+
+    expect($releaseCheckout)->toContain(
+        "['rev-parse', '--is-inside-work-tree']",
+        "['rev-parse', '--show-toplevel']",
+        "['rev-parse', '--verify', 'HEAD']",
+        "['rev-parse', '--verify', 'refs/remotes/origin/main']",
+        "['status', '--porcelain=v1', '--untracked-files=all']",
+        "['GIT_OPTIONAL_LOCKS' => '0']",
+        "'core.fsmonitor=false'",
+        "'core.untrackedCache=false'",
+        "private readonly string \$gitBinary = '/usr/bin/git'",
+        'private function protectedGitBinary(): bool',
+        "\$this->gitBinary !== '/usr/bin/git'",
+        '($mode & 0022) === 0',
+        "(\$metadata['uid'] ?? null) === 0",
+        '$head === $expectedRevision',
+        '$originMain === $expectedRevision',
+        "\$status === ''",
+    )->not->toContain(
+        'git reset',
+        'git clean',
+        'git checkout',
+        'git pull',
+        'git fetch',
     );
 
     expect($strictJson)->toContain(

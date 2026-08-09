@@ -1126,6 +1126,10 @@ final class MetricRetentionFakeTimeSeriesStore implements TimeSeriesStore
         CarbonImmutable $from,
         CarbonImmutable $to,
     ): array {
+        if ($this->missingAll) {
+            return [];
+        }
+
         return collect($this->points)
             ->filter(fn (TimeSeriesPoint $point): bool => $point->externalKey === $externalKey
                 && $point->tier === $tier

@@ -4,7 +4,9 @@ namespace Tests\Support\Monitoring;
 
 use App\Domain\Monitoring\Contracts\CollectorCertificateIssuer;
 use App\Domain\Monitoring\Data\CollectorCertificateBundle;
+use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CollectorEnrollmentService;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Models\Device;
@@ -95,6 +97,29 @@ final class CollectorOutageFixture
             'highest_seen_source_sequence' => $highestSeenSourceSequence,
             'runtime' => ['checks_executed' => 1],
         ];
+    }
+
+    public static function canonicalObservation(
+        Monitor $monitor,
+        MonitoringCollector $collector,
+        int $sourceSequence,
+        CarbonImmutable $at,
+    ): MonitorObservation {
+        return MonitorObservation::query()->create([
+            'monitor_id' => $monitor->id,
+            'source_key' => "collector:{$collector->collector_uuid}:{$sourceSequence}",
+            'state' => $monitor->current_state,
+            'observed_at' => $at,
+            'ingested_at' => $at,
+        ]);
+    }
+
+    /** @param list<int> $monitorIds */
+    public static function rosterFingerprint(array $monitorIds): string
+    {
+        sort($monitorIds, SORT_NUMERIC);
+
+        return hash('sha256', json_encode(array_values(array_unique($monitorIds)), JSON_THROW_ON_ERROR));
     }
 
     private static function centralSecretKey(): string

@@ -233,11 +233,18 @@ function driverWorkspaceVehicleAt(Site $site, User $driver, string $name): Asset
 
 function driverWorkspaceSession(User $driver, Asset $vehicle): FleetDriverSession
 {
+    $endedAt = now();
+    $startedAt = $endedAt->copy()->subHour();
+
+    if (! $startedAt->isSameDay($endedAt)) {
+        $startedAt = $endedAt->copy()->startOfDay();
+    }
+
     return FleetDriverSession::query()->create([
         'asset_id' => $vehicle->id,
         'user_id' => $driver->id,
-        'started_at' => now()->subHour(),
-        'ended_at' => now()->subMinutes(10),
+        'started_at' => $startedAt,
+        'ended_at' => $endedAt,
         'source' => 'manual',
         'status' => 'closed',
     ]);
