@@ -4,6 +4,7 @@ namespace App\Domain\Monitoring\Support;
 
 use App\Infrastructure\Monitoring\InfluxDbTimeSeriesStore;
 use App\Infrastructure\Monitoring\LaravelSnapshotStore;
+use App\Support\Monitoring\StrictJsonObjectDecoder;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -812,11 +813,8 @@ POWERSHELL;
     private function decode(string $encoded): array
     {
         try {
-            $decoded = json_decode($encoded, true, 32, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            $this->refuse();
-        }
-        if (! is_array($decoded) || array_is_list($decoded)) {
+            $decoded = (new StrictJsonObjectDecoder)->decode($encoded, 32);
+        } catch (Throwable) {
             $this->refuse();
         }
 

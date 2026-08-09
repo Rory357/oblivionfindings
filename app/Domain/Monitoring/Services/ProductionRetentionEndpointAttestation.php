@@ -18,6 +18,7 @@ final class ProductionRetentionEndpointAttestation
         array $observed,
         string $releaseRevision,
         ?CarbonImmutable $now = null,
+        ?string $publicKey = null,
     ): array {
         if (! $this->absolute($path) || is_link($path)) {
             throw new RuntimeException('Production endpoint attestation path is invalid.');
@@ -38,7 +39,7 @@ final class ProductionRetentionEndpointAttestation
             throw new RuntimeException('Production endpoint attestation is invalid.', previous: $exception);
         }
 
-        return $this->verify($document, $observed, $releaseRevision, $now);
+        return $this->verify($document, $observed, $releaseRevision, $now, $publicKey);
     }
 
     /**
@@ -84,7 +85,9 @@ final class ProductionRetentionEndpointAttestation
             throw new RuntimeException('Production endpoint attestation is outside its approved window.');
         }
 
-        $publicKey ??= $this->publicKey();
+        if (! is_string($publicKey) || strlen($publicKey) !== SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) {
+            throw new RuntimeException('Production endpoint attestation public key is unavailable.');
+        }
         $expectedReference = 'ATTEST-'.substr(hash('sha256', $publicKey), 0, 32);
         $signature = base64_decode((string) ($document['signature_base64'] ?? ''), true);
         $unsigned = $document;
@@ -115,16 +118,6 @@ final class ProductionRetentionEndpointAttestation
         unset($item);
 
         return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-    }
-
-    private function publicKey(): string
-    {
-        $decoded = base64_decode((string) config('monitoring.retention.production_evidence_attestation_public_key'), true);
-        if (! is_string($decoded) || strlen($decoded) !== SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) {
-            throw new RuntimeException('Production endpoint attestation public key is unavailable.');
-        }
-
-        return $decoded;
     }
 
     /** @param array<string, mixed> $value @param list<string> $keys */

@@ -289,3 +289,16 @@ it('refuses external evidence stored inside the repository', function (): void {
     expect(fn () => (new ConfigurationHistoryEvidenceContract)->loadProductionManifest(__FILE__, dirname(__DIR__, 3)))
         ->toThrow(InvalidArgumentException::class);
 });
+
+it('rejects duplicate object keys at every depth before validating A10 evidence', function (string $encoded): void {
+    $decode = new ReflectionMethod(ConfigurationHistoryEvidenceContract::class, 'decode');
+
+    expect(fn () => $decode->invoke(new ConfigurationHistoryEvidenceContract, $encoded))
+        ->toThrow(
+            InvalidArgumentException::class,
+            'Configuration history evidence contract is incomplete or unsafe.',
+        );
+})->with([
+    'duplicate root classification' => '{"schema_version":2,"schema_version":1}',
+    'escaped duplicate nested commitment' => '{"commitments":{"firmware":"first","firm\\u0077are":"second"}}',
+]);

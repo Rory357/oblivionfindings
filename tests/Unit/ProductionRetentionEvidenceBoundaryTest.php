@@ -3,7 +3,9 @@
 use App\Domain\Monitoring\Services\ProductionRetentionEndpointAttestation;
 use App\Domain\Monitoring\Services\ProductionRetentionEndpointGuard;
 use App\Domain\Monitoring\Services\ProductionRetentionEvidenceArtifactWriter;
+use App\Domain\Monitoring\Services\ProductionRetentionReleaseAuthority;
 use App\Infrastructure\Monitoring\InfluxDbTimeSeriesStore;
+use Carbon\CarbonImmutable;
 
 function productionRetentionSettings(array $overrides = []): array
 {
@@ -102,6 +104,75 @@ function productionRetentionWriter(): ProductionRetentionEvidenceArtifactWriter
 {
     return new ProductionRetentionEvidenceArtifactWriter(productionRetentionPublicKey());
 }
+
+function productionRetentionReleaseAuthority(CarbonImmutable $now): array
+{
+    $publicKey = productionRetentionPublicKey();
+
+    return [
+        'schema_version' => 1,
+        'evidence_class' => 'monitoring_production_retention_release_authority_v1',
+        'release_revision' => str_repeat('d', 40),
+        'valid_from_utc' => $now->subHour()->format('Y-m-d\TH:i:s\Z'),
+        'valid_until_utc' => $now->addHour()->format('Y-m-d\TH:i:s\Z'),
+        'attestation_public_key_base64' => base64_encode($publicKey),
+        'key_reference' => 'ATTEST-'.substr(hash('sha256', $publicKey), 0, 32),
+    ];
+}
+
+function productionRetentionProtectedAuthorityMetadata(array $overrides = []): array
+{
+    return [
+        'is_regular_file' => true,
+        'is_symlink' => false,
+        'mode' => 0100644,
+        'owner_uid' => 0,
+        'stable_identity' => true,
+        ...$overrides,
+    ];
+}
+
+it('requires the fixed protected release authority and cannot trust a caller supplied attestation key', function (): void {
+    $now = CarbonImmutable::parse('2026-08-09T12:00:00Z');
+    $record = productionRetentionReleaseAuthority($now);
+    $verifier = new ProductionRetentionReleaseAuthority;
+    $verified = $verifier->verifyRecord(
+        json_encode($record, JSON_THROW_ON_ERROR),
+        productionRetentionProtectedAuthorityMetadata(),
+        $now,
+    );
+
+    expect($verified['release_revision'])->toBe(str_repeat('d', 40))
+        ->and($verified['key_reference'])->toBe($record['key_reference'])
+        ->and($verified['public_key'])->toBe(productionRetentionPublicKey());
+
+    expect(fn () => $verifier->verifyRecord(
+        json_encode($record, JSON_THROW_ON_ERROR),
+        productionRetentionProtectedAuthorityMetadata(['mode' => 0100664]),
+        $now,
+    ))->toThrow(RuntimeException::class, 'release authority is invalid');
+
+    $substituted = $record;
+    $substitutedPair = sodium_crypto_sign_seed_keypair(str_repeat("\x61", SODIUM_CRYPTO_SIGN_SEEDBYTES));
+    $substituted['attestation_public_key_base64'] = base64_encode(sodium_crypto_sign_publickey($substitutedPair));
+    expect(fn () => $verifier->verifyRecord(
+        json_encode($substituted, JSON_THROW_ON_ERROR),
+        productionRetentionProtectedAuthorityMetadata(),
+        $now,
+    ))->toThrow(RuntimeException::class, 'release authority is invalid');
+
+    $attestation = productionRetentionAttestation('018f47a8-674f-7d2c-9f1c-9d5f82f7d129');
+    expect(fn () => (new ProductionRetentionEndpointAttestation)->verify(
+        $attestation,
+        [
+            'mysql_endpoint_sha256' => str_repeat('a', 64),
+            'influx_scope_sha256' => str_repeat('b', 64),
+            'influx_tls_certificate_sha256' => str_repeat('c', 64),
+        ],
+        str_repeat('d', 40),
+        CarbonImmutable::now('UTC'),
+    ))->toThrow(RuntimeException::class, 'public key is unavailable');
+});
 
 it('rejects every local fixture and incomplete endpoint combination as A05 production evidence', function (): void {
     $guard = new ProductionRetentionEndpointGuard;

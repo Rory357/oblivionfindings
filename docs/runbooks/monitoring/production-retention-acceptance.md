@@ -8,7 +8,7 @@ This runbook records the A05 production acceptance evidence for native monitorin
 - The command executes the normal raw-to-hourly and hourly-to-daily downsampler, then applies policy-governed metric retention. Eligible raw and hourly ranges will be deleted from InfluxDB only after the application dynamically verifies every occupied downstream bucket and its exact count, minimum, maximum, p50, p95 and stored value.
 - Configuration-snapshot retention is excluded from this bounded command.
 - The command refuses local, testing, SQLite, fake-store, reserved/documentation hostnames, non-TLS InfluxDB, incomplete endpoint and unhealthy InfluxDB configurations. Changing the application environment merely to bypass this guard invalidates the evidence.
-- A production label is not sufficient. The command observes the live MySQL server UUID, host, port and schema plus the live InfluxDB HTTPS certificate and configured organisation/bucket scope. A separately controlled Ed25519 attestation must pin those commitments, the exact 40-character deployed release revision and the one-time run UUID.
+- A production label is not sufficient. The command observes the live MySQL server UUID, host, port and schema plus the live InfluxDB HTTPS certificate and configured organisation/bucket scope. A separately controlled Ed25519 attestation must pin those commitments, the exact 40-character deployed release revision and the one-time run UUID. The trusted public key and release revision come only from the fixed protected release-authority file; process environment cannot substitute either trust input.
 - Tests, local fixtures, seeded demonstrations and copied JSON are never production evidence. A release artifact is eligible only when `classification` is `production_real_endpoints`, `status` is `verified`, and `a05_release_evidence` is `true`.
 - The artifact contains only times, counts, fixed endpoint types, status and safe error codes. It never contains Sites, Devices, monitors, series, policies, metric names, dimensions, values, payloads, endpoint addresses or credentials.
 
@@ -26,12 +26,23 @@ Prepare representative real data before the approved window. The command fails c
 
 Provision an absolute evidence directory outside the release checkout. It must already exist, be writable only by the service account (POSIX mode `0700`, or an equivalently restricted Windows ACL), and be on append-only or retention-locked storage. Do not place it in a public web, shared temporary or source-control directory.
 
-Before the window, have the independent release authority create the endpoint-attestation JSON. It must:
+Before the window, install the release-authority record at exactly `/etc/oblivion/monitoring-retention-release-authority.json`. There is no command-line or environment override for this path. It must be a root-owned regular file, stable throughout the read, not a symlink and not group- or other-writable. Its exact JSON keys are:
+
+- `schema_version`: integer `1`;
+- `evidence_class`: `monitoring_production_retention_release_authority_v1`;
+- `release_revision`: the exact lowercase 40-character deployed revision;
+- `valid_from_utc` and `valid_until_utc`: exact UTC-second timestamps defining a window no longer than 24 hours;
+- `attestation_public_key_base64`: the independent authority's 32-byte Ed25519 public key in strict Base64;
+- `key_reference`: `ATTEST-` followed by the first 32 hexadecimal characters of the SHA-256 commitment of the decoded public key.
+
+Provision the record through the protected release-control plane. The deployed application service account needs read access only. A value in `MONITORING_A05_ATTESTATION_PUBLIC_KEY` is not a release trust anchor and is ignored by this gate; do not use caller environment to select or rotate the approval key.
+
+Then have the independent release authority create the endpoint-attestation JSON. It must:
 
 - be an ordinary file at an absolute path outside the release checkout, not a symlink, and no larger than 32 KiB;
 - use schema `monitoring-production-retention-endpoint-attestation-v1` with no additional keys;
-- contain the one-time run UUID, exact `OBLIVION_RELEASE_REVISION`, UTC validity window of no more than 24 hours, the three observed endpoint commitments, key reference and detached signature;
-- be signed with the release authority's Ed25519 key. Configure only its public key in `MONITORING_A05_ATTESTATION_PUBLIC_KEY`; never place the signing key on the application host.
+- contain the one-time run UUID, exact protected-authority release revision, UTC validity window of no more than 24 hours, the three observed endpoint commitments, key reference and detached signature;
+- be signed with the private Ed25519 key corresponding to the public key in the protected release-authority record; never place the signing key on the application host.
 
 Generate the endpoint commitments from the deployed runtime through the approved release process. Do not type endpoint addresses, database identity, certificates or commitments into application code, and do not reuse an attestation from another release, environment, scope or run.
 
@@ -47,8 +58,8 @@ Use the platform-appropriate absolute private directory on non-Windows deploymen
 
 The command is automatically registered from `app/Console/Commands`. It performs these gates in order:
 
-1. Requires the production runtime, a real non-reserved MySQL connection, the concrete InfluxDB store, complete TLS endpoint configuration, an eligible output directory, the deployed release revision and a current signed endpoint attestation.
-2. Connects to the live endpoints, verifies the MySQL identity and InfluxDB TLS certificate/scope against the signed pins, then requires a healthy InfluxDB response.
+1. Requires the production runtime, a real non-reserved MySQL connection, the concrete InfluxDB store, complete TLS endpoint configuration, an eligible output directory and an endpoint-attestation path.
+2. Reads the fixed protected release-authority record, rejects an unprotected, unstable, expired or malformed record, and obtains the only eligible release revision and attestation public key from it. Before any endpoint probe or retention mutation, the command requires one clean source checkout whose `HEAD` and `origin/main` both equal the protected authority revision; it repeats that exact check after verification and before writing a release-eligible artifact. It then connects to the live endpoints and verifies the MySQL identity and InfluxDB TLS certificate/scope against the signed pins before requiring a healthy InfluxDB response.
 3. Captures an opaque, in-memory count and payload commitment across the complete due legal-hold ranges. These record keys and payload commitments never enter the output.
 4. Runs raw-to-hourly and hourly-to-daily downsampling synchronously against InfluxDB and persists coverage watermarks in MySQL.
 5. Executes metric-only retention through durable deletion intents. The pending intent and its exact policy/range/rollup commitment are committed before external deletion; acknowledgement, pointer transition and the linked tombstone complete afterward. A later run safely reconciles an interrupted intent without deleting the range twice.
@@ -71,13 +82,13 @@ Accept the run only when the command exits `0` and its value-free result has:
 }
 ```
 
-Independently validate the sidecar in the evidence store, confirm the embedded endpoint attestation run UUID equals the artifact UUID and its release revision equals the deployed revision, attach both immutable files to the release record, and record the deployed release identifier, operator, approval/change reference and observation window in the release system. Those operational identifiers deliberately stay outside the value-free application artifact.
+Independently validate the sidecar in the evidence store, confirm the embedded endpoint attestation run UUID equals the artifact UUID and its release revision and key reference equal the fixed protected release-authority record, attach both immutable files to the release record, and record the deployed release identifier, operator, approval/change reference and observation window in the release system. Those operational identifiers deliberately stay outside the value-free application artifact.
 
-Reject the run if the command exits non-zero, no artifact is produced, the checksum differs, the endpoint attestation is absent/expired/mismatched/invalid, `a05_release_evidence` is false, any safe error code is present, the verified execution counts are empty, or an unresolved deletion intent remains. A failed artifact is diagnostic evidence only and cannot close A05.
+Reject the run if the command exits non-zero, no artifact is produced, the checksum differs, the fixed release authority is absent/unprotected/expired/malformed, the endpoint attestation is absent/expired/mismatched/invalid, `a05_release_evidence` is false, any safe error code is present, the verified execution counts are empty, or an unresolved deletion intent remains. A failed artifact is diagnostic evidence only and cannot close A05.
 
 ## Failure and recovery
 
-- Endpoint, release-revision, attestation, health or output-directory failures occur before any downsampling or retention mutation. Correct the deployed configuration, approval file or private evidence-store permissions and rerun with a new one-time attestation under a new approved window.
+- Endpoint, protected-authority, attestation, health or output-directory failures occur before any downsampling or retention mutation. Correct the deployed configuration, protected authority/approval file or private evidence-store permissions and rerun with a new one-time attestation under a new approved window.
 - Coverage, privacy, legal-hold, tombstone, pointer or reference errors fail the evidence result. Do not edit the JSON, its checksum, coverage rows, series pointers or tombstones. Investigate the named safe error code and retain the failed pair.
 - If InfluxDB deletion succeeds but database finalisation is interrupted, leave the durable `pending` or `delete_acknowledged` intent intact. Restore database service, run the same normal retention path, and allow reconciliation to verify absence/presence, complete the pointer transition and create exactly one linked tombstone. Never manually mark an intent complete or fabricate a tombstone. The current evidence run remains failed if an intent is unresolved.
 - A failure after retention begins may have completed normal policy-governed deletions. Completed intents, their linked tombstones and pointer transitions are the authoritative audit trail. Do not attempt to reverse them by deleting business records. Follow the approved time-series restore procedure, reconcile against the preserved MySQL lineage, and run acceptance again with a new artifact UUID and attestation.

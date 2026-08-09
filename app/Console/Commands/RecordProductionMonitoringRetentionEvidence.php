@@ -10,7 +10,9 @@ use App\Domain\Monitoring\Services\ProductionRetentionEndpointGuard;
 use App\Domain\Monitoring\Services\ProductionRetentionEndpointProbe;
 use App\Domain\Monitoring\Services\ProductionRetentionEvidenceArtifactWriter;
 use App\Domain\Monitoring\Services\ProductionRetentionEvidenceVerifier;
+use App\Domain\Monitoring\Services\ProductionRetentionReleaseAuthority;
 use App\Domain\Monitoring\Services\RetentionEnforcer;
+use App\Support\Monitoring\LoadSoakReleaseCheckoutVerifier;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +36,8 @@ final class RecordProductionMonitoringRetentionEvidence extends Command
         ProductionRetentionEndpointAttestation $endpointAttestation,
         ProductionRetentionEvidenceVerifier $verifier,
         ProductionRetentionEvidenceArtifactWriter $writer,
+        ProductionRetentionReleaseAuthority $releaseAuthority,
+        LoadSoakReleaseCheckoutVerifier $releaseCheckout,
     ): int {
         $outputDirectory = trim((string) $this->option('output-directory'));
         $attestationPath = trim((string) $this->option('endpoint-attestation'));
@@ -66,15 +70,20 @@ final class RecordProductionMonitoringRetentionEvidence extends Command
                 $errors[] = 'output_directory_ineligible';
             }
         }
-        $releaseRevision = getenv('OBLIVION_RELEASE_REVISION');
         if ($attestationPath === '') {
             $errors[] = 'endpoint_attestation_required';
         }
-        if (! is_string($releaseRevision) || preg_match('/^[a-f0-9]{40}$/', $releaseRevision) !== 1) {
-            $errors[] = 'release_revision_required';
-        }
         if ($errors !== []) {
             return $this->finish(array_values(array_unique($errors)));
+        }
+
+        try {
+            $authority = $releaseAuthority->loadInstalled();
+        } catch (Throwable) {
+            return $this->finish(['release_authority_invalid']);
+        }
+        if (! $releaseCheckout->verify(base_path(), $authority['release_revision'])) {
+            return $this->finish(['release_checkout_invalid']);
         }
 
         try {
@@ -82,7 +91,9 @@ final class RecordProductionMonitoringRetentionEvidence extends Command
             $approvedEndpoints = $endpointAttestation->load(
                 $attestationPath,
                 $fingerprints,
-                $releaseRevision,
+                $authority['release_revision'],
+                null,
+                $authority['public_key'],
             );
         } catch (Throwable) {
             return $this->finish(['endpoint_attestation_invalid']);
@@ -141,8 +152,17 @@ final class RecordProductionMonitoringRetentionEvidence extends Command
             );
         }
 
+        if (! $releaseCheckout->verify(base_path(), $authority['release_revision'])) {
+            $report['errors'] = array_values(array_unique([
+                ...$report['errors'],
+                'release_checkout_changed',
+            ]));
+            $report['status'] = 'failed';
+            $report['a05_release_evidence'] = false;
+        }
+
         try {
-            $artifact = $writer->write($outputDirectory, $report);
+            $artifact = $writer->write($outputDirectory, $report, $authority['public_key']);
         } catch (Throwable) {
             return $this->finish(['evidence_artifact_write_failed']);
         }

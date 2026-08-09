@@ -60,10 +60,10 @@ final class ProductionRetentionEvidenceArtifactWriter
     ];
 
     /** @return array{filename: string, sha256_filename: string, sha256: string} */
-    public function write(string $directory, array $report): array
+    public function write(string $directory, array $report, ?string $attestationPublicKey = null): array
     {
         $directory = $this->eligibleDirectory($directory);
-        $this->assertValueFreeContract($report);
+        $this->assertValueFreeContract($report, $attestationPublicKey);
 
         $artifactId = (string) ($report['artifact_id'] ?? '');
         if (! Str::isUuid($artifactId)) {
@@ -162,7 +162,7 @@ final class ProductionRetentionEvidenceArtifactWriter
         return str_starts_with(strtolower($path), strtolower($parent));
     }
 
-    private function assertValueFreeContract(array $report): void
+    private function assertValueFreeContract(array $report, ?string $attestationPublicKey): void
     {
         $keys = array_keys($report);
         sort($keys);
@@ -237,7 +237,7 @@ final class ProductionRetentionEvidenceArtifactWriter
                 ],
                 (string) ($attestation['release_revision'] ?? ''),
                 null,
-                $this->resolvedAttestationPublicKey(),
+                $this->resolvedAttestationPublicKey($attestationPublicKey),
             );
         } catch (Throwable $exception) {
             throw new RuntimeException('Evidence report endpoint attestation is invalid.', previous: $exception);
@@ -323,21 +323,17 @@ final class ProductionRetentionEvidenceArtifactWriter
         }
     }
 
-    private function resolvedAttestationPublicKey(): string
+    private function resolvedAttestationPublicKey(?string $attestationPublicKey): string
     {
+        if (is_string($attestationPublicKey)
+            && strlen($attestationPublicKey) === SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) {
+            return $attestationPublicKey;
+        }
         if (is_string($this->attestationPublicKey)
             && strlen($this->attestationPublicKey) === SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) {
             return $this->attestationPublicKey;
         }
-        $container = Container::getInstance();
-        $encoded = $container->bound('config')
-            ? $container->make('config')->get('monitoring.retention.production_evidence_attestation_public_key')
-            : getenv('MONITORING_A05_ATTESTATION_PUBLIC_KEY');
-        $decoded = is_string($encoded) ? base64_decode($encoded, true) : false;
-        if (! is_string($decoded) || strlen($decoded) !== SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) {
-            throw new RuntimeException('Production endpoint attestation public key is unavailable.');
-        }
 
-        return $decoded;
+        throw new RuntimeException('Production endpoint attestation public key is unavailable.');
     }
 }

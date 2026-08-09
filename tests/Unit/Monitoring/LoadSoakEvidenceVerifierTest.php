@@ -596,9 +596,11 @@ it('cannot turn a locally generated key and caller environment pin into release 
 
 it('binds release evidence to the exact clean deployed origin main checkout', function (): void {
     $checkout = sys_get_temp_dir().DIRECTORY_SEPARATOR.'oblivion-load-soak-checkout-'.bin2hex(random_bytes(8));
+    $gitBinary = PHP_OS_FAMILY === 'Linux' ? '/usr/bin/git' : 'git';
     mkdir($checkout, 0700, true);
 
-    $run = static function (array $command) use ($checkout): string {
+    $run = static function (array $command) use ($checkout, $gitBinary): string {
+        $command[0] = $gitBinary;
         $process = new Process($command, $checkout);
         $process->mustRun();
 
@@ -616,7 +618,7 @@ it('binds release evidence to the exact clean deployed origin main checkout', fu
         $run(['git', 'update-ref', 'refs/remotes/origin/main', $revision]);
         $run(['git', 'config', 'core.fsmonitor', 'untrusted-release-evidence-hook']);
 
-        $verifier = new LoadSoakReleaseCheckoutVerifier('git');
+        $verifier = new LoadSoakReleaseCheckoutVerifier($gitBinary);
 
         expect($verifier->verify($checkout, $revision))->toBeTrue();
         $run(['git', 'config', '--unset', 'core.fsmonitor']);

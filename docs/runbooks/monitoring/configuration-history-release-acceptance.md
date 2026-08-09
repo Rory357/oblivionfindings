@@ -37,7 +37,7 @@ The gate explicitly rejects PHPUnit, local relabelling, fake stores, a stale con
 
 Do not use bare SHA-256 for targets, firmware versions, storage paths or external keys; those values may have low entropy and be dictionary-reversible. Every field ending in `_hmac_sha256` is lowercase `HMAC-SHA-256` using the evidence HMAC key and the exact value described by its name. Content HMACs cover exact restored JSON bytes. Configuration HMACs cover compact JSON with unescaped slashes. The diff HMAC covers the exact compact recomputed diff JSON. Target identity covers `site:<id>|device:<id>`.
 
-Both documents use schema version 2. Recursively sort every JSON object by key while preserving list order, remove the `attestation` member, encode compact JSON with unescaped slashes, prefix the exact context plus a newline, then create an Ed25519 detached signature:
+Both documents use schema version 2. Duplicate JSON object keys are rejected recursively, including keys whose escape sequences decode to the same name; normal last-key-wins parsing is never accepted as evidence. Recursively sort every JSON object by key while preserving list order, remove the `attestation` member, encode compact JSON with unescaped slashes, prefix the exact context plus a newline, then create an Ed25519 detached signature:
 
 - Production context: `oblivion-a10-production-manifest-v2`
 - Browser context: `oblivion-a10-browser-evidence-v2`

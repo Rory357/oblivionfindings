@@ -21,6 +21,8 @@ it('keeps A10 production configuration history proof attested isolated value fre
         ->toBeLessThan(strpos($command, 'loadProductionManifest'));
 
     expect($contract)->toContain(
+        'use App\\Support\\Monitoring\\StrictJsonObjectDecoder;',
+        '(new StrictJsonObjectDecoder)->decode($encoded, 32)',
         "app()->environment('restore-verification')",
         "class_exists('PHPUnit\\\\Framework\\\\TestCase', false)",
         'InfluxDbTimeSeriesStore::class',
@@ -84,6 +86,7 @@ it('keeps A10 production configuration history proof attested isolated value fre
         'Ed25519 public keys from distinct',
         'keyed HMAC',
         'verified restore reconciliation artifact',
+        'Duplicate JSON object keys are rejected recursively',
         'private evidence directory',
         'recomputes the structural diff',
         'exact changed firmware commitment',
