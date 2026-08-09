@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+import { loginAs } from '../e2e/helpers';
 
 const email = process.env.VISUAL_EMAIL ?? 'admin@demo.test';
 const password = process.env.VISUAL_PASSWORD ?? 'password';
@@ -18,12 +20,70 @@ const authenticatedPages = [
     { name: 'notifications', path: '/notifications' },
 ] as const;
 
+const volatileTextReplacements: Partial<
+    Record<
+        (typeof authenticatedPages)[number]['name'],
+        Array<{ pattern: string; flags: string; replacement: string }>
+    >
+> = {
+    'finance-dashboard': [
+        {
+            pattern:
+                '\\b(January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{4}\\b',
+            flags: 'gi',
+            replacement: 'Reference period',
+        },
+        {
+            pattern: '\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\b',
+            flags: 'g',
+            replacement: 'Mon',
+        },
+    ],
+    checklists: [
+        {
+            pattern:
+                '\\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\\s+\\d{1,2}\\s+(January|February|March|April|May|June|July|August|September|October|November|December)\\b',
+            flags: 'g',
+            replacement: 'Reference date',
+        },
+        {
+            pattern:
+                '\\b\\d{1,2}(?:\\s+[A-Z][a-z]{2})?\\s*[–-]\\s*\\d{1,2}\\s+[A-Z][a-z]{2}\\b',
+            flags: 'g',
+            replacement: 'reference week',
+        },
+    ],
+};
+
+async function stabiliseVolatileText(
+    page: Page,
+    targetName: (typeof authenticatedPages)[number]['name'],
+) {
+    const replacements = volatileTextReplacements[targetName];
+    if (!replacements) return;
+
+    await page.evaluate((rules) => {
+        const walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+        );
+        let node = walker.nextNode();
+        while (node) {
+            let value = node.textContent ?? '';
+            for (const rule of rules) {
+                value = value.replace(
+                    new RegExp(rule.pattern, rule.flags),
+                    rule.replacement,
+                );
+            }
+            node.textContent = value;
+            node = walker.nextNode();
+        }
+    }, replacements);
+}
+
 test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.locator('#email').fill(email);
-    await page.locator('#password').fill(password);
-    await page.getByTestId('login-button').click();
-    await expect(page).not.toHaveURL(/\/login$/);
+    await loginAs(page, email, password);
 });
 
 for (const target of authenticatedPages) {
@@ -33,6 +93,7 @@ for (const target of authenticatedPages) {
         const main = page.locator('#main-content');
         await expect(main).toBeVisible();
         await expect(main).toContainText(/[A-Za-z0-9]/);
+        await stabiliseVolatileText(page, target.name);
         await expect(page).toHaveScreenshot(`${target.name}.png`, {
             fullPage: true,
         });

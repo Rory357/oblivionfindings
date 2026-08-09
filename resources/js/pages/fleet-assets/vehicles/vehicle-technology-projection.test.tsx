@@ -142,10 +142,10 @@ describe('Fleet vehicle technology projection', () => {
             />,
         );
         expect(
-            screen.getByText('Vehicle technology is not available'),
+            screen.getByText('Security & Devices access required'),
         ).toBeVisible();
         expect(
-            screen.getByText(/current Site and source permissions/i),
+            screen.getByText(/Vehicle operations remain available/i),
         ).toBeVisible();
 
         rerender(

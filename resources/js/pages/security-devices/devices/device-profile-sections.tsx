@@ -1,4 +1,10 @@
-import { ItChangeDestination } from '@/components/security-devices/permission-destinations';
+import {
+    ClientProfileAccessRequired,
+    FleetTechnologyAccessRequired,
+    HrEmployeeEquipmentAccessRequired,
+    ItChangeDestination,
+    ItWorkspaceAccessRequired,
+} from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -1638,9 +1644,30 @@ export function DeviceProfileHeader({
                                 {header.location.name}
                             </Link>
                         ) : (
-                            <p className="mt-1 text-sm font-semibold">
-                                {header.location?.name ?? 'Unassigned'}
-                            </p>
+                            <div className="mt-1 space-y-1">
+                                <p className="text-sm font-semibold">
+                                    {header.location?.name ?? 'Unassigned'}
+                                </p>
+                                {header.location?.access?.state ===
+                                'restricted' ? (
+                                    header.location.type === 'staff' ? (
+                                        <HrEmployeeEquipmentAccessRequired
+                                            label={header.location.access.label}
+                                            className="min-h-0 text-xs"
+                                        />
+                                    ) : header.location.type === 'vehicle' ? (
+                                        <FleetTechnologyAccessRequired
+                                            label={header.location.access.label}
+                                            className="min-h-0 text-xs"
+                                        />
+                                    ) : (
+                                        <ClientProfileAccessRequired
+                                            label={header.location.access.label}
+                                            className="min-h-0 text-xs"
+                                        />
+                                    )
+                                ) : null}
+                            </div>
                         )}
                         <p className="text-xs text-muted-foreground">
                             {header.assignment
@@ -2181,39 +2208,60 @@ export function DeviceTicketsSection({ profile }: { profile: DeviceProfile }) {
 
     return (
         <div className="space-y-2">
-            {profile.tickets.map((ticket) => (
-                <Link
-                    key={ticket.id}
-                    href={ticket.href}
-                    className="flex min-h-16 flex-col gap-2 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40 sm:flex-row sm:items-center sm:justify-between"
-                >
-                    <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs font-semibold text-primary">
-                                {ticket.reference}
-                            </span>
-                            <Badge variant={stateBadgeVariant(ticket.status)}>
-                                {humanise(ticket.status)}
-                            </Badge>
-                            <Badge variant="outline">
-                                {humanise(ticket.priority)}
-                            </Badge>
-                        </div>
-                        <p className="mt-1 truncate text-sm font-semibold">
-                            {ticket.title}
-                        </p>
-                        {ticket.nextAction && (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                                Next: {ticket.nextAction}
+            {profile.tickets.map((ticket, index) =>
+                ticket.access.state === 'restricted' ||
+                !ticket.href ||
+                ticket.id === null ? (
+                    <div
+                        key={`restricted-it-ticket-${index}`}
+                        className="rounded-xl border bg-card px-4"
+                    >
+                        <ItWorkspaceAccessRequired
+                            label={ticket.access.label}
+                        />
+                    </div>
+                ) : (
+                    <Link
+                        key={ticket.id}
+                        href={ticket.href}
+                        className="flex min-h-16 flex-col gap-2 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono text-xs font-semibold text-primary">
+                                    {ticket.reference}
+                                </span>
+                                {ticket.status ? (
+                                    <Badge
+                                        variant={stateBadgeVariant(
+                                            ticket.status,
+                                        )}
+                                    >
+                                        {humanise(ticket.status)}
+                                    </Badge>
+                                ) : null}
+                                {ticket.priority ? (
+                                    <Badge variant="outline">
+                                        {humanise(ticket.priority)}
+                                    </Badge>
+                                ) : null}
+                            </div>
+                            <p className="mt-1 truncate text-sm font-semibold">
+                                {ticket.title}
                             </p>
-                        )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                        {humanise(ticket.workType)}
-                        <ArrowRight className="h-4 w-4" />
-                    </div>
-                </Link>
-            ))}
+                            {ticket.nextAction && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Next: {ticket.nextAction}
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                            {ticket.workType ? humanise(ticket.workType) : null}
+                            <ArrowRight className="h-4 w-4" />
+                        </div>
+                    </Link>
+                ),
+            )}
         </div>
     );
 }

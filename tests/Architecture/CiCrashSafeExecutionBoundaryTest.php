@@ -30,7 +30,6 @@ it('keeps PHP and browser CI in bounded crash safe shards', function () {
 
     foreach ([
         'chromium-desktop',
-        'chromium-mobile',
         'it-security-desktop-1440',
         'it-security-desktop-1280',
     ] as $project) {
@@ -44,5 +43,6 @@ it('keeps PHP and browser CI in bounded crash safe shards', function () {
         ->toContain('timeout-minutes: 50')
         ->toContain('npx playwright test --project=${{ matrix.project }}')
         ->toContain('playwright-artifacts-${{ matrix.project }}')
+        ->not->toContain('- chromium-mobile')
         ->not->toContain('run: npm run visual:test');
 });

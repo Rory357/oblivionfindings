@@ -30,6 +30,7 @@ The duplicate-free exact JSON schema is:
   "authority_reference": "AUTHORITY-00000000000000000000000000000000",
   "release_revision": "<40 lowercase hex>",
   "environment_reference_sha256": "<64 lowercase hex>",
+  "runtime_environment_sha256": "<SHA-256 of the protected runtime JSON>",
   "not_before": "YYYY-MM-DDTHH:MM:SSZ",
   "not_after": "YYYY-MM-DDTHH:MM:SSZ"
 }
@@ -40,6 +41,21 @@ reference and environment reference are opaque; do not derive them from a Site,
 Device, hostname, endpoint, credential, tracker identity or customer value.
 Provision a new record for each approved deployed release exercise.
 
+The runtime hash must match the exact root-owned
+`/etc/oblivion/security-devices-s10-release-runtime.json` file. This second
+file is a duplicate-free JSON object containing only the environment variables
+required by the deployed read-only Artisan gates. It must be a stable regular
+non-symlink file owned by root with mode `0600`. It requires
+`APP_ENV=production`, disabled debug, `DB_CONNECTION=mysql`,
+`MONITORING_COLLECTOR_REPLAY_STORE=redis` and a non-empty application key. It
+may contain the protected database/application values needed by the release,
+but those values are never printed or copied to the artifact. Do not use a
+workstation `.env`, caller shell variables or an evidence fixture database.
+The orchestrator also sets `APP_CONFIG_CACHE` to the fixed verified-absent
+`/run/oblivion-s10-release-no-config-cache.php` path before each child. If a
+file or symlink exists there, the run fails. Laravel therefore cannot prefer a
+caller-prepared ignored `bootstrap/cache/config.php` over the protected values.
+
 The gate verifies the authority, exact Git top-level source checkout, clean
 tracked/non-ignored worktree, and matching `HEAD` and `origin/main` before and
 after each sustained child gate.
@@ -49,17 +65,24 @@ authority, dirty checkout, missing Git metadata, changed revision or changed
 identity fails closed. An artifact-only deployment without verifiable checkout
 metadata cannot use a caller-supplied revision as a substitute.
 
+The orchestrator bootstraps only its five exact tracked support sources and
+never executes the ignored Composer autoloader before the checkout decision.
+Git and child-process supervision use a bounded shell-free native process runner.
 Git inspection uses the fixed root-owned `/usr/bin/git`, disables ambient
 filesystem-monitor and untracked-cache configuration, and runs both children
 through fixed root-owned `/usr/bin/bash` in privileged, non-profile mode with
 `--noprofile --norc -p`, a bounded system `PATH`, and the resolved root-owned
-`/usr/bin/php8.4`. One shared child environment preserves the Laravel
-application, database and secret variables needed by the read-only commands,
-but removes every ambient `GIT_*` selector or configuration override plus Bash
-startup/exported-function and PHP configuration-injection variables. A
-caller-supplied Git index, `BASH_ENV`, exported command function, `PHPRC`, or
-`PHP_INI_SCAN_DIR` therefore cannot replace the checkout identity, child
-contract or PHP runtime. The Git check binds reviewed source; it does not
+`/usr/bin/php8.4`. Git receives only a minimal fixed environment. Each
+sustained child receives only the exact authority-hashed root-private runtime
+JSON plus the fixed system path/PHP binding; no caller environment is inherited.
+Git selectors, Bash startup/exported functions, PHP configuration,
+dynamic-loader, proxy and CA injection keys are forbidden in that protected
+file. A caller-supplied database, Git index, `BASH_ENV`, exported command
+function, `PHPRC`, proxy or loader therefore cannot replace the checkout, data
+source, child contract or PHP runtime. The protected environment is re-read
+immediately before each child, the fixed cache-bypass path is rechecked, and
+the environment hash remains pinned across all four
+authority snapshots. The Git check binds reviewed source; it does not
 pretend that ignored/generated dependencies, built assets or runtime
 configuration are Git source. Those remain separately governed by
 deployment/runtime attestation and V10 release packaging.
@@ -101,7 +124,7 @@ either child payload into the combined artifact.
 Success creates one collision-safe
 `security-devices-s10-release-evidence-<timestamp>-<random>.json` file using
 exclusive creation, flush and filesystem sync. The value-free artifact contains
-the exact release revision, environment and authority references, both child
+the exact release revision, environment, protected-runtime hash and authority references, both child
 SHA-256 values, bounded time/count summaries, the two provider labels, native
 Queclink transport label and explicit release-provenance result. It contains no
 Site, Device, tracker, target, endpoint, credential, provider response, frame,

@@ -8,6 +8,7 @@ import type {
     Resident,
 } from '@/components/resident-tracking/types';
 import { GovernedLocationExportDialog } from '@/components/security-devices/governed-location-export-dialog';
+import { DeviceProfileAccessRequired } from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -89,8 +90,17 @@ export type ClientLocationData = {
         acknowledge_panic_url?: string;
         fleet_dashboard_url?: string;
         history_url?: string;
+        tracking_workspace_url?: string | null;
+        tracking_workspace_access?: {
+            state: 'available' | 'restricted';
+            label: string;
+        };
         last_command_status?: CommandStatus;
         detail_url?: string | null;
+        detail_access?: {
+            state: 'available' | 'restricted';
+            label: string;
+        };
     } | null;
     currentLocation: {
         lat: number;
@@ -264,6 +274,7 @@ export default function ClientLocationTab({
             profile_url: undefined,
             history_url: tracker.history_url,
             detail_url: tracker.detail_url,
+            detail_access: tracker.detail_access,
             last_command_status: tracker.last_command_status,
         };
     }, [
@@ -445,16 +456,23 @@ export default function ClientLocationTab({
                                 <Navigation className="h-4 w-4" />
                                 Current location
                             </CardTitle>
-                            <Link
-                                href={
-                                    tracker.fleet_dashboard_url ??
-                                    `/fleet-assets/resident-tracking?focus=${clientId}`
-                                }
-                                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                            >
-                                Open in Fleet Dashboard
-                                <ExternalLink className="h-3 w-3" />
-                            </Link>
+                            {tracker.tracking_workspace_url ? (
+                                <Link
+                                    href={tracker.tracking_workspace_url}
+                                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    Open Tracking workspace
+                                    <ExternalLink className="h-3 w-3" />
+                                </Link>
+                            ) : tracker.tracking_workspace_access?.state ===
+                              'restricted' ? (
+                                <DeviceProfileAccessRequired
+                                    label={
+                                        tracker.tracking_workspace_access.label
+                                    }
+                                    className="min-h-0 text-xs"
+                                />
+                            ) : null}
                         </CardHeader>
                         <CardContent className="p-0">
                             {hasLocation ? (

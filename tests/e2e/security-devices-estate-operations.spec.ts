@@ -85,6 +85,54 @@ test.describe('Security & Devices estate operations', () => {
         await expect(page.getByText(fixture.deviceName).first()).toBeVisible();
         await expectNoPageOverflow(page);
 
+        const openSiteProfile = page.getByRole('link', {
+            name: 'Open Site profile',
+        });
+        await expect(openSiteProfile).toHaveAttribute(
+            'href',
+            `/sites/${fixture.siteId}?tab=technology`,
+        );
+        await openSiteProfile.click();
+        await expect(page).toHaveURL(
+            new RegExp(`/sites/${fixture.siteId}\\?tab=technology$`),
+        );
+        await expect(
+            page.getByRole('heading', {
+                name: fixture.siteName,
+                level: 1,
+                exact: true,
+            }),
+        ).toBeVisible();
+
+        const technology = page.getByTestId('site-technology-projection');
+        await expect(technology).toBeVisible();
+        await expect(
+            technology.getByRole('heading', {
+                name: 'Technology & monitoring',
+                level: 2,
+            }),
+        ).toBeVisible();
+        const canonicalDevice = technology.locator(
+            `a[href="/security-devices/devices/${fixture.deviceId}"]`,
+        );
+        await expect(canonicalDevice).toHaveCount(1);
+        await expect(canonicalDevice).toContainText(fixture.deviceName);
+        await expect(canonicalDevice).toBeVisible();
+
+        const openFullTechnology = technology.getByRole('link', {
+            name: 'Open full technology view',
+        });
+        await expect(openFullTechnology).toHaveAttribute(
+            'href',
+            `/security-devices/sites/${fixture.siteId}`,
+        );
+        await openFullTechnology.click();
+        await expect(page).toHaveURL(
+            new RegExp(`/security-devices/sites/${fixture.siteId}$`),
+        );
+        await expect(page.getByText(fixture.deviceName).first()).toBeVisible();
+        await expectNoPageOverflow(page);
+
         await page.goto('/security-devices/devices');
         await expect(
             page.getByRole('heading', { name: 'All devices', level: 1 }),

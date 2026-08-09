@@ -80,7 +80,7 @@ test.describe('control room — smoke', () => {
             page.getByText('Critical', { exact: true }).first(),
         ).toBeVisible();
         await expect(
-            page.getByText('SLA breached', { exact: true }),
+            page.getByText('SLA breached', { exact: true }).first(),
         ).toBeVisible();
         await expect(
             page.getByText('Last 24 hours', { exact: true }),

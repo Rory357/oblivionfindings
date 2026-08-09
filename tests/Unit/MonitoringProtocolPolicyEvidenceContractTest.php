@@ -4,6 +4,7 @@ it('requires a complete value-free sustained protocol and policy evidence matrix
     $service = (string) file_get_contents(__DIR__.'/../../app/Domain/Monitoring/Services/ProtocolPolicyEvidenceService.php');
     $command = (string) file_get_contents(__DIR__.'/../../app/Console/Commands/MonitoringProtocolPolicyEvidence.php');
     $script = (string) file_get_contents(__DIR__.'/../../scripts/monitoring/verify-protocol-policy-evidence.sh');
+    $runbook = (string) file_get_contents(__DIR__.'/../../docs/runbooks/monitoring/protocol-policy-release-acceptance.md');
 
     foreach ([
         "'icmp'",
@@ -45,6 +46,9 @@ it('requires a complete value-free sustained protocol and policy evidence matrix
             'private function continuousExecutionEvidence(',
             'private function executionWindow(',
             'private function opaqueFingerprint(',
+            'private function recentMaintenanceWindows(',
+            'Collection $recentMaintenanceWindows',
+            'foreach ($recentMaintenanceWindows as $window)',
             "'oldest_evidence_at'",
             "'newest_evidence_at'",
         );
@@ -68,4 +72,9 @@ it('requires a complete value-free sustained protocol and policy evidence matrix
             'observation_seconds',
         )
         ->not->toContain('echo "$report"', '--insecure');
+    expect($runbook)->toContain(
+        'same recurrence-aware bounded',
+        'first occurrence ended',
+        'invalidates the sustained observation fingerprint',
+    );
 });

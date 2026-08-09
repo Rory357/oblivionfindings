@@ -76,6 +76,17 @@ it('renders the unified resident sidebar and queues Locate Now', async () => {
                     acknowledge_panic_url:
                         '/operations/clients/9012/location/acknowledge-panic',
                     last_command_status: 'acked',
+                    tracking_workspace_url:
+                        '/security-devices/tracking?tab=personal-safety',
+                    tracking_workspace_access: {
+                        state: 'available',
+                        label: 'Open Tracking workspace',
+                    },
+                    detail_url: '/security-devices/devices/12',
+                    detail_access: {
+                        state: 'available',
+                        label: 'Open Device Profile',
+                    },
                 },
                 currentLocation: {
                     lat: -37.723657,
@@ -99,6 +110,12 @@ it('renders the unified resident sidebar and queues Locate Now', async () => {
     expect(screen.getByText('No panic events recorded')).toBeVisible();
     expect(screen.getAllByText(/Charging/i).length).toBeGreaterThan(0);
     expect(screen.getByText('Acknowledged')).toBeVisible();
+    expect(
+        screen.getByRole('link', { name: 'Open Tracking workspace' }),
+    ).toHaveAttribute('href', '/security-devices/tracking?tab=personal-safety');
+    expect(
+        screen.getByRole('link', { name: 'Open Device Profile' }),
+    ).toHaveAttribute('href', '/security-devices/devices/12');
     expect(
         screen.queryByText('Location Tracking Consent Not Active'),
     ).not.toBeInTheDocument();
@@ -190,6 +207,16 @@ it('does not expose tracker commands when the server omits management URLs', asy
                     panic_active: true,
                     last_safety_event: 'sos',
                     last_safety_event_at: '2026-05-18T04:00:00Z',
+                    tracking_workspace_url: null,
+                    tracking_workspace_access: {
+                        state: 'restricted',
+                        label: 'Tracking workspace access required',
+                    },
+                    detail_url: null,
+                    detail_access: {
+                        state: 'restricted',
+                        label: 'Device Profile access required',
+                    },
                 },
                 currentLocation: {
                     lat: 0,
@@ -214,6 +241,16 @@ it('does not expose tracker commands when the server omits management URLs', asy
     ).toBeDisabled();
     expect(
         screen.queryByRole('button', { name: /Acknowledge/i }),
+    ).not.toBeInTheDocument();
+    expect(
+        screen.getByText('Tracking workspace access required'),
+    ).toBeVisible();
+    expect(screen.getByText('Device Profile access required')).toBeVisible();
+    expect(
+        screen.queryByRole('link', { name: /Tracking workspace/i }),
+    ).not.toBeInTheDocument();
+    expect(
+        screen.queryByRole('link', { name: /Device Profile/i }),
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Locate Now/i }));

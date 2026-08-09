@@ -470,7 +470,7 @@ export function JobCard({
             )}
 
             <footer className="mt-auto flex items-center justify-between gap-2">
-                <div className="min-w-0">
+                <div className="min-w-0" data-test="viewer-eligibility">
                     <EligibilityChip eligibility={job.viewer_eligibility} />
                 </div>
                 <div className="flex gap-1.5">

@@ -13,15 +13,25 @@ test.use({ viewport: { width: 1440, height: 900 } });
 
 function seedClientProfilePhaseOneFixture() {
     const output = runLaravelPhp(`
+$site = \\App\\Models\\Site::query()->updateOrCreate(
+    ['name' => 'Playwright Client Profile Site'],
+    [
+        'type' => 'house',
+        'is_active' => true,
+    ],
+);
+
 $client = \\App\\Models\\Client::factory()->create([
     'first_name' => 'Playwright',
     'last_name' => 'Profile',
     'status' => 'active',
+    'site_id' => $site->id,
 ]);
 $recentClient = \\App\\Models\\Client::factory()->create([
     'first_name' => 'Recent',
     'last_name' => 'Playwright Client',
     'status' => 'active',
+    'site_id' => $site->id,
 ]);
 
 echo json_encode([
@@ -127,7 +137,7 @@ test.describe('operations client profile phase 1', () => {
             'true',
         );
         await expect(page.getByTestId('client-tab-care_plans')).toHaveAttribute(
-            'aria-pressed',
+            'aria-selected',
             'true',
         );
         await expect(
@@ -147,7 +157,7 @@ test.describe('operations client profile phase 1', () => {
             .poll(() => new URL(page.url()).searchParams.get('tab'))
             .toBe('care_plans');
         await expect(page.getByTestId('client-tab-care_plans')).toHaveAttribute(
-            'aria-pressed',
+            'aria-selected',
             'true',
         );
         await expect(
@@ -251,7 +261,7 @@ echo json_encode([
         await page.keyboard.press('d');
         await expect(
             page.getByTestId('client-tab-progress_notes'),
-        ).toHaveAttribute('aria-pressed', 'true');
+        ).toHaveAttribute('aria-selected', 'true');
         await expect(
             page
                 .getByTestId('client-daily-notes-tab')

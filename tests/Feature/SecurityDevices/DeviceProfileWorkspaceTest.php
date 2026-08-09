@@ -9,13 +9,16 @@ use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitorObservation;
+use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
 use App\Models\Asset;
 use App\Models\AuditLog;
+use App\Models\Client;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
@@ -219,8 +222,164 @@ class DeviceProfileWorkspaceTest extends TestCase
 
                 $this->assertSame('vehicle', $location['type']);
                 $this->assertSame('Fleet response van', $location['name']);
-                $this->assertSame("/fleet-assets/vehicles/{$vehicle->id}", $location['href']);
+                $this->assertSame("/fleet-assets/vehicles/{$vehicle->id}?tab=technology", $location['href']);
+                $this->assertSame('available', $location['access']['state']);
             });
+    }
+
+    public function test_vehicle_assignment_names_the_fleet_destination_without_falling_back_to_the_generic_asset_profile(): void
+    {
+        $site = Site::factory()->create(['name' => 'Restricted Fleet operations']);
+        $vehicle = Asset::factory()->vehicle()->forSite($site)->create([
+            'name' => 'Restricted Fleet response van',
+        ]);
+        $device = Device::factory()->tracking()->create(['name' => 'Restricted response van tracker']);
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
+            'assignable_id' => $vehicle->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now(),
+        ]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+        $permissionIds = Permission::query()
+            ->whereIn('key', [
+                'securityDevices.viewAny',
+                'securityDevices.devices.view',
+                'assets.viewAny',
+            ])
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])
+            ->all();
+        $this->assertCount(3, $permissionIds);
+        $viewer->permissionOverrides()->syncWithoutDetaching($permissionIds);
+        $this->assertFalse($viewer->canDo('fleet.viewAny'));
+
+        $this->actingAs($viewer)
+            ->get("/security-devices/devices/{$device->id}")
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $location = $page->toArray()['props']['profile']['header']['location'];
+
+                $this->assertSame('vehicle', $location['type']);
+                $this->assertSame('Restricted Fleet response van', $location['name']);
+                $this->assertNull($location['href']);
+                $this->assertSame('restricted', $location['access']['state']);
+                $this->assertSame('Fleet vehicle technology access required', $location['access']['label']);
+            });
+    }
+
+    public function test_asset_link_returns_to_the_same_canonical_asset_technology_tab(): void
+    {
+        $site = Site::factory()->create(['name' => 'Asset technology site']);
+        $asset = Asset::factory()->forSite($site)->create([
+            'name' => 'Canonical gateway cabinet',
+            'category' => 'equipment',
+        ]);
+        $device = Device::factory()->create(['name' => 'Canonical cabinet switch']);
+        DeviceAssetLink::query()->create([
+            'device_id' => $device->id,
+            'asset_id' => $asset->id,
+            'link_type' => LinkType::InstalledIn,
+            'linked_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/security-devices/devices/{$device->id}")
+            ->assertOk()
+            ->assertInertia(function ($page) use ($asset): void {
+                $link = $page->toArray()['props']['assetLinks'][0];
+
+                $this->assertSame($asset->id, $link['asset_id']);
+                $this->assertSame('Canonical gateway cabinet', $link['asset_name']);
+                $this->assertSame("/fleet-assets/assets/{$asset->id}?tab=technology", $link['href']);
+                $this->assertSame('available', $link['access']['state']);
+            });
+    }
+
+    public function test_client_assignment_uses_the_domain_specific_canonical_profile_destination_and_fails_closed_without_client_access(): void
+    {
+        $site = Site::factory()->create();
+        $client = Client::factory()->create([
+            'site_id' => $site->id,
+            'first_name' => 'Mere',
+            'last_name' => 'Rangi',
+        ]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+        $this->admin->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'clients.viewAny')->value('id') => ['allowed' => true],
+        ]);
+        $this->assertTrue($this->admin->canDo('clients.viewAny'));
+        $healthcare = Device::factory()->create([
+            'domain' => 'iot_healthcare',
+            'name' => 'Mere healthcare sensor',
+        ]);
+        $tracking = Device::factory()->create([
+            'domain' => 'tracking',
+            'category' => 'personal_tracker',
+            'name' => 'Mere personal tracker',
+        ]);
+
+        foreach ([$healthcare, $tracking] as $device) {
+            DeviceAssignment::query()->create([
+                'device_id' => $device->id,
+                'assignable_type' => DeviceAssignment::TARGET_CLIENT,
+                'assignable_id' => $client->id,
+                'assignment_type' => 'permanent',
+                'assigned_at' => now(),
+            ]);
+        }
+
+        foreach ([
+            [$healthcare, 'healthcare_devices'],
+            [$tracking, 'location'],
+        ] as [$device, $tab]) {
+            $this->actingAs($this->admin)
+                ->get("/security-devices/devices/{$device->id}")
+                ->assertOk()
+                ->assertInertia(function ($page) use ($client, $tab): void {
+                    $location = $page->toArray()['props']['profile']['header']['location'];
+
+                    $this->assertSame('client', $location['type']);
+                    $this->assertSame('Mere Rangi', $location['name']);
+                    $this->assertSame(
+                        "/operations/clients/{$client->id}?tab={$tab}",
+                        $location['href'],
+                    );
+                    $this->assertSame('available', $location['access']['state']);
+                });
+        }
+
+        $itManager = User::factory()->create();
+        $itManager->roles()->attach(Role::query()->where('name', 'it_manager')->firstOrFail());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $itManager->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+
+        $this->assertTrue($itManager->canDo('securityDevices.devices.view'));
+        $this->assertFalse($itManager->canDo('clients.viewAny'));
+        $this->assertFalse($itManager->canDo('clients.viewAssigned'));
+
+        $denied = $this->actingAs($itManager)
+            ->get("/security-devices/devices/{$healthcare->id}");
+
+        $denied->assertNotFound();
+        $this->assertStringNotContainsString('Mere Rangi', $denied->getContent());
+        $this->assertStringNotContainsString('healthcare_devices', $denied->getContent());
     }
 
     public function test_management_uses_server_declared_actions_and_fails_closed_without_an_execution_adapter(): void
@@ -457,10 +616,18 @@ class DeviceProfileWorkspaceTest extends TestCase
         $this->actingAs($viewer)
             ->get("/security-devices/devices/{$device->id}")
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('profile.controlRoomAlerts', 0)
-                ->where('profile.sections', fn ($sections): bool => collect($sections)
-                    ->every(fn (array $section): bool => ! str_starts_with((string) ($section['href'] ?? ''), '/control-room/alerts/'))));
+            ->assertInertia(function ($page): void {
+                $props = $page->toArray()['props']['profile'];
+                $alert = $props['controlRoomAlerts'][0];
+
+                $this->assertCount(1, $props['controlRoomAlerts']);
+                $this->assertNull($alert['id']);
+                $this->assertNull($alert['reference']);
+                $this->assertNull($alert['href']);
+                $this->assertSame('restricted', $alert['access']['state']);
+                $this->assertSame('Control Room alert access required', $alert['access']['label']);
+                $this->assertTrue(collect($props['sections'])->pluck('key')->contains('events'));
+            });
     }
 
     public function test_all_sites_device_access_does_not_bypass_control_room_site_scope(): void
@@ -581,6 +748,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         ]);
         $ticket = ItTicket::factory()->create([
             'requester_user_id' => $this->admin->id,
+            'site_id' => $site->id,
             'title' => 'Private linked ticket',
         ]);
         ItTicketLink::query()->create([
@@ -608,16 +776,68 @@ class DeviceProfileWorkspaceTest extends TestCase
 
             $this->assertFalse($keys->contains('monitors'));
             $this->assertFalse($keys->contains('interfaces-sensors'));
-            $this->assertFalse($keys->contains('tickets'));
-            $this->assertFalse($keys->contains('events'));
+            $this->assertTrue($keys->contains('tickets'));
+            $this->assertTrue($keys->contains('events'));
             $this->assertFalse($keys->contains('maintenance'));
             $this->assertFalse($keys->contains('audit'));
             $this->assertSame([], $props['profile']['monitors']);
-            $this->assertSame([], $props['profile']['tickets']);
+            $this->assertCount(1, $props['profile']['tickets']);
+            $this->assertNull($props['profile']['tickets'][0]['id']);
+            $this->assertNull($props['profile']['tickets'][0]['reference']);
+            $this->assertNull($props['profile']['tickets'][0]['title']);
+            $this->assertNull($props['profile']['tickets'][0]['href']);
+            $this->assertSame('restricted', $props['profile']['tickets'][0]['access']['state']);
+            $this->assertSame('IT workspace access required', $props['profile']['tickets'][0]['access']['label']);
             $this->assertSame([], $props['profile']['audit']);
-            $this->assertSame([], $props['profile']['controlRoomAlerts']);
+            $this->assertCount(1, $props['profile']['controlRoomAlerts']);
+            $this->assertNull($props['profile']['controlRoomAlerts'][0]['id']);
+            $this->assertNull($props['profile']['controlRoomAlerts'][0]['reference']);
+            $this->assertNull($props['profile']['controlRoomAlerts'][0]['href']);
+            $this->assertSame('restricted', $props['profile']['controlRoomAlerts'][0]['access']['state']);
             $this->assertSame([], $props['recentEvents']);
             $this->assertSame([], $props['maintenanceRecords']);
+        });
+    }
+
+    public function test_profile_does_not_turn_a_cross_site_ticket_link_into_an_access_required_marker(): void
+    {
+        $deviceSite = Site::factory()->create();
+        $hiddenTicketSite = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->worker->id,
+            'primary_site_id' => $deviceSite->id,
+            'secondary_site_ids' => [],
+        ]);
+        $device = Device::factory()->create();
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $deviceSite->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now(),
+        ]);
+        $hiddenTicket = ItTicket::factory()->create([
+            'requester_user_id' => $this->admin->id,
+            'site_id' => $hiddenTicketSite->id,
+            'title' => 'Hidden Site ticket sentinel',
+        ]);
+        ItTicketLink::query()->create([
+            'ticket_id' => $hiddenTicket->id,
+            'relationship' => 'affected_device',
+            'linkable_type' => Device::class,
+            'linkable_id' => $device->id,
+            'created_by_user_id' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->worker)
+            ->get("/security-devices/devices/{$device->id}");
+
+        $response->assertOk()->assertInertia(function ($page): void {
+            $props = $page->toArray()['props']['profile'];
+
+            $this->assertSame([], $props['tickets']);
+            $this->assertFalse(collect($props['sections'])->pluck('key')->contains('tickets'));
+            $this->assertStringNotContainsString('Hidden Site ticket sentinel', json_encode($props));
         });
     }
 

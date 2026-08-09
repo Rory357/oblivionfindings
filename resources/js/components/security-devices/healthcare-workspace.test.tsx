@@ -76,7 +76,11 @@ const clientDevice = {
     client: {
         id: 4,
         displayName: 'Mere',
-        href: '/clients/4',
+        href: '/operations/clients/4?tab=healthcare_devices',
+        access: {
+            state: 'available',
+            label: 'Open Client Profile healthcare devices',
+        },
     },
     location: null,
     assignment: {
@@ -210,7 +214,10 @@ describe('HealthcareWorkspacePanels', () => {
         const card = screen.getByRole('article', { name: 'Mere wearable' });
         expect(
             within(card).getByRole('link', { name: 'Mere' }),
-        ).toHaveAttribute('href', '/clients/4');
+        ).toHaveAttribute(
+            'href',
+            '/operations/clients/4?tab=healthcare_devices',
+        );
         expect(within(card).getByText('Aroha Support')).toBeInTheDocument();
         expect(within(card).getByText('72% battery')).toBeInTheDocument();
         expect(within(card).getByText('Connected')).toBeInTheDocument();
@@ -222,6 +229,45 @@ describe('HealthcareWorkspacePanels', () => {
         ).toHaveAttribute('href', '/it/tickets/9');
         expect(
             within(card).queryByText(/123 bpm|diabetes|warfarin/i),
+        ).not.toBeInTheDocument();
+    });
+
+    it('shows an explicit access-required state instead of linking protected Client identity', () => {
+        render(
+            <HealthcareWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'client-devices',
+                        label: 'Client devices',
+                        inventoryTotal: 1,
+                        inventoryShown: 1,
+                        devices: [
+                            {
+                                ...clientDevice,
+                                client: {
+                                    id: null,
+                                    displayName: 'Assigned client',
+                                    href: null,
+                                    access: {
+                                        state: 'restricted',
+                                        label: 'Client Profile access required',
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                }}
+            />,
+        );
+
+        const card = screen.getByRole('article', { name: 'Mere wearable' });
+        expect(
+            within(card).getByText('Client Profile access required'),
+        ).toBeInTheDocument();
+        expect(
+            within(card).queryByRole('link', { name: 'Assigned client' }),
         ).not.toBeInTheDocument();
     });
 

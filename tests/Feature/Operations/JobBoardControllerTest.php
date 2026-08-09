@@ -279,6 +279,7 @@ class JobBoardControllerTest extends TestCase
             ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.week', null)
                 ->where('available_skills.0', 'Medication')
                 ->where('available_skills.1', 'NZSL')
                 ->where('jobs.data', function ($jobs) use ($matching, $wrongSkill, $tooLate) {

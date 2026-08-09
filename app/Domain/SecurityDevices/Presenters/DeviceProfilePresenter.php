@@ -80,11 +80,11 @@ class DeviceProfilePresenter
         $observations = $canViewMonitoring
             ? $this->latestObservations($monitors->pluck('id'))
             : collect();
-        $tickets = $canViewIt ? $this->tickets($viewer, $device) : collect();
+        $tickets = $canViewIt
+            ? $this->tickets($viewer, $device)
+            : $this->restrictedTickets($device);
         $audit = $canViewAudit ? $this->audit($device) : collect();
-        $controlRoomAlerts = $canViewControlRoom
-            ? $this->controlRoomAlerts($viewer, $device)
-            : collect();
+        $controlRoomAlerts = $this->controlRoomAlerts($viewer, $device, $canViewControlRoom);
         $management = $this->management($viewer, $device);
 
         return [
@@ -217,7 +217,7 @@ class DeviceProfilePresenter
         return match ($assignment->assignable_type) {
             DeviceAssignment::TARGET_SITE => $this->siteLocation($device, $assignment),
             DeviceAssignment::TARGET_ROOM => $this->roomLocation($device, $assignment),
-            DeviceAssignment::TARGET_CLIENT => $this->clientLocation($device, $assignment),
+            DeviceAssignment::TARGET_CLIENT => $this->clientLocation($viewer, $device, $assignment),
             DeviceAssignment::TARGET_VEHICLE => $this->vehicleLocation($viewer, $assignment),
             DeviceAssignment::TARGET_STAFF => $this->staffLocation($viewer, $assignment),
             default => null,
@@ -239,17 +239,36 @@ class DeviceProfilePresenter
     }
 
     /** @return array<string, mixed>|null */
-    private function clientLocation(Device $device, DeviceAssignment $assignment): ?array
+    private function clientLocation(User $viewer, Device $device, DeviceAssignment $assignment): ?array
     {
         $client = Client::query()
-            ->find($assignment->assignable_id, ['id', 'first_name', 'last_name']);
+            ->find($assignment->assignable_id, ['id', 'site_id', 'first_name', 'last_name']);
 
-        return $client ? [
+        if (! $client) {
+            return null;
+        }
+
+        $canViewClient = Gate::forUser($viewer)->allows('view', $client);
+        $tab = match ($device->domain) {
+            'iot_healthcare' => 'healthcare_devices',
+            'tracking' => 'location',
+            default => 'profile',
+        };
+
+        return [
             'id' => $client->id,
             'type' => 'client',
-            'name' => $client->full_name,
-            'href' => "/operations/clients/{$client->id}",
-        ] : null;
+            'name' => $canViewClient ? $client->full_name : 'Assigned client',
+            'href' => $canViewClient
+                ? "/operations/clients/{$client->id}?tab={$tab}"
+                : null,
+            'access' => [
+                'state' => $canViewClient ? 'available' : 'restricted',
+                'label' => $canViewClient
+                    ? 'Open Client Profile'
+                    : 'Client Profile access required',
+            ],
+        ];
     }
 
     /** @return array<string, mixed>|null */
@@ -286,12 +305,26 @@ class DeviceProfilePresenter
                 'client_id',
             ]);
 
-        return $asset ? [
+        if (! $asset) {
+            return null;
+        }
+
+        $href = $viewer->canDo('fleet.viewAny')
+            ? "/fleet-assets/vehicles/{$asset->id}?tab=technology"
+            : null;
+
+        return [
             'id' => $asset->id,
             'type' => 'vehicle',
             'name' => $asset->name ?: $asset->registration_number,
-            'href' => $this->assetHref($viewer, $asset),
-        ] : null;
+            'href' => $href,
+            'access' => [
+                'state' => $href ? 'available' : 'restricted',
+                'label' => $href
+                    ? 'Open Fleet vehicle technology'
+                    : 'Fleet vehicle technology access required',
+            ],
+        ];
     }
 
     /** @return array<string, mixed>|null */
@@ -299,12 +332,24 @@ class DeviceProfilePresenter
     {
         $staff = User::query()->find($assignment->assignable_id, ['id', 'name']);
 
-        return $staff ? [
+        if (! $staff) {
+            return null;
+        }
+
+        $href = $this->staffProfileHref($viewer, $staff->id);
+
+        return [
             'id' => $staff->id,
             'type' => 'staff',
             'name' => $staff->name,
-            'href' => $this->staffProfileHref($viewer, $staff->id),
-        ] : null;
+            'href' => $href,
+            'access' => [
+                'state' => $href ? 'available' : 'restricted',
+                'label' => $href
+                    ? 'Open HR equipment view'
+                    : 'HR employee equipment access required',
+            ],
+        ];
     }
 
     private function staffProfileHref(User $viewer, int $staffId): ?string
@@ -319,21 +364,7 @@ class DeviceProfilePresenter
             ->whereIn('user_id', $visibleStaff)
             ->value('id');
 
-        return $profileId ? "/hr/people/{$profileId}" : null;
-    }
-
-    private function assetHref(User $viewer, Asset $asset): ?string
-    {
-        $isVehicle = strtolower(trim((string) $asset->category)) === 'vehicle'
-            || $asset->categoryRef?->slug === 'vehicle';
-        if ($isVehicle && $viewer->canDo('fleet.viewAny')) {
-            return "/fleet-assets/vehicles/{$asset->id}";
-        }
-
-        $canUseAssetRoute = ($viewer->canDo('assets.viewAny') || $viewer->canDo('assets.viewAssigned'))
-            && Gate::forUser($viewer)->allows('view', $asset);
-
-        return $canUseAssetRoute ? "/fleet-assets/assets/{$asset->id}" : null;
+        return $profileId ? "/hr/people/{$profileId}?tab=assets" : null;
     }
 
     /** @return array<string, mixed> */
@@ -436,8 +467,8 @@ class DeviceProfilePresenter
             ['key' => 'configuration', 'label' => 'Configuration', 'group' => 'technical'],
             $canViewManagement ? ['key' => 'management', 'label' => 'Management', 'group' => 'technical', 'count' => $commandCount] : null,
             ['key' => 'assignments', 'label' => 'Assignments', 'group' => 'operations', 'count' => $device->assignments->count()],
-            $canViewIt ? ['key' => 'tickets', 'label' => 'Tickets', 'group' => 'operations', 'count' => $tickets->count()] : null,
-            $canViewMonitoring || $canViewControlRoom ? [
+            $canViewIt || $tickets->isNotEmpty() ? ['key' => 'tickets', 'label' => 'Tickets', 'group' => 'operations', 'count' => $tickets->count()] : null,
+            $canViewMonitoring || $controlRoomAlerts->isNotEmpty() ? [
                 'key' => 'events',
                 'label' => 'Events',
                 'group' => 'operations',
@@ -701,13 +732,54 @@ class DeviceProfilePresenter
                 'nextAction' => $link->ticket->next_action,
                 'updatedAt' => $link->ticket->updated_at?->toISOString(),
                 'href' => "/it/tickets/{$link->ticket->id}",
+                'access' => [
+                    'state' => 'available',
+                    'label' => 'Open IT ticket',
+                ],
             ])
             ->unique('id')
             ->values();
     }
 
     /** @return Collection<int, array<string, mixed>> */
-    private function controlRoomAlerts(User $viewer, Device $device): Collection
+    private function restrictedTickets(Device $device): Collection
+    {
+        try {
+            $siteId = $this->siteResolver->resolveForContext($device->id);
+        } catch (UnexpectedValueException) {
+            return collect();
+        }
+
+        $hasLinkedTicket = ItTicketLink::query()
+            ->where('relationship', 'affected_device')
+            ->where('linkable_type', Device::class)
+            ->where('linkable_id', $device->id)
+            ->whereHas('ticket', fn (Builder $ticket): Builder => $ticket->where('site_id', $siteId))
+            ->exists();
+
+        if (! $hasLinkedTicket) {
+            return collect();
+        }
+
+        return collect([[
+            'id' => null,
+            'reference' => null,
+            'title' => null,
+            'status' => null,
+            'priority' => null,
+            'workType' => null,
+            'nextAction' => null,
+            'updatedAt' => null,
+            'href' => null,
+            'access' => [
+                'state' => 'restricted',
+                'label' => 'IT workspace access required',
+            ],
+        ]]);
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
+    private function controlRoomAlerts(User $viewer, Device $device, bool $canViewControlRoom): Collection
     {
         $query = ControlRoomAlert::query()
             ->whereIn('status', ControlRoomAlert::ACTIVE_STATUSES)
@@ -751,6 +823,24 @@ class DeviceProfilePresenter
         }
 
         $alerts = $query->get();
+        if (! $canViewControlRoom) {
+            return $alerts->isEmpty()
+                ? collect()
+                : collect([[
+                    'id' => null,
+                    'reference' => null,
+                    'type' => null,
+                    'severity' => null,
+                    'status' => null,
+                    'triggeredAt' => null,
+                    'href' => null,
+                    'access' => [
+                        'state' => 'restricted',
+                        'label' => 'Control Room alert access required',
+                    ],
+                ]]);
+        }
+
         $readableAlertIds = $this->controlRoomAccess->readableIds($alerts, $viewer);
 
         return $alerts->map(function (ControlRoomAlert $alert) use ($readableAlertIds): array {

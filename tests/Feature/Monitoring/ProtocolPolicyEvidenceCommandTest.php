@@ -485,10 +485,19 @@ it('requires current suppression and recovery evidence to correlate to the exerc
 
     $maintenanceTarget->forceFill(['suppressed_at' => now()->subMinutes(25)])->save();
 
-    $insideRecurringOccurrence = app(ProtocolPolicyEvidenceService::class)->report(60)['policy'];
+    $insideRecurringOccurrence = app(ProtocolPolicyEvidenceService::class)->report(60);
 
-    expect($insideRecurringOccurrence['maintenance'])
+    expect($insideRecurringOccurrence['policy']['maintenance'])
         ->toMatchArray(['state' => 'verified', 'observed_suppressions' => 1]);
+
+    $recurringRoster = $insideRecurringOccurrence['evidence_roster_fingerprint'];
+    $maintenanceWindow->forceFill(['reason' => 'release_acceptance_revised'])->save();
+    $changedRecurringWindow = app(ProtocolPolicyEvidenceService::class)->report(60);
+
+    expect($changedRecurringWindow['policy']['maintenance'])
+        ->toMatchArray(['state' => 'verified', 'observed_suppressions' => 1])
+        ->and($changedRecurringWindow['evidence_roster_fingerprint'])
+        ->not->toBe($recurringRoster);
 
     $maintenanceWindow->forceFill([
         'starts_at' => now()->subMinutes(30),

@@ -43,16 +43,29 @@ it('reuses one signed request for each active replay sample and emits conservati
             },
         );
 
-        $evidence = $api->verifyTransport('2df1d87c-2d04-4e57-80ab-8a15f39c944d', 'active', 2);
+        $evidence = $api->verifyTransport(
+            '2df1d87c-2d04-4e57-80ab-8a15f39c944d',
+            'active',
+            2,
+            str_repeat('a', 64),
+            str_repeat('b', 64),
+        );
 
-        expect($evidence)->toBe([
+        expect($evidence)->toMatchArray([
+            'schema' => 'oblivion-collector-transport-evidence-v2',
             'state' => 'response_contract_matched',
+            'collector_reference_sha256' => hash('sha256', '2df1d87c-2d04-4e57-80ab-8a15f39c944d'),
+            'signing_key_reference_sha256' => str_repeat('a', 64),
+            'identity_generation_reference_sha256' => str_repeat('b', 64),
             'expected_identity_state' => 'active',
             'pinned_https_contract' => 'matched',
             'initial_response' => 'validation_rejected',
             'replay_attempt' => 'authentication_denied',
             'samples' => 2,
-        ])->and($calls)->toHaveCount(4)
+        ])->and($evidence['observed_from_utc'])->toMatch('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/')
+            ->and($evidence['observed_until_utc'])->toMatch('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/')
+            ->and($evidence['observed_until_utc'])->toBeGreaterThanOrEqual($evidence['observed_from_utc'])
+            ->and($calls)->toHaveCount(4)
             ->and($calls[0]['method'])->toBe('POST')
             ->and($calls[0]['path'])->toBe('/api/monitoring/collectors/configuration')
             ->and(json_decode($calls[0]['body'], true, 8, JSON_THROW_ON_ERROR))->toBe([
@@ -113,14 +126,28 @@ it('reports only the revoked response contract and rejects non-exact bodies', fu
             $transport,
         );
 
-        expect($api->verifyTransport('2df1d87c-2d04-4e57-80ab-8a15f39c944d', 'revoked', 1))->toBe([
+        $evidence = $api->verifyTransport(
+            '2df1d87c-2d04-4e57-80ab-8a15f39c944d',
+            'revoked',
+            1,
+            str_repeat('c', 64),
+            str_repeat('d', 64),
+        );
+
+        expect($evidence)->toMatchArray([
+            'schema' => 'oblivion-collector-transport-evidence-v2',
             'state' => 'response_contract_matched',
+            'collector_reference_sha256' => hash('sha256', '2df1d87c-2d04-4e57-80ab-8a15f39c944d'),
+            'signing_key_reference_sha256' => str_repeat('c', 64),
+            'identity_generation_reference_sha256' => str_repeat('d', 64),
             'expected_identity_state' => 'revoked',
             'pinned_https_contract' => 'matched',
             'initial_response' => 'authentication_denied',
             'replay_attempt' => 'not_exercised',
             'samples' => 1,
-        ])->and($calls)->toHaveCount(1)
+        ])->and($evidence['observed_from_utc'])->toMatch('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/')
+            ->and($evidence['observed_until_utc'])->toMatch('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/')
+            ->and($calls)->toHaveCount(1)
             ->and($calls[0]['useMtls'])->toBeTrue();
 
         $response['body'] = '{"message":"Collector authentication failed.","origin":"proxy"}';
@@ -129,6 +156,8 @@ it('reports only the revoked response contract and rejects non-exact bodies', fu
             '2df1d87c-2d04-4e57-80ab-8a15f39c944d',
             'revoked',
             1,
+            str_repeat('c', 64),
+            str_repeat('d', 64),
         ))->toThrow(CentralApiFailure::class, 'expected response contract');
     } finally {
         removeCollectorDirectory($directory);

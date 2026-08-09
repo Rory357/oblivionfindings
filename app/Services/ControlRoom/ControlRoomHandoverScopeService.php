@@ -252,7 +252,10 @@ class ControlRoomHandoverScopeService
         }
 
         return AuditLog::query()
-            ->where('auditable_type', ControlRoomAlert::class)
+            ->whereIn('auditable_type', [
+                ControlRoomAlert::class,
+                (new ControlRoomAlert)->getMorphClass(),
+            ])
             ->whereIn('auditable_id', $alertIds)
             ->whereIn('action', self::MATERIAL_ALERT_ACTIONS)
             ->whereBetween('created_at', [$shiftStart, $criteriaAt])

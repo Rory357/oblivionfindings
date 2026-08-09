@@ -5,9 +5,41 @@ use App\Domain\Monitoring\Contracts\TimeSeriesStore;
 use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Services\ConfigurationHistoryEvidenceService;
 use App\Domain\Monitoring\Support\ConfigurationHistoryEvidenceContract;
+use App\Domain\Monitoring\Support\ConfigurationHistoryReleaseAuthority;
 use App\Infrastructure\Monitoring\InfluxDbTimeSeriesStore;
 use App\Infrastructure\Monitoring\LaravelSnapshotStore;
 use Carbon\CarbonImmutable;
+
+/** @return array<string, mixed> */
+function verifiedConfigurationHistoryReleaseAuthority(?CarbonImmutable $now = null): array
+{
+    $now ??= CarbonImmutable::now('UTC');
+    $record = [
+        'authority_reference' => 'AUTHORITY-'.str_repeat('a', 32),
+        'browser_attestation_public_key_base64' => base64_encode(str_repeat('b', 32)),
+        'evidence_acl_reference' => 'ACL-'.str_repeat('1', 32),
+        'evidence_class' => 'monitoring_configuration_history_release_authority_v1',
+        'hmac_key_sha256' => hash('sha256', str_repeat('h', 32)),
+        'production_attestation_public_key_base64' => base64_encode(str_repeat('p', 32)),
+        'release_revision' => str_repeat('a', 40),
+        'restored_environment_reference_sha256' => str_repeat('3', 64),
+        'schema_version' => 1,
+        'valid_from_utc' => $now->subMinutes(5)->format('Y-m-d\TH:i:s\Z'),
+        'valid_until_utc' => $now->addHour()->format('Y-m-d\TH:i:s\Z'),
+    ];
+
+    return (new ConfigurationHistoryReleaseAuthority)->verifyRecord(
+        json_encode($record, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+        [
+            'is_regular_file' => true,
+            'is_symlink' => false,
+            'mode' => 0100600,
+            'owner_uid' => 0,
+            'stable_identity' => true,
+        ],
+        $now,
+    );
+}
 
 /** @return list<string> */
 function protectConfigurationHistoryWindowsDirectory(string $path): array
@@ -104,7 +136,10 @@ it('requires exact recomputed bounded diff paths rather than a self asserted non
     putenv('MONITORING_A10_EVIDENCE_HMAC_KEY='.base64_encode(str_repeat('h', 32)));
 
     try {
-        $contract = new ConfigurationHistoryEvidenceContract;
+        $contract = new ConfigurationHistoryEvidenceContract(
+            verifiedConfigurationHistoryReleaseAuthority(),
+            true,
+        );
         $service = new ConfigurationHistoryEvidenceService(
             new ConfigurationHistoryGuardSnapshotStore,
             new ConfigurationHistoryGuardTimeSeriesStore,
@@ -159,7 +194,8 @@ it('requires exact recomputed bounded diff paths rather than a self asserted non
 });
 
 it('admits only exact process-scoped restore endpoints roots and concrete stores', function (): void {
-    $contract = new ConfigurationHistoryEvidenceContract;
+    $authority = verifiedConfigurationHistoryReleaseAuthority();
+    $contract = new ConfigurationHistoryEvidenceContract($authority, true);
     $objectRoot = sys_get_temp_dir().DIRECTORY_SEPARATOR.'a10-object-'.bin2hex(random_bytes(6));
     $evidenceRoot = sys_get_temp_dir().DIRECTORY_SEPARATOR.'a10-evidence-'.bin2hex(random_bytes(6));
     mkdir($objectRoot, 0700);
@@ -172,7 +208,6 @@ it('admits only exact process-scoped restore endpoints roots and concrete stores
         ...protectConfigurationHistoryWindowsDirectory($objectRoot),
         ...protectConfigurationHistoryWindowsDirectory($evidenceRoot),
     ]));
-    $revision = $contract->currentReleaseRevision(base_path()) ?? str_repeat('a', 40);
     $environment = [
         'MONITORING_RESTORE_MYSQL_DSN' => 'mysql://restore.invalid/a10',
         'DB_URL' => 'mysql://restore.invalid/a10',
@@ -184,12 +219,8 @@ it('admits only exact process-scoped restore endpoints roots and concrete stores
         'MONITORING_RESTORE_FILESYSTEM_DRIVER' => 'local',
         'MONITORING_RESTORE_FILESYSTEM_ROOT' => $objectRoot,
         'MONITORING_A10_EVIDENCE_DIRECTORY' => $evidenceRoot,
-        'MONITORING_A10_EVIDENCE_ACL_REFERENCE' => 'ACL-'.str_repeat('1', 32),
-        'MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY' => base64_encode(str_repeat('p', 32)),
-        'MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY' => base64_encode(str_repeat('b', 32)),
         'MONITORING_A10_EVIDENCE_HMAC_KEY' => base64_encode(str_repeat('h', 32)),
         'MONITORING_A10_WINDOWS_ACL_ALLOWED_IDENTITIES' => implode('|', $windowsAclIdentities),
-        'OBLIVION_RELEASE_REVISION' => $revision,
     ];
     $previousEnvironment = [];
     foreach ($environment as $key => $value) {
@@ -228,26 +259,22 @@ it('admits only exact process-scoped restore endpoints roots and concrete stores
             false,
         ))->toBe([]);
 
-        $sharedAttestationKey = str_repeat('s', SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES);
-        $paddedAttestationKey = base64_encode($sharedAttestationKey);
-        $unpaddedAttestationKey = rtrim($paddedAttestationKey, '=');
-        putenv('MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY='.$paddedAttestationKey);
-        putenv('MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY='.$unpaddedAttestationKey);
-        expect(base64_decode($unpaddedAttestationKey, true))->toBe($sharedAttestationKey)
-            ->and($contract->runtimeErrors(
-                LaravelSnapshotStore::class,
-                InfluxDbTimeSeriesStore::class,
-                base_path(),
-                false,
-            ))->toContain('independent_attestation_keys_required');
-        putenv(
-            'MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY='.
-            $environment['MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY'],
-        );
-        putenv(
-            'MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY='.
-            $environment['MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY'],
-        );
+        putenv('MONITORING_A10_EVIDENCE_HMAC_KEY='.base64_encode(str_repeat('x', 32)));
+        expect($contract->runtimeErrors(
+            LaravelSnapshotStore::class,
+            InfluxDbTimeSeriesStore::class,
+            base_path(),
+            false,
+        ))->toContain('evidence_hmac_key_mismatch');
+        putenv('MONITORING_A10_EVIDENCE_HMAC_KEY='.$environment['MONITORING_A10_EVIDENCE_HMAC_KEY']);
+
+        $unverifiedCheckout = new ConfigurationHistoryEvidenceContract($authority, false);
+        expect($unverifiedCheckout->runtimeErrors(
+            LaravelSnapshotStore::class,
+            InfluxDbTimeSeriesStore::class,
+            base_path(),
+            false,
+        ))->toContain('release_checkout_unverified');
 
         config()->set('monitoring.storage.timeseries.url', 'https://wrong.invalid');
         expect($contract->runtimeErrors(

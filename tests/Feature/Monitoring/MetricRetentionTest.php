@@ -31,6 +31,7 @@ use App\Models\Site;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -112,6 +113,27 @@ it('rejects reserved production endpoints and endpoint attestations that do not 
         $secretKey,
     ));
 
+    $encoded = json_encode($document, JSON_THROW_ON_ERROR);
+    $duplicate = preg_replace(
+        '/\A\{/',
+        '{"run_id":"'.$document['run_id'].'",',
+        $encoded,
+        1,
+    );
+    $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'retention-attestation-'.bin2hex(random_bytes(8)).'.json';
+    file_put_contents($path, $duplicate);
+    try {
+        expect(fn () => $attestation->load(
+            $path,
+            $observed,
+            $releaseRevision,
+            CarbonImmutable::now(),
+            $publicKey,
+        ))->toThrow(RuntimeException::class, 'attestation is invalid');
+    } finally {
+        @unlink($path);
+    }
+
     $wrongPins = $observed;
     $wrongPins['influx_scope_sha256'] = str_repeat('f', 64);
     expect(fn () => $attestation->verify(
@@ -122,6 +144,23 @@ it('rejects reserved production endpoints and endpoint attestations that do not 
         $publicKey,
     ))->toThrow(RuntimeException::class, 'does not match the live endpoints');
 
+    $validFrom = $document['valid_from_utc'];
+    $document['valid_from_utc'] = CarbonImmutable::now()->subHour()->format('Y-m-d\TH:i:sP');
+    $document['signature_base64'] = base64_encode(sodium_crypto_sign_detached(
+        "oblivion-a05-production-endpoints-v1\n".$attestation->canonicalJson(
+            Arr::except($document, 'signature_base64'),
+        ),
+        $secretKey,
+    ));
+    expect(fn () => $attestation->verify(
+        $document,
+        $observed,
+        $releaseRevision,
+        CarbonImmutable::now(),
+        $publicKey,
+    ))->toThrow(RuntimeException::class, 'outside its approved window');
+
+    $document['valid_from_utc'] = $validFrom;
     $document['signature_base64'] = base64_encode(str_repeat("\x00", SODIUM_CRYPTO_SIGN_BYTES));
     expect(fn () => $attestation->verify(
         $document,

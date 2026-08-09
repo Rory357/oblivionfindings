@@ -2,10 +2,11 @@
 
 namespace App\Domain\Monitoring\Services;
 
+use App\Support\Monitoring\StrictJsonObjectDecoder;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
-use JsonException;
 use RuntimeException;
+use Throwable;
 
 final class ProductionRetentionEndpointAttestation
 {
@@ -34,8 +35,11 @@ final class ProductionRetentionEndpointAttestation
             throw new RuntimeException('Production endpoint attestation is invalid.');
         }
         try {
-            $document = json_decode((string) file_get_contents($resolved), true, 16, JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
+            $document = (new StrictJsonObjectDecoder)->decode(
+                (string) file_get_contents($resolved),
+                16,
+            );
+        } catch (Throwable $exception) {
             throw new RuntimeException('Production endpoint attestation is invalid.', previous: $exception);
         }
 
@@ -74,14 +78,15 @@ final class ProductionRetentionEndpointAttestation
                 throw new RuntimeException('Production endpoint attestation does not match the live endpoints.');
             }
         }
-        try {
-            $from = CarbonImmutable::parse($document['valid_from_utc'])->utc();
-            $until = CarbonImmutable::parse($document['valid_until_utc'])->utc();
-        } catch (\Throwable $exception) {
-            throw new RuntimeException('Production endpoint attestation is invalid.', previous: $exception);
-        }
+        $from = $this->utc($document['valid_from_utc'] ?? null);
+        $until = $this->utc($document['valid_until_utc'] ?? null);
         $now ??= CarbonImmutable::now('UTC');
-        if (! $from->lt($until) || $now->lt($from) || $now->gt($until) || $from->diffInHours($until, true) > 24) {
+        if ($from === null
+            || $until === null
+            || ! $from->lt($until)
+            || $now->lt($from)
+            || $now->gt($until)
+            || $from->diffInSeconds($until, true) > 86_400) {
             throw new RuntimeException('Production endpoint attestation is outside its approved window.');
         }
 
@@ -128,6 +133,25 @@ final class ProductionRetentionEndpointAttestation
         sort($keys);
         if ($actual !== $keys) {
             throw new RuntimeException('Production endpoint attestation is invalid.');
+        }
+    }
+
+    private function utc(mixed $value): ?CarbonImmutable
+    {
+        if (! is_string($value)
+            || preg_match('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/', $value) !== 1) {
+            return null;
+        }
+
+        try {
+            $parsed = CarbonImmutable::createFromFormat('!Y-m-d\TH:i:s\Z', $value, 'UTC');
+
+            return $parsed instanceof CarbonImmutable
+                && $parsed->format('Y-m-d\TH:i:s\Z') === $value
+                    ? $parsed
+                    : null;
+        } catch (Throwable) {
+            return null;
         }
     }
 

@@ -32,6 +32,10 @@ type Location = {
     type: string;
     name: string;
     href: string | null;
+    access?: {
+        state: 'available' | 'restricted';
+        label: string;
+    };
 };
 
 type Capability = {
@@ -172,18 +176,22 @@ export type DeviceProfile = {
         };
     };
     tickets: Array<{
-        id: number;
-        reference: string;
-        title: string;
-        status: string;
-        priority: string;
-        workType: string;
+        id: number | null;
+        reference: string | null;
+        title: string | null;
+        status: string | null;
+        priority: string | null;
+        workType: string | null;
         nextAction: string | null;
         updatedAt: string | null;
-        href: string;
+        href: string | null;
+        access: {
+            state: 'available' | 'restricted';
+            label: string;
+        };
     }>;
     controlRoomAlerts: Array<{
-        id: number;
+        id: number | null;
         reference: string | null;
         type: string | null;
         severity: string | null;

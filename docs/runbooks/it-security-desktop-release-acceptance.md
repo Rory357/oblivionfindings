@@ -161,9 +161,88 @@ Run the dedicated IT/Security Playwright regression at both approved desktop vie
 npm run visual:test:it-security
 ```
 
-This command runs only `it-security-desktop-1440` and `it-security-desktop-1280`. The retained legacy mobile project remains outside IT/Security acceptance.
+This command runs only `it-security-desktop-1440` and `it-security-desktop-1280`. The broad visual configuration and CI matrix are also desktop-only: they retain the required legacy `chromium-desktop` regression project at its historical `1440 x 1000` alongside those two dedicated IT/Security projects. The full-page shell baselines run separately in `chromium-desktop-visual` at the same historical viewport so mutating legacy journeys cannot redefine snapshot state; `npm run visual:test:legacy` runs both required legacy projects. Those broader projects are regression guards, not additional D01-D18 acceptance viewports. No mobile project is configured, and mobile remains outside product and release acceptance.
+
+The interaction audit also pins the 24 canonical cross-module source surfaces used by Control Room, Site, Client healthcare/location, Fleet/Assets, HR equipment, Settings API/mailbox, and monitoring recovery. Adding or moving one of those handoffs requires updating the exact inventory rather than silently falling outside the scan.
 
 Record the local gate by source revision and attach its summaries without copying test databases, `.env.dusk.local`, Playwright state, screenshots, logs, SQLite files, or command-output files into the release. Never relabel a local Dusk result as deployed browser proof.
+
+## Signed deployed evidence manifest
+
+Free-form notes and editable `passed` strings cannot close V10. After the
+independent reviewer has inspected the retained capture archives, network
+traces, console records, accessibility reports and companion artifacts, produce
+one duplicate-key-free signed JSON manifest outside the checkout. It must bind
+all of the following to one exact release revision:
+
+- exactly D01-D18 in order with the exact actor aliases above;
+- exactly `1440 x 900` and `1280 x 800` for every primary row: 18 rows and 36
+  viewport records;
+- restored-environment D07, D12, D15 and D18 at both viewports: four rows and
+  eight additional viewport records;
+- the protected primary or restored environment reference on every row, with
+  no primary row relabelled as restored evidence;
+- passed overflow, console, network, privacy, keyboard and accessibility
+  outcomes plus positive route-evidence counts for every viewport;
+- immutable SHA-256 commitments for each capture archive, network trace,
+  console record, accessibility report, route manifest, fixture manifest and
+  actor-session reference;
+- one distinct opaque result reference per row and one distinct capture archive
+  reference and SHA-256 per viewport across all 22 rows / 44 viewport records; and
+- verified local-automated, deployment/runtime, central-runtime, collector,
+  retention, protocol/provider, load/soak, configuration-history and
+  storage-restore companions. Every companion records the same release revision
+  and either the protected primary or restored environment reference as defined
+  by its runbook.
+
+The signing authority exists only at
+`/etc/oblivion/it-security-desktop-release-authority.json`; there is no CLI or
+environment override. It is a stable root-owned regular non-symlink file, not
+group- or other-writable, with a validity window no longer than seven days. Its
+exact keys are `schema_version=1`,
+`evidence_class=it_security_desktop_release_authority_v1`, an opaque
+`AUTHORITY-` reference, exact release revision, primary and restored 64-hex
+environment references, an opaque `KEY-` reference, the independent reviewer's
+32-byte Ed25519 public key in Base64, and exact UTC `not_before_utc` /
+`not_after_utc` bounds. The private signing key remains outside the application
+host and is never copied into the manifest or release checkout.
+
+The manifest has exactly `payload` and `signature_base64`. The payload uses the
+exact value-free schema enforced by
+`ItSecurityDesktopReleaseEvidenceVerifier`; sign its recursively key-sorted,
+compact UTF-8 JSON representation. Use only the fixed actor aliases, opaque
+references, UTC timestamps, counts, booleans and SHA-256 commitments. Never
+include a deployment URL, cookie, person, Site/Device identifier, private route
+parameter, screenshot text, coordinate, clinical value, credential, endpoint,
+provider payload or console body. Keep the manifest outside the checkout as a
+stable regular non-symlink file no larger than 2 MiB and not group- or
+other-writable.
+
+From the clean deployed checkout, verify the final package with:
+
+```bash
+php scripts/release/verify-it-security-desktop-evidence.php \
+  --manifest=/private/oblivion-evidence/it-security-desktop-release.json
+```
+
+The verifier reads no browser session or live endpoint. It bootstraps only its
+three exact tracked support sources and never executes the ignored Composer
+autoloader before the checkout decision. It requires Linux, the fixed protected
+authority, a clean exact `HEAD == origin/main` checkout, a valid
+Ed25519 signature, all 18/36 primary and 4/8 restored records, exact actor and
+viewport contracts, distinct non-replayed result/capture evidence, and all nine revision/environment-bound companions. It
+rechecks the authority and checkout after verification and emits only a
+value-free aggregate result plus the signed manifest SHA-256. Any missing row,
+single viewport, wrong actor, failed criterion, primary evidence relabelled as
+restored, replayed result/capture artifact, mixed revision/environment, invalid
+companion, duplicate key, changed authority, dirty checkout or invalid
+signature exits non-zero with `v10_release_evidence=false`.
+
+This gate proves completeness, identity and independent attestation of the
+retained package. It does not make a fabricated capture true: the reviewer must
+inspect the immutable source artifacts and release-system approvals before
+signing, and the signed manifest plus its verifier output must be retained in
+the approved immutable evidence store.
 
 ## Completion record
 

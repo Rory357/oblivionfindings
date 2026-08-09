@@ -592,6 +592,10 @@ export default function TimesheetsIndex({
     } | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
     const [initialShiftId, setInitialShiftId] = useState<number | null>(null);
+    const [selectedApprovalIds, setSelectedApprovalIds] = useState<number[]>(
+        [],
+    );
+    const [approvalDecisionNotes, setApprovalDecisionNotes] = useState('');
     const hoverTimer = useRef<number | null>(null);
 
     // Dialog deep links: ?create=1 (shift detail), ?view={id} (attendance,
@@ -618,6 +622,39 @@ export default function TimesheetsIndex({
 
     const rows = timesheets.data;
     const submittedCount = tabCounts.submitted ?? 0;
+    const selectableApprovalIds = rows
+        .filter((row) => row.status === 'submitted')
+        .map((row) => row.id);
+    const allVisibleApprovalsSelected =
+        selectableApprovalIds.length > 0 &&
+        selectableApprovalIds.every((id) => selectedApprovalIds.includes(id));
+
+    function toggleApprovalSelection(id: number, checked: boolean) {
+        setSelectedApprovalIds((current) =>
+            checked
+                ? Array.from(new Set([...current, id]))
+                : current.filter((selectedId) => selectedId !== id),
+        );
+    }
+
+    function bulkApproveSelected() {
+        if (selectedApprovalIds.length === 0) return;
+
+        router.post(
+            '/operations/timesheets/bulk-approve',
+            {
+                ids: selectedApprovalIds,
+                decision_notes: approvalDecisionNotes || null,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedApprovalIds([]);
+                    setApprovalDecisionNotes('');
+                },
+            },
+        );
+    }
 
     function switchTab(next: string) {
         setTab(next);
@@ -848,6 +885,38 @@ export default function TimesheetsIndex({
                         </div>
                     </div>
 
+                    {canApprove && selectedApprovalIds.length > 0 ? (
+                        <div className="flex flex-wrap items-end gap-3 border-b border-border bg-status-warning-bg/40 px-4 py-3">
+                            <div className="min-w-[260px] flex-1">
+                                <label
+                                    htmlFor="timesheet-approval-notes"
+                                    className="mb-1 block text-xs font-semibold"
+                                >
+                                    Decision notes (optional)
+                                </label>
+                                <Input
+                                    id="timesheet-approval-notes"
+                                    value={approvalDecisionNotes}
+                                    onChange={(event) =>
+                                        setApprovalDecisionNotes(
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Add one note for the selected timesheets"
+                                    data-test="approvals-decision-notes"
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                onClick={bulkApproveSelected}
+                                data-test="approvals-bulk-approve"
+                            >
+                                <CheckCircle2 className="h-4 w-4" /> Approve{' '}
+                                {selectedApprovalIds.length} selected
+                            </Button>
+                        </div>
+                    ) : null}
+
                     {/* Table */}
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
@@ -857,6 +926,21 @@ export default function TimesheetsIndex({
                                         <input
                                             type="checkbox"
                                             aria-label="Select all"
+                                            checked={
+                                                allVisibleApprovalsSelected
+                                            }
+                                            disabled={
+                                                !canApprove ||
+                                                selectableApprovalIds.length ===
+                                                    0
+                                            }
+                                            onChange={(event) =>
+                                                setSelectedApprovalIds(
+                                                    event.target.checked
+                                                        ? selectableApprovalIds
+                                                        : [],
+                                                )
+                                            }
                                         />
                                     </th>
                                     <th className="px-2 py-2.5">Date</th>
@@ -893,6 +977,11 @@ export default function TimesheetsIndex({
                                     return (
                                         <tr
                                             key={t.id}
+                                            data-test={
+                                                t.status === 'submitted'
+                                                    ? 'approvals-row'
+                                                    : undefined
+                                            }
                                             className="cursor-pointer border-t border-border transition-colors hover:bg-muted/30"
                                             onClick={() => setViewing(t)}
                                             onContextMenu={(e) => {
@@ -934,7 +1023,29 @@ export default function TimesheetsIndex({
                                                     e.stopPropagation()
                                                 }
                                             >
-                                                <input type="checkbox" />
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label={`Select timesheet ${t.id}`}
+                                                    checked={selectedApprovalIds.includes(
+                                                        t.id,
+                                                    )}
+                                                    disabled={
+                                                        !canApprove ||
+                                                        t.status !== 'submitted'
+                                                    }
+                                                    data-test={
+                                                        t.status === 'submitted'
+                                                            ? 'approvals-row-checkbox'
+                                                            : undefined
+                                                    }
+                                                    onChange={(event) =>
+                                                        toggleApprovalSelection(
+                                                            t.id,
+                                                            event.target
+                                                                .checked,
+                                                        )
+                                                    }
+                                                />
                                             </td>
                                             <td className="px-2 py-3">
                                                 <div className="font-semibold">

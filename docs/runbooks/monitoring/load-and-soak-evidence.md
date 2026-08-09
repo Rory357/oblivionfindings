@@ -212,7 +212,14 @@ This Git check is deliberately classified as source-checkout identity, not a
 hash of ignored/generated runtime inputs. Composer dependencies, built assets,
 runtime configuration and process binaries remain separately governed by the
 deployment/runtime attestation and V10 release manifest; an ignored file is not
-silently relabelled as source evidence by this gate. The output records
+silently relabelled as source evidence by this gate.
+
+The verifier itself does not execute Composer's ignored `vendor/autoload.php`:
+it loads only its five exact tracked support files and uses native `proc_open`
+with the protected Git binary, a shell-free argument vector, a bounded timeout
+and the scrubbed process environment. Modifying ignored Composer code therefore
+cannot change this gate's checkout or evidence decision while Git still reports
+a clean source tree. The output records
 `release_authority_verified: true` and its value-free
 `release_authority_reference` plus `release_checkout_verified: true`, and binds
 the source, attestation, authority key,

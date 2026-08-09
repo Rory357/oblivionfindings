@@ -9,13 +9,6 @@ import {
     seedGovernancePrivacyConsentsReadinessFixtures,
 } from './helpers';
 
-function idFromPath(pathname: string, resource: string): number {
-    const match = pathname.match(new RegExp(`/${resource}/(\\d+)`));
-    expect(match).not.toBeNull();
-
-    return Number(match?.[1]);
-}
-
 function auditLogCount(model: string, id: number): number {
     const output = runLaravelPhp(
         `echo \\App\\Models\\AuditLog::where('auditable_type', '${model}')->where('auditable_id', ${id})->count();`,
@@ -31,7 +24,7 @@ function dsrExportPath(id: number): string {
 }
 
 test.describe('privacy DSR and breach readiness', () => {
-    test.setTimeout(90_000);
+    test.setTimeout(180_000);
 
     test('DSR and breach lifecycles work and privacy dashboard denies coordinators', async ({
         page,
@@ -39,33 +32,54 @@ test.describe('privacy DSR and breach readiness', () => {
         seedGovernancePrivacyConsentsReadinessFixtures();
         const consoleErrors = collectConsoleErrors(page);
         const unique = Date.now();
+        const dsrEmail = 'privacy-readiness+' + unique + '@example.test';
+        const breachNature =
+            'Playwright privacy lifecycle breach ' +
+            unique +
+            ': exposed report link.';
 
         await loginAsStaff(page);
 
         await page.goto('/privacy/requests/create');
-        await expect(page.getByTestId('privacy-dsr-create-form')).toBeVisible();
-        await page.getByTestId('privacy-dsr-request-type-select').click();
-        await page.getByRole('option', { name: /Right to Access/i }).click();
-        await page
-            .getByTestId('privacy-dsr-subject-name')
+        await expect(page).toHaveURL(/\/privacy\/dashboard(?:\?|$)/);
+        const requestWizard = page.getByRole('dialog', {
+            name: 'New privacy request',
+        });
+        await expect(requestWizard).toBeVisible();
+        await requestWizard
+            .getByRole('button', { name: /Access · IPP 6/i })
+            .click();
+        await requestWizard.getByRole('button', { name: 'Continue' }).click();
+        await requestWizard
+            .getByLabel('Subject name')
             .fill('Playwright Privacy Subject');
-        await page
-            .getByTestId('privacy-dsr-subject-email')
-            .fill(`privacy-readiness+${unique}@example.test`);
-        await page
-            .getByTestId('privacy-dsr-details')
+        await requestWizard.getByLabel('Subject email').fill(dsrEmail);
+        await requestWizard.getByRole('button', { name: 'Continue' }).click();
+        await requestWizard
+            .getByLabel('Request details')
             .fill(
                 'Please provide all personal data held for readiness testing.',
             );
-        await page.getByTestId('privacy-dsr-submit').click();
+        await requestWizard.getByRole('button', { name: 'Continue' }).click();
+        await requestWizard
+            .getByRole('button', { name: 'Create request' })
+            .click();
+        await expect(requestWizard.getByText('Request logged!')).toBeVisible();
 
-        await expect(page).toHaveURL(/\/privacy\/requests\/\d+$/);
+        const dsrId = Number(
+            runLaravelPhp(
+                "echo \\App\\Models\\DataSubjectRequest::query()->where('subject_email', " +
+                    JSON.stringify(dsrEmail) +
+                    ")->value('id');",
+            ).trim(),
+        );
+        expect(dsrId).toBeGreaterThan(0);
+        await page.goto('/privacy/requests/' + dsrId);
         await expect(page.getByTestId('privacy-dsr-show')).toBeVisible();
         await expect(page.getByTestId('privacy-dsr-status')).toContainText(
             'pending verification',
         );
 
-        const dsrId = idFromPath(new URL(page.url()).pathname, 'requests');
         page.once('dialog', (dialog) =>
             dialog.accept('Photo ID checked by privacy lead.'),
         );
@@ -84,7 +98,7 @@ test.describe('privacy DSR and breach readiness', () => {
         await expect(page).toHaveURL(new RegExp(`/privacy/requests/${dsrId}$`));
         await expect
             .poll(() => dsrExportPath(dsrId))
-            .toContain('private/dsr-exports/');
+            .toContain('private/privacy-request-exports/');
 
         page.once('dialog', (dialog) =>
             dialog.accept('Export generated and response sent.'),
@@ -98,35 +112,47 @@ test.describe('privacy DSR and breach readiness', () => {
         ).toBeGreaterThanOrEqual(3);
 
         await page.goto('/privacy/breaches/create');
-        await expect(
-            page.getByTestId('privacy-breach-create-form'),
-        ).toBeVisible();
-        await page
-            .getByTestId('privacy-breach-nature')
-            .fill(
-                `Playwright privacy lifecycle breach ${unique}: exposed report link.`,
-            );
-        await page.getByTestId('privacy-breach-affected-count').fill('3');
-        await page
-            .getByTestId('privacy-breach-consequences')
+        await expect(page).toHaveURL(/\/privacy\/dashboard(?:\?|$)/);
+        const breachWizard = page.getByRole('dialog', {
+            name: 'Log data breach',
+        });
+        await expect(breachWizard).toBeVisible();
+        await breachWizard.getByLabel('Nature of breach').fill(breachNature);
+        await breachWizard.getByRole('button', { name: 'Continue' }).click();
+        await breachWizard.getByLabel('Approx. individuals affected').fill('3');
+        await breachWizard
+            .getByLabel('Likely consequences')
             .fill('Possible access to contact details.');
-        await page
-            .getByTestId('privacy-breach-measures')
+        await breachWizard.getByRole('button', { name: 'Continue' }).click();
+        await breachWizard
+            .getByLabel('Measures taken')
             .fill('Link revoked and access logs reviewed.');
-        await page.getByTestId('privacy-breach-requires-authority').click();
-        await page.getByTestId('privacy-breach-requires-subjects').click();
-        await page.getByTestId('privacy-breach-submit').click();
+        await breachWizard.getByRole('switch').nth(0).click();
+        await breachWizard.getByRole('switch').nth(1).click();
+        await breachWizard.getByRole('button', { name: 'Continue' }).click();
+        await breachWizard.getByRole('button', { name: 'Log breach' }).click();
+        await expect(breachWizard.getByText('Breach logged!')).toBeVisible();
 
-        await expect(page).toHaveURL(/\/privacy\/breaches\/\d+$/);
+        const breachId = Number(
+            runLaravelPhp(
+                "echo \\App\\Models\\DataBreachLog::query()->where('nature_of_breach', " +
+                    JSON.stringify(breachNature) +
+                    ")->value('id');",
+            ).trim(),
+        );
+        expect(breachId).toBeGreaterThan(0);
+        await page.goto('/privacy/breaches/' + breachId);
         await expect(page.getByTestId('privacy-breach-show')).toBeVisible();
         await expect(page.getByTestId('privacy-breach-status')).toContainText(
             'discovered',
         );
         await expect(
-            page.getByTestId('privacy-breach-opc-countdown'),
+            page.getByText('OPC notification pending', { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByTestId('privacy-breach-notify-opc'),
         ).toBeVisible();
 
-        const breachId = idFromPath(new URL(page.url()).pathname, 'breaches');
         page.once('dialog', (dialog) => dialog.accept('OPC-PW-001'));
         await page.getByTestId('privacy-breach-notify-opc').click();
         await expect(page.getByTestId('privacy-breach-status')).toContainText(

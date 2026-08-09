@@ -1,6 +1,8 @@
 import { OperationalStateBadge } from '@/components/security-devices/estate-operations';
 import {
+    ClientProfileAccessRequired,
     SiteProfileAccessRequired,
+    type ClientProfileAccess,
     type SiteProfileAccess,
 } from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
@@ -56,7 +58,12 @@ type HealthcareDevice = {
     health: string | null;
     lastSeenAt: string | null;
     deviceHref: string;
-    client: { id: number; displayName: string; href: string } | null;
+    client: {
+        id: number | null;
+        displayName: string;
+        href: string | null;
+        access: ClientProfileAccess;
+    } | null;
     location: {
         site: {
             id: number;
@@ -382,12 +389,25 @@ function HealthcareDeviceCard({ device }: { device: HealthcareDevice }) {
                         <span className="text-muted-foreground">
                             Assigned client
                         </span>
-                        <Link
-                            href={device.client.href}
-                            className="font-medium text-primary hover:underline"
-                        >
-                            {device.client.displayName}
-                        </Link>
+                        {device.client.href &&
+                        device.client.access.state === 'available' ? (
+                            <Link
+                                href={device.client.href}
+                                className="font-medium text-primary hover:underline"
+                            >
+                                {device.client.displayName}
+                            </Link>
+                        ) : (
+                            <>
+                                <span className="font-medium">
+                                    {device.client.displayName}
+                                </span>
+                                <ClientProfileAccessRequired
+                                    label={device.client.access.label}
+                                    className="min-h-0 text-xs"
+                                />
+                            </>
+                        )}
                     </div>
                 ) : null}
                 {device.location ? (

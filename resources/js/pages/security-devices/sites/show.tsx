@@ -246,6 +246,7 @@ export default function SiteTechnologyShow({
                             <SiteProfileDestination
                                 siteId={site.id}
                                 canView={can.view_site_profile}
+                                tab="technology"
                             />
                             <OperationalStateBadge state={summary.health} />
                             {site.type ? (

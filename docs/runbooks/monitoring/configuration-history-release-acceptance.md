@@ -2,7 +2,7 @@
 
 This is the bounded A10 acceptance gate for real production configuration and history evidence. It is read-only. It does not collect a snapshot, create an evidence file, copy configuration, expose a target, change retention, or repair a restore.
 
-A local database, factory, mock store, preview, Dusk run, PHPUnit process, relabelled environment, or locally authored fixture is regression evidence only. It must never be labelled as production proof. The gate permits store reads only after exact process-scoped restore endpoints, concrete stores, private roots, the current release revision and independent evidence keys have passed the preflight.
+A local database, factory, mock store, preview, Dusk run, PHPUnit process, relabelled environment, or locally authored fixture is regression evidence only. It must never be labelled as production proof. The gate permits store reads only after exact process-scoped restore endpoints, concrete stores, private roots, the fixed protected release authority and its exact clean checkout have passed the preflight.
 
 ## What one green gate proves
 
@@ -20,18 +20,27 @@ The gate proves all of these linked facts without printing a Site, Device, targe
 
 ## Required isolated process
 
-Use the same isolated restore process that passed `monitoring:reconcile-restore --assert-process-config`. Before invoking A10, export these values into that process without printing them:
+Before invoking A10, install the release authority only at
+`/etc/oblivion/monitoring-configuration-history-release-authority.json`. There
+is no CLI or environment override. It must be a stable root-owned regular
+non-symlink file, not group- or other-writable, and valid for no more than 24
+hours. Its duplicate-key-free exact schema contains `schema_version=1`,
+`evidence_class=monitoring_configuration_history_release_authority_v1`, opaque
+`AUTHORITY-` and `ACL-` references, the exact 40-hex release revision, the
+restored-environment SHA-256 reference, distinct production and browser Ed25519
+public keys, SHA-256 of the secret HMAC key, and exact UTC validity bounds. The
+private signing keys remain on their independent review systems.
+
+Use the same isolated restore process that passed `monitoring:reconcile-restore --assert-process-config`. Before invoking A10, export only these runtime values without printing them:
 
 - `MONITORING_RESTORE_MYSQL_DSN` and matching `DB_URL`.
 - `MONITORING_RESTORE_INFLUX_URL` and matching `MONITORING_TIMESERIES_URL`.
 - `MONITORING_RESTORE_INFLUX_TOKEN`, `MONITORING_RESTORE_INFLUX_ORG`, and `MONITORING_RESTORE_INFLUX_BUCKET`, each exactly matching the configured restored Influx scope.
 - `MONITORING_RESTORE_FILESYSTEM_DRIVER` and `MONITORING_RESTORE_FILESYSTEM_ROOT`. For S3/MinIO, also set the exact `MONITORING_RESTORE_OBJECT_BUCKET` and `MONITORING_RESTORE_OBJECT_ENDPOINT`.
-- `OBLIVION_RELEASE_REVISION`, the exact 40-character lowercase revision of the active release. If Git metadata exists, it must match this value.
-- `MONITORING_A10_EVIDENCE_DIRECTORY`, an absolute private evidence directory outside the checkout, and `MONITORING_A10_EVIDENCE_ACL_REFERENCE=ACL-<32 lowercase hex>`. On POSIX the object/evidence roots and all three input files must have no group/other permissions. On Windows protect both roots from inherited ACL changes and set `MONITORING_A10_WINDOWS_ACL_ALLOWED_IDENTITIES` to the exact pipe-delimited service-account, SYSTEM and approved administrative identities; every effective allow rule must be in that allowlist. Input files must inherit only those rules. The independent attester also binds the opaque ACL review reference.
-- `MONITORING_A10_EVIDENCE_HMAC_KEY`, base64 for at least 32 random bytes held in the approved secret store.
-- `MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY` and `MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY`, base64 Ed25519 public keys from distinct independent signers. The two keys must differ.
+- `MONITORING_A10_EVIDENCE_DIRECTORY`, an absolute private evidence directory outside the checkout. On POSIX the object/evidence roots and all three input files must have no group/other permissions. On Windows protect both roots from inherited ACL changes and set `MONITORING_A10_WINDOWS_ACL_ALLOWED_IDENTITIES` to the exact pipe-delimited service-account, SYSTEM and approved administrative identities; every effective allow rule must be in that allowlist. Input files must inherit only those rules. The independent attester binds the authority's opaque ACL review reference.
+- `MONITORING_A10_EVIDENCE_HMAC_KEY`, base64 for at least 32 random bytes held in the approved secret store. Its raw-key SHA-256 must match the fixed authority; a caller-selected replacement cannot validate commitments.
 
-The gate explicitly rejects PHPUnit, local relabelling, fake stores, a stale config cache, mismatched process values, a default in-checkout restore root, or evidence outside the private evidence directory before any monitoring store method runs.
+The gate explicitly rejects PHPUnit, local relabelling, fake stores, a stale config cache, mismatched process values, a default in-checkout restore root, evidence outside the private evidence directory, an absent/expired/replaced authority, a caller-selected signer/HMAC/revision, or a checkout whose clean `HEAD` and `origin/main` do not both equal the authority revision before any monitoring store method runs.
 
 ## Commitments and attestations
 
@@ -51,13 +60,13 @@ The production manifest must contain exactly:
 - The reviewed observation times.
 - Baseline and changed snapshot IDs plus UUIDs, capacity-series ID and pointer-event ID.
 - HMAC commitments for baseline/changed content, configuration, storage path and firmware, plus diff, capacity external key and target identity.
-- `restore.backup_generation_reference`, `restore.recovery_point_at_utc`, and SHA-256 of the exact verified restore reconciliation artifact.
+- `restore.backup_generation_reference`, `restore.recovery_point_at_utc`, SHA-256 of the exact verified restore reconciliation artifact, and the protected restored-environment reference.
 - Signed opaque `CHG-`, `OP-` and `RV-` references and an approved decision.
 - The production attestation envelope.
 
-The browser companion must contain exactly the restored environment classification, current release, same backup/ACL references, changed snapshot ID/UUID, capacity-series ID, changed content/diff/firmware/capacity HMAC commitments, the configuration/firmware route contract, and both viewport objects. Each viewport object contains `status=passed`, an opaque `CAPTURE-` reference, SHA-256 of the retained capture, and SHA-256 of the retained network trace. The browser attestation binds all of it.
+The browser companion must contain exactly the restored environment classification, current release, protected restored-environment reference, same backup/ACL references, changed snapshot ID/UUID, capacity-series ID, changed content/diff/firmware/capacity HMAC commitments, the configuration/firmware route contract, and both viewport objects. Each viewport object contains `status=passed`, an opaque `CAPTURE-` reference, SHA-256 of the retained capture, and SHA-256 of the retained network trace. The browser attestation binds all of it.
 
-Keep the production manifest, the exact verified restore reconciliation JSON, and the browser companion inside the private evidence directory. They must be regular non-symlink files no larger than 64 KiB; never commit them. Preserve the signed source documents and capture/trace artifacts in immutable evidence storage.
+Keep the production manifest, the exact verified restore reconciliation JSON and its adjacent exact-name `.sha256` sidecar, and the browser companion inside the private evidence directory. They must be regular non-symlink files no larger than 64 KiB; never commit them. The gate recomputes the restore JSON hash, verifies the sidecar names that exact JSON file, and accepts only a verified V3 restore artifact carrying the protected restore-authority reference/hash and immutable backup-manifest hash, whose clean `HEAD == origin/main` revision and restored-environment reference match both independently signed documents. Preserve the protected authority, signed source documents and capture/trace artifacts in immutable evidence storage.
 
 ## Production observation and restored browser prerequisites
 
@@ -78,7 +87,7 @@ php artisan monitoring:configuration-history-evidence `
   --json
 ```
 
-The command exits `0` only when every value-free check is `verified`. It prints only the check states, counts, a timestamp and an evidence fingerprint. Dependency and payload failures become `not_verified`; exception values are never emitted.
+The command exits `0` only when every value-free check is `verified`. It repeats the protected authority, exact checkout, endpoint, store and private-root preflight after all restored reads and before emitting success, so expiry or replacement during verification fails closed. It prints only the check states, counts, a timestamp and an evidence fingerprint. Dependency and payload failures become `not_verified`; exception values are never emitted.
 
 Retain the three exact inputs, stdout, signatures, capture/trace artifacts and approval record together. A failed or unsigned document cannot be repaired in place; preserve it, correct the source workflow and issue a new independently signed evidence set.
 

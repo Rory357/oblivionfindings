@@ -317,6 +317,10 @@ it('preserves staff profile and history location access with active tracking con
             ->where('location.canManage', false)
             ->where('location.tracker.id', $device->id)
             ->where('location.tracker.detail_url', null)
+            ->where('location.tracker.detail_access.state', 'restricted')
+            ->where('location.tracker.detail_access.label', 'Device Profile access required')
+            ->where('location.tracker.tracking_workspace_url', null)
+            ->where('location.tracker.tracking_workspace_access.state', 'restricted')
             ->where('location.currentLocation.lat', -36.8485)
             ->where('location.trackingConsent.status', 'given'));
 
@@ -340,7 +344,10 @@ it('preserves staff profile and history location access with active tracking con
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('location.tracker.id', $device->id)
-            ->where('location.tracker.detail_url', null));
+            ->where('location.tracker.detail_url', null)
+            ->where('location.tracker.detail_access.state', 'restricted')
+            ->where('location.tracker.tracking_workspace_url', null)
+            ->where('location.tracker.tracking_workspace_access.state', 'restricted'));
 
     $this->get("/security-devices/devices/{$device->id}")->assertNotFound();
 
@@ -357,7 +364,10 @@ it('preserves staff profile and history location access with active tracking con
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('location.tracker.id', $device->id)
-            ->where('location.tracker.detail_url', "/security-devices/devices/{$device->id}"));
+            ->where('location.tracker.detail_url', "/security-devices/devices/{$device->id}")
+            ->where('location.tracker.detail_access.state', 'available')
+            ->where('location.tracker.tracking_workspace_url', '/security-devices/tracking?tab=personal-safety')
+            ->where('location.tracker.tracking_workspace_access.state', 'available'));
 
     $this->get("/security-devices/devices/{$device->id}")->assertOk();
 });

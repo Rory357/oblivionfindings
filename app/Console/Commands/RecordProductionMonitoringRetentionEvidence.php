@@ -152,6 +152,24 @@ final class RecordProductionMonitoringRetentionEvidence extends Command
             );
         }
 
+        try {
+            $currentFingerprints = $endpointProbe->fingerprints($settings);
+            $endpointAttestation->verify(
+                $approvedEndpoints,
+                $currentFingerprints,
+                $authority['release_revision'],
+                null,
+                $authority['public_key'],
+            );
+        } catch (Throwable) {
+            $report['errors'] = array_values(array_unique([
+                ...$report['errors'],
+                'endpoint_identity_changed_or_expired',
+            ]));
+            $report['status'] = 'failed';
+            $report['a05_release_evidence'] = false;
+        }
+
         if (! $releaseCheckout->verify(base_path(), $authority['release_revision'])) {
             $report['errors'] = array_values(array_unique([
                 ...$report['errors'],

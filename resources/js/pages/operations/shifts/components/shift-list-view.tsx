@@ -231,6 +231,7 @@ function ShiftRowItem({
 
     return (
         <li
+            data-test={`shift-row-${shift.id}`}
             className={[
                 'group flex cursor-pointer items-center gap-3 px-4 transition-colors hover:bg-muted/40',
                 last ? '' : 'border-b border-border',

@@ -67,6 +67,7 @@ import {
     Radar,
     RadioTower,
     Send,
+    Server,
     ShieldAlert,
     ShieldQuestion,
     SkipForward,
@@ -309,17 +310,31 @@ export type AlertWorkspaceDetail = {
         href: string | null;
     } | null;
     linked_it_work?: {
-        id: number;
+        id: number | null;
         reference: string | null;
-        title: string;
-        status: string;
+        title: string | null;
+        status: string | null;
         status_reason: string | null;
-        priority: string;
-        sla_state: string;
+        priority: string | null;
+        sla_state: string | null;
         resolution_due_at: string | null;
         monitoring_recovered_at: string | null;
         assignee: UserRef | null;
-        href: string;
+        href: string | null;
+        access: {
+            state: 'available' | 'restricted';
+            message: string | null;
+        };
+    } | null;
+    linked_device?: {
+        id: number | null;
+        uid: string | null;
+        name: string | null;
+        href: string | null;
+        access: {
+            state: 'available' | 'restricted';
+            message: string | null;
+        };
     } | null;
     monitoring_incident_evidence?: MonitoringIncidentEvidence | null;
     resolve_gate: JourneyGateData;
@@ -679,9 +694,10 @@ export function AlertWorkspaceDialog({
         {
             key: 'linked',
             label: 'Linked records',
-            blurb: d.linked_it_work
-                ? 'Control Room · IT · governed records'
-                : 'incident · H&S · client',
+            blurb:
+                d.linked_it_work || d.linked_device
+                    ? 'Control Room · IT · Security & Devices'
+                    : 'incident · H&S · client',
             icon: LinkIcon,
         },
     ];
@@ -4618,24 +4634,48 @@ export function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
     );
     if (d.linked_it_work) {
         const work = d.linked_it_work;
+        const restricted = work.access.state === 'restricted' || !work.href;
         rows.push(
             <LinkedRow
                 key="it-work"
                 icon={FileText}
                 title="IT incident work"
-                sub={[
-                    work.reference,
-                    titleCase(work.status),
-                    work.assignee
-                        ? `with ${work.assignee.name}`
-                        : 'awaiting IT triage',
-                    work.monitoring_recovered_at
-                        ? 'monitoring recovered; technician closure still required'
-                        : null,
-                ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                href={work.href}
+                sub={
+                    restricted
+                        ? (work.access.message ??
+                          'IT workspace access required')
+                        : [
+                              work.reference,
+                              work.status ? titleCase(work.status) : null,
+                              work.assignee
+                                  ? `with ${work.assignee.name}`
+                                  : 'awaiting IT triage',
+                              work.monitoring_recovered_at
+                                  ? 'monitoring recovered; technician closure still required'
+                                  : null,
+                          ]
+                              .filter(Boolean)
+                              .join(' · ')
+                }
+                href={restricted ? null : work.href}
+            />,
+        );
+    }
+    if (d.linked_device) {
+        const device = d.linked_device;
+        const restricted = device.access.state === 'restricted' || !device.href;
+        rows.push(
+            <LinkedRow
+                key="canonical-device"
+                icon={Server}
+                title="Canonical Device"
+                sub={
+                    restricted
+                        ? (device.access.message ??
+                          'Security & Devices access required')
+                        : [device.name, device.uid].filter(Boolean).join(' · ')
+                }
+                href={restricted ? null : device.href}
             />,
         );
     }

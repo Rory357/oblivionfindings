@@ -206,6 +206,14 @@ describe('Control Room linked H&S handover', () => {
             monitoring_recovered_at: '2026-07-18T01:30:00Z',
             assignee: { id: 8, name: 'Moana Rangi' },
             href: '/it/tickets/42',
+            access: { state: 'available', message: null },
+        };
+        d.linked_device = {
+            id: 10,
+            uid: 'NET-CORE-01',
+            name: 'Core switch',
+            href: '/security-devices/devices/10',
+            access: { state: 'available', message: null },
         };
 
         render(<LinkedSection d={d} />);
@@ -218,6 +226,70 @@ describe('Control Room linked H&S handover', () => {
             'monitoring recovered; technician closure still required',
         );
         expect(screen.queryByText(/create IT ticket/i)).not.toBeInTheDocument();
+        expect(
+            screen.getByText('Canonical Device').closest('a'),
+        ).toHaveAttribute('href', '/security-devices/devices/10');
+        expect(
+            screen.getByText('Canonical Device').closest('a'),
+        ).toHaveTextContent('Core switch · NET-CORE-01');
+    });
+
+    it('keeps same-Site handoff ownership explicit without leaking inaccessible record identity', () => {
+        const d = detail(
+            {
+                status: 'awaiting_acceptance',
+                owner: null,
+                accepted_by: null,
+                accepted_at: null,
+                notes: null,
+            },
+            null,
+        );
+        d.linked_it_work = {
+            id: null,
+            reference: null,
+            title: null,
+            status: null,
+            status_reason: null,
+            priority: null,
+            sla_state: null,
+            resolution_due_at: null,
+            monitoring_recovered_at: null,
+            assignee: null,
+            href: null,
+            access: {
+                state: 'restricted',
+                message: 'IT workspace access is required to open this record.',
+            },
+        };
+        d.linked_device = {
+            id: null,
+            uid: null,
+            name: null,
+            href: null,
+            access: {
+                state: 'restricted',
+                message:
+                    'Security & Devices access is required to open this Device.',
+            },
+        };
+
+        render(<LinkedSection d={d} />);
+
+        expect(screen.getByText('IT incident work').closest('a')).toBeNull();
+        expect(screen.getByText('Canonical Device').closest('a')).toBeNull();
+        expect(
+            screen.getByText(
+                'IT workspace access is required to open this record.',
+            ),
+        ).toBeVisible();
+        expect(
+            screen.getByText(
+                'Security & Devices access is required to open this Device.',
+            ),
+        ).toBeVisible();
+        expect(screen.queryByText('IT-000042')).toBeNull();
+        expect(screen.queryByText('Core switch')).toBeNull();
     });
 });
 

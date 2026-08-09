@@ -12,6 +12,16 @@ export type SiteProfileAccess = {
     label: string;
 };
 
+export type ClientProfileAccess = {
+    state: 'available' | 'restricted';
+    label: string;
+};
+
+export type DeviceProfileAccess = {
+    state: 'available' | 'restricted';
+    label: string;
+};
+
 export function ControlRoomAlertAccessRequired({
     label = 'Control Room alert access required',
     className = '',
@@ -53,9 +63,11 @@ export function ControlRoomDestination({ canView }: { canView: boolean }) {
 export function SiteProfileDestination({
     siteId,
     canView,
+    tab,
 }: {
     siteId: number;
     canView: boolean;
+    tab?: string;
 }) {
     if (!canView) {
         return <SiteProfileAccessRequired className="px-2" />;
@@ -63,7 +75,10 @@ export function SiteProfileDestination({
 
     return (
         <Button asChild variant="outline" size="sm" className="min-h-11">
-            <Link href={`/sites/${siteId}`} className="frontline-focus">
+            <Link
+                href={`/sites/${siteId}${tab ? `?tab=${encodeURIComponent(tab)}` : ''}`}
+                className="frontline-focus"
+            >
                 Open Site profile
                 <ArrowUpRight className="ml-2 h-4 w-4" aria-hidden />
             </Link>
@@ -73,6 +88,96 @@ export function SiteProfileDestination({
 
 export function SiteProfileAccessRequired({
     label = 'Site profile access required',
+    className = '',
+}: {
+    label?: string;
+    className?: string;
+}) {
+    return (
+        <span
+            role="note"
+            className={`flex min-h-11 items-center gap-2 text-sm text-muted-foreground ${className}`}
+        >
+            <LockKeyhole className="h-4 w-4 shrink-0" aria-hidden />
+            {label}
+        </span>
+    );
+}
+
+export function ClientProfileAccessRequired({
+    label = 'Client Profile access required',
+    className = '',
+}: {
+    label?: string;
+    className?: string;
+}) {
+    return (
+        <span
+            role="note"
+            className={`flex min-h-11 items-center gap-2 text-sm text-muted-foreground ${className}`}
+        >
+            <LockKeyhole className="h-4 w-4 shrink-0" aria-hidden />
+            {label}
+        </span>
+    );
+}
+
+export function DeviceProfileAccessRequired({
+    label = 'Device Profile access required',
+    className = '',
+}: {
+    label?: string;
+    className?: string;
+}) {
+    return (
+        <span
+            role="note"
+            className={`flex min-h-11 items-center gap-2 text-sm text-muted-foreground ${className}`}
+        >
+            <LockKeyhole className="h-4 w-4 shrink-0" aria-hidden />
+            {label}
+        </span>
+    );
+}
+
+export function HrEmployeeEquipmentAccessRequired({
+    label = 'HR employee equipment access required',
+    className = '',
+}: {
+    label?: string;
+    className?: string;
+}) {
+    return (
+        <span
+            role="note"
+            className={`flex min-h-11 items-center gap-2 text-sm text-muted-foreground ${className}`}
+        >
+            <LockKeyhole className="h-4 w-4 shrink-0" aria-hidden />
+            {label}
+        </span>
+    );
+}
+
+export function FleetTechnologyAccessRequired({
+    label = 'Fleet technology access required',
+    className = '',
+}: {
+    label?: string;
+    className?: string;
+}) {
+    return (
+        <span
+            role="note"
+            className={`flex min-h-11 items-center gap-2 text-sm text-muted-foreground ${className}`}
+        >
+            <LockKeyhole className="h-4 w-4 shrink-0" aria-hidden />
+            {label}
+        </span>
+    );
+}
+
+export function ItWorkspaceAccessRequired({
+    label = 'IT workspace access required',
     className = '',
 }: {
     label?: string;

@@ -4,6 +4,7 @@ namespace App\Domain\Monitoring\Support;
 
 use App\Infrastructure\Monitoring\InfluxDbTimeSeriesStore;
 use App\Infrastructure\Monitoring\LaravelSnapshotStore;
+use App\Support\Monitoring\LoadSoakReleaseCheckoutVerifier;
 use App\Support\Monitoring\StrictJsonObjectDecoder;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
@@ -34,6 +35,21 @@ final class ConfigurationHistoryEvidenceContract
         'snapshot_store_unavailable',
         'secret_manager_unavailable',
     ];
+
+    /** @var array<string, mixed>|null */
+    private ?array $authoritySnapshot = null;
+
+    /**
+     * The overrides are test seams only. Production callers resolve this
+     * contract without arguments and must use the fixed installed authority
+     * plus the exact clean checkout gate.
+     *
+     * @param  array<string, mixed>|null  $verifiedReleaseAuthority
+     */
+    public function __construct(
+        private readonly ?array $verifiedReleaseAuthority = null,
+        private readonly ?bool $verifiedCheckout = null,
+    ) {}
 
     public function restoredRuntimeIsIsolated(
         string $snapshotStoreClass,
@@ -101,22 +117,16 @@ final class ConfigurationHistoryEvidenceContract
         if ($this->evidenceDirectory($repositoryRoot) === null) {
             $errors[] = 'private_evidence_directory_required';
         }
-        $productionAttestationKey = $this->attestationPublicKey(
-            'MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY',
-        );
-        $browserAttestationKey = $this->attestationPublicKey(
-            'MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY',
-        );
-        if ($productionAttestationKey === null
-            || $browserAttestationKey === null
-            || hash_equals($productionAttestationKey, $browserAttestationKey)) {
-            $errors[] = 'independent_attestation_keys_required';
-        }
-        if ($this->hmacKey() === null) {
-            $errors[] = 'evidence_hmac_key_required';
-        }
-        if ($this->currentReleaseRevision($repositoryRoot) === null) {
-            $errors[] = 'release_revision_unavailable';
+        try {
+            $authority = $this->releaseAuthority();
+            if ($this->hmacKey($authority) === null) {
+                $errors[] = 'evidence_hmac_key_mismatch';
+            }
+            if (! $this->checkoutVerified($repositoryRoot, (string) $authority['release_revision'])) {
+                $errors[] = 'release_checkout_unverified';
+            }
+        } catch (Throwable) {
+            $errors[] = 'protected_release_authority_required';
         }
 
         return array_values(array_unique($errors));
@@ -125,35 +135,55 @@ final class ConfigurationHistoryEvidenceContract
     /** @return array<string, mixed> */
     public function loadProductionManifest(string $path, string $repositoryRoot): array
     {
+        $authority = $this->releaseAuthority();
+
         return $this->validateProductionManifest(
             $this->loadExternalJson($path, $repositoryRoot),
-            expectedRevision: $this->currentReleaseRevision($repositoryRoot),
-            expectedAclReference: $this->requiredReferenceEnvironment('MONITORING_A10_EVIDENCE_ACL_REFERENCE', 'ACL'),
+            publicKey: $authority['production_public_key'],
+            expectedRevision: $authority['release_revision'],
+            expectedAclReference: $authority['evidence_acl_reference'],
+            expectedRestoredEnvironmentReference: $authority['restored_environment_reference_sha256'],
         );
     }
 
     /** @return array<string, mixed> */
     public function loadBrowserEvidence(string $path, string $repositoryRoot): array
     {
+        $authority = $this->releaseAuthority();
+
         return $this->validateBrowserEvidence(
             $this->loadExternalJson($path, $repositoryRoot),
-            expectedRevision: $this->currentReleaseRevision($repositoryRoot),
-            expectedAclReference: $this->requiredReferenceEnvironment('MONITORING_A10_EVIDENCE_ACL_REFERENCE', 'ACL'),
+            publicKey: $authority['browser_public_key'],
+            expectedRevision: $authority['release_revision'],
+            expectedAclReference: $authority['evidence_acl_reference'],
+            expectedRestoredEnvironmentReference: $authority['restored_environment_reference_sha256'],
         );
     }
 
     /** @return array{document: array<string, mixed>, sha256: string} */
     public function loadRestoreEvidence(string $path, string $repositoryRoot): array
     {
+        $authority = $this->releaseAuthority();
         $resolved = $this->externalFile($path, $repositoryRoot);
         $encoded = file_get_contents($resolved);
         if (! is_string($encoded)) {
             $this->refuse();
         }
+        $sha256 = hash('sha256', $encoded);
+        $checksumPath = $this->externalFile($path.'.sha256', $repositoryRoot);
+        $checksum = file_get_contents($checksumPath);
+        $expectedChecksum = $sha256.'  '.basename($resolved)."\n";
+        if (! is_string($checksum) || ! hash_equals($expectedChecksum, $checksum)) {
+            $this->refuse();
+        }
 
         return [
-            'document' => $this->validateRestoreEvidence($this->decode($encoded)),
-            'sha256' => hash('sha256', $encoded),
+            'document' => $this->validateRestoreEvidence(
+                $this->decode($encoded),
+                expectedRevision: $authority['release_revision'],
+                expectedRestoredEnvironmentReference: $authority['restored_environment_reference_sha256'],
+            ),
+            'sha256' => $sha256,
         ];
     }
 
@@ -167,6 +197,7 @@ final class ConfigurationHistoryEvidenceContract
         ?string $publicKey = null,
         ?string $expectedRevision = null,
         ?string $expectedAclReference = null,
+        ?string $expectedRestoredEnvironmentReference = null,
     ): array {
         $this->exactKeys($manifest, [
             'schema_version',
@@ -191,7 +222,7 @@ final class ConfigurationHistoryEvidenceContract
         $this->verifyAttestation(
             $manifest,
             'oblivion-a10-production-manifest-v2',
-            $publicKey ?? $this->requiredAttestationPublicKey('MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY'),
+            $publicKey ?? (string) $this->releaseAuthority()['production_public_key'],
         );
 
         if (($manifest['schema_version'] ?? null) !== 2
@@ -213,7 +244,7 @@ final class ConfigurationHistoryEvidenceContract
         $this->reference($manifest['target_reference'] ?? null, 'TARGET');
         $this->reference($manifest['collection_run_reference'] ?? null, 'RUN');
         $this->reference($manifest['evidence_acl_reference'] ?? null, 'ACL');
-        $expectedAclReference ??= $this->requiredReferenceEnvironment('MONITORING_A10_EVIDENCE_ACL_REFERENCE', 'ACL');
+        $expectedAclReference ??= (string) $this->releaseAuthority()['evidence_acl_reference'];
         if (! hash_equals($expectedAclReference, (string) $manifest['evidence_acl_reference'])) {
             $this->refuse();
         }
@@ -278,9 +309,18 @@ final class ConfigurationHistoryEvidenceContract
             'backup_generation_reference',
             'recovery_point_at_utc',
             'evidence_sha256',
+            'restored_environment_reference_sha256',
         ]);
         $this->reference($restore['backup_generation_reference'] ?? null, 'BKP');
         $this->sha256($restore['evidence_sha256'] ?? null);
+        $this->sha256($restore['restored_environment_reference_sha256'] ?? null);
+        $expectedRestoredEnvironmentReference ??= (string) $this->releaseAuthority()['restored_environment_reference_sha256'];
+        if (! hash_equals(
+            $expectedRestoredEnvironmentReference,
+            (string) $restore['restored_environment_reference_sha256'],
+        )) {
+            $this->refuse();
+        }
         $recoveryPoint = $this->utc($restore['recovery_point_at_utc'] ?? null);
         if ($recoveryPoint->lt($completed) || $recoveryPoint->gt($now)) {
             $this->refuse();
@@ -313,6 +353,7 @@ final class ConfigurationHistoryEvidenceContract
         ?string $publicKey = null,
         ?string $expectedRevision = null,
         ?string $expectedAclReference = null,
+        ?string $expectedRestoredEnvironmentReference = null,
     ): array {
         $this->exactKeys($evidence, [
             'schema_version',
@@ -321,6 +362,7 @@ final class ConfigurationHistoryEvidenceContract
             'fixture',
             'synthetic',
             'release_revision',
+            'restored_environment_reference_sha256',
             'backup_generation_reference',
             'evidence_reference',
             'evidence_acl_reference',
@@ -335,7 +377,7 @@ final class ConfigurationHistoryEvidenceContract
         $this->verifyAttestation(
             $evidence,
             'oblivion-a10-browser-evidence-v2',
-            $publicKey ?? $this->requiredAttestationPublicKey('MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY'),
+            $publicKey ?? (string) $this->releaseAuthority()['browser_public_key'],
         );
 
         if (($evidence['schema_version'] ?? null) !== 2
@@ -354,10 +396,18 @@ final class ConfigurationHistoryEvidenceContract
             || ! hash_equals($expectedRevision, (string) $evidence['release_revision'])) {
             $this->refuse();
         }
+        $this->sha256($evidence['restored_environment_reference_sha256'] ?? null);
+        $expectedRestoredEnvironmentReference ??= (string) $this->releaseAuthority()['restored_environment_reference_sha256'];
+        if (! hash_equals(
+            $expectedRestoredEnvironmentReference,
+            (string) $evidence['restored_environment_reference_sha256'],
+        )) {
+            $this->refuse();
+        }
         $this->reference($evidence['backup_generation_reference'] ?? null, 'BKP');
         $this->reference($evidence['evidence_reference'] ?? null, 'BROWSER');
         $this->reference($evidence['evidence_acl_reference'] ?? null, 'ACL');
-        $expectedAclReference ??= $this->requiredReferenceEnvironment('MONITORING_A10_EVIDENCE_ACL_REFERENCE', 'ACL');
+        $expectedAclReference ??= (string) $this->releaseAuthority()['evidence_acl_reference'];
         if (! hash_equals($expectedAclReference, (string) $evidence['evidence_acl_reference'])) {
             $this->refuse();
         }
@@ -410,12 +460,31 @@ final class ConfigurationHistoryEvidenceContract
     }
 
     /** @param array<string, mixed> $evidence @return array<string, mixed> */
-    public function validateRestoreEvidence(array $evidence, ?CarbonImmutable $now = null): array
-    {
+    public function validateRestoreEvidence(
+        array $evidence,
+        ?CarbonImmutable $now = null,
+        ?string $expectedRevision = null,
+        ?string $expectedRestoredEnvironmentReference = null,
+    ): array {
         $this->exactKeys($evidence, [
+            'schema_version',
+            'evidence_class',
+            'environment',
+            'fixture',
+            'synthetic',
+            'status',
+            'restore_release_evidence',
+            'release_revision',
+            'restored_environment_reference_sha256',
+            'restore_authority_reference',
+            'restore_authority_sha256',
+            'checkout_clean_verified',
+            'checksum_algorithm',
+            'publication',
             ...self::RESTORE_ZERO_CHECKS,
             'checked_at',
             'backup_generation',
+            'backup_manifest_sha256',
             'recovery_point_utc',
             'recovery_started_at_utc',
             'verification_started_at_utc',
@@ -426,6 +495,35 @@ final class ConfigurationHistoryEvidenceContract
             'maximum_rto_minutes',
             'recovery_objectives_met',
         ]);
+        if (($evidence['schema_version'] ?? null) !== 3
+            || ($evidence['evidence_class'] ?? null) !== 'isolated-restore-reconciliation-v3'
+            || ($evidence['environment'] ?? null) !== 'restore-verification'
+            || ($evidence['fixture'] ?? null) !== false
+            || ($evidence['synthetic'] ?? null) !== false
+            || ($evidence['status'] ?? null) !== 'verified'
+            || ($evidence['restore_release_evidence'] ?? null) !== true
+            || ($evidence['checkout_clean_verified'] ?? null) !== true
+            || ($evidence['checksum_algorithm'] ?? null) !== 'sha256'
+            || ($evidence['publication'] ?? null) !== 'collision_safe_exclusive_create') {
+            $this->refuse();
+        }
+        $this->sha256($evidence['release_revision'] ?? null, 40);
+        $expectedRevision ??= $this->currentReleaseRevision(base_path());
+        if (! is_string($expectedRevision)
+            || ! hash_equals($expectedRevision, (string) $evidence['release_revision'])) {
+            $this->refuse();
+        }
+        $this->sha256($evidence['restored_environment_reference_sha256'] ?? null);
+        $expectedRestoredEnvironmentReference ??= (string) $this->releaseAuthority()['restored_environment_reference_sha256'];
+        if (! hash_equals(
+            $expectedRestoredEnvironmentReference,
+            (string) $evidence['restored_environment_reference_sha256'],
+        )) {
+            $this->refuse();
+        }
+        $this->reference($evidence['restore_authority_reference'] ?? null, 'AUTHORITY');
+        $this->sha256($evidence['restore_authority_sha256'] ?? null);
+        $this->sha256($evidence['backup_manifest_sha256'] ?? null);
         foreach (self::RESTORE_ZERO_CHECKS as $check) {
             if (($evidence[$check] ?? null) !== 0) {
                 $this->refuse();
@@ -475,6 +573,9 @@ final class ConfigurationHistoryEvidenceContract
     {
         $linked = [
             [$manifest['release_revision'] ?? null, $browser['release_revision'] ?? null],
+            [$manifest['release_revision'] ?? null, data_get($restore, 'document.release_revision')],
+            [data_get($manifest, 'restore.restored_environment_reference_sha256'), $browser['restored_environment_reference_sha256'] ?? null],
+            [data_get($manifest, 'restore.restored_environment_reference_sha256'), data_get($restore, 'document.restored_environment_reference_sha256')],
             [data_get($manifest, 'restore.backup_generation_reference'), $browser['backup_generation_reference'] ?? null],
             [data_get($manifest, 'restore.backup_generation_reference'), data_get($restore, 'document.backup_generation')],
             [data_get($manifest, 'restore.evidence_sha256'), $restore['sha256'] ?? null],
@@ -521,16 +622,14 @@ final class ConfigurationHistoryEvidenceContract
 
     public function currentReleaseRevision(string $repositoryRoot): ?string
     {
-        $environment = getenv('OBLIVION_RELEASE_REVISION');
-        $environment = is_string($environment) && preg_match('/^[a-f0-9]{40}$/D', $environment) === 1
-            ? $environment
-            : null;
-        $gitRevision = $this->gitHeadRevision($repositoryRoot);
-        if ($gitRevision !== null && $environment !== null && ! hash_equals($gitRevision, $environment)) {
+        try {
+            $authority = $this->releaseAuthority();
+            $revision = (string) ($authority['release_revision'] ?? '');
+        } catch (Throwable) {
             return null;
         }
 
-        return $gitRevision ?? $environment;
+        return $this->checkoutVerified($repositoryRoot, $revision) ? $revision : null;
     }
 
     /** @return array<string, mixed> */
@@ -776,40 +875,94 @@ POWERSHELL;
         }
     }
 
-    private function requiredAttestationPublicKey(string $environmentKey): string
-    {
-        $key = $this->attestationPublicKey($environmentKey);
-        if ($key === null) {
-            $this->refuse();
-        }
-
-        return $key;
-    }
-
-    private function attestationPublicKey(string $environmentKey): ?string
-    {
-        $encoded = getenv($environmentKey);
-        $decoded = is_string($encoded) ? base64_decode($encoded, true) : false;
-
-        return is_string($decoded) && strlen($decoded) === SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES
-            ? $decoded
-            : null;
-    }
-
-    private function hmacKey(): ?string
+    /** @param array<string, mixed>|null $authority */
+    private function hmacKey(?array $authority = null): ?string
     {
         $encoded = getenv('MONITORING_A10_EVIDENCE_HMAC_KEY');
         $decoded = is_string($encoded) ? base64_decode($encoded, true) : false;
+        $authority ??= $this->releaseAuthority();
 
-        return is_string($decoded) && strlen($decoded) >= 32 ? $decoded : null;
+        return is_string($decoded)
+            && strlen($decoded) >= 32
+            && hash_equals((string) ($authority['hmac_key_sha256'] ?? ''), hash('sha256', $decoded))
+                ? $decoded
+                : null;
     }
 
-    private function requiredReferenceEnvironment(string $environmentKey, string $prefix): string
+    /** @return array<string, mixed> */
+    private function releaseAuthority(): array
     {
-        $reference = getenv($environmentKey);
-        $this->reference($reference, $prefix);
+        $authority = $this->verifiedReleaseAuthority
+            ?? (new ConfigurationHistoryReleaseAuthority)->loadInstalled();
+        if (! $this->verifiedAuthorityShape($authority)) {
+            $this->refuse();
+        }
 
-        return $reference;
+        if ($this->authoritySnapshot === null) {
+            $this->authoritySnapshot = $authority;
+        } elseif (! hash_equals(
+            (string) $this->authoritySnapshot['authority_sha256'],
+            (string) $authority['authority_sha256'],
+        )) {
+            $this->refuse();
+        }
+
+        return $authority;
+    }
+
+    /** @param array<string, mixed> $authority */
+    private function verifiedAuthorityShape(array $authority): bool
+    {
+        if (! $this->exactKeysMatch($authority, [
+            'authority_reference',
+            'authority_sha256',
+            'browser_public_key',
+            'evidence_acl_reference',
+            'hmac_key_sha256',
+            'production_public_key',
+            'release_revision',
+            'restored_environment_reference_sha256',
+        ])) {
+            return false;
+        }
+
+        return is_string($authority['production_public_key'])
+            && strlen($authority['production_public_key']) === SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES
+            && is_string($authority['browser_public_key'])
+            && strlen($authority['browser_public_key']) === SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES
+            && ! hash_equals($authority['production_public_key'], $authority['browser_public_key'])
+            && $this->matches($authority['authority_reference'], '/\AAUTHORITY-[a-f0-9]{32}\z/')
+            && $this->matches($authority['evidence_acl_reference'], '/\AACL-[a-f0-9]{32}\z/')
+            && $this->shaValue($authority['authority_sha256'])
+            && $this->shaValue($authority['hmac_key_sha256'])
+            && $this->shaValue($authority['release_revision'], 40)
+            && $this->shaValue($authority['restored_environment_reference_sha256']);
+    }
+
+    private function checkoutVerified(string $repositoryRoot, string $revision): bool
+    {
+        return $this->verifiedCheckout
+            ?? (new LoadSoakReleaseCheckoutVerifier)->verify($repositoryRoot, $revision);
+    }
+
+    /** @param array<string, mixed> $value @param list<string> $expected */
+    private function exactKeysMatch(array $value, array $expected): bool
+    {
+        $actual = array_keys($value);
+        sort($actual, SORT_STRING);
+        sort($expected, SORT_STRING);
+
+        return $actual === $expected;
+    }
+
+    private function shaValue(mixed $value, int $length = 64): bool
+    {
+        return is_string($value) && preg_match('/\A[a-f0-9]{'.$length.'}\z/', $value) === 1;
+    }
+
+    private function matches(mixed $value, string $pattern): bool
+    {
+        return is_string($value) && preg_match($pattern, $value) === 1;
     }
 
     /** @return array<string, mixed> */
@@ -848,67 +1001,6 @@ POWERSHELL;
         }
 
         return array_map($this->canonicalValue(...), $value);
-    }
-
-    private function gitHeadRevision(string $repositoryRoot): ?string
-    {
-        $git = rtrim($repositoryRoot, '\\/').DIRECTORY_SEPARATOR.'.git';
-        if (is_file($git)) {
-            $pointer = trim((string) file_get_contents($git));
-            if (preg_match('/^gitdir:\s*(.+)$/i', $pointer, $matches) !== 1) {
-                return null;
-            }
-            $git = $matches[1];
-            if (! $this->isAbsolutePath($git)) {
-                $git = rtrim($repositoryRoot, '\\/').DIRECTORY_SEPARATOR.$git;
-            }
-        }
-        $git = realpath($git);
-        if (! is_string($git) || ! is_dir($git)) {
-            return null;
-        }
-        $head = trim((string) file_get_contents($git.DIRECTORY_SEPARATOR.'HEAD'));
-        if (preg_match('/^[a-f0-9]{40}$/D', $head) === 1) {
-            return $head;
-        }
-        if (preg_match('/^ref:\s*(refs\/[A-Za-z0-9._\/-]+)$/D', $head, $matches) !== 1) {
-            return null;
-        }
-        $ref = $matches[1];
-        $loose = $git.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $ref);
-        if (is_file($loose)) {
-            $revision = trim((string) file_get_contents($loose));
-
-            return preg_match('/^[a-f0-9]{40}$/D', $revision) === 1 ? $revision : null;
-        }
-        $commonDirFile = $git.DIRECTORY_SEPARATOR.'commondir';
-        $common = is_file($commonDirFile)
-            ? realpath($git.DIRECTORY_SEPARATOR.trim((string) file_get_contents($commonDirFile)))
-            : $git;
-        if (! is_string($common)) {
-            return null;
-        }
-        $loose = $common.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $ref);
-        if (is_file($loose)) {
-            $revision = trim((string) file_get_contents($loose));
-
-            return preg_match('/^[a-f0-9]{40}$/D', $revision) === 1 ? $revision : null;
-        }
-        $packed = $common.DIRECTORY_SEPARATOR.'packed-refs';
-        if (! is_file($packed)) {
-            return null;
-        }
-        foreach (file($packed, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
-            if (str_starts_with($line, '#') || str_starts_with($line, '^')) {
-                continue;
-            }
-            [$revision, $candidate] = array_pad(explode(' ', trim($line), 2), 2, null);
-            if ($candidate === $ref && preg_match('/^[a-f0-9]{40}$/D', (string) $revision) === 1) {
-                return $revision;
-            }
-        }
-
-        return null;
     }
 
     /** @param list<string> $expected */

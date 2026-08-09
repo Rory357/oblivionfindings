@@ -4,6 +4,9 @@ it('keeps A10 production configuration history proof attested isolated value fre
     $root = dirname(__DIR__, 2);
     $command = (string) file_get_contents($root.'/app/Console/Commands/MonitoringConfigurationHistoryEvidence.php');
     $contract = (string) file_get_contents($root.'/app/Domain/Monitoring/Support/ConfigurationHistoryEvidenceContract.php');
+    $releaseAuthority = (string) file_get_contents(
+        $root.'/app/Domain/Monitoring/Support/ConfigurationHistoryReleaseAuthority.php',
+    );
     $service = (string) file_get_contents($root.'/app/Domain/Monitoring/Services/ConfigurationHistoryEvidenceService.php');
     $runbook = (string) file_get_contents($root.'/docs/runbooks/monitoring/configuration-history-release-acceptance.md');
 
@@ -17,8 +20,11 @@ it('keeps A10 production configuration history proof attested isolated value fre
         'No target or configuration value was emitted.',
         'loadRestoreEvidence',
         'return $report[\'all_verified\'] ? self::SUCCESS : self::FAILURE;',
-    )->and(strpos($command, '$contract->restoredRuntimeIsIsolated('))
-        ->toBeLessThan(strpos($command, 'loadProductionManifest'));
+    )->and(substr_count($command, '$contract->restoredRuntimeIsIsolated('))->toBe(2)
+        ->and(strpos($command, '$contract->restoredRuntimeIsIsolated('))
+        ->toBeLessThan(strpos($command, 'loadProductionManifest'))
+        ->and(strrpos($command, '$contract->restoredRuntimeIsIsolated('))
+        ->toBeGreaterThan(strpos($command, '$report = $evidence->report('));
 
     expect($contract)->toContain(
         'use App\\Support\\Monitoring\\StrictJsonObjectDecoder;',
@@ -35,15 +41,28 @@ it('keeps A10 production configuration history proof attested isolated value fre
         "'MONITORING_RESTORE_FILESYSTEM_ROOT'",
         "'MONITORING_A10_EVIDENCE_DIRECTORY'",
         "'MONITORING_A10_EVIDENCE_HMAC_KEY'",
-        "'MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY'",
-        "'MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY'",
-        "'OBLIVION_RELEASE_REVISION'",
+        'ConfigurationHistoryReleaseAuthority',
+        'LoadSoakReleaseCheckoutVerifier',
+        'releaseAuthority()',
+        'checkoutVerified(',
+        "'protected_release_authority_required'",
+        "'release_checkout_unverified'",
+        "'evidence_hmac_key_mismatch'",
         'sodium_crypto_sign_verify_detached(',
         "'oblivion-a10-production-manifest-v2'",
         "'oblivion-a10-browser-evidence-v2'",
         "'changed_firmware_hmac_sha256'",
         "'evidence_sha256'",
         "'recovery_objectives_met'",
+        "'restore_release_evidence'",
+        "'checkout_clean_verified'",
+        "'restored_environment_reference_sha256'",
+        "'isolated-restore-reconciliation-v3'",
+        "'restore_authority_reference'",
+        "'restore_authority_sha256'",
+        "'backup_manifest_sha256'",
+        '$path.\'.sha256\'',
+        '$expectedChecksum = $sha256.\'  \'.basename($resolved)."\\n"',
         '($permissions & 0077) === 0',
         "'MONITORING_A10_WINDOWS_ACL_ALLOWED_IDENTITIES'",
         '$ErrorActionPreference = \'Stop\'',
@@ -55,6 +74,29 @@ it('keeps A10 production configuration history proof attested isolated value fre
         "'baseline_firmware_sha256'",
         "'changed_firmware_sha256'",
         "'capacity_external_key_sha256'",
+        "getenv('OBLIVION_RELEASE_REVISION')",
+        "getenv('MONITORING_A10_PRODUCTION_ATTESTATION_PUBLIC_KEY')",
+        "getenv('MONITORING_A10_BROWSER_ATTESTATION_PUBLIC_KEY')",
+        "getenv('MONITORING_RESTORED_ENVIRONMENT_REFERENCE_SHA256')",
+        "getenv('MONITORING_A10_EVIDENCE_ACL_REFERENCE')",
+    );
+
+    expect($releaseAuthority)->toContain(
+        "AUTHORITY_PATH = '/etc/oblivion/monitoring-configuration-history-release-authority.json'",
+        "'monitoring_configuration_history_release_authority_v1'",
+        "'production_attestation_public_key_base64'",
+        "'browser_attestation_public_key_base64'",
+        "'hmac_key_sha256'",
+        "'restored_environment_reference_sha256'",
+        "'evidence_acl_reference'",
+        'hash_equals($productionKey, $browserKey)',
+        'MAXIMUM_AUTHORITY_SECONDS = 86_400',
+        "(\$metadata['owner_uid'] ?? null) === 0",
+        '(new StrictJsonObjectDecoder)->decode($rawAuthority, 16)',
+    )->not->toContain(
+        'getenv(',
+        '$_ENV',
+        '$_SERVER',
     );
 
     expect($service)->toContain(
@@ -83,7 +125,8 @@ it('keeps A10 production configuration history proof attested isolated value fre
         'bounded A10 acceptance gate',
         'must never be labelled as production proof',
         'exact process-scoped restore endpoints',
-        'Ed25519 public keys from distinct',
+        'distinct production and browser Ed25519',
+        '`/etc/oblivion/monitoring-configuration-history-release-authority.json`',
         'keyed HMAC',
         'verified restore reconciliation artifact',
         'Duplicate JSON object keys are rejected recursively',

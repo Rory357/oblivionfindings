@@ -164,7 +164,11 @@ class HealthcareWorkspaceTest extends TestCase
                 $this->assertSame([
                     'id' => $client->id,
                     'displayName' => 'Mere',
-                    'href' => "/clients/{$client->id}",
+                    'href' => "/operations/clients/{$client->id}?tab=healthcare_devices",
+                    'access' => [
+                        'state' => 'available',
+                        'label' => 'Open Client Profile healthcare devices',
+                    ],
                 ], $row['client']);
                 $this->assertSame('Aroha Support', $row['supportContact']['name']);
                 $this->assertSame('key worker', $row['supportContact']['role']);

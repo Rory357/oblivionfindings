@@ -79,11 +79,94 @@ it('provides version and database-free doctor commands', function () {
     removeCollectorDirectory($state);
 });
 
-it('rejects a fingerprint-valid certificate paired with a different private key before persisting enrolment', function () {
+it('binds transport evidence to opaque collector and identity-generation references', function () {
+    $directory = collectorTempDirectory('transport-evidence-identity');
+    $identityPath = $directory.'/collector.identity.json';
+    $certificatePath = $directory.'/collector.crt.pem';
+    $privateKeyPath = $directory.'/collector.key.pem';
+    $collectorId = '2df1d87c-2d04-4e57-80ab-8a15f39c944d';
+    $certificatePair = collectorCertificatePair('oblivion-collector-'.$collectorId);
+    $requestSecretKey = collectorIdentitySecretKey();
+    $requestPublicKey = sodium_crypto_sign_publickey_from_secretkey($requestSecretKey);
+    $captured = [];
+    $output = '';
+
+    try {
+        file_put_contents($certificatePath, $certificatePair['certificate']);
+        file_put_contents($privateKeyPath, $certificatePair['private_key']);
+        file_put_contents($identityPath, json_encode([
+            'collector_id' => $collectorId,
+            'site_id' => 9,
+            'central_url' => 'https://central.example.test',
+            'tls_public_key_pin' => 'sha256//'.base64_encode(str_repeat("\x21", 32)),
+            'central_signing_public_key' => base64_encode(collectorPublicKey()),
+            'request_signing_secret_key' => base64_encode($requestSecretKey),
+            'state_directory' => $directory,
+            'client_certificate_file' => $certificatePath,
+            'client_private_key_file' => $privateKeyPath,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+
+        $application = new CollectorApplication(
+            transportEvidenceTransport: function (
+                string $actualCollectorId,
+                string $expectedState,
+                int $samples,
+                string $signingKeyReference,
+                string $identityGenerationReference,
+            ) use (&$captured): array {
+                $captured = compact(
+                    'actualCollectorId',
+                    'expectedState',
+                    'samples',
+                    'signingKeyReference',
+                    'identityGenerationReference',
+                );
+
+                return ['state' => 'response_contract_matched'];
+            },
+            output: function (string $message, mixed $_stream) use (&$output): void {
+                $output .= $message;
+            },
+        );
+
+        $exitCode = $application->run([
+            'oblivion-collector',
+            'verify-transport',
+            "--identity={$identityPath}",
+            '--expect=active',
+            '--samples=5',
+        ]);
+        $signingKeyReference = hash('sha256', $requestPublicKey);
+        $identityGenerationReference = hash(
+            'sha256',
+            $collectorId."\0".hash('sha256', $certificatePair['certificate'])."\0".$signingKeyReference,
+        );
+
+        expect($exitCode)->toBe(0)
+            ->and($captured)->toBe([
+                'actualCollectorId' => $collectorId,
+                'expectedState' => 'active',
+                'samples' => 5,
+                'signingKeyReference' => $signingKeyReference,
+                'identityGenerationReference' => $identityGenerationReference,
+            ])
+            ->and($output)->toContain('"state":"response_contract_matched"')
+            ->and($output)->not->toContain($collectorId, base64_encode($requestSecretKey), $certificatePair['certificate']);
+    } finally {
+        removeCollectorDirectory($directory);
+    }
+});
+
+it('rejects a fingerprint-valid but misbound mTLS identity before persisting enrolment', function (
+    string $certificateCommonName,
+    bool $useDifferentPrivateKey,
+) {
     $directory = collectorTempDirectory('enrol-mismatched-mtls');
     $identityPath = $directory.'/collector.identity.json';
-    $certificatePair = collectorCertificatePair('oblivion-collector-test');
-    $differentPair = collectorCertificatePair('oblivion-collector-other');
+    $certificatePair = collectorCertificatePair($certificateCommonName);
+    $privateKeyPair = $useDifferentPrivateKey
+        ? collectorCertificatePair('oblivion-collector-other')
+        : $certificatePair;
     $certificate = openssl_x509_read($certificatePair['certificate']);
     $fingerprint = $certificate === false ? false : openssl_x509_fingerprint($certificate, 'sha256');
     $output = '';
@@ -105,7 +188,7 @@ it('rejects a fingerprint-valid certificate paired with a different private key 
                 'site_id' => 9,
                 'central_signing_public_key' => base64_encode(collectorPublicKey()),
                 'client_certificate' => $certificatePair['certificate'],
-                'client_private_key' => $differentPair['private_key'],
+                'client_private_key' => $privateKeyPair['private_key'],
                 'client_certificate_fingerprint' => strtolower($fingerprint),
                 'acknowledged_source_sequence' => 0,
             ],
@@ -137,7 +220,16 @@ it('rejects a fingerprint-valid certificate paired with a different private key 
             : putenv('OBLIVION_COLLECTOR_ENROLMENT_TOKEN='.$previousToken);
         removeCollectorDirectory($directory);
     }
-});
+})->with([
+    'certificate and key differ' => [
+        'oblivion-collector-2df1d87c-2d04-4e57-80ab-8a15f39c944d',
+        true,
+    ],
+    'certificate subject names a different collector' => [
+        'oblivion-collector-other',
+        false,
+    ],
+]);
 
 it('allows an exact accepted configuration replay but rejects a changed same-sequence envelope', function () {
     $directory = collectorTempDirectory('config-replay');

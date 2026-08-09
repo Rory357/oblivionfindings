@@ -201,8 +201,7 @@ export default function VehicleShow({
     const [activeSection, setActiveSection] = useState<
         'operations' | 'technology'
     >(() => {
-        if (typeof window === 'undefined' || !canViewVehicleTechnology)
-            return 'operations';
+        if (typeof window === 'undefined') return 'operations';
         return new URLSearchParams(window.location.search).get('tab') ===
             'technology'
             ? 'technology'
@@ -243,10 +242,7 @@ export default function VehicleShow({
     }, [activeSection, canViewVehicleTechnology, hasTechnologyProp]);
 
     const openSection = (section: string) => {
-        const next =
-            section === 'technology' && canViewVehicleTechnology
-                ? 'technology'
-                : 'operations';
+        const next = section === 'technology' ? 'technology' : 'operations';
         setActiveSection(next);
         if (typeof window !== 'undefined') {
             const url = new URL(window.location.href);
@@ -372,12 +368,10 @@ export default function VehicleShow({
                             <Car className="mr-1.5 h-3.5 w-3.5" />
                             Vehicle operations
                         </TabsTrigger>
-                        {canViewVehicleTechnology ? (
-                            <TabsTrigger value="technology">
-                                <Cpu className="mr-1.5 h-3.5 w-3.5" />
-                                Vehicle technology
-                            </TabsTrigger>
-                        ) : null}
+                        <TabsTrigger value="technology">
+                            <Cpu className="mr-1.5 h-3.5 w-3.5" />
+                            Vehicle technology
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="operations" className="space-y-4">
@@ -1685,15 +1679,17 @@ export default function VehicleShow({
                         />
                     </TabsContent>
 
-                    {canViewVehicleTechnology ? (
-                        <TabsContent value="technology">
-                            <VehicleTechnologyProjectionPanel
-                                projection={vehicle_technology}
-                                loading={technologyLoading}
-                                failed={technologyFailed}
-                            />
-                        </TabsContent>
-                    ) : null}
+                    <TabsContent value="technology">
+                        <VehicleTechnologyProjectionPanel
+                            projection={
+                                canViewVehicleTechnology
+                                    ? vehicle_technology
+                                    : null
+                            }
+                            loading={technologyLoading}
+                            failed={technologyFailed}
+                        />
+                    </TabsContent>
                 </Tabs>
 
                 {canManage && (

@@ -3,7 +3,10 @@ import { runLaravelPhp } from './helpers';
 export function seedTrackingWorkspaceReadinessFixtures() {
     type Fixture = {
         activeClientName: string;
+        activeClientProfileName: string;
+        activeClientId: number;
         activeDeviceName: string;
+        activeDeviceId: number;
         withdrawnClientName: string;
         withdrawnDeviceName: string;
         vehicleName: string;
@@ -255,7 +258,10 @@ $historyEventLabel = 'playwright_location_report';
 
 echo json_encode([
     'activeClientName' => $activeClient->preferred_name,
+    'activeClientProfileName' => $activeClient->full_name,
+    'activeClientId' => $activeClient->id,
     'activeDeviceName' => $activeDevice->name,
+    'activeDeviceId' => $activeDevice->id,
     'withdrawnClientName' => $withdrawnClient->preferred_name,
     'withdrawnDeviceName' => $withdrawnDevice->name,
     'vehicleName' => $vehicle->name,

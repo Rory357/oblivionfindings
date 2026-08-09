@@ -1,12 +1,30 @@
 #!/usr/bin/env php
 <?php
 
+use App\Support\Monitoring\S10NativeProcessRunner;
 use App\Support\Monitoring\S10ProcessEnvironment;
+use App\Support\Monitoring\S10ProtectedRuntimeEnvironment;
 use App\Support\Monitoring\S10ReleaseAuthorityVerifier;
 use App\Support\Monitoring\StrictJsonObjectDecoder;
-use Symfony\Component\Process\Process;
 
-require dirname(__DIR__, 2).'/vendor/autoload.php';
+$root = dirname(__DIR__, 2);
+$bootstrapFiles = [
+    '/app/Support/Monitoring/StrictJsonObjectDecoder.php',
+    '/app/Support/Monitoring/S10ProcessEnvironment.php',
+    '/app/Support/Monitoring/S10ProtectedRuntimeEnvironment.php',
+    '/app/Support/Monitoring/S10ReleaseAuthorityVerifier.php',
+    '/app/Support/Monitoring/S10NativeProcessRunner.php',
+];
+
+foreach ($bootstrapFiles as $relativePath) {
+    $path = $root.$relativePath;
+    if (is_link($path) || ! is_file($path)) {
+        fwrite(STDOUT, '{"status":"failed","reason":"bootstrap","s10_release_evidence":false}'.PHP_EOL);
+        exit(1);
+    }
+
+    require_once $path;
+}
 
 const S10_GIT_BINARY = '/usr/bin/git';
 const S10_BASH_BINARY = '/usr/bin/bash';
@@ -73,7 +91,7 @@ $intervalSeconds = $integerArgument('interval-seconds', 60, 60, 60);
 $windowMinutes = $integerArgument('window-minutes', 60, 60, 60);
 $maxFrameAge = $integerArgument('max-frame-age', 900, 60, 900);
 
-$applicationPath = realpath(dirname(__DIR__, 2));
+$applicationPath = realpath($root);
 $outputArgument = $arguments['output-directory'];
 $outputDirectory = is_string($outputArgument) && ! is_link($outputArgument)
     ? realpath($outputArgument)
@@ -106,7 +124,13 @@ $resolvedPhpBinary = realpath(S10_PHP_BINARY);
 if (! is_string($resolvedPhpBinary) || ! $protectedExecutable($resolvedPhpBinary)) {
     $fail('runtime_binaries');
 }
-$processEnvironment = S10ProcessEnvironment::processOverrides($resolvedPhpBinary);
+$gitEnvironment = [];
+foreach (S10ProcessEnvironment::sanitized([], $resolvedPhpBinary) as $key => $value) {
+    if (is_string($key) && is_string($value)) {
+        $gitEnvironment[$key] = $value;
+    }
+}
+$processRunner = new S10NativeProcessRunner;
 $normalizedApplicationPath = rtrim(str_replace('\\', '/', $applicationPath), '/');
 $normalizedOutputDirectory = rtrim(str_replace('\\', '/', $outputDirectory), '/');
 if ($normalizedOutputDirectory === $normalizedApplicationPath
@@ -115,9 +139,9 @@ if ($normalizedOutputDirectory === $normalizedApplicationPath
 }
 
 $authorityVerifier = new S10ReleaseAuthorityVerifier;
-$git = static function (array $arguments) use ($applicationPath, $processEnvironment): ?string {
+$git = static function (array $arguments) use ($applicationPath, $gitEnvironment, $processRunner): ?string {
     try {
-        $process = new Process(
+        $result = $processRunner->run(
             [
                 S10_GIT_BINARY,
                 '--no-optional-locks',
@@ -130,15 +154,14 @@ $git = static function (array $arguments) use ($applicationPath, $processEnviron
                 ...$arguments,
             ],
             null,
-            $processEnvironment,
+            $gitEnvironment,
+            10,
         );
-        $process->setTimeout(10);
-        $process->run();
-        if (! $process->isSuccessful() || trim($process->getErrorOutput()) !== '') {
+        if (! $result['successful'] || trim($result['stderr']) !== '') {
             return null;
         }
 
-        return trim($process->getOutput());
+        return trim($result['stdout']);
     } catch (Throwable) {
         return null;
     }
@@ -173,20 +196,22 @@ $identitySnapshot = static function () use ($authorityVerifier, $fail, $git, $no
     return [...$authority, 'verified_at' => $verifiedAt];
 };
 
-$runChild = static function (array $command, int $timeoutSeconds, string $failure) use (
+$runChild = static function (array $command, array $environment, int $timeoutSeconds, string $failure) use (
     $applicationPath,
     $fail,
-    $processEnvironment,
+    $processRunner,
 ): string {
-    $process = new Process($command, $applicationPath, $processEnvironment);
-    $process->setTimeout($timeoutSeconds);
-    $process->run();
-    $output = $process->getOutput();
-    if (! $process->isSuccessful()
-        || ! is_string($output)
+    $result = $processRunner->run(
+        $command,
+        $applicationPath,
+        $environment,
+        $timeoutSeconds,
+    );
+    $output = $result['stdout'];
+    if (! $result['successful']
         || strlen($output) < 2
         || strlen($output) > 65_536
-        || trim($process->getErrorOutput()) !== '') {
+        || trim($result['stderr']) !== '') {
         $fail($failure);
     }
 
@@ -246,6 +271,10 @@ $validateWindow = static function (
 };
 
 $protocolBefore = $identitySnapshot();
+$protocolEnvironment = (new S10ProtectedRuntimeEnvironment)->loadInstalled(
+    (string) $protocolBefore['runtime_environment_sha256'],
+    $resolvedPhpBinary,
+);
 $protocolRaw = $runChild([
     S10_BASH_BINARY,
     '--noprofile',
@@ -259,7 +288,7 @@ $protocolRaw = $runChild([
     '--samples='.$protocolSamples,
     '--interval-seconds='.$intervalSeconds,
     '--window-minutes='.$windowMinutes,
-], (($protocolSamples - 1) * $intervalSeconds) + 300, 'protocol_policy_evidence');
+], $protocolEnvironment, (($protocolSamples - 1) * $intervalSeconds) + 300, 'protocol_policy_evidence');
 $protocolAfter = $identitySnapshot();
 
 try {
@@ -292,6 +321,10 @@ if (! $hasExactKeys($protocol, [
 }
 
 $queclinkBefore = $identitySnapshot();
+$queclinkEnvironment = (new S10ProtectedRuntimeEnvironment)->loadInstalled(
+    (string) $queclinkBefore['runtime_environment_sha256'],
+    $resolvedPhpBinary,
+);
 $queclinkRaw = $runChild([
     S10_BASH_BINARY,
     '--noprofile',
@@ -305,7 +338,7 @@ $queclinkRaw = $runChild([
     '--samples='.$queclinkSamples,
     '--interval-seconds='.$intervalSeconds,
     '--max-frame-age='.$maxFrameAge,
-], (($queclinkSamples - 1) * $intervalSeconds) + 300, 'queclink_native_listener_evidence');
+], $queclinkEnvironment, (($queclinkSamples - 1) * $intervalSeconds) + 300, 'queclink_native_listener_evidence');
 $queclinkAfter = $identitySnapshot();
 
 try {
@@ -362,6 +395,7 @@ $artifact = [
     'authority_sha256' => $protocolBefore['authority_sha256'],
     'release_revision' => $protocolBefore['release_revision'],
     'environment_reference_sha256' => $protocolBefore['environment_reference_sha256'],
+    'runtime_environment_sha256' => $protocolBefore['runtime_environment_sha256'],
     'provider_api_contracts' => ['unifi', 'milesight'],
     'queclink_transport' => 'native_tcp',
     'protocol_policy_evidence' => [

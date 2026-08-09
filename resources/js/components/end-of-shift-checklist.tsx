@@ -8,7 +8,7 @@ import {
     LogOut,
     Pill,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import DictateButton from '@/components/dictate-button';
 import DraftResumePrompt from '@/components/draft-resume-prompt';
@@ -370,9 +370,16 @@ export default function EndOfShiftChecklist({
     const [serverBlockers, setServerBlockers] = useState<
         EndOfShiftBlocker[] | null
     >(null);
+    const previousOpen = useRef(false);
+    const previousSessionId = useRef(session.id);
 
     useEffect(() => {
-        if (!open) {
+        const justOpened = open && !previousOpen.current;
+        const sessionChanged = session.id !== previousSessionId.current;
+        previousOpen.current = open;
+        previousSessionId.current = session.id;
+
+        if (!open || (!justOpened && !sessionChanged)) {
             return;
         }
 
@@ -380,8 +387,9 @@ export default function EndOfShiftChecklist({
         setNotes('');
         setOverrideReason('');
         setBreakMinutes(session.break_minutes ?? 0);
+        setTasks(session.tasks ?? []);
         setServerBlockers(null);
-    }, [open, session.id, session.break_minutes]);
+    }, [open, session.id, session.break_minutes, session.tasks]);
 
     useEffect(() => {
         if (!open || !flashedClockOutBlockers?.length) {
@@ -391,10 +399,14 @@ export default function EndOfShiftChecklist({
         setServerBlockers(flashedClockOutBlockers);
     }, [flashedClockOutBlockers, open]);
 
-    // Resync local tasks if the session payload changes (e.g. live refresh).
+    // Keep closed state current, but never overwrite task ticks while the
+    // worker is completing the open dialog. Live refreshes can otherwise
+    // replace the local draft with the still-incomplete server payload.
     useEffect(() => {
-        setTasks(session.tasks ?? []);
-    }, [session.tasks]);
+        if (!open) {
+            setTasks(session.tasks ?? []);
+        }
+    }, [open, session.tasks]);
 
     // Drop the tasks_pending blocker once the worker has ticked off every
     // task in the embedded list — no more "End shift anyway" + override

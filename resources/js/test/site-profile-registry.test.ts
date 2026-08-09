@@ -50,6 +50,7 @@ describe('site profile registry', () => {
             'assets',
             'fleet',
             'hardware',
+            'technology',
             'plan',
             'documents',
             'financials',
@@ -119,6 +120,9 @@ describe('site profile registry', () => {
             resolveSiteProfileTab('meal-planner', 'house', allPermissions).id,
         ).toBe('meal_planner');
         expect(
+            resolveSiteProfileTab('type-plan', 'house', allPermissions).id,
+        ).toBe('plan');
+        expect(
             resolveSiteProfileTab('meal_planner', 'head_office', allPermissions)
                 .id,
         ).toBe('overview');
@@ -137,8 +141,26 @@ describe('site profile registry', () => {
         expect(dataPropForTab('clients')).toBe('clientsData');
         expect(dataPropForTab('hazards')).toBe('hazardsData');
         expect(dataPropForTab('checklists')).toBe('checklistsData');
+        expect(dataPropForTab('technology')).toBe('technology');
         expect(dataPropForTab('vendors')).toBe('vendorsCredentialsData');
         expect(dataPropForTab('overview')).toBeUndefined();
+    });
+
+    it('resolves the technology deep link only for an authorised viewer', () => {
+        expect(
+            resolveSiteProfileTab('technology', 'house', {
+                viewTechnology: true,
+            }),
+        ).toMatchObject({
+            id: 'technology',
+            dataProp: 'technology',
+            locked: false,
+        });
+        expect(
+            resolveSiteProfileTab('technology', 'house', {
+                viewTechnology: false,
+            }).id,
+        ).toBe('overview');
     });
 
     it('totals warning counts by group without treating ordinary counts as warnings', () => {

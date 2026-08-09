@@ -164,6 +164,11 @@ final class HrEquipmentAccessProjectionService
             ->map(function (DeviceAssignment $assignment) use ($profile, $visibleIds): array {
                 $device = $assignment->device;
                 $isActive = $assignment->released_at === null;
+                $canOpenDevice = $device
+                    && in_array((int) $device->id, $visibleIds, true);
+                $recoveryOnly = $device
+                    && ! $this->profileIsCurrent($profile)
+                    && ! $canOpenDevice;
 
                 return [
                     'key' => 'device-'.$assignment->id,
@@ -181,17 +186,25 @@ final class HrEquipmentAccessProjectionService
                     'health' => $this->enumValue($device?->health_status),
                     'condition' => null,
                     'needs_recovery' => ! $this->profileIsCurrent($profile) && $isActive,
-                    'href' => $device && in_array((int) $device->id, $visibleIds, true)
+                    'href' => $canOpenDevice
                         ? "/security-devices/devices/{$device->id}"
                         : null,
                     'canonical_asset_ids' => $device?->activeAssetLinks
                         ?->pluck('asset_id')
                         ->map(fn (mixed $id): int => (int) $id)
                         ->all() ?? [],
-                    'recovery_only' => $device
-                        && ! $this->profileIsCurrent($profile)
-                        && ! in_array((int) $device->id, $visibleIds, true),
+                    'recovery_only' => $recoveryOnly,
                     'historical_only' => false,
+                    'destination_access' => [
+                        'state' => $canOpenDevice
+                            ? 'available'
+                            : ($recoveryOnly ? 'recovery_only' : 'restricted'),
+                        'label' => $canOpenDevice
+                            ? 'Open Device Profile'
+                            : ($recoveryOnly
+                                ? 'Recovery-only HR view'
+                                : 'Device Profile access required'),
+                    ],
                 ];
             })
             ->values();
@@ -258,6 +271,10 @@ final class HrEquipmentAccessProjectionService
                     'canonical_asset_ids' => $asset ? [(int) $asset->id] : [],
                     'recovery_only' => false,
                     'historical_only' => false,
+                    'destination_access' => [
+                        'state' => 'available',
+                        'label' => 'Open Fleet & Assets record',
+                    ],
                 ];
             })
             ->values();
@@ -298,6 +315,12 @@ final class HrEquipmentAccessProjectionService
                     'canonical_asset_ids' => $asset->fleet_asset_id ? [(int) $asset->fleet_asset_id] : [],
                     'recovery_only' => false,
                     'historical_only' => $historicalOnly,
+                    'destination_access' => [
+                        'state' => $historicalOnly ? 'historical_only' : 'available',
+                        'label' => $historicalOnly
+                            ? 'Historical HR record — no action available'
+                            : 'Open HR equipment record',
+                    ],
                 ];
             })
             ->values();

@@ -79,3 +79,61 @@ it('withholds an external dead-man heartbeat unless the central runtime is genui
             'does not send Site, Device, queue, credential, or customer data',
         );
 });
+
+it('requires independently signed release-bound watchdog outage evidence', function (): void {
+    $root = str_replace('\\', '/', dirname(__DIR__, 2));
+    $verifierPath = $root.'/app/Support/Monitoring/ExternalWatchdogEvidenceVerifier.php';
+    $commandPath = $root.'/scripts/monitoring/verify-external-watchdog-evidence.php';
+    $authorityPath = $root.'/app/Support/Monitoring/CentralRuntimeReleaseAuthorityVerifier.php';
+    $runbookPath = $root.'/docs/runbooks/monitoring/runtime-and-regional-outage.md';
+
+    expect(file_exists($verifierPath))->toBeTrue()
+        ->and(file_exists($commandPath))->toBeTrue()
+        ->and(file_exists($authorityPath))->toBeTrue();
+
+    $verifier = (string) file_get_contents($verifierPath);
+    $command = (string) file_get_contents($commandPath);
+    $authority = (string) file_get_contents($authorityPath);
+    $runbook = (string) file_get_contents($runbookPath);
+
+    expect($authority)->toContain(
+        "AUTHORITY_PATH = '/etc/oblivion/monitoring-central-runtime-release-authority.json'",
+        "'watchdog_attestation_public_key_sha256'",
+        'StrictJsonObjectDecoder',
+        'MAXIMUM_AUTHORITY_SECONDS = 86_400',
+    )->and($verifier)->toContain(
+        'sodium_crypto_sign_verify_detached',
+        "'scheduler_outage'",
+        "'worker_outage'",
+        "'listener_outage'",
+        "'regional_outage'",
+        'MAXIMUM_ALARM_SECONDS = 360',
+        'MAXIMUM_RECOVERY_SECONDS = 1_800',
+        "'samples'",
+        '$samples < 15',
+        "'supervised_programs'",
+        "'central_runtime_evidence_sha256'",
+        "'external_watchdog_release_evidence' => true",
+    )->and($command)->toContain(
+        'LoadSoakReleaseCheckoutVerifier',
+        "new LoadSoakReleaseCheckoutVerifier('/usr/bin/git')",
+        "'central-runtime-evidence'",
+        "'public-key'",
+        "'signature'",
+        "'external_watchdog_release_evidence' => false",
+    )->not->toContain(
+        'vendor/autoload.php',
+        'git fetch',
+        'git pull',
+        'git reset',
+        'git clean',
+    )->and($runbook)->toContain(
+        'four sequential events in this exact order',
+        '`scheduler_outage`',
+        '`worker_outage`',
+        '`listener_outage`',
+        '`regional_outage`',
+        'verify-external-watchdog-evidence.php',
+        'Do not conduct these outage drills against',
+    );
+});

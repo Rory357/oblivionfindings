@@ -3,6 +3,8 @@
 namespace App\Services\ControlRoom;
 
 use App\Domain\Monitoring\Presenters\MonitoringIncidentEvidencePresenter;
+use App\Domain\SecurityDevices\Models\Device as CanonicalDevice;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\AuditLog;
 use App\Models\ControlRoom\ConfigOption;
 use App\Models\ControlRoom\OperatorNote;
@@ -30,6 +32,7 @@ class AlertWorkspaceService
         private UserSiteAccessService $siteAccess,
         private HsVisibilityService $hsVisibility,
         private ControlRoomAlertProvenanceService $provenance,
+        private SecurityDevicesAccessService $deviceAccess,
         private MonitoringIncidentEvidencePresenter $monitoringIncidentEvidence,
         private LinkedOperationalEvidencePresenter $linkedEvidence,
         private ControlRoomAlertLifecycleService $lifecycle,
@@ -67,7 +70,7 @@ class AlertWorkspaceService
             'sla.slaDefinition',
             'client:id,first_name,last_name,site_id',
             'clientIncident:id,reference_number,control_room_alert_id,hs_event_id,status,severity,client_id,site_id,title',
-            'device:id,type,latitude,longitude,location_description,site_id,client_id,asset_id',
+            'device:id,canonical_device_id,type,latitude,longitude,location_description,site_id,client_id,asset_id',
             'tasks' => fn ($q) => $q->whereNull('parent_task_id')->orderBy('sort_order')->with(['assignedTo:id,name', 'subtasks.assignedTo:id,name']),
             'discussions' => fn ($q) => $q->whereNull('parent_id')->orderBy('created_at', 'asc')->with(['user:id,name', 'replies' => fn ($r) => $r->orderBy('created_at', 'asc')->with('user:id,name')]),
             'watchers.user:id,name',
@@ -75,7 +78,10 @@ class AlertWorkspaceService
         ]);
 
         $auditLogs = AuditLog::query()
-            ->where('auditable_type', ControlRoomAlert::class)
+            ->whereIn('auditable_type', [
+                ControlRoomAlert::class,
+                (new ControlRoomAlert)->getMorphClass(),
+            ])
             ->where('auditable_id', $alert->id)
             ->with('user:id,name')
             ->orderByDesc('created_at')
@@ -121,6 +127,7 @@ class AlertWorkspaceService
             ->first();
         $canViewIncident = $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
         $monitoringContext = $this->monitoringIncidentEvidence->forAlert($alert, $user);
+        $linkedCanonicalDevice = $this->linkedCanonicalDevice($alert, $user);
         $canOpenIncident = $linkedIncident !== null
             && $canViewIncident
             && $user->can('view', $linkedIncident);
@@ -394,6 +401,7 @@ class AlertWorkspaceService
             ] : null,
             'linked_hs_event' => $this->hsVisibility->forControlRoomAlert($alert, $user),
             'linked_it_work' => $monitoringContext['linked_it_work'],
+            'linked_device' => $linkedCanonicalDevice,
             'monitoring_incident_evidence' => $monitoringContext['incident_evidence'],
             'linked_operational_evidence' => $linkedOperationalEvidence,
             'resolve_gate' => $resolveGate,
@@ -420,5 +428,45 @@ class AlertWorkspaceService
         );
 
         return $staffQuery->get(['id', 'name', 'email']);
+    }
+
+    /** @return array<string, mixed>|null */
+    private function linkedCanonicalDevice(ControlRoomAlert $alert, User $user): ?array
+    {
+        $canonicalDeviceId = $this->provenance->authoritativeCanonicalDeviceId($alert);
+        if ($canonicalDeviceId === null) {
+            return null;
+        }
+
+        $device = $this->deviceAccess->visibleDevices($user)
+            ->whereKey($canonicalDeviceId)
+            ->first(['id', 'device_uid', 'name']);
+        if (! $device instanceof CanonicalDevice) {
+            return null;
+        }
+
+        if (! $user->canDo('securityDevices.devices.view')) {
+            return [
+                'id' => null,
+                'uid' => null,
+                'name' => null,
+                'href' => null,
+                'access' => [
+                    'state' => 'restricted',
+                    'message' => 'Security & Devices access is required to open this Device.',
+                ],
+            ];
+        }
+
+        return [
+            'id' => $device->id,
+            'uid' => $device->device_uid,
+            'name' => $device->name,
+            'href' => "/security-devices/devices/{$device->id}",
+            'access' => [
+                'state' => 'available',
+                'message' => null,
+            ],
+        ];
     }
 }

@@ -295,7 +295,9 @@ class TrackingWorkspacePresenter
         $location = $privacy['locationAllowed']
             ? $this->location($device, $asset, $group)
             : null;
-        $canonicalHref = $this->canonicalHref($group, $client, $staff, $session, $asset);
+        $canonicalHref = $privacy['locationAllowed']
+            ? $this->canonicalHref($group, $client, $staff, $session, $asset)
+            : null;
 
         return [
             'id' => $device->id,

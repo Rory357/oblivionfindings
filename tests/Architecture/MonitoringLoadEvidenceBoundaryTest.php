@@ -24,6 +24,10 @@ it('keeps local synthetic monitoring performance artifacts ineligible for V09 cl
     );
 
     expect($script)->toContain(
+        "'/app/Support/Monitoring/StrictJsonObjectDecoder.php'",
+        "'/app/Support/Monitoring/LoadSoakReleaseCheckoutVerifier.php'",
+        'is_link($path) || ! is_file($path)',
+        'require_once $path',
         "getenv('MONITORING_LOAD_SOAK_ATTESTATION_PUBLIC_KEY_SHA256')",
         'if ($testAuthority)',
         "'--test-authority'",
@@ -45,6 +49,7 @@ it('keeps local synthetic monitoring performance artifacts ineligible for V09 cl
         "'local_fixture_can_close_v09' => false",
         "'test_authority_can_close_v09' => false",
     )->not->toContain(
+        'vendor/autoload.php',
         'file_put_contents',
         'MONITORING_LOAD_SOAK_AUTHORITY_PATH',
         '--authority=',
@@ -95,13 +100,19 @@ it('keeps local synthetic monitoring performance artifacts ineligible for V09 cl
     );
 
     expect($releaseCheckout)->toContain(
+        'proc_open(',
+        "'bypass_shell' => true",
+        "'suppress_errors' => true",
+        'proc_get_status($process)',
+        'microtime(true) + 10',
+        '@proc_terminate($process)',
         "['rev-parse', '--is-inside-work-tree']",
         "['rev-parse', '--show-toplevel']",
         "['rev-parse', '--verify', 'HEAD']",
         "['rev-parse', '--verify', 'refs/remotes/origin/main']",
         "['status', '--porcelain=v1', '--untracked-files=all']",
         '$this->gitProcessEnvironment()',
-        "str_starts_with(strtoupper(\$key), 'GIT_')",
+        "! str_starts_with(strtoupper(\$key), 'GIT_')",
         "'GIT_DIR'",
         "'GIT_INDEX_FILE'",
         "'GIT_WORK_TREE'",
@@ -118,6 +129,7 @@ it('keeps local synthetic monitoring performance artifacts ineligible for V09 cl
         '$originMain === $expectedRevision',
         "\$status === ''",
     )->not->toContain(
+        'Symfony\\Component\\Process',
         'git reset',
         'git clean',
         'git checkout',

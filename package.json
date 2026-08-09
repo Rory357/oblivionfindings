@@ -15,6 +15,7 @@
         "test:watch": "vitest",
         "types": "tsc --noEmit",
         "visual:test": "playwright test -c playwright.config.ts",
+        "visual:test:legacy": "playwright test -c playwright.config.ts --project=chromium-desktop --project=chromium-desktop-visual",
         "visual:test:it-security": "playwright test -c playwright.config.ts --project=it-security-desktop-1440 --project=it-security-desktop-1280",
         "visual:update": "playwright test -c playwright.config.ts --update-snapshots"
     },

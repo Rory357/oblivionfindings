@@ -27,10 +27,12 @@ final class CollectorApplication
 
     /**
      * @param  null|\Closure(string, string, string, string, string): array<string, mixed>  $enrolmentTransport
+     * @param  null|\Closure(string, string, int, string, string): array<string, mixed>  $transportEvidenceTransport
      * @param  null|\Closure(string, mixed): void  $output
      */
     public function __construct(
         private readonly ?\Closure $enrolmentTransport = null,
+        private readonly ?\Closure $transportEvidenceTransport = null,
         private readonly ?\Closure $output = null,
     ) {}
 
@@ -134,9 +136,17 @@ final class CollectorApplication
         $certificate = openssl_x509_read($clientCertificate);
         $privateKey = openssl_pkey_get_private($clientPrivateKey);
         $actualFingerprint = $certificate === false ? false : openssl_x509_fingerprint($certificate, 'sha256');
+        $parsedCertificate = $certificate === false ? false : openssl_x509_parse($certificate, false);
+        $now = time();
         if ($certificate === false || $privateKey === false || ! is_string($actualFingerprint)
+            || ! is_array($parsedCertificate)
             || ! openssl_x509_check_private_key($certificate, $privateKey)
-            || ! hash_equals($certificateFingerprint, strtolower($actualFingerprint))) {
+            || ! hash_equals($certificateFingerprint, strtolower($actualFingerprint))
+            || ($parsedCertificate['subject']['CN'] ?? null) !== 'oblivion-collector-'.$collectorId
+            || ! is_int($parsedCertificate['validFrom_time_t'] ?? null)
+            || ! is_int($parsedCertificate['validTo_time_t'] ?? null)
+            || $now < $parsedCertificate['validFrom_time_t']
+            || $now >= $parsedCertificate['validTo_time_t']) {
             sodium_memzero($secretKey);
             throw new CentralApiFailure('Collector mTLS enrolment identity is invalid.');
         }
@@ -319,14 +329,35 @@ final class CollectorApplication
         if (! is_string($secretKey) || strlen($secretKey) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) {
             throw new RuntimeException('Collector request signing key is invalid.');
         }
+        $publicKey = sodium_crypto_sign_publickey_from_secretkey($secretKey);
+        $certificate = $this->readBounded($identity['client_certificate_file']);
+        $signingKeyReference = hash('sha256', $publicKey);
+        $identityGenerationReference = hash(
+            'sha256',
+            strtolower($identity['collector_id'])."\0".hash('sha256', $certificate)."\0".$signingKeyReference,
+        );
         try {
-            $evidence = (new HttpsCentralApi(
-                $identity['central_url'],
-                $identity['tls_public_key_pin'],
-                $secretKey,
-                $identity['client_certificate_file'],
-                $identity['client_private_key_file'],
-            ))->verifyTransport($identity['collector_id'], $expectedState, $samples);
+            $evidence = $this->transportEvidenceTransport !== null
+                ? ($this->transportEvidenceTransport)(
+                    $identity['collector_id'],
+                    $expectedState,
+                    $samples,
+                    $signingKeyReference,
+                    $identityGenerationReference,
+                )
+                : (new HttpsCentralApi(
+                    $identity['central_url'],
+                    $identity['tls_public_key_pin'],
+                    $secretKey,
+                    $identity['client_certificate_file'],
+                    $identity['client_private_key_file'],
+                ))->verifyTransport(
+                    $identity['collector_id'],
+                    $expectedState,
+                    $samples,
+                    $signingKeyReference,
+                    $identityGenerationReference,
+                );
         } finally {
             sodium_memzero($secretKey);
         }

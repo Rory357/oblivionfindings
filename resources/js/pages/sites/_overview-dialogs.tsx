@@ -82,7 +82,7 @@ function SiteLineBody({
     return (
         <>
             <DialogHeader>
-                <DialogTitle>Edit site line</DialogTitle>
+                <DialogTitle>Edit phone &amp; email</DialogTitle>
                 <DialogDescription>
                     Update the phone number and email staff use to contact this
                     Site.

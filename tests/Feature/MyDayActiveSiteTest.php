@@ -115,6 +115,42 @@ it('uses the open attendance session shift as the active site shift after the UT
         );
 });
 
+it('does not let an unsupported legacy active shift displace a clockable scheduled shift', function () {
+    $worker = User::factory()->frontlineWorker()->create();
+    $site = Site::factory()->create(['name' => 'Rimu House', 'type' => 'house']);
+    $client = Client::factory()->create([
+        'site_id' => $site->id,
+        'first_name' => 'Margaret',
+        'last_name' => 'Hewitt',
+    ]);
+
+    Shift::factory()->create([
+        'user_id' => $worker->id,
+        'client_id' => $client->id,
+        'site_id' => $site->id,
+        'starts_at' => Carbon::now()->subHours(2),
+        'ends_at' => Carbon::now()->addHours(2),
+        'status' => 'active',
+    ]);
+
+    $scheduled = Shift::factory()->create([
+        'user_id' => $worker->id,
+        'client_id' => $client->id,
+        'site_id' => $site->id,
+        'starts_at' => Carbon::now()->subMinutes(20),
+        'ends_at' => Carbon::now()->addHours(7),
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($worker)
+        ->get('/my-day')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('my-day/index')
+            ->where('active_shift.id', $scheduled->id)
+        );
+});
+
 it('exposes active shift site checklists and clears them after completion', function () {
     $this->seed(RbacSeeder::class);
 

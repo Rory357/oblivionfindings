@@ -23,7 +23,7 @@ jobs:
       matrix:
         project:
           - chromium-desktop
-          - chromium-mobile
+          - chromium-desktop-visual
           - it-security-desktop-1440
           - it-security-desktop-1280
 

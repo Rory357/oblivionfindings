@@ -195,8 +195,8 @@ export function VehicleTechnologyProjectionPanel({
                 <CardContent className="py-10">
                     <EmptyState
                         icon={ShieldCheck}
-                        title="Vehicle technology is not available"
-                        description="Your current Site and source permissions do not allow this projection."
+                        title="Security & Devices access required"
+                        description="Vehicle operations remain available, but your current Site and Security & Devices permissions do not allow this technology projection."
                     />
                 </CardContent>
             </Card>

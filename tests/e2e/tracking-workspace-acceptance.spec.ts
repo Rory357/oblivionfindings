@@ -63,9 +63,13 @@ test.describe('Tracking specialist workspace', () => {
         await expect(activeCard).toContainText(fixture.activeClientName);
         await expect(activeCard).toContainText('Consent active');
         await expect(activeCard).toContainText('Last location');
-        await expect(
-            activeCard.getByRole('link', { name: 'Open client location' }),
-        ).toHaveAttribute('href', /\/operations\/clients\/\d+\?tab=location/);
+        const clientLocationLink = activeCard.getByRole('link', {
+            name: 'Open client location',
+        });
+        await expect(clientLocationLink).toHaveAttribute(
+            'href',
+            `/operations/clients/${fixture.activeClientId}?tab=location`,
+        );
         const deviceDetailHref = await activeCard
             .getByRole('link', { name: fixture.activeDeviceName })
             .getAttribute('href');
@@ -84,6 +88,73 @@ test.describe('Tracking specialist workspace', () => {
         await expect(withdrawnCard).toContainText(fixture.withdrawnClientName);
         await expect(withdrawnCard).toContainText('Consent withdrawn');
         await expect(withdrawnCard).not.toContainText('Last location');
+        await expect(
+            withdrawnCard.getByRole('link', { name: 'Open client location' }),
+        ).toHaveCount(0);
+        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
+        await expectNoPageOverflow(page);
+
+        await clientLocationLink.click();
+        await expect(page).toHaveURL(
+            new RegExp(
+                `/operations/clients/${fixture.activeClientId}\\?tab=location$`,
+            ),
+        );
+        const trackingWorkspaceLink = page.getByRole('link', {
+            name: 'Open Tracking workspace',
+        });
+        await expect(trackingWorkspaceLink).toHaveAttribute(
+            'href',
+            '/security-devices/tracking?tab=personal-safety',
+        );
+        const deviceProfileLink = page.getByRole('link', {
+            name: 'Open Device Profile',
+        });
+        await expect(deviceProfileLink).toHaveAttribute(
+            'href',
+            `/security-devices/devices/${fixture.activeDeviceId}`,
+        );
+        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
+        await expectNoPageOverflow(page);
+
+        await deviceProfileLink.click();
+        await expect(page).toHaveURL(
+            new RegExp(
+                `/security-devices/devices/${fixture.activeDeviceId}(?:\\?.*)?$`,
+            ),
+        );
+        await expect(
+            page.getByRole('heading', {
+                name: fixture.activeDeviceName,
+                level: 1,
+            }),
+        ).toBeVisible();
+        const clientReturnLink = page
+            .locator('[data-testid="device-profile-header"]')
+            .getByRole('link', {
+                name: fixture.activeClientProfileName,
+                exact: true,
+            });
+        await expect(clientReturnLink).toHaveAttribute(
+            'href',
+            `/operations/clients/${fixture.activeClientId}?tab=location`,
+        );
+        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
+        await expectNoPageOverflow(page);
+
+        await clientReturnLink.click();
+        await expect(page).toHaveURL(
+            new RegExp(
+                `/operations/clients/${fixture.activeClientId}\\?tab=location$`,
+            ),
+        );
+        await trackingWorkspaceLink.click();
+        await expect(page).toHaveURL(
+            /\/security-devices\/tracking\?tab=personal-safety$/,
+        );
+        await expect(
+            page.getByRole('article', { name: fixture.activeDeviceName }),
+        ).toBeVisible();
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
         await expectNoPageOverflow(page);
 

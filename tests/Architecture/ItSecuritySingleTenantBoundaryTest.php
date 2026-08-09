@@ -163,6 +163,90 @@ it('keeps active IT and Security Devices surfaces free of known inert interactio
     expect($findings)->toBe([]);
 });
 
+it('keeps the interaction audit bound to the exact release cross-module source inventory', function () {
+    $root = str_replace('\\', '/', dirname(__DIR__, 2));
+    $audit = file_get_contents($root.'/resources/js/test/it-security-interaction-audit.test.ts');
+    $expected = [
+        'resources/js/pages/control-room/alerts/index.tsx',
+        'resources/js/pages/control-room/show.tsx',
+        'resources/js/pages/control-room/map.tsx',
+        'resources/js/pages/control-room/devices/index.tsx',
+        'resources/js/pages/control-room/devices/show.tsx',
+        'resources/js/components/control-room/alert-workspace-dialog.tsx',
+        'resources/js/components/control-room/alert-workspace/linked-journey.tsx',
+        'resources/js/components/control-room/alert-worklist/alert-worklist.tsx',
+        'resources/js/components/control-room/alert-worklist/alert-worklist-row.tsx',
+        'resources/js/pages/sites/show.tsx',
+        'resources/js/components/sites/site-technology-projection.tsx',
+        'resources/js/pages/operations/clients/show.tsx',
+        'resources/js/pages/operations/clients/tabs/healthcare-devices.tsx',
+        'resources/js/components/client-location-tab.tsx',
+        'resources/js/pages/fleet-assets/vehicles/show.tsx',
+        'resources/js/pages/fleet-assets/vehicles/vehicle-technology-projection.tsx',
+        'resources/js/pages/fleet-assets/assets/show.tsx',
+        'resources/js/components/assets/asset-finance-technology-projection.tsx',
+        'resources/js/pages/fleet-assets/resident-tracking/history.tsx',
+        'resources/js/pages/hr/employees/show.tsx',
+        'resources/js/pages/settings/api.tsx',
+        'resources/js/pages/settings/it-mailbox.tsx',
+        'resources/js/components/monitoring/delivery-recovery-card.tsx',
+        'resources/js/components/monitoring/monitoring-incident-evidence-card.tsx',
+    ];
+    $inventoryMatch = [];
+
+    expect($audit)->toBeString()
+        ->and(preg_match(
+            '/const crossModuleSources = \[(.*?)\];/s',
+            (string) $audit,
+            $inventoryMatch,
+        ))->toBe(1);
+
+    $inventorySources = [];
+    expect(preg_match_all("/'([^']+)'/", $inventoryMatch[1], $inventorySources))->toBe(count($expected))
+        ->and($inventorySources[1])->toBe($expected)
+        ->and($audit)->toContain(
+            'crossModuleSources.map((file) => resolve(workspace, file))',
+            'isInsideDestinationBackedElement(node, source)',
+            'hasDndKitListeners(opening)',
+        );
+
+    foreach ($expected as $relativePath) {
+        expect(is_file($root.'/'.$relativePath))->toBeTrue();
+    }
+});
+
+it('keeps the Site Profile technology tab bound to its canonical optional projection', function () {
+    $root = str_replace('\\', '/', dirname(__DIR__, 2));
+    $controller = file_get_contents($root.'/app/Http/Controllers/Sites/SiteProfileController.php');
+    $page = file_get_contents($root.'/resources/js/pages/sites/show.tsx');
+    $registry = file_get_contents($root.'/resources/js/pages/sites/tabs/registry.ts');
+    $projection = file_get_contents($root.'/resources/js/components/sites/site-technology-projection.tsx');
+    $securitySite = file_get_contents($root.'/resources/js/pages/security-devices/sites/show.tsx');
+
+    expect($controller)
+        ->toContain("'viewTechnology' => \$technology->canView(\$user, \$site)")
+        ->toContain("'viewHardwarePlacement' => \$technology->canView(\$user, \$site)")
+        ->toContain("'technology' => Inertia::optional(")
+        ->toContain('fn () => $technology->present($user, $site)')
+        ->and($registry)
+        ->toContain("id: 'technology'")
+        ->toContain("dataProp: 'technology'")
+        ->toContain("permission: 'viewTechnology'")
+        ->and($page)
+        ->toContain('viewTechnology: props.can.viewTechnology')
+        ->toContain("case 'technology':")
+        ->toContain('<SiteTechnologyProjectionPanel')
+        ->toContain('data={tabData as SiteTechnologyProjection}')
+        ->toContain('canViewHardwarePlacement={props.can.viewHardwarePlacement}')
+        ->and($securitySite)
+        ->toContain('<SiteProfileDestination')
+        ->toContain('tab="technology"')
+        ->and($projection)
+        ->toContain('canViewHardwarePlacement &&')
+        ->toContain('data.can.view_room_placement ? (')
+        ->toContain('<Link href={`/sites/${siteId}/hardware`}>');
+});
+
 it('keeps Queclink governed actions safe when no tracker is paired', function () {
     $root = str_replace('\\', '/', dirname(__DIR__, 2));
     $hub = file_get_contents($root.'/resources/js/pages/security-devices/integrations/queclink-hub.tsx');

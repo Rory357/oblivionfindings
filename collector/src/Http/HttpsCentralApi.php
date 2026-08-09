@@ -112,16 +112,24 @@ final readonly class HttpsCentralApi implements CentralApi
         ]);
     }
 
-    /** @return array{state: string, expected_identity_state: string, pinned_https_contract: string, initial_response: string, replay_attempt: string, samples: int} */
-    public function verifyTransport(string $collectorId, string $expectedIdentityState, int $samples = 5): array
-    {
+    /** @return array{schema: string, state: string, collector_reference_sha256: string, signing_key_reference_sha256: string, identity_generation_reference_sha256: string, expected_identity_state: string, pinned_https_contract: string, initial_response: string, replay_attempt: string, samples: int, observed_from_utc: string, observed_until_utc: string} */
+    public function verifyTransport(
+        string $collectorId,
+        string $expectedIdentityState,
+        int $samples,
+        string $signingKeyReference,
+        string $identityGenerationReference,
+    ): array {
         if (preg_match('/\A[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/i', $collectorId) !== 1
             || ! in_array($expectedIdentityState, ['active', 'revoked'], true)
             || $samples < 1
-            || $samples > 20) {
+            || $samples > 20
+            || preg_match('/\A[a-f0-9]{64}\z/', $signingKeyReference) !== 1
+            || preg_match('/\A[a-f0-9]{64}\z/', $identityGenerationReference) !== 1) {
             throw new CentralApiFailure('Collector transport evidence scope is invalid.');
         }
 
+        $observedFrom = gmdate('Y-m-d\TH:i:s\Z');
         $method = 'POST';
         $path = '/api/monitoring/collectors/configuration';
         $body = json_encode([
@@ -145,7 +153,11 @@ final readonly class HttpsCentralApi implements CentralApi
         }
 
         return [
+            'schema' => 'oblivion-collector-transport-evidence-v2',
             'state' => 'response_contract_matched',
+            'collector_reference_sha256' => hash('sha256', strtolower($collectorId)),
+            'signing_key_reference_sha256' => $signingKeyReference,
+            'identity_generation_reference_sha256' => $identityGenerationReference,
             'expected_identity_state' => $expectedIdentityState,
             'pinned_https_contract' => 'matched',
             'initial_response' => $expectedIdentityState === 'active'
@@ -155,6 +167,8 @@ final readonly class HttpsCentralApi implements CentralApi
                 ? 'authentication_denied'
                 : 'not_exercised',
             'samples' => $samples,
+            'observed_from_utc' => $observedFrom,
+            'observed_until_utc' => gmdate('Y-m-d\TH:i:s\Z'),
         ];
     }
 

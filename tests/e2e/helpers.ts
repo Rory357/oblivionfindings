@@ -11,11 +11,6 @@ export const ROSTERING_DEMO_PUBLISH_TARGET = {
     siteId: 9001,
 } as const;
 
-export const ROSTERING_DEMO_FRONTLINE_TARGET = {
-    week: '2026-05-04',
-    siteId: 9002,
-} as const;
-
 export const ROSTERING_DEMO_SUGGESTION_TARGET = {
     week: '2026-05-11',
     siteId: 9001,
@@ -140,8 +135,16 @@ echo json_encode([
 `);
 }
 
-export function resetMedicationReadinessFixtures() {
+export function resetFrontlineLifecycleReadinessFixtures() {
     runArtisan(['db:seed', '--class=FrontlineLifecycleDemoSeeder', '--force']);
+}
+
+export function resetMedicationReadinessFixtures() {
+    resetFrontlineLifecycleReadinessFixtures();
+}
+
+export function resetJobBoardReadinessFixtures() {
+    runArtisan(['db:seed', '--class=JobBoardReadinessDemoSeeder', '--force']);
 }
 
 export function resetRosteringReadinessFixtures(
@@ -151,9 +154,11 @@ export function resetRosteringReadinessFixtures(
 
     const assignmentShiftStatus = options.assignmentShiftStatus ?? 'scheduled';
 
-    runLaravelPhp(`
+    const resetResult = runLaravelJson<{ frontlineWeek: string }>(`
 $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
 $at = fn (string $value) => \\Carbon\\Carbon::parse($value, $timezone)->utc();
+$frontlineWeekStart = \\Carbon\\Carbon::now($timezone)->startOfWeek()->addWeek()->startOfDay();
+$frontlineWeek = $frontlineWeekStart->toDateString();
 $assignmentShiftStatus = ${JSON.stringify(assignmentShiftStatus)};
 
 $publishWorkerId = \\App\\Models\\User::query()->where('email', 'roster-e2e-worker@demo.test')->value('id');
@@ -169,14 +174,28 @@ $frontlineId = \\App\\Models\\User::query()->where('email', 'roster-e2e-frontlin
     ]);
 
 \\App\\Models\\RosterPeriod::withTrashed()
-    ->whereIn('site_id', [9001, 9002])
-    ->whereIn('week_start', ['2026-05-04', '2026-05-11'])
+    ->where(function ($query) use ($frontlineWeek): void {
+        $query->where(function ($publishQuery): void {
+            $publishQuery->where('site_id', 9001)
+                ->whereIn('week_start', ['2026-05-04', '2026-05-11']);
+        })->orWhere(function ($frontlineQuery) use ($frontlineWeek): void {
+            $frontlineQuery->where('site_id', 9002)
+                ->where('week_start', $frontlineWeek);
+        });
+    })
     ->where('version', '>', 1)
     ->forceDelete();
 
 \\App\\Models\\RosterPeriod::withTrashed()
-    ->whereIn('site_id', [9001, 9002])
-    ->whereIn('week_start', ['2026-05-04', '2026-05-11'])
+    ->where(function ($query) use ($frontlineWeek): void {
+        $query->where(function ($publishQuery): void {
+            $publishQuery->where('site_id', 9001)
+                ->whereIn('week_start', ['2026-05-04', '2026-05-11']);
+        })->orWhere(function ($frontlineQuery) use ($frontlineWeek): void {
+            $frontlineQuery->where('site_id', 9002)
+                ->where('week_start', $frontlineWeek);
+        });
+    })
     ->where('version', 1)
     ->get()
     ->each(function ($period): void {
@@ -229,8 +248,8 @@ $frontlineId = \\App\\Models\\User::query()->where('email', 'roster-e2e-frontlin
 
 \\App\\Models\\Shift::query()->whereKey(9301)->update([
     'user_id' => $frontlineId,
-    'starts_at' => $at('2026-05-07 09:00'),
-    'ends_at' => $at('2026-05-07 12:00'),
+    'starts_at' => $frontlineWeekStart->copy()->addDays(2)->setTime(9, 0)->utc(),
+    'ends_at' => $frontlineWeekStart->copy()->addDays(2)->setTime(12, 0)->utc(),
     'status' => 'scheduled',
     'published_at' => null,
     'publish_dirty_at' => null,
@@ -240,7 +259,16 @@ $frontlineId = \\App\\Models\\User::query()->where('email', 'roster-e2e-frontlin
     ->where('shift_id', 9201)
     ->where('type', \\App\\Services\\ShiftTimelineService::ASSIGNED_EVENT_TYPE)
     ->delete();
+
+echo json_encode(['frontlineWeek' => $frontlineWeek], JSON_THROW_ON_ERROR);
 `);
+
+    return {
+        frontlineTarget: {
+            week: resetResult.frontlineWeek,
+            siteId: 9002,
+        },
+    };
 }
 
 export function seedGovernancePrivacyConsentsReadinessFixtures() {
@@ -304,18 +332,37 @@ export function runLaravelJson<T>(code: string): T {
     return JSON.parse(runLaravelPhp(code)) as T;
 }
 
+export function resetBrowserLoginThrottle(email: string) {
+    runLaravelPhp(`
+$email = ${JSON.stringify(email)};
+$identity = \\Illuminate\\Support\\Str::transliterate(
+    \\Illuminate\\Support\\Str::lower($email).'|127.0.0.1'
+);
+\\Illuminate\\Support\\Facades\\RateLimiter::clear($identity);
+\\Illuminate\\Support\\Facades\\RateLimiter::clear(md5('login'.$identity));
+`);
+}
+
 export async function loginAs(
     page: Page,
     email: string,
     password = 'password',
 ) {
+    // Stop authenticated Inertia/background requests before clearing the
+    // cookie jar. Otherwise a late response from the previous identity can
+    // repopulate its session cookie while the fixture reset is running.
+    await page.goto('about:blank');
+    await page.context().clearCookies();
+    resetBrowserLoginThrottle(email);
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
     await page.locator('#email').fill(email);
     await page.locator('#password').fill(password);
     const loginButton = page.getByTestId('login-button');
     await expect(loginButton).toBeEnabled();
     await Promise.all([
-        page.waitForURL((url) => !url.pathname.endsWith('/login')),
+        page.waitForURL((url) => !url.pathname.endsWith('/login'), {
+            waitUntil: 'commit',
+        }),
         loginButton.click(),
     ]);
 }
@@ -355,6 +402,10 @@ export async function publishCurrentWeek(
  */
 export async function loginAsFrontlineDemoWorker(page: Page) {
     await loginAs(page, 'sw1@demo.test', 'password');
+}
+
+export async function loginAsJobBoardDemoWorker(page: Page) {
+    await loginAs(page, 'sw8@demo.test', 'password');
 }
 
 export async function loginAsMedsDemoWorker(page: Page) {

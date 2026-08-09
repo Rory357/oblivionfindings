@@ -29,7 +29,9 @@ it('binds A05 release evidence to the fixed protected authority before any endpo
         $command,
         '$releaseCheckout->verify(base_path(), $authority[\'release_revision\'])',
     );
+    $endpointProbeCount = substr_count($command, '$endpointProbe->fingerprints($settings)');
     $endpointProbe = strpos($command, '$endpointProbe->fingerprints($settings)');
+    $finalEndpointProbe = strrpos($command, '$endpointProbe->fingerprints($settings)');
     $downsample = strpos($command, '(new DownsampleMetrics)->handle');
     $writerCall = strpos($command, '$writer->write($outputDirectory, $report, $authority[\'public_key\'])');
 
@@ -47,6 +49,7 @@ it('binds A05 release evidence to the fixed protected authority before any endpo
             'return $this->finish([\'release_checkout_invalid\'])',
             "'release_authority_changed_or_expired'",
             "'release_checkout_changed'",
+            "'endpoint_identity_changed_or_expired'",
             'use App\\Support\\Monitoring\\LoadSoakReleaseCheckoutVerifier;',
             '$authority[\'release_revision\']',
             '$authority[\'public_key\']',
@@ -65,11 +68,15 @@ it('binds A05 release evidence to the fixed protected authority before any endpo
         ->and($checkoutChecks)->toBe(2)
         ->and($firstCheckoutCheck)->toBeInt()
         ->and($endpointProbe)->toBeInt()
+        ->and($finalEndpointProbe)->toBeInt()
+        ->and($endpointProbeCount)->toBe(2)
         ->and($downsample)->toBeInt()
         ->and($writerCall)->toBeInt()
         ->and($firstAuthorityRead)->toBeLessThan($endpointProbe)
         ->and($firstCheckoutCheck)->toBeLessThan($endpointProbe)
         ->and($endpointProbe)->toBeLessThan($downsample)
+        ->and($finalEndpointProbe)->toBeGreaterThan($downsample)
+        ->and($finalEndpointProbe)->toBeLessThan($writerCall)
         ->and(strrpos(
             $command,
             '$releaseCheckout->verify(base_path(), $authority[\'release_revision\'])',
@@ -81,6 +88,7 @@ it('binds A05 release evidence to the fixed protected authority before any endpo
             'There is no command-line or environment override for this path.',
             'process environment cannot substitute either trust input',
             'clean source checkout whose `HEAD` and `origin/main` both equal the protected authority revision',
+            're-probes the live MySQL and InfluxDB identities and requires the exact same',
             're-reads the fixed authority immediately before artifact publication',
         );
 });

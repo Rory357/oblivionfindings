@@ -131,3 +131,67 @@ it('ships a value-free pinned HTTPS response-contract probe', function () {
         'exact revoked collector UUID',
     );
 });
+
+it('binds the complete collector exercise to one protected release authority', function () {
+    $authority = (string) file_get_contents(base_path('app/Support/Monitoring/CollectorReleaseAuthorityVerifier.php'));
+    $verifier = (string) file_get_contents(base_path('app/Support/Monitoring/CollectorReleaseEvidenceVerifier.php'));
+    $script = (string) file_get_contents(base_path('scripts/monitoring/verify-collector-release-evidence.php'));
+    $runbook = (string) file_get_contents(base_path('docs/runbooks/monitoring/collector-outage-and-revocation.md'));
+
+    expect($authority)->toContain(
+        "'/etc/oblivion/monitoring-collector-release-authority.json'",
+        'StrictJsonObjectDecoder',
+        "'owner_uid'",
+        '($metadata[\'mode\'] & 0022) === 0',
+        "'attestation_public_key_sha256'",
+        "'remote_site_reference_sha256'",
+        "'load_balancer_reference_sha256'",
+        'MAXIMUM_AUTHORITY_SECONDS = 86_400',
+        'identitiesRemainPinned',
+    );
+
+    expect($verifier)->toContain(
+        "'oblivion-collector-transport-evidence-v2'",
+        "'monitoring_collector_release_evidence_v1'",
+        'sodium_crypto_sign_verify_detached',
+        "'samples'] ?? null) !== 5",
+        "'same_shared_redis_verified'",
+        "'mtls_header_replacement_verified'",
+        "'legacy_fingerprint_header_disabled'",
+        "'cross_instance_replay_reference_sha256'",
+        "'reviewed_at'",
+        "'exactly_one_root_correlation'",
+        "'pinned_monitor_roster_sha256'",
+        "'post_boundary_observations'",
+        "'roster_drift_negative_reference_sha256'",
+        "['snmpv3', 'ssh_read_only', 'winrm_approved']",
+        "'observed_at'",
+        "'old_identity_forwarded_and_denied'",
+        "'revoked_at'",
+        "'replacement_issued_at'",
+        "'replacement_consumed_at'",
+        "'service_restored_at'",
+        "'replacement_token_reuse_denial_reference_sha256'",
+        "'general_site_token_denial_reference_sha256'",
+        "'collector_release_evidence' => true",
+    );
+
+    expect($script)->toContain(
+        "new LoadSoakReleaseCheckoutVerifier('/usr/bin/git')",
+        'CollectorReleaseAuthorityVerifier',
+        'CollectorReleaseEvidenceVerifier',
+        "'active-transport'",
+        "'revoked-transport'",
+        "'replacement-transport'",
+        'identitiesRemainPinned([$authorityBefore, $authorityAfter])',
+        "'release_identity_changed'",
+    )->not->toContain('--authority=', 'getenv(');
+
+    expect($runbook)->toContain(
+        '/etc/oblivion/monitoring-collector-release-authority.json',
+        'monitoring_collector_release_evidence_v1',
+        'verify-collector-release-evidence.php',
+        'protected authority, environment, revision, remote Site and load balancer',
+        'close A03.',
+    );
+});

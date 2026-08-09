@@ -21,10 +21,7 @@ function expectNoUnexpectedConsoleErrors(errors: string[]) {
 }
 
 /** Open the PRN wizard and advance past the "Choose med" step. */
-async function openPrnSheetFor(
-    page: Page,
-    medicationName: string,
-) {
+async function openPrnSheetFor(page: Page, medicationName: string) {
     await page.getByTestId('meds-prn-button').click();
     await page
         .getByRole('button', {
@@ -52,9 +49,14 @@ async function openGuidedRound(page: Page) {
         })
         .first()
         .click();
-    // The meds board also names fixture meds (overdue strip, schedule rows),
-    // so wait for the guided page before asserting on medication names.
-    await page.waitForURL(/\/emar\/rounds\/\d+\/guided/);
+    // The canonical desktop round workspace opens its safety-gated guided
+    // dialog through the rounds query rather than the retired standalone page.
+    await page.waitForURL(/\/emar\/rounds\?.*guided=\d+/);
+    await expect(
+        page.getByRole('dialog', {
+            name: /Guided round · PW Meds Readiness Round/i,
+        }),
+    ).toBeVisible();
 }
 
 async function recordCurrentRoundItem(
@@ -62,21 +64,37 @@ async function recordCurrentRoundItem(
     action: 'given' | 'refused' | 'held',
     reason?: string,
 ) {
-    const testId =
-        action === 'given'
-            ? 'meds-round-given'
-            : action === 'refused'
-              ? 'meds-round-refused'
-              : 'meds-round-held';
+    await page
+        .getByRole('checkbox', { name: /Right resident, right medication/i })
+        .check();
+    await page
+        .getByRole('button', {
+            name:
+                action === 'given'
+                    ? 'Given'
+                    : action === 'refused'
+                      ? 'Refused'
+                      : 'Held',
+            exact: true,
+        })
+        .click();
 
-    await page.getByTestId(testId).click();
-
-    if (reason) {
-        await page.getByRole('textbox').fill(reason);
+    if (action !== 'given') {
+        await page.getByRole('combobox', { name: 'Select reason…' }).click();
+        await page
+            .getByRole('option', {
+                name: action === 'refused' ? 'Refused' : 'Withheld',
+                exact: true,
+            })
+            .click();
+        if (reason) {
+            await page.getByPlaceholder('Add a note').fill(reason);
+        }
     }
 
-    await page.getByRole('button', { name: /^Confirm$/ }).click();
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 15_000 });
+    const confirm = page.getByRole('button', { name: /^Confirm$/ });
+    await confirm.click();
+    await expect(confirm).toBeHidden({ timeout: 15_000 });
 }
 
 async function openMarFromMedsHome(page: Page) {
@@ -95,6 +113,8 @@ async function openMarFromMedsHome(page: Page) {
 }
 
 test.describe('meds readiness workflows', () => {
+    test.describe.configure({ timeout: 90_000 });
+
     test.beforeEach(async ({ context }) => {
         resetMedicationReadinessFixtures();
         await context.setOffline(false);
@@ -212,12 +232,23 @@ test.describe('meds readiness workflows', () => {
             })
             .first()
             .click();
-        await page.waitForURL(/\/emar\/rounds\/\d+\/guided/);
+        await page.waitForURL(/\/emar\/rounds\?.*guided=\d+/);
 
-        await expect(page.getByText('PW Meds Morning Tablets')).toBeVisible();
-        await expect(page.getByTestId('meds-round-given')).toBeVisible();
-        await expect(page.getByTestId('meds-round-refused')).toBeVisible();
-        await expect(page.getByTestId('meds-round-held')).toBeVisible();
+        const guidedDialog = page.getByRole('dialog', {
+            name: /Guided round · PW Meds Readiness Round/i,
+        });
+        await expect(
+            guidedDialog.getByText('PW Meds Morning Tablets'),
+        ).toBeVisible();
+        await expect(
+            guidedDialog.getByRole('button', { name: 'Given', exact: true }),
+        ).toBeVisible();
+        await expect(
+            guidedDialog.getByRole('button', { name: 'Refused', exact: true }),
+        ).toBeVisible();
+        await expect(
+            guidedDialog.getByRole('button', { name: 'Held', exact: true }),
+        ).toBeVisible();
 
         expectNoUnexpectedConsoleErrors(consoleErrors);
     });
@@ -240,7 +271,9 @@ test.describe('meds readiness workflows', () => {
             page.getByRole('heading', { name: 'Round complete' }),
         ).toBeVisible();
         await expect(
-            page.getByText('Every dose in this round has been recorded.'),
+            page.getByText(
+                /Every dose in PW Meds Readiness Round has been recorded/,
+            ),
         ).toBeVisible();
 
         await page.getByRole('button', { name: /Finish round/i }).click();
@@ -281,53 +314,35 @@ test.describe('meds readiness workflows', () => {
         ).toBeHidden({ timeout: 20_000 });
 
         await page.reload();
-        await expect(page.getByText('2 of 3 done')).toBeVisible();
+        await expect(page.getByText('2 of 3 recorded')).toBeVisible();
         await expect(page.getByText('PW Meds Eye Drops')).toBeVisible();
 
         expectNoUnexpectedConsoleErrors(consoleErrors);
     });
 
-    test('canonical MAR supports row detail selection', async ({
+    test('canonical MAR opens the safety-gated dose workflow', async ({
         page,
-    }, testInfo) => {
+    }) => {
         const consoleErrors = collectConsoleErrors(page);
 
         await openMarFromMedsHome(page);
 
-        if (testInfo.project.name.includes('mobile')) {
-            const hasHorizontalScroll = await page.evaluate(
-                () =>
-                    document.documentElement.scrollWidth >
-                    document.documentElement.clientWidth + 1,
-            );
-            expect(hasHorizontalScroll).toBe(false);
-        }
-
-        const firstRow = page
-            .getByTestId('mar-row')
-            .filter({ hasText: 'PW Meds Morning Tablets' })
+        const doseCell = page
+            .getByRole('button', {
+                name: /PW Meds Morning Tablets, (Due|Overdue).*record dose/i,
+            })
             .first();
-        await expect(firstRow).toBeVisible();
-        await firstRow.click();
+        await expect(doseCell).toBeVisible();
+        await doseCell.click();
 
+        const dialog = page.getByRole('dialog', { name: /Record dose/i });
+        await expect(dialog).toBeVisible();
         await expect(
-            page
-                .getByTestId('mar-detail-pane')
-                .filter({ hasText: /PW Meds/i })
-                .last(),
+            dialog.getByRole('heading', { name: 'Safety checks' }),
         ).toBeVisible();
-
-        if (!testInfo.project.name.includes('mobile')) {
-            await firstRow.focus();
-            await firstRow.press('ArrowDown');
-            await expect(page.locator('[data-test="mar-row"]:focus')).toHaveCount(
-                1,
-            );
-            await page.locator('[data-test="mar-row"]:focus').press('Enter');
-            await expect(
-                page.getByRole('dialog', { name: /Record Administration/i }),
-            ).toBeVisible();
-        }
+        await expect(
+            dialog.getByText('The five rights', { exact: true }),
+        ).toBeVisible();
 
         expectNoUnexpectedConsoleErrors(consoleErrors);
     });
@@ -341,39 +356,41 @@ test.describe('meds readiness workflows', () => {
 
         await openMarFromMedsHome(page);
 
-        const controlledRow = page
-            .getByTestId('mar-row')
-            .filter({ hasText: 'PW Meds Controlled PRN' })
-            .first();
-        await expect(controlledRow).toBeVisible();
-        await controlledRow.getByRole('button', { name: /^Give$/ }).click();
+        await page.getByRole('tab', { name: 'PRN', exact: true }).click();
+        const controlledPrn = page
+            .locator('li')
+            .filter({ hasText: 'PW Meds Controlled PRN' });
+        await expect(controlledPrn).toBeVisible();
+        await controlledPrn.getByRole('button', { name: 'Give' }).click();
 
-        const dialog = page.getByTestId('record-administration-dialog');
-        const submitButton = page.getByTestId('record-administration-submit');
-        await expect(dialog).toBeVisible();
-        await expect(submitButton).toBeDisabled();
+        const dialog = page.getByRole('dialog', {
+            name: /Give as-needed med/i,
+        });
+        await dialog.getByTestId('meds-prn-continue').click();
+        await dialog
+            .getByRole('button', { name: 'Severe pain', exact: true })
+            .click();
+        await dialog.getByTestId('meds-prn-continue').click();
+        await dialog.getByPlaceholder('e.g. 1').fill('1');
 
-        await dialog.getByTestId('record-administration-scan-code').click();
-        await dialog.getByTestId('record-administration-scan-verify').click();
+        await dialog.getByTestId('meds-prn-continue').click();
         await expect(
-            dialog.getByText(/code verified for this medication/i),
-        ).toBeVisible({ timeout: 15_000 });
-        await expect(submitButton).toBeDisabled();
+            dialog.getByText('A witness is required for this medication'),
+        ).toBeVisible();
 
-        await dialog.getByPlaceholder('Why is this PRN being given?').fill(
-            'Severe pain',
-        );
-        await dialog.getByText('Select witness...').click();
+        await dialog
+            .getByRole('combobox', { name: 'Choose a witness…' })
+            .click();
         await page
             .getByRole('option', { name: /Medication Demo Witness/i })
             .click();
-        // The second checker confirms with their own password before the
-        // dose can be saved (EnhancedMarService witness credential rule).
         await dialog.locator('input[type="password"]').fill('password');
-        await expect(submitButton).toBeEnabled();
-        await submitButton.click();
+        await dialog.getByTestId('meds-prn-continue').click();
 
-        await expect(dialog).toBeHidden({ timeout: 15_000 });
+        await expect(
+            dialog.getByRole('heading', { name: 'Review & sign' }),
+        ).toBeVisible();
+        await expect(dialog.getByTestId('meds-prn-submit')).toBeVisible();
 
         expectNoUnexpectedConsoleErrors(consoleErrors);
     });

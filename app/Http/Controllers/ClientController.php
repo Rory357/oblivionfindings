@@ -362,6 +362,25 @@ class ClientController extends Controller
             return redirect()->to($location);
         }
 
+        // Canonicalize the retired profile tab before the Inertia page mounts.
+        // A client-side replacement is intentionally retained as a fallback,
+        // but using it for the initial visit can race a fast browser Back action
+        // because Inertia throttles history writes. The server redirect keeps the
+        // legacy bookmark compatible while preserving every unrelated query key
+        // in one deterministic browser-history entry.
+        if ($request->query('tab') === 'support_plan') {
+            $query = $request->query();
+            $query['tab'] = 'care_plans';
+            ksort($query);
+            $location = route('operations.clients.show', $client, false);
+
+            if ($query !== []) {
+                $location .= '?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+            }
+
+            return redirect()->to($location);
+        }
+
         AuditLogger::log('clients.view', $client);
 
         $sectionAccess = app(ClientProfileSectionAccess::class)
@@ -3334,12 +3353,13 @@ class ClientController extends Controller
         $currentLocation = null;
 
         if ($device) {
-            $canonicalDetailUrl = $viewer->canDo('securityDevices.viewAny')
+            $canonicalDeviceAvailable = $viewer->canDo('securityDevices.viewAny')
                 && $viewer->canDo('securityDevices.devices.view')
                 && app(SecurityDevicesAccessService::class)
                     ->visibleDevices($viewer)
                     ->whereKey($device->id)
-                    ->exists()
+                    ->exists();
+            $canonicalDetailUrl = $canonicalDeviceAvailable
                 ? "/security-devices/devices/{$device->id}"
                 : null;
             $meta = $device->meta ?? [];
@@ -3401,12 +3421,27 @@ class ClientController extends Controller
                 ] : []),
                 'fleet_dashboard_url' => '/fleet-assets/resident-tracking?focus='.$client->id,
                 'history_url' => "/fleet-assets/resident-tracking/history/{$client->id}",
+                'tracking_workspace_url' => $canonicalDeviceAvailable
+                    ? '/security-devices/tracking?tab=personal-safety'
+                    : null,
+                'tracking_workspace_access' => [
+                    'state' => $canonicalDeviceAvailable ? 'available' : 'restricted',
+                    'label' => $canonicalDeviceAvailable
+                        ? 'Open Tracking workspace'
+                        : 'Tracking workspace access required',
+                ],
                 'last_command_status' => QueclinkPendingCommand::query()
                     ->where('command_word', 'GTRTO')
                     ->whereHas('device', fn ($query) => $query->where('device_id', $device->id))
                     ->latest()
                     ->value('status'),
                 'detail_url' => $canonicalDetailUrl,
+                'detail_access' => [
+                    'state' => $canonicalDeviceAvailable ? 'available' : 'restricted',
+                    'label' => $canonicalDeviceAvailable
+                        ? 'Open Device Profile'
+                        : 'Device Profile access required',
+                ],
             ];
 
             if ($lat !== null && $lng !== null) {

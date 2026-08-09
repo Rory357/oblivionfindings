@@ -44,19 +44,23 @@ final class ItTicketContextPresenter
 
         $ticket->loadMissing('links.linkable');
 
-        $devices = $ticket->links
+        $deviceLinks = $ticket->links
             ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'affected_device'
                 && $link->linkable instanceof Device
-                && $this->canViewDevice($link->linkable, $viewer))
-            ->map(fn (ItTicketLink $link): array => $this->presentDevice($link->linkable, $link, $ticket, $viewer))
+                && $this->deviceWithinViewerScope($link->linkable, $viewer));
+        $devices = ($viewer->canDo('securityDevices.devices.view')
+            ? $deviceLinks->map(fn (ItTicketLink $link): array => $this->presentDevice($link->linkable, $link, $ticket, $viewer))
+            : ($deviceLinks->isNotEmpty() ? collect([$this->restrictedDevice()]) : collect()))
             ->values()
             ->all();
 
-        $alerts = $ticket->links
+        $alertLinks = $ticket->links
             ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'source_alert'
                 && $link->linkable instanceof ControlRoomAlert
-                && $this->canViewAlert($link->linkable, $viewer))
-            ->map(fn (ItTicketLink $link): array => $this->presentAlert($link->linkable))
+                && $this->alertWithinViewerScope($link->linkable, $viewer));
+        $alerts = ($viewer->canDo('controlRoom.alerts.view')
+            ? $alertLinks->map(fn (ItTicketLink $link): array => $this->presentAlert($link->linkable))
+            : ($alertLinks->isNotEmpty() ? collect([$this->restrictedAlert()]) : collect()))
             ->values()
             ->all();
 
@@ -223,20 +227,15 @@ final class ItTicketContextPresenter
             ->all();
     }
 
-    private function canViewDevice(Device $device, User $viewer): bool
+    private function deviceWithinViewerScope(Device $device, User $viewer): bool
     {
-        return $viewer->canDo('securityDevices.devices.view')
-            && $this->deviceAccess->visibleDevices($viewer)
-                ->whereKey($device->getKey())
-                ->exists();
+        return $this->deviceAccess->visibleDevices($viewer)
+            ->whereKey($device->getKey())
+            ->exists();
     }
 
-    private function canViewAlert(ControlRoomAlert $alert, User $viewer): bool
+    private function alertWithinViewerScope(ControlRoomAlert $alert, User $viewer): bool
     {
-        if (! $viewer->canDo('controlRoom.alerts.view')) {
-            return false;
-        }
-
         $query = ControlRoomAlert::query()->whereKey($alert->getKey());
         $this->siteAccess->applyAlertScope($query, $viewer);
 
@@ -259,6 +258,10 @@ final class ItTicketContextPresenter
             'health_status' => $this->value($device->health_status),
             'last_seen_at' => $device->last_seen_at?->toIso8601String(),
             'href' => route('security-devices.devices.show', $device),
+            'access' => [
+                'state' => 'available',
+                'message' => null,
+            ],
             'is_monitoring_evidence' => $isMonitoringEvidence,
             'can_unlink' => ! $isMonitoringEvidence
                 && in_array($ticket->work_type, ItTicket::INTAKE_WORK_TYPES, true)
@@ -279,6 +282,50 @@ final class ItTicketContextPresenter
             'status' => $alert->status,
             'triggered_at' => $alert->triggered_at?->toIso8601String(),
             'href' => route('control-room.alerts.show', $alert),
+            'access' => [
+                'state' => 'available',
+                'message' => null,
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function restrictedDevice(): array
+    {
+        return [
+            'id' => null,
+            'uid' => null,
+            'name' => null,
+            'domain' => null,
+            'category' => null,
+            'status' => null,
+            'health_status' => null,
+            'last_seen_at' => null,
+            'href' => null,
+            'access' => [
+                'state' => 'restricted',
+                'message' => 'Security & Devices access is required to open this Device.',
+            ],
+            'is_monitoring_evidence' => false,
+            'can_unlink' => false,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function restrictedAlert(): array
+    {
+        return [
+            'id' => null,
+            'reference' => null,
+            'alert_type' => null,
+            'severity' => null,
+            'status' => null,
+            'triggered_at' => null,
+            'href' => null,
+            'access' => [
+                'state' => 'restricted',
+                'message' => 'Control Room access is required to open this alert.',
+            ],
         ];
     }
 

@@ -225,7 +225,11 @@ export function SiteTechnologyProjectionPanel({
     const { summary } = data;
 
     return (
-        <div className="space-y-4" data-testid="site-technology-projection">
+        <div
+            className="space-y-4"
+            data-test="site-technology-projection"
+            data-testid="site-technology-projection"
+        >
             <Card className="overflow-hidden border-primary/20">
                 <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
                     <div className="space-y-2">

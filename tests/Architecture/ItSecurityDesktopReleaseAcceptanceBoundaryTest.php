@@ -5,6 +5,13 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
     $runbook = (string) file_get_contents($root.'/docs/runbooks/it-security-desktop-release-acceptance.md');
     $rbac = (string) file_get_contents($root.'/database/seeders/RbacSeeder.php');
     $playwrightConfig = (string) file_get_contents($root.'/playwright.config.ts');
+    $visualWorkflow = (string) file_get_contents($root.'/.github/workflows/visual.yml');
+    $evidenceVerifier = (string) file_get_contents(
+        $root.'/app/Support/Release/ItSecurityDesktopReleaseEvidenceVerifier.php',
+    );
+    $evidenceScript = (string) file_get_contents(
+        $root.'/scripts/release/verify-it-security-desktop-evidence.php',
+    );
     $package = json_decode(
         (string) file_get_contents($root.'/package.json'),
         true,
@@ -120,6 +127,60 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
             'V10 remains open unless D01-D18 pass at both viewports against the deployed release',
         );
 
+    expect($runbook)->toContain(
+        '## Signed deployed evidence manifest',
+        '`/etc/oblivion/it-security-desktop-release-authority.json`',
+        'exactly D01-D18 in order',
+        '18 rows and 36',
+        'restored-environment D07, D12, D15 and D18',
+        'eight additional viewport records',
+        'protected primary or restored environment reference on every row',
+        'one distinct opaque result reference per row',
+        '22 rows / 44 viewport records',
+        'all nine revision/environment-bound companions',
+        'verify-it-security-desktop-evidence.php',
+        'v10_release_evidence=false',
+    )->and($evidenceVerifier)->toContain(
+        "AUTHORITY_PATH = '/etc/oblivion/it-security-desktop-release-authority.json'",
+        'StrictJsonObjectDecoder',
+        'sodium_crypto_sign_verify_detached',
+        '$read = @fstat($handle)',
+        '$final = @lstat(self::AUTHORITY_PATH)',
+        "'D01' => ['release-requester']",
+        "'D16' => ['release-it-manager', 'release-it-reviewer']",
+        "'D18' => ['release-denied', 'release-source-denied']",
+        "private const array RESTORED_ROWS = ['D07', 'D12', 'D15', 'D18']",
+        'foreach ([[1440, 900], [1280, 800]]',
+        "'environment_reference_sha256'",
+        'uniqueEvidenceReferences(',
+        'array_unique($resultReferences, SORT_STRING)',
+        'array_unique($captureReferences, SORT_STRING)',
+        'array_unique($captureHashes, SORT_STRING)',
+        "'primary_rows' => count(self::ROW_ACTORS)",
+        "'restored_rows' => count(self::RESTORED_ROWS)",
+    )->and($evidenceScript)->toContain(
+        'LoadSoakReleaseCheckoutVerifier',
+        "'/app/Support/Monitoring/StrictJsonObjectDecoder.php'",
+        "'/app/Support/Monitoring/LoadSoakReleaseCheckoutVerifier.php'",
+        "'/app/Support/Release/ItSecurityDesktopReleaseEvidenceVerifier.php'",
+        'is_link($path) || ! is_file($path)',
+        'require_once $path',
+        'verifyInstalledAuthority',
+        'verifyManifest',
+        '$read = @fstat($handle)',
+        '$final = @lstat($path)',
+        "'v10_release_evidence' => true",
+        "'v10_release_evidence' => false",
+        "'primary_viewports' => \$result['primary_viewports']",
+        "'restored_viewports' => \$result['restored_viewports']",
+    )->and($evidenceScript)->not->toContain(
+        'vendor/autoload.php',
+        'git fetch',
+        'git pull',
+        'git reset',
+        'git clean',
+    );
+
     $inventoryMatch = [];
     expect(preg_match(
         '/const itSecurityDesktopOnlySpecs = \[(.*?)\];/s',
@@ -137,21 +198,43 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
 
     expect($package['scripts']['visual:test:it-security'] ?? null)
         ->toBe('playwright test -c playwright.config.ts --project=it-security-desktop-1440 --project=it-security-desktop-1280')
+        ->and($package['scripts']['visual:test:legacy'] ?? null)
+        ->toBe('playwright test -c playwright.config.ts --project=chromium-desktop --project=chromium-desktop-visual')
         ->and($runbook)->toContain(
             'npm run visual:test:it-security',
-            'The retained legacy mobile project remains outside IT/Security acceptance.',
+            'npm run visual:test:legacy',
+            'The broad visual configuration and CI matrix are also desktop-only',
+            'mutating legacy journeys cannot redefine snapshot state',
+            'No mobile project is configured, and mobile remains outside product and release acceptance.',
         )
         ->and($playwrightConfig)->toContain(
             "name: 'it-security-desktop-1440'",
             "name: 'it-security-desktop-1280'",
             "name: 'chromium-desktop'",
+            "name: 'chromium-desktop-visual'",
+        )
+        ->and($visualWorkflow)->toContain(
+            '- chromium-desktop',
+            '- chromium-desktop-visual',
+            '- it-security-desktop-1440',
+            '- it-security-desktop-1280',
+        )
+        ->and($playwrightConfig)->not->toContain(
             "name: 'chromium-mobile'",
             "devices['Pixel 7']",
         )
         ->and(substr_count($playwrightConfig, 'testMatch: itSecurityDesktopOnlyTestMatch'))->toBe(2)
-        ->and(substr_count($playwrightConfig, 'testIgnore: itSecurityDesktopOnlyTestMatch'))->toBe(2)
+        ->and(preg_match_all(
+            '/testIgnore:\s*\[[^\]]*itSecurityDesktopOnlyTestMatch/s',
+            $playwrightConfig,
+        ))->toBe(1)
+        ->and(substr_count($playwrightConfig, 'testMatch: legacyAppShellVisualTestMatch'))->toBe(1)
         ->and(preg_match(
-            "/name: 'chromium-desktop',\\s+testIgnore: itSecurityDesktopOnlyTestMatch,\\s+use:/s",
+            "/name: 'chromium-desktop',\\s+testIgnore: \\[\\s*itSecurityDesktopOnlyTestMatch,\\s*legacyAppShellVisualTestMatch,\\s*\\],\\s+use:.*?viewport: \\{ width: 1440, height: 1000 \\}/s",
+            $playwrightConfig,
+        ))->toBe(1)
+        ->and(preg_match(
+            "/name: 'chromium-desktop-visual',\\s+testMatch: legacyAppShellVisualTestMatch,\\s+snapshotPathTemplate:.*?__screenshots__\\/chromium-desktop.*?viewport: \\{ width: 1440, height: 1000 \\}/s",
             $playwrightConfig,
         ))->toBe(1)
         ->and(preg_match(
@@ -160,10 +243,6 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         ))->toBe(1)
         ->and(preg_match(
             "/name: 'it-security-desktop-1280',\\s+testMatch: itSecurityDesktopOnlyTestMatch,\\s+use:.*?viewport: \\{ width: 1280, height: 800 \\}/s",
-            $playwrightConfig,
-        ))->toBe(1)
-        ->and(preg_match(
-            "/name: 'chromium-mobile',\\s+testIgnore: itSecurityDesktopOnlyTestMatch,\\s+use: \\{ \.\.\.devices\['Pixel 7'\] \\}/s",
             $playwrightConfig,
         ))->toBe(1);
 

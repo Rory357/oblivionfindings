@@ -2,7 +2,6 @@
 
 namespace App\Support\Monitoring;
 
-use Symfony\Component\Process\Process;
 use Throwable;
 
 final class LoadSoakReleaseCheckoutVerifier
@@ -44,8 +43,11 @@ final class LoadSoakReleaseCheckoutVerifier
     /** @param list<string> $arguments */
     private function git(string $checkout, array $arguments): ?string
     {
+        $process = null;
+        $pipes = [];
+
         try {
-            $process = new Process(
+            $process = proc_open(
                 [
                     $this->gitBinary,
                     '--no-optional-locks',
@@ -57,25 +59,108 @@ final class LoadSoakReleaseCheckoutVerifier
                     $checkout,
                     ...$arguments,
                 ],
+                [
+                    0 => ['pipe', 'r'],
+                    1 => ['pipe', 'w'],
+                    2 => ['pipe', 'w'],
+                ],
+                $pipes,
                 null,
                 $this->gitProcessEnvironment(),
+                [
+                    'bypass_shell' => true,
+                    'suppress_errors' => true,
+                ],
             );
-            $process->setTimeout(10);
-            $process->run();
-
-            if (! $process->isSuccessful() || trim($process->getErrorOutput()) !== '') {
+            if (! is_resource($process)
+                || ! isset($pipes[0], $pipes[1], $pipes[2])
+                || ! is_resource($pipes[0])
+                || ! is_resource($pipes[1])
+                || ! is_resource($pipes[2])) {
                 return null;
             }
 
-            return trim($process->getOutput());
+            fclose($pipes[0]);
+            unset($pipes[0]);
+            stream_set_blocking($pipes[1], false);
+            stream_set_blocking($pipes[2], false);
+
+            $stdout = '';
+            $stderr = '';
+            $exitCode = null;
+            $deadline = microtime(true) + 10;
+
+            while (true) {
+                $read = array_values(array_filter(
+                    [$pipes[1], $pipes[2]],
+                    static fn ($pipe): bool => is_resource($pipe) && ! feof($pipe),
+                ));
+                if ($read !== []) {
+                    $write = null;
+                    $except = null;
+                    @stream_select($read, $write, $except, 0, 200_000);
+
+                    foreach ($read as $pipe) {
+                        $chunk = fread($pipe, 8192);
+                        if (! is_string($chunk)) {
+                            return null;
+                        }
+                        if ($pipe === $pipes[1]) {
+                            $stdout .= $chunk;
+                        } else {
+                            $stderr .= $chunk;
+                        }
+                    }
+                } else {
+                    usleep(10_000);
+                }
+
+                $status = proc_get_status($process);
+                if (! is_array($status)) {
+                    return null;
+                }
+                if (($status['running'] ?? false) !== true) {
+                    $exitCode = $status['exitcode'] ?? null;
+
+                    break;
+                }
+                if (microtime(true) >= $deadline) {
+                    @proc_terminate($process);
+
+                    return null;
+                }
+            }
+
+            $remainingOutput = stream_get_contents($pipes[1]);
+            $remainingError = stream_get_contents($pipes[2]);
+            if (! is_string($remainingOutput) || ! is_string($remainingError)) {
+                return null;
+            }
+            $stdout .= $remainingOutput;
+            $stderr .= $remainingError;
+
+            if ($exitCode !== 0 || trim($stderr) !== '') {
+                return null;
+            }
+
+            return trim($stdout);
         } catch (Throwable) {
             return null;
+        } finally {
+            foreach ($pipes as $pipe) {
+                if (is_resource($pipe)) {
+                    fclose($pipe);
+                }
+            }
+            if (is_resource($process)) {
+                proc_close($process);
+            }
         }
     }
 
     /**
-     * False values tell Symfony Process not to inherit ambient Git controls.
-     * The release gate must inspect only the repository selected by -C.
+     * proc_open receives a complete environment, so ambient Git controls are
+     * removed before the fixed binary inspects the repository selected by -C.
      *
      * @return array<string, string|false>
      */
@@ -84,9 +169,11 @@ final class LoadSoakReleaseCheckoutVerifier
         $environment = [];
         $ambient = getenv();
         if (is_array($ambient)) {
-            foreach (array_keys($ambient) as $key) {
-                if (is_string($key) && str_starts_with(strtoupper($key), 'GIT_')) {
-                    $environment[$key] = false;
+            foreach ($ambient as $key => $value) {
+                if (is_string($key)
+                    && is_string($value)
+                    && ! str_starts_with(strtoupper($key), 'GIT_')) {
+                    $environment[$key] = $value;
                 }
             }
         }
@@ -108,7 +195,7 @@ final class LoadSoakReleaseCheckoutVerifier
             'GIT_SHALLOW_FILE',
             'GIT_WORK_TREE',
         ] as $key) {
-            $environment[$key] = false;
+            unset($environment[$key]);
         }
         $environment['GIT_OPTIONAL_LOCKS'] = '0';
 

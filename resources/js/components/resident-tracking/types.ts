@@ -93,5 +93,9 @@ export type Resident = {
     profile_url?: string;
     history_url?: string;
     detail_url?: string | null;
+    detail_access?: {
+        state: 'available' | 'restricted';
+        label: string;
+    };
     last_command_status?: CommandStatus;
 };

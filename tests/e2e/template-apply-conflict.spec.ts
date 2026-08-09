@@ -4,6 +4,7 @@ import {
     collectConsoleErrors,
     expectNoConsoleErrors,
     loginAsStaff,
+    resetRosteringReadinessFixtures,
 } from './helpers';
 import {
     rosteringFlagsEnabled,
@@ -20,6 +21,8 @@ test.describe('roster templates — apply preflight', () => {
     test('blocks template rows that would create staff conflicts', async ({
         page,
     }) => {
+        resetRosteringReadinessFixtures();
+
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsStaff(page);

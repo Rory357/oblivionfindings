@@ -35,6 +35,7 @@ const deviceFixture = {
     health_status: 'healthy',
     last_seen_at: '2026-07-18T00:58:00Z',
     href: '/security-devices/devices/10',
+    access: { state: 'available' as const, message: null },
     is_monitoring_evidence: false,
     can_unlink: true,
 };
@@ -47,6 +48,7 @@ const alertFixture = {
     status: 'resolved',
     triggered_at: '2026-07-18T00:55:00Z',
     href: '/control-room/alerts/20',
+    access: { state: 'available' as const, message: null },
 };
 
 const incidentEvidenceFixture = {
@@ -231,6 +233,64 @@ it('keeps linked work context visible without offering agent workspaces to reque
     expect(screen.queryByRole('link', { name: /IT-000042/i })).toBeNull();
     expect(screen.queryByRole('link', { name: /IT-000052/i })).toBeNull();
     expect(screen.queryByRole('link', { name: /IT-000060/i })).toBeNull();
+});
+
+it('names inaccessible source modules without exposing linked Device or alert identity', () => {
+    render(
+        <TicketLinkedContext
+            recoveredAt={null}
+            devices={[
+                {
+                    id: null,
+                    uid: null,
+                    name: null,
+                    domain: null,
+                    category: null,
+                    status: null,
+                    health_status: null,
+                    last_seen_at: null,
+                    href: null,
+                    access: {
+                        state: 'restricted',
+                        message:
+                            'Security & Devices access is required to open this Device.',
+                    },
+                    is_monitoring_evidence: false,
+                    can_unlink: false,
+                },
+            ]}
+            alerts={[
+                {
+                    id: null,
+                    reference: null,
+                    alert_type: null,
+                    severity: null,
+                    status: null,
+                    triggered_at: null,
+                    href: null,
+                    access: {
+                        state: 'restricted',
+                        message:
+                            'Control Room access is required to open this alert.',
+                    },
+                },
+            ]}
+        />,
+    );
+
+    expect(screen.getByText('Affected Device')).toBeVisible();
+    expect(screen.getByText('Source alert')).toBeVisible();
+    expect(
+        screen.getByText(
+            'Security & Devices access is required to open this Device.',
+        ),
+    ).toBeVisible();
+    expect(
+        screen.getByText('Control Room access is required to open this alert.'),
+    ).toBeVisible();
+    expect(screen.queryByText('Core switch')).toBeNull();
+    expect(screen.queryByText('CR-000123')).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
 });
 
 it('lets an agent remove a human Device link but protects monitoring evidence', async () => {

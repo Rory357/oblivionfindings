@@ -168,6 +168,7 @@ test('an active team member can see a team event while other and inactive profil
             'ends_at' => now()->addWeek()->addHour()->toDateTimeString(),
             'audience_type' => 'team',
             'audience_team' => ' clinical support ',
+            'audience_user_ids' => [],
         ])
         ->assertRedirect();
 
@@ -182,6 +183,7 @@ test('an active team member can see a team event while other and inactive profil
         ->put("/hr/calendar/events/{$event->id}", [
             'audience_type' => 'team',
             'audience_team' => ' CLINICAL   SUPPORT ',
+            'audience_user_ids' => [],
         ])
         ->assertRedirect();
 

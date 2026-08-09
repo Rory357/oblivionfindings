@@ -183,7 +183,10 @@ $auditableIds = [
     ->where(function ($query) use ($marker, $auditableIds, $deletedLeaveChainAuditIds) {
         $query->where(function ($markerQuery) use ($marker) {
             $markerQuery->where(function ($runQuery) use ($marker) {
-                $runQuery->where('action', 'codex.live_hr_gaps')
+                $runQuery->whereIn('action', [
+                    'codex.live_hr_gaps',
+                    'hr.playwright.live_gaps',
+                ])
                     ->where('meta', 'like', '%'.$marker.'%');
             })->orWhere(function ($scopeQuery) use ($marker) {
                 $scopeQuery->where('action', 'codex.cleanup_scope')
@@ -212,6 +215,12 @@ function seedFixtures(): Fixture {
 $marker = ${JSON.stringify(marker)};
 $admin = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
 $role = \\App\\Models\\Role::query()->where('name', 'support_worker')->firstOrFail();
+$siteId = collect([
+    $admin->hrEmployeeProfile?->primary_site_id,
+    ...($admin->hrEmployeeProfile?->secondary_site_ids ?? []),
+])->filter()->map(fn ($id) => (int) $id)->first()
+    ?? \\App\\Models\\Site::query()->active()->notArchived()->orderBy('id')->value('id');
+throw_unless($siteId, \\RuntimeException::class, 'A canonical active Site is required for the HR lifecycle fixture.');
 
 $employee = \\App\\Models\\User::query()->create([
     'name' => $marker.' Worker',
@@ -233,6 +242,7 @@ $profile = \\App\\Domain\\Hr\\Models\\HrEmployeeProfile::query()->create([
     'hourly_rate' => 30,
     'start_date' => now()->subYear()->toDateString(),
     'is_active' => true,
+    'primary_site_id' => $siteId,
     'team' => 'Community Support',
     'created_by' => $admin->id,
     'updated_by' => $admin->id,
@@ -258,6 +268,7 @@ $payrollProfile = \\App\\Domain\\Hr\\Models\\HrEmployeeProfile::query()->create(
     'hourly_rate' => 30,
     'start_date' => now()->subYear()->toDateString(),
     'is_active' => true,
+    'primary_site_id' => $siteId,
     'team' => 'Community Support',
     'created_by' => $admin->id,
     'updated_by' => $admin->id,
@@ -298,6 +309,17 @@ $exitTask = $checklist->tasks()->create([
     'due_date' => now()->addWeek()->toDateString(),
     'notes' => 'workflow_key=exit_interview; marker='.$marker,
 ]);
+$checklist->tasks()->create([
+    'category' => 'equipment_return',
+    'title' => 'Return equipment — '.$marker,
+    'description' => 'Keep the employee current until the remaining required offboarding work is complete.',
+    'is_required' => true,
+    'sort_order' => 2,
+    'assigned_to_user_id' => $admin->id,
+    'status' => 'pending',
+    'due_date' => now()->addWeek()->toDateString(),
+    'notes' => 'workflow_key=equipment_return; marker='.$marker,
+]);
 
 $candidate = \\App\\Domain\\Hr\\Models\\HrCandidate::query()->create([
     'first_name' => 'Codex',
@@ -311,6 +333,7 @@ $candidate = \\App\\Domain\\Hr\\Models\\HrCandidate::query()->create([
 ]);
 $application = \\App\\Domain\\Hr\\Models\\HrApplication::query()->create([
     'candidate_id' => $candidate->id,
+    'target_site_id' => $siteId,
     'position_title' => 'Smoke Support Worker',
     'position_role' => 'support_worker',
     'status' => 'active',
@@ -318,6 +341,7 @@ $application = \\App\\Domain\\Hr\\Models\\HrApplication::query()->create([
 $offerToken = 'codex-live-'.\\Illuminate\\Support\\Str::random(40);
 $offer = \\App\\Domain\\Hr\\Models\\HrOffer::query()->create([
     'application_id' => $application->id,
+    'primary_site_id' => $siteId,
     'position_title' => 'Smoke Support Worker',
     'position_role' => 'support_worker',
     'proposed_start_date' => now()->addWeeks(3)->toDateString(),
@@ -345,6 +369,7 @@ $overrideCandidate = \\App\\Domain\\Hr\\Models\\HrCandidate::query()->create([
 ]);
 $overrideApplication = \\App\\Domain\\Hr\\Models\\HrApplication::query()->create([
     'candidate_id' => $overrideCandidate->id,
+    'target_site_id' => $siteId,
     'position_title' => 'Smoke Support Worker',
     'position_role' => 'support_worker',
     'status' => 'active',
@@ -427,10 +452,10 @@ $payslip = \\App\\Domain\\Hr\\Models\\HrPayslip::query()->create([
 
 \\App\\Models\\AuditLog::query()->create([
     'user_id' => null,
-    'action' => 'codex.live_hr_gaps',
+    'action' => 'hr.playwright.live_gaps',
     'auditable_type' => null,
     'auditable_id' => null,
-    'meta' => ['old_values' => ['state' => 'before'], 'new_values' => ['state' => $marker]],
+    'meta' => ['before' => ['state' => 'before'], 'after' => ['state' => $marker]],
 ]);
 
 echo json_encode([
@@ -583,12 +608,14 @@ echo \\App\\Models\\AuditLog::query()
 
         await loginAsStaff(page);
 
-        await page.goto('/hr/settings/audit-log?action=codex.live_hr_gaps');
+        await page.goto(
+            '/hr/settings/audit-log?action=hr.playwright.live_gaps',
+        );
         await expect(
             page.getByRole('heading', { name: 'Audit Log' }),
         ).toBeVisible();
         const auditRow = page.locator('tr').filter({
-            hasText: 'codex.live_hr_gaps',
+            hasText: 'hr.playwright.live_gaps',
         });
         await expect(auditRow).toContainText('System');
         await auditRow.click();
@@ -1002,12 +1029,12 @@ echo json_encode(['status' => $candidate->status, 'auditRecorded' => $auditRecor
             .getByRole('button', { name: 'Move approval level down' })
             .click();
         expect((await moveDownCompleted).status()).toBeLessThan(400);
-        await page.reload();
         const movedLeaveRoute = page
             .locator('tr')
             .filter({ hasText: `${fixture.marker} Worker` })
             .filter({ hasText: '36h' });
         await expect(movedLeaveRoute).toBeVisible();
+        await expect(movedLeaveRoute.locator('td').nth(1)).toHaveText('2');
         const [moveUpCompleted] = await Promise.all([
             page.waitForResponse(
                 (response) =>
@@ -1021,6 +1048,7 @@ echo json_encode(['status' => $candidate->status, 'auditRecorded' => $auditRecor
                 .click(),
         ]);
         expect(moveUpCompleted.status()).toBeLessThan(400);
+        await expect(movedLeaveRoute.locator('td').nth(1)).toHaveText('1');
 
         const deactivateCompleted = page.waitForResponse(
             (response) =>
@@ -1028,7 +1056,9 @@ echo json_encode(['status' => $candidate->status, 'auditRecorded' => $auditRecor
                 response.url().endsWith('/active') &&
                 response.request().method() === 'PATCH',
         );
-        await leaveRoute.getByRole('button', { name: 'Deactivate' }).click();
+        await movedLeaveRoute
+            .getByRole('button', { name: 'Deactivate' })
+            .click();
         expect((await deactivateCompleted).status()).toBeLessThan(400);
         const inactiveLeaveRoute = page
             .locator('tr')

@@ -6,7 +6,10 @@ import {
     DeviceDocumentHistory,
     type DeviceDocumentHistoryItem,
 } from '@/components/security-devices/device-document-history';
-import { ControlRoomAlertAccessRequired } from '@/components/security-devices/permission-destinations';
+import {
+    ControlRoomAlertAccessRequired,
+    FleetTechnologyAccessRequired,
+} from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -105,6 +108,10 @@ type AssetLink = {
     asset_name: string | null;
     asset_tag: string | null;
     href: string | null;
+    access: {
+        state: 'available' | 'restricted';
+        label: string;
+    };
     link_type: string;
     linked_at: string;
     notes: string | null;
@@ -949,10 +956,24 @@ export default function DeviceShow({
                                                                     `Asset #${link.asset_id}`}
                                                             </Link>
                                                         ) : (
-                                                            <p className="truncate font-medium">
-                                                                {link.asset_name ??
-                                                                    `Asset #${link.asset_id}`}
-                                                            </p>
+                                                            <>
+                                                                <p className="truncate font-medium">
+                                                                    {link.asset_name ??
+                                                                        `Asset #${link.asset_id}`}
+                                                                </p>
+                                                                {link.access
+                                                                    .state ===
+                                                                'restricted' ? (
+                                                                    <FleetTechnologyAccessRequired
+                                                                        label={
+                                                                            link
+                                                                                .access
+                                                                                .label
+                                                                        }
+                                                                        className="min-h-0 text-xs"
+                                                                    />
+                                                                ) : null}
+                                                            </>
                                                         )}
                                                         {link.asset_tag && (
                                                             <p className="font-mono text-xs text-muted-foreground">
@@ -1251,53 +1272,63 @@ export default function DeviceShow({
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
-                                    {profile.controlRoomAlerts.map((alert) =>
-                                        alert.href &&
-                                        alert.access.state === 'available' ? (
-                                            <Link
-                                                key={alert.id}
-                                                href={alert.href}
-                                                className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm transition-colors hover:bg-muted/50"
-                                            >
-                                                <span className="min-w-0">
-                                                    <span className="font-medium">
-                                                        {alert.reference}
+                                    {profile.controlRoomAlerts.map(
+                                        (alert, index) =>
+                                            alert.href &&
+                                            alert.access.state ===
+                                                'available' ? (
+                                                <Link
+                                                    key={
+                                                        alert.id ??
+                                                        `restricted-alert-${index}`
+                                                    }
+                                                    href={alert.href}
+                                                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm transition-colors hover:bg-muted/50"
+                                                >
+                                                    <span className="min-w-0">
+                                                        <span className="font-medium">
+                                                            {alert.reference}
+                                                        </span>
+                                                        <span className="ml-2 text-muted-foreground">
+                                                            {alert.type?.replace(
+                                                                /[._-]+/g,
+                                                                ' ',
+                                                            )}
+                                                        </span>
                                                     </span>
-                                                    <span className="ml-2 text-muted-foreground">
-                                                        {alert.type?.replace(
-                                                            /[._-]+/g,
-                                                            ' ',
-                                                        )}
+                                                    <span className="flex shrink-0 items-center gap-2">
+                                                        {alert.severity ? (
+                                                            <Badge variant="outline">
+                                                                {alert.severity}
+                                                            </Badge>
+                                                        ) : null}
+                                                        {alert.status ? (
+                                                            <Badge variant="secondary">
+                                                                {alert.status}
+                                                            </Badge>
+                                                        ) : null}
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {formatDateTime(
+                                                                alert.triggeredAt,
+                                                            )}
+                                                        </span>
                                                     </span>
-                                                </span>
-                                                <span className="flex shrink-0 items-center gap-2">
-                                                    {alert.severity ? (
-                                                        <Badge variant="outline">
-                                                            {alert.severity}
-                                                        </Badge>
-                                                    ) : null}
-                                                    {alert.status ? (
-                                                        <Badge variant="secondary">
-                                                            {alert.status}
-                                                        </Badge>
-                                                    ) : null}
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {formatDateTime(
-                                                            alert.triggeredAt,
-                                                        )}
-                                                    </span>
-                                                </span>
-                                            </Link>
-                                        ) : (
-                                            <div
-                                                key={alert.id}
-                                                className="rounded-md border px-3"
-                                            >
-                                                <ControlRoomAlertAccessRequired
-                                                    label={alert.access.label}
-                                                />
-                                            </div>
-                                        ),
+                                                </Link>
+                                            ) : (
+                                                <div
+                                                    key={
+                                                        alert.id ??
+                                                        `restricted-alert-${index}`
+                                                    }
+                                                    className="rounded-md border px-3"
+                                                >
+                                                    <ControlRoomAlertAccessRequired
+                                                        label={
+                                                            alert.access.label
+                                                        }
+                                                    />
+                                                </div>
+                                            ),
                                     )}
                                 </CardContent>
                             </Card>

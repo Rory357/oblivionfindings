@@ -13,6 +13,7 @@ import {
     type PageHeroBadge,
     type PageHeroMetaItem,
 } from '@/components/page';
+import { DeviceProfileAccessRequired } from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -301,6 +302,11 @@ interface EquipmentItem {
     needs_recovery: boolean;
     href: string | null;
     recovery_only: boolean;
+    historical_only: boolean;
+    destination_access: {
+        state: 'available' | 'restricted' | 'recovery_only' | 'historical_only';
+        label: string;
+    };
 }
 interface ProvisioningWorkflow {
     id: number;
@@ -3400,6 +3406,11 @@ function EquipmentAccessTab({
                                     <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
                                 </Link>
                             </Button>
+                        ) : !can.view_devices ? (
+                            <DeviceProfileAccessRequired
+                                label="Security & Devices access required"
+                                className="min-h-9 text-xs"
+                            />
                         ) : null}
                         {links.hr_assets ? (
                             <Button asChild size="sm" variant="outline">
@@ -3458,6 +3469,16 @@ function EquipmentAccessTab({
                                                     Recovery due
                                                 </Badge>
                                             ) : null}
+                                            {item.recovery_only ? (
+                                                <Badge variant="outline">
+                                                    Recovery-only view
+                                                </Badge>
+                                            ) : null}
+                                            {item.historical_only ? (
+                                                <Badge variant="outline">
+                                                    History only
+                                                </Badge>
+                                            ) : null}
                                         </div>
                                         <p className="mt-1 text-xs text-muted-foreground">
                                             {[
@@ -3473,6 +3494,23 @@ function EquipmentAccessTab({
                                                 .join(' · ') ||
                                                 'No identifying details recorded'}
                                         </p>
+                                        {item.destination_access.state ===
+                                        'restricted' ? (
+                                            <DeviceProfileAccessRequired
+                                                label={
+                                                    item.destination_access
+                                                        .label
+                                                }
+                                                className="mt-1 min-h-0 text-xs"
+                                            />
+                                        ) : item.destination_access.state ===
+                                              'recovery_only' ||
+                                          item.destination_access.state ===
+                                              'historical_only' ? (
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                {item.destination_access.label}
+                                            </p>
+                                        ) : null}
                                     </div>
                                     <div className="w-36 shrink-0 text-right">
                                         <p className="text-xs font-medium">

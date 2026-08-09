@@ -90,6 +90,19 @@ final class S10ProcessEnvironment
         return $ambient;
     }
 
+    /** @return array<string, string> */
+    public static function runtimeEnvironment(string $phpBinary): array
+    {
+        $environment = [];
+        foreach (self::sanitized(self::ambientEnvironment(), $phpBinary) as $key => $value) {
+            if (is_string($key) && is_string($value)) {
+                $environment[$key] = $value;
+            }
+        }
+
+        return $environment;
+    }
+
     /** @return array<string, mixed> */
     private static function ambientEnvironment(): array
     {

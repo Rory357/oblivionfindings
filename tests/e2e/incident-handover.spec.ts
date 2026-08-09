@@ -60,7 +60,11 @@ test.describe('desktop incident handover journeys', () => {
         await loginAsFixture(page, manifest.users.operator);
         await page.goto('/control-room');
         await expect(
-            page.getByRole('heading', { name: /Control Room Desk/i }),
+            page.getByRole('heading', {
+                name: 'Desk',
+                exact: true,
+                level: 1,
+            }),
         ).toBeVisible();
 
         const { alert } = await createAlert(page, manifest);
@@ -109,7 +113,14 @@ test.describe('desktop incident handover journeys', () => {
         const retry = await postLaravel(
             page,
             `/control-room/alerts/${alert.id}/create-incident`,
-            { type: 'injury', severity: 'high' },
+            {
+                type: 'injury',
+                severity: 'high',
+                title: 'Bathroom fall requiring clinical review',
+                description: 'Aroha fell beside the bathroom rail.',
+                immediate_action_taken:
+                    'First aid completed and area isolated.',
+            },
         );
         const retryJourney = (await retry.json()) as typeof firstJourney;
         expect(retryJourney.journey.incident.id).toBe(
@@ -222,7 +233,9 @@ test.describe('desktop incident handover journeys', () => {
                 'The factual incident record is complete; H&S governance remains independent.',
         });
         invariant = readIncidentJourney(incidentId);
-        expect(invariant.incident.status).toBe('closed');
+        // Acceptance transfers governance ownership but does not complete it.
+        // The incident must remain reviewed until the linked H&S journey closes.
+        expect(invariant.incident.status).toBe('reviewed');
         expect(invariant.health_safety?.status).toBe('open');
         expect(invariant.health_safety?.handover_status).toBe('accepted');
 
@@ -260,6 +273,8 @@ test.describe('desktop incident handover journeys', () => {
             reported_severity: 'critical',
             occurred_at: new Date().toISOString(),
             description: 'Hospital treatment required after a serious fall.',
+            immediate_action_taken:
+                'First aid provided, the area isolated, and emergency clinical support called.',
             medical_treatment_type: 'hospital',
             injury_classification: 'notifiable',
             is_notifiable: true,
@@ -352,7 +367,17 @@ echo json_encode(['id' => \\App\\Models\\HsInvestigation::query()->where('hs_eve
         await postLaravel(
             page,
             `/health-safety/events/${eventId}/investigations/${investigationId}/recommendations/0/disposition`,
-            { disposition: 'corrective_action' },
+            {
+                disposition: 'corrective_action',
+                assigned_to_user_id: manifest.users.owner.id,
+                due_date: new Date(Date.now() + 3 * 86_400_000)
+                    .toISOString()
+                    .slice(0, 10),
+                priority: 'high',
+                responsibility_choice: 'new_responsibility',
+                new_responsibility_reason:
+                    'The investigation created a new named safety responsibility.',
+            },
         );
         const actionId = scalar<{ id: number }>(`
 echo json_encode(['id' => \\App\\Models\\HsCorrectiveAction::query()->where('hs_event_id', ${eventId})->value('id')], JSON_THROW_ON_ERROR);
@@ -376,7 +401,8 @@ echo json_encode(['id' => \\App\\Models\\HsCorrectiveAction::query()->where('hs_
             page,
             `/health-safety/events/${eventId}/corrective-actions/${actionId}/verify`,
             {
-                effectiveness_confirmed: true,
+                evidence_reviewed: true,
+                effective: true,
                 verification_notes:
                     'Independent check confirmed the rail and process.',
             },
@@ -466,6 +492,8 @@ echo json_encode(['id' => $signal->id], JSON_THROW_ON_ERROR);
             type: 'fall',
             severity: 'high',
             note: 'Operator called the house and confirmed the fall.',
+            immediate_action_taken:
+                'The bathroom was isolated and first aid was provided while clinical help was called.',
         });
         const incidentId = scalar<{ id: number }>(`
 echo json_encode(['id' => \\App\\Models\\ClientIncident::query()->where('control_room_alert_id', ${alert.id})->value('id')], JSON_THROW_ON_ERROR);
@@ -473,6 +501,9 @@ echo json_encode(['id' => \\App\\Models\\ClientIncident::query()->where('control
         await postLaravel(page, `/control-room/alerts/${alert.id}/confirm`, {
             type: 'fall',
             severity: 'high',
+            note: 'Operator called the house and confirmed the fall.',
+            immediate_action_taken:
+                'The bathroom was isolated and first aid was provided while clinical help was called.',
         });
         let invariant = readIncidentJourney(incidentId);
         expect(invariant.incident.source).toBe('sensor');
@@ -530,6 +561,8 @@ echo json_encode(['id' => \\App\\Models\\ClientIncident::query()->where('control
             severity: 'high',
             occurred_at: new Date().toISOString(),
             description: 'First similar medication concern reported manually.',
+            immediate_action_taken:
+                'The dose was withheld and the prescriber was contacted immediately.',
         });
         const manualIncidentId = incidentIdForRequest(manualUuid);
 

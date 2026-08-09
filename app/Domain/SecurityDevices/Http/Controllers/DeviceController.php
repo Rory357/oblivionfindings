@@ -21,6 +21,7 @@ use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
 use App\Models\Site;
 use App\Models\SiteRoom;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -157,6 +158,7 @@ class DeviceController extends Controller
         $relations = [
             'assignments' => fn ($q) => $q->with(['assignedBy:id,name', 'releasedBy:id,name'])->latest('assigned_at')->limit(20),
             'activeAssetLinks.asset',
+            'activeAssetLinks.asset.categoryRef:id,slug',
             'documents',
             'documentHistory' => fn ($query) => $query
                 ->with([
@@ -327,18 +329,28 @@ class DeviceController extends Controller
                 'notes' => $a->notes,
             ]),
             'assignmentTargets' => $assignmentTargets,
-            'assetLinks' => $device->activeAssetLinks->map(fn ($link) => [
-                'id' => $link->id,
-                'asset_id' => $link->asset_id,
-                'asset_name' => $link->asset?->name,
-                'asset_tag' => $link->asset?->asset_tag,
-                'href' => in_array((int) $link->asset_id, $accessibleAssetIds, true)
-                    ? "/fleet-assets/assets/{$link->asset_id}"
-                    : null,
-                'link_type' => $link->link_type?->value,
-                'linked_at' => $link->linked_at?->toISOString(),
-                'notes' => $link->notes,
-            ]),
+            'assetLinks' => $device->activeAssetLinks->map(function ($link) use ($user, $accessibleAssetIds): array {
+                $destination = $link->asset && in_array((int) $link->asset_id, $accessibleAssetIds, true)
+                    ? $this->assetTechnologyDestination($user, $link->asset)
+                    : [
+                        'href' => null,
+                        'access' => [
+                            'state' => 'restricted',
+                            'label' => 'Fleet & Assets technology access required',
+                        ],
+                    ];
+
+                return [
+                    'id' => $link->id,
+                    'asset_id' => $link->asset_id,
+                    'asset_name' => $link->asset?->name,
+                    'asset_tag' => $link->asset?->asset_tag,
+                    ...$destination,
+                    'link_type' => $link->link_type?->value,
+                    'linked_at' => $link->linked_at?->toISOString(),
+                    'notes' => $link->notes,
+                ];
+            }),
             'availableAssets' => $availableAssets,
             'linkTypes' => collect(LinkType::cases())->map(fn ($t) => [
                 'value' => $t->value,
@@ -460,6 +472,37 @@ class DeviceController extends Controller
                 'manageMaintenance' => $profile['capabilities']['maintenance']['available'],
             ],
         ]);
+    }
+
+    /** @return array{href: string|null, access: array{state: string, label: string}} */
+    private function assetTechnologyDestination(User $viewer, Asset $asset): array
+    {
+        $isVehicle = strcasecmp((string) $asset->category, 'vehicle') === 0
+            || $asset->categoryRef?->slug === 'vehicle';
+
+        if ($isVehicle) {
+            $href = $viewer->canDo('fleet.viewAny')
+                ? "/fleet-assets/vehicles/{$asset->id}?tab=technology"
+                : null;
+
+            return [
+                'href' => $href,
+                'access' => [
+                    'state' => $href ? 'available' : 'restricted',
+                    'label' => $href
+                        ? 'Open Fleet vehicle technology'
+                        : 'Fleet vehicle technology access required',
+                ],
+            ];
+        }
+
+        return [
+            'href' => "/fleet-assets/assets/{$asset->id}?tab=technology",
+            'access' => [
+                'state' => 'available',
+                'label' => 'Open Asset technology',
+            ],
+        ];
     }
 
     private function documentLifecycleLabel(DeviceDocument $document): string

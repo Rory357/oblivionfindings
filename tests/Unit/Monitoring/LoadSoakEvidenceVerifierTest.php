@@ -544,6 +544,86 @@ it('writes a collision-safe test-authority artifact that cannot claim V09 releas
     }
 });
 
+it('does not execute ignored Composer autoload code in the verification path', function (): void {
+    $root = dirname(__DIR__, 3);
+    $temporary = sys_get_temp_dir().DIRECTORY_SEPARATOR.'oblivion-load-soak-bootstrap-'.bin2hex(random_bytes(8));
+    $supportFiles = [
+        'StrictJsonObjectDecoder.php',
+        'LoadSoakEvidenceVerifier.php',
+        'LoadSoakPlatformAttestationVerifier.php',
+        'LoadSoakReleaseAuthorityVerifier.php',
+        'LoadSoakReleaseCheckoutVerifier.php',
+    ];
+
+    mkdir($temporary.DIRECTORY_SEPARATOR.'scripts'.DIRECTORY_SEPARATOR.'monitoring', 0700, true);
+    mkdir($temporary.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'Support'.DIRECTORY_SEPARATOR.'Monitoring', 0700, true);
+    mkdir($temporary.DIRECTORY_SEPARATOR.'vendor', 0700, true);
+    copy(
+        $root.'/scripts/monitoring/verify-load-soak-evidence.php',
+        $temporary.'/scripts/monitoring/verify-load-soak-evidence.php',
+    );
+    foreach ($supportFiles as $file) {
+        copy(
+            $root.'/app/Support/Monitoring/'.$file,
+            $temporary.'/app/Support/Monitoring/'.$file,
+        );
+    }
+    file_put_contents(
+        $temporary.'/vendor/autoload.php',
+        "<?php throw new RuntimeException('ignored Composer autoload executed');\n",
+    );
+
+    $evidence = validLoadSoakEvidence();
+    $rawEvidence = json_encode($evidence, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $signed = signedLoadSoakAttestation($evidence, $rawEvidence);
+    $evidencePath = $temporary.DIRECTORY_SEPARATOR.'evidence.json';
+    $attestationPath = $temporary.DIRECTORY_SEPARATOR.'attestation.json';
+    $publicKeyPath = $temporary.DIRECTORY_SEPARATOR.'public-key.txt';
+    file_put_contents($evidencePath, $rawEvidence);
+    file_put_contents($attestationPath, json_encode($signed['attestation'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+    file_put_contents($publicKeyPath, $signed['public']);
+
+    try {
+        $process = new Process([
+            PHP_BINARY,
+            $temporary.'/scripts/monitoring/verify-load-soak-evidence.php',
+            '--evidence='.$evidencePath,
+            '--attestation='.$attestationPath,
+            '--public-key='.$publicKeyPath,
+            '--output-directory='.$temporary,
+            '--test-authority',
+        ], $temporary, [
+            'MONITORING_LOAD_SOAK_ATTESTATION_PUBLIC_KEY_SHA256' => $signed['pin'],
+        ]);
+        $process->run();
+
+        $output = json_decode($process->getOutput(), true, 32, JSON_THROW_ON_ERROR);
+
+        expect($process->getExitCode())->toBe(0)
+            ->and($process->getErrorOutput())->toBe('')
+            ->and($output['status'])->toBe('contract_valid_test_authority')
+            ->and($output['release_provenance_verified'])->toBeFalse();
+    } finally {
+        $remove = static function (string $path) use (&$remove): void {
+            if (is_dir($path) && ! is_link($path)) {
+                foreach (scandir($path) ?: [] as $entry) {
+                    if ($entry !== '.' && $entry !== '..') {
+                        $remove($path.DIRECTORY_SEPARATOR.$entry);
+                    }
+                }
+                rmdir($path);
+
+                return;
+            }
+
+            if (file_exists($path) || is_link($path)) {
+                unlink($path);
+            }
+        };
+        $remove($temporary);
+    }
+});
+
 it('cannot turn a locally generated key and caller environment pin into release evidence', function (): void {
     $root = dirname(__DIR__, 3);
     $temporary = sys_get_temp_dir().DIRECTORY_SEPARATOR.'oblivion-load-soak-release-'.bin2hex(random_bytes(8));

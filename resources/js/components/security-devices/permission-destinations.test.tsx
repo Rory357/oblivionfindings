@@ -1,9 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
+    ClientProfileAccessRequired,
     ControlRoomAlertAccessRequired,
     ControlRoomDestination,
+    DeviceProfileAccessRequired,
+    FleetTechnologyAccessRequired,
+    HrEmployeeEquipmentAccessRequired,
     ItChangeDestination,
+    ItWorkspaceAccessRequired,
     SiteProfileDestination,
 } from './permission-destinations';
 
@@ -52,6 +57,59 @@ describe('Security & Devices permission destinations', () => {
         expect(
             screen.getByRole('link', { name: /open site profile/i }),
         ).toHaveAttribute('href', '/sites/42');
+
+        rerender(
+            <SiteProfileDestination siteId={42} canView tab="technology" />,
+        );
+
+        expect(
+            screen.getByRole('link', { name: /open site profile/i }),
+        ).toHaveAttribute('href', '/sites/42?tab=technology');
+    });
+
+    it('renders missing Client Profile access as an icon-and-text state without a link', () => {
+        render(<ClientProfileAccessRequired />);
+
+        expect(screen.getByRole('note')).toHaveTextContent(
+            'Client Profile access required',
+        );
+        expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('renders missing Device Profile access as an icon-and-text state without a link', () => {
+        render(<DeviceProfileAccessRequired />);
+
+        expect(screen.getByRole('note')).toHaveTextContent(
+            'Device Profile access required',
+        );
+        expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('renders missing HR equipment access as an icon-and-text state without a link', () => {
+        render(<HrEmployeeEquipmentAccessRequired />);
+
+        expect(screen.getByRole('note')).toHaveTextContent(
+            'HR employee equipment access required',
+        );
+        expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('renders missing Fleet technology access as an icon-and-text state without a link', () => {
+        render(<FleetTechnologyAccessRequired />);
+
+        expect(screen.getByRole('note')).toHaveTextContent(
+            'Fleet technology access required',
+        );
+        expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('renders missing IT workspace access as an icon-and-text state without a link', () => {
+        render(<ItWorkspaceAccessRequired />);
+
+        expect(screen.getByRole('note')).toHaveTextContent(
+            'IT workspace access required',
+        );
+        expect(screen.queryByRole('link')).not.toBeInTheDocument();
     });
 
     it('omits the IT Change link when the destination-safe record is absent', () => {

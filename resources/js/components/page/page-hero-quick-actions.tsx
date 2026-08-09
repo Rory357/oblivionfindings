@@ -17,6 +17,7 @@ export type PageHeroQuickAction = {
     /** Count badge in the top-right corner. */
     badge?: number;
     'aria-label'?: string;
+    'data-test'?: string;
 };
 
 interface PageHeroQuickActionsProps {
@@ -78,11 +79,20 @@ function QuickActionButton({ action }: { action: PageHeroQuickAction }) {
     );
 
     const triggerNode = action.href ? (
-        <Link href={action.href} aria-label={label}>
+        <Link
+            href={action.href}
+            aria-label={label}
+            data-test={action['data-test']}
+        >
             {inner}
         </Link>
     ) : (
-        <button type="button" onClick={action.onClick} aria-label={label}>
+        <button
+            type="button"
+            onClick={action.onClick}
+            aria-label={label}
+            data-test={action['data-test']}
+        >
             {inner}
         </button>
     );

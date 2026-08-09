@@ -290,7 +290,7 @@ class CalendarController extends Controller
                     }
                 },
             ],
-            'audience_user_ids' => ['nullable', 'required_if:audience_type,people', 'array', 'min:1'],
+            'audience_user_ids' => ['exclude_unless:audience_type,people', 'required_if:audience_type,people', 'array', 'min:1'],
             'audience_user_ids.*' => ['integer', 'exists:users,id'],
             'reminders' => ['nullable', 'array'],
             'reminders.*.offset_minutes' => ['required_with:reminders', 'integer', 'min:0', 'max:43200'],
@@ -432,7 +432,7 @@ class CalendarController extends Controller
                     }
                 },
             ],
-            'audience_user_ids' => ['nullable', 'required_if:audience_type,people', 'array', 'min:1'],
+            'audience_user_ids' => ['exclude_unless:audience_type,people', 'required_if:audience_type,people', 'array', 'min:1'],
             'audience_user_ids.*' => ['integer', 'exists:users,id'],
             'reminders' => ['nullable', 'array'],
             'reminders.*.offset_minutes' => ['required_with:reminders', 'integer', 'min:0', 'max:43200'],

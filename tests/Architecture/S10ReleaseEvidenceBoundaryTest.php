@@ -4,6 +4,8 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
     $root = dirname(__DIR__, 2);
     $authority = (string) file_get_contents($root.'/app/Support/Monitoring/S10ReleaseAuthorityVerifier.php');
     $processEnvironment = (string) file_get_contents($root.'/app/Support/Monitoring/S10ProcessEnvironment.php');
+    $protectedRuntimeEnvironment = (string) file_get_contents($root.'/app/Support/Monitoring/S10ProtectedRuntimeEnvironment.php');
+    $nativeProcess = (string) file_get_contents($root.'/app/Support/Monitoring/S10NativeProcessRunner.php');
     $script = (string) file_get_contents($root.'/scripts/monitoring/verify-s10-release-evidence.php');
     $runbook = (string) file_get_contents($root.'/docs/runbooks/monitoring/s10-release-evidence.md');
 
@@ -20,6 +22,7 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         "'security_devices_s10_release_authority_v1'",
         "'release_revision'",
         "'environment_reference_sha256'",
+        "'runtime_environment_sha256'",
         "'authority_reference'",
         'MAXIMUM_AUTHORITY_SECONDS = 86_400',
         'public function identitiesRemainPinned(array $snapshots): bool',
@@ -54,6 +57,39 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         "'PHP_INI_SCAN_DIR'",
         '$overrides[$key] = false',
         "\$overrides['GIT_OPTIONAL_LOCKS'] = '0'",
+        'public static function runtimeEnvironment(string $phpBinary): array',
+    );
+
+    expect($protectedRuntimeEnvironment)->toContain(
+        "ENVIRONMENT_PATH = '/etc/oblivion/security-devices-s10-release-runtime.json'",
+        "CONFIG_CACHE_BYPASS_PATH = '/run/oblivion-s10-release-no-config-cache.php'",
+        'StrictJsonObjectDecoder',
+        'hash_equals($expectedSha256, hash(\'sha256\', $rawEnvironment))',
+        '($metadata[\'owner_uid\'] ?? null) === 0',
+        '($metadata[\'mode\'] & 0777) === 0600',
+        '($environment[\'APP_ENV\'] ?? null) !== \'production\'',
+        '($environment[\'DB_CONNECTION\'] ?? null) !== \'mysql\'',
+        '($environment[\'MONITORING_COLLECTOR_REPLAY_STORE\'] ?? null) !== \'redis\'',
+        "'PHPRC'",
+        "'APP_CONFIG_CACHE'",
+        "'LD_PRELOAD'",
+        "'HTTPS_PROXY'",
+        "'PATH' => S10ProcessEnvironment::SYSTEM_PATH",
+        "'APP_CONFIG_CACHE' => self::CONFIG_CACHE_BYPASS_PATH",
+        'file_exists(self::CONFIG_CACHE_BYPASS_PATH)',
+        'is_link(self::CONFIG_CACHE_BYPASS_PATH)',
+    )->not->toContain('getenv(', '$_ENV', '$_SERVER');
+
+    expect($nativeProcess)->toContain(
+        'proc_open(',
+        "'bypass_shell' => true",
+        'microtime(true) + $timeoutSeconds',
+        '@proc_terminate($process)',
+        'strlen($stdout) > $maximumOutputBytes',
+        "'successful' => \$exitCode === 0",
+    )->not->toContain(
+        'Symfony',
+        'vendor/autoload.php',
     );
 
     expect($script)->toContain(
@@ -71,8 +107,16 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         "S10_BASH_BINARY = '/usr/bin/bash'",
         "S10_PHP_BINARY = '/usr/bin/php8.4'",
         'S10_CHILD_BOOTSTRAP',
-        'S10ProcessEnvironment::processOverrides($resolvedPhpBinary)',
-        'new Process($command, $applicationPath, $processEnvironment)',
+        "'/app/Support/Monitoring/S10NativeProcessRunner.php'",
+        "'/app/Support/Monitoring/S10ProtectedRuntimeEnvironment.php'",
+        'is_link($path) || ! is_file($path)',
+        'require_once $path',
+        'S10ProcessEnvironment::sanitized([], $resolvedPhpBinary)',
+        'new S10ProtectedRuntimeEnvironment',
+        '(string) $protocolBefore[\'runtime_environment_sha256\']',
+        '(string) $queclinkBefore[\'runtime_environment_sha256\']',
+        'new S10NativeProcessRunner',
+        '$processRunner->run(',
         "'--noprofile'",
         "'--norc'",
         "'-p'",
@@ -80,7 +124,7 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         'readonly -f php',
         "'core.fsmonitor=false'",
         "'core.untrackedCache=false'",
-        'trim($process->getErrorOutput())',
+        "trim(\$result['stderr'])",
         "'/scripts/monitoring/verify-protocol-policy-evidence.sh'",
         "'/scripts/monitoring/verify-queclink-native-listener-evidence.sh'",
         "\$integerArgument('protocol-samples', 15, 15, 120)",
@@ -93,6 +137,7 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         "'queclink_transport' => 'native_tcp'",
         "'release_revision' => \$protocolBefore['release_revision']",
         "'environment_reference_sha256' => \$protocolBefore['environment_reference_sha256']",
+        "'runtime_environment_sha256' => \$protocolBefore['runtime_environment_sha256']",
         "'sha256' => hash('sha256', \$protocolRaw)",
         "'sha256' => hash('sha256', \$queclinkRaw)",
         "fopen(\$artifactPath, 'x+b')",
@@ -105,6 +150,9 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         '--authority=',
         'getenv(',
         'file_put_contents',
+        'vendor/autoload.php',
+        'new Process(',
+        'Symfony',
     );
 
     expect($runbook)->toContain(

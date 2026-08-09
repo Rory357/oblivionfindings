@@ -116,7 +116,10 @@ function technicalLabel(value: string | null | undefined): string {
 
 function DeviceCard({ device }: { device: HealthcareDevice }) {
     return (
-        <Card data-testid={`client-healthcare-device-${device.id}`}>
+        <Card
+            data-test={`client-healthcare-device-${device.id}`}
+            data-testid={`client-healthcare-device-${device.id}`}
+        >
             <CardContent className="space-y-4 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
@@ -272,7 +275,11 @@ export function ClientHealthcareDevicesTab({
     }
 
     return (
-        <div className="space-y-4" data-testid="client-healthcare-devices">
+        <div
+            className="space-y-4"
+            data-test="client-healthcare-devices"
+            data-testid="client-healthcare-devices"
+        >
             <Card className="border-primary/20">
                 <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
                     <div className="space-y-1">

@@ -72,9 +72,10 @@ final class ProtocolPolicyEvidenceService
                 && in_array($observation->state, $substantiveStates, true))
             ->pluck('monitor_id')
             ->mapWithKeys(fn (mixed $id): array => [(int) $id => true]);
+        $recentMaintenanceWindows = $this->recentMaintenanceWindows($since, $now);
 
         $protocols = $this->protocolEvidence($monitors, $freshMonitorIds, $since, $now);
-        $policy = $this->policyEvidence($monitors, $since, $now);
+        $policy = $this->policyEvidence($monitors, $recentMaintenanceWindows, $since, $now);
         $continuousExecution = $this->continuousExecutionEvidence($monitors, $latestObservations, $since, $now);
         $allVerified = collect($protocols)
             ->merge($policy)
@@ -83,7 +84,10 @@ final class ProtocolPolicyEvidenceService
         return [
             'observed_at' => $now->toIso8601String(),
             'window_minutes' => $windowMinutes,
-            'evidence_roster_fingerprint' => $this->evidenceRosterFingerprint($monitors, $since, $now),
+            'evidence_roster_fingerprint' => $this->evidenceRosterFingerprint(
+                $monitors,
+                $recentMaintenanceWindows,
+            ),
             'execution_cursor' => $this->executionCursor($monitors, $latestObservations),
             'continuous_execution' => $continuousExecution,
             'all_verified' => $allVerified,
@@ -221,10 +225,12 @@ final class ProtocolPolicyEvidenceService
 
     /**
      * @param  Collection<int, Monitor>  $monitors
+     * @param  Collection<int, MonitoringMaintenanceWindow>  $recentMaintenanceWindows
      * @return array<string, array<string, int|string>>
      */
     private function policyEvidence(
         Collection $monitors,
+        Collection $recentMaintenanceWindows,
         CarbonImmutable $since,
         CarbonImmutable $now,
     ): array {
@@ -287,22 +293,6 @@ final class ProtocolPolicyEvidenceService
             ->where('suppression_reason', 'dependency')
             ->filter($suppressedWithinWindow)
             ->count();
-        $recentMaintenanceWindows = MonitoringMaintenanceWindow::query()
-            ->whereIn('status', ['active', 'completed'])
-            ->where('starts_at', '<=', $now)
-            ->where(function ($query) use ($since): void {
-                $query->where(function ($oneOff) use ($since): void {
-                    $oneOff->whereNull('recurrence')
-                        ->where('ends_at', '>=', $since);
-                })->orWhere(function ($recurring) use ($since): void {
-                    $recurring->whereNotNull('recurrence')
-                        ->where(function ($horizon) use ($since): void {
-                            $horizon->whereNull('recurrence_until')
-                                ->orWhere('recurrence_until', '>=', $since);
-                        });
-                });
-            })
-            ->get();
         $maintenanceSuppressions = $monitors
             ->where('effective_state', MonitorState::Suppressed)
             ->where('suppression_reason', 'maintenance')
@@ -550,9 +540,35 @@ final class ProtocolPolicyEvidenceService
         ];
     }
 
-    /** @param Collection<int, Monitor> $monitors */
-    private function evidenceRosterFingerprint(Collection $monitors, CarbonImmutable $since, CarbonImmutable $now): string
+    /** @return Collection<int, MonitoringMaintenanceWindow> */
+    private function recentMaintenanceWindows(CarbonImmutable $since, CarbonImmutable $now): Collection
     {
+        return MonitoringMaintenanceWindow::query()
+            ->whereIn('status', ['active', 'completed'])
+            ->where('starts_at', '<=', $now)
+            ->where(function ($query) use ($since): void {
+                $query->where(function ($oneOff) use ($since): void {
+                    $oneOff->whereNull('recurrence')
+                        ->where('ends_at', '>=', $since);
+                })->orWhere(function ($recurring) use ($since): void {
+                    $recurring->whereNotNull('recurrence')
+                        ->where(function ($horizon) use ($since): void {
+                            $horizon->whereNull('recurrence_until')
+                                ->orWhere('recurrence_until', '>=', $since);
+                        });
+                });
+            })
+            ->get();
+    }
+
+    /**
+     * @param  Collection<int, Monitor>  $monitors
+     * @param  Collection<int, MonitoringMaintenanceWindow>  $recentMaintenanceWindows
+     */
+    private function evidenceRosterFingerprint(
+        Collection $monitors,
+        Collection $recentMaintenanceWindows,
+    ): string {
         $components = $monitors->map(fn (Monitor $monitor): string => json_encode([
             'kind' => 'monitor',
             'id' => (int) $monitor->id,
@@ -595,11 +611,7 @@ final class ProtocolPolicyEvidenceService
         foreach (MonitorDependency::query()->where('is_active', true)->get() as $dependency) {
             $components[] = json_encode(['kind' => 'dependency', 'attributes' => $dependency->getAttributes()], JSON_THROW_ON_ERROR);
         }
-        foreach (MonitoringMaintenanceWindow::query()
-            ->whereIn('status', ['active', 'completed'])
-            ->where('starts_at', '<=', $now)
-            ->where('ends_at', '>=', $since)
-            ->get() as $window) {
+        foreach ($recentMaintenanceWindows as $window) {
             $components[] = json_encode(['kind' => 'maintenance', 'attributes' => $window->getAttributes()], JSON_THROW_ON_ERROR);
         }
         foreach (IntegrationSiteConfig::query()->active()->whereHas('site')->get() as $mapping) {

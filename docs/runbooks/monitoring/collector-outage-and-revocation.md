@@ -103,7 +103,11 @@ files, request headers, or Redis keys into the evidence record.
    The command succeeds only when every first signed request over pinned HTTPS
    matches the deliberate invalid-checkpoint response contract and its byte-
    identical replay matches the generic authentication-denial contract. The
-   aggregate JSON proves only those observed response contracts. Separately
+   value-free v2 JSON binds the response contracts to opaque SHA-256 references
+   for the collector UUID, request-signing public key and complete mTLS/signing
+   identity generation, plus exact UTC observation bounds. Compare those
+   references to the central enrolment/audit record without copying the raw UUID,
+   key or certificate into the attachment. Separately
    retain sanitized proxy evidence that the requests were forwarded to the
    collector application after verified mTLS, plus runtime evidence that every
    application instance resolves the replay store to the approved shared Redis
@@ -160,7 +164,9 @@ files, request headers, or Redis keys into the evidence record.
    revocation audit, the verified-mTLS proxy configuration, and sanitized
    upstream routing evidence showing the request was forwarded to the
    collector middleware. A controller validation response fails the revoked
-   sequence.
+   sequence. The revoked result must have the same collector, signing-key and
+   identity-generation references as the initial active result; a result from a
+   different collector or identity cannot be substituted.
 
 5. Issue one replacement enrolment for the exact revoked collector UUID and
    consume the token once through the approved secret injector. `enrol`
@@ -169,12 +175,83 @@ files, request headers, or Redis keys into the evidence record.
    before revocation and still inside its validity window, cannot reactivate an
    existing collector UUID; only the collector-specific replacement enrolment
    can do so. Fetch a fresh signed configuration, run one bounded collection
-   cycle, repeat the active five-sample transport proof, confirm a current
+   cycle, repeat the active five-sample transport proof, confirm its collector
+   reference matches the pre-revocation evidence while its signing-key and
+   identity-generation references are both different, confirm a current
    heartbeat and contiguous zero-backlog checkpoint, then restart the timer.
    Confirm a second use of the replacement token and an attempted use of a
    still-valid general Site token against the revoked UUID are both denied, and
    the central audit shows ordered revoke, replacement issue, consumption, and
    restored service evidence.
+
+## Protected combined release evidence
+
+The five deployed steps above form one exercise. Individual transport JSON
+documents are diagnostic inputs, not interchangeable release proof. Before the
+exercise, a release owner installs the exact duplicate-free JSON authority at
+`/etc/oblivion/monitoring-collector-release-authority.json`. It must be a stable
+regular non-symlink file owned by root, not group/other writable, valid for no
+more than 24 hours, and contain only:
+
+- `schema_version=1` and
+  `evidence_class=monitoring_collector_release_authority_v1`;
+- one opaque `AUTHORITY-` reference, the exact reviewed 40-hex `origin/main`
+  revision and an opaque environment SHA-256;
+- opaque SHA-256 commitments to the genuinely remote Site and approved
+  load-balanced endpoint; and
+- the SHA-256 of the independent Ed25519 public key authorised to sign the
+  combined exercise, plus exact UTC `not_before` and `not_after` bounds.
+
+There is no command-line or environment override for that trust root. The
+signed `monitoring_collector_release_evidence_v1` document must link the exact
+authority hash/reference, environment, revision, remote Site, load balancer and
+the byte hashes of the initial-active, revoked and replacement-active v2
+transport documents. It records only opaque commitments and bounded counts. It
+must prove all application instances were reviewed during this exercise; the dedicated CA, proxy,
+verified-certificate-header replacement, disabled legacy header, shared Redis,
+`nginx -t`, load-balancer routing and cross-instance replay evidence; and the
+single pinned-roster outage/recovery, unrelated-Site and roster-drift negative
+check. It also binds one post-recovery accepted credentialed protocol lease with a clean
+plaintext scan, the ordered central revocation/replacement audits, replacement
+and general-token reuse denials, current replacement heartbeat and zero
+backlog.
+
+The verifier requires the same collector reference across all three transport
+documents, the old signing key and identity generation across initial-active
+and revoked evidence, and fresh signing and identity-generation references in
+the replacement-active evidence. Every transport phase is exactly five
+samples. Deployment review, credential observation, revocation, revoked
+transport, replacement issue/consumption, replacement transport, reuse denials
+and restored-service evidence must form one ordered interval inside the
+authority window. The outage must contain buffered evidence, exactly one root
+correlation, the complete pinned monitor roster returning after its boundary,
+matching non-zero acknowledged/highest sequences, zero final gap/corruption,
+and downstream recovery before revocation.
+
+Retain the three transport JSON documents, signed combined document, detached
+signature and public key in a private external directory outside the checkout,
+then run from the exact deployed release:
+
+```bash
+/usr/bin/php8.4 scripts/monitoring/verify-collector-release-evidence.php \
+  --active-transport=/private/evidence/collector-active.json \
+  --revoked-transport=/private/evidence/collector-revoked.json \
+  --replacement-transport=/private/evidence/collector-replacement.json \
+  --evidence=/private/evidence/collector-exercise.json \
+  --signature=/private/evidence/collector-exercise.sig \
+  --public-key=/private/evidence/collector-exercise.pub
+```
+
+The verifier accepts only stable regular external files that are not
+group/other writable, a clean exact `HEAD == origin/main` checkout, and one
+protected authority, environment, revision, remote Site and load balancer
+before and after verification. It emits a single value-free result and fails
+closed on mixed runs, substituted signers, incomplete rosters, weak deployment
+review, chronology drift or authority/revision replacement. This executable
+gate makes the deployed evidence coherent; running it with local fixtures or
+without the real remote collector, load balancer, shared Redis, controlled
+outage, credential lease and revocation/re-enrolment exercise does not itself
+close A03.
 
 ## Escalation, repair rule, and closure evidence
 

@@ -1,5 +1,6 @@
 import PanicStatusBadge from '@/components/resident-tracking/panic-status-badge';
 import type { Resident } from '@/components/resident-tracking/types';
+import { DeviceProfileAccessRequired } from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
@@ -581,11 +582,20 @@ export default function ResidentSidebar({
                                 href={resident.detail_url}
                                 className="flex items-center gap-1 text-xs text-primary hover:underline"
                             >
-                                Open device console
+                                Open Device Profile
                                 <ExternalLink className="h-3 w-3" />
                             </Link>
                         </div>
                     )}
+                    {!resident.detail_url &&
+                        resident.detail_access?.state === 'restricted' && (
+                            <div className="mt-3 border-t pt-2">
+                                <DeviceProfileAccessRequired
+                                    label={resident.detail_access.label}
+                                    className="min-h-0 text-xs"
+                                />
+                            </div>
+                        )}
                 </CollapsibleContent>
             </Collapsible>
 

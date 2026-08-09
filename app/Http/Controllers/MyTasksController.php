@@ -17,6 +17,7 @@ use App\Models\MedicationRound;
 use App\Models\PpeAllocation;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
+use App\Models\ShiftOpenPosition;
 use App\Models\Site;
 use App\Models\SiteChecklistRun;
 use App\Models\Timesheet;
@@ -94,6 +95,7 @@ class MyTasksController extends Controller
         // 6. Tasks (CR alerts + followups + notes - existing aggregation)
         $tasks = $this->getCrTasks($userId);
         $notifications = $this->getDigestNotifications($user);
+        $pendingClaimsCount = $this->getPendingClaimsCount($user);
 
         // 8. Stats
         $todayShifts = $shifts->filter(fn ($s) => $s['is_today']);
@@ -148,6 +150,7 @@ class MyTasksController extends Controller
             'incidents' => $incidents,
             'tasks' => $tasks,
             'notifications' => $notifications,
+            'pending_claims_count' => $pendingClaimsCount,
             'stats' => $stats,
             'clock' => $clock,
             'active_round' => $activeRound,
@@ -223,6 +226,32 @@ class MyTasksController extends Controller
             ->all();
     }
 
+    /**
+     * Keep the worker's claimed-cover next action on /my-day without leaking
+     * positions outside their canonical Site scope.
+     */
+    private function getPendingClaimsCount(User $user): int
+    {
+        if (! $user->canDo('job_board.viewAny')
+            && ! $user->canDo('job_board.claim')
+            && ! $user->canDo('shifts.viewAny')
+            && ! $user->canDo('shifts.viewAssigned')) {
+            return 0;
+        }
+
+        try {
+            return ShiftOpenPosition::query()
+                ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $user, ['reports.viewAny']))
+                ->where('claimed_by', $user->id)
+                ->where('status', 'claimed')
+                ->count();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 0;
+        }
+    }
+
     private function buildChecklistConfig(User $user, string $today): array
     {
         return [
@@ -278,6 +307,7 @@ class MyTasksController extends Controller
             $shift = Shift::query()
                 ->where('user_id', $user->id)
                 ->visibleToFrontline()
+                ->whereIn('status', ['in_progress', 'scheduled', 'draft'])
                 ->where(function ($query) use ($nowUtc, $workerDayStart, $workerDayEnd) {
                     $query
                         ->where(function ($overlap) use ($nowUtc) {
@@ -287,7 +317,7 @@ class MyTasksController extends Controller
                         })
                         ->orWhereBetween('starts_at', [$workerDayStart, $workerDayEnd]);
                 })
-                ->orderByRaw("FIELD(status, 'in_progress', 'scheduled', 'draft')")
+                ->orderByRaw("CASE status WHEN 'in_progress' THEN 0 WHEN 'scheduled' THEN 1 WHEN 'draft' THEN 2 ELSE 3 END")
                 ->orderBy('starts_at')
                 ->with($relations)
                 ->first();

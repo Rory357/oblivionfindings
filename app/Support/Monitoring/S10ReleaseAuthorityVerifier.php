@@ -21,6 +21,7 @@ final class S10ReleaseAuthorityVerifier
         'not_after',
         'not_before',
         'release_revision',
+        'runtime_environment_sha256',
         'schema_version',
     ];
 
@@ -32,7 +33,8 @@ final class S10ReleaseAuthorityVerifier
      *     authority_reference: ?string,
      *     authority_sha256: ?string,
      *     environment_reference_sha256: ?string,
-     *     release_revision: ?string
+     *     release_revision: ?string,
+     *     runtime_environment_sha256: ?string
      * }
      */
     public function verifyInstalled(DateTimeImmutable $verifiedAt): array
@@ -97,7 +99,8 @@ final class S10ReleaseAuthorityVerifier
      *     authority_reference: ?string,
      *     authority_sha256: ?string,
      *     environment_reference_sha256: ?string,
-     *     release_revision: ?string
+     *     release_revision: ?string,
+     *     runtime_environment_sha256: ?string
      * }
      */
     public function verifyRecord(
@@ -118,6 +121,7 @@ final class S10ReleaseAuthorityVerifier
             $authorityReference = $authority['authority_reference'] ?? null;
             $environmentReference = $authority['environment_reference_sha256'] ?? null;
             $releaseRevision = $authority['release_revision'] ?? null;
+            $runtimeEnvironmentSha256 = $authority['runtime_environment_sha256'] ?? null;
             $notBefore = $this->utc($authority['not_before'] ?? null);
             $notAfter = $this->utc($authority['not_after'] ?? null);
             $verifiedAt = $verifiedAt->setTimezone(new DateTimeZone('UTC'));
@@ -130,6 +134,8 @@ final class S10ReleaseAuthorityVerifier
                 && preg_match('/\A[0-9a-f]{40}\z/', $releaseRevision) === 1
                 && is_string($environmentReference)
                 && preg_match('/\A[0-9a-f]{64}\z/', $environmentReference) === 1
+                && is_string($runtimeEnvironmentSha256)
+                && preg_match('/\A[0-9a-f]{64}\z/', $runtimeEnvironmentSha256) === 1
                 && $notBefore !== null
                 && $notAfter !== null
                 && $notBefore < $notAfter
@@ -144,6 +150,7 @@ final class S10ReleaseAuthorityVerifier
                     'authority_sha256' => hash('sha256', $rawAuthority),
                     'environment_reference_sha256' => $environmentReference,
                     'release_revision' => $releaseRevision,
+                    'runtime_environment_sha256' => $runtimeEnvironmentSha256,
                 ]
                 : $this->invalid();
         } catch (Throwable) {
@@ -158,7 +165,7 @@ final class S10ReleaseAuthorityVerifier
             return false;
         }
 
-        foreach (['authority_reference', 'authority_sha256', 'environment_reference_sha256', 'release_revision'] as $key) {
+        foreach (['authority_reference', 'authority_sha256', 'environment_reference_sha256', 'release_revision', 'runtime_environment_sha256'] as $key) {
             $pinned = $snapshots[0][$key] ?? null;
             if (! is_string($pinned)) {
                 return false;
@@ -251,7 +258,8 @@ final class S10ReleaseAuthorityVerifier
      *     authority_reference: null,
      *     authority_sha256: null,
      *     environment_reference_sha256: null,
-     *     release_revision: null
+     *     release_revision: null,
+     *     runtime_environment_sha256: null
      * }
      */
     private function invalid(): array
@@ -262,6 +270,7 @@ final class S10ReleaseAuthorityVerifier
             'authority_sha256' => null,
             'environment_reference_sha256' => null,
             'release_revision' => null,
+            'runtime_environment_sha256' => null,
         ];
     }
 }

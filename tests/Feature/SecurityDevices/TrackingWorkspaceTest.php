@@ -218,6 +218,7 @@ class TrackingWorkspaceTest extends TestCase
                 $this->assertSame('none', $row['privacy']['basis']);
                 $this->assertFalse($row['privacy']['locationAllowed']);
                 $this->assertNull($row['location']);
+                $this->assertNull($row['canonicalHref']);
                 $this->assertNull($row['historyHref']);
             });
 
@@ -237,6 +238,7 @@ class TrackingWorkspaceTest extends TestCase
                 $this->assertSame('none', $row['privacy']['basis']);
                 $this->assertFalse($row['privacy']['locationAllowed']);
                 $this->assertNull($row['location']);
+                $this->assertNull($row['canonicalHref']);
             });
     }
 
@@ -298,8 +300,12 @@ class TrackingWorkspaceTest extends TestCase
 
                 $this->assertSame('withdrawn', $withdrawn['privacy']['state']);
                 $this->assertSame('Tracking consent was withdrawn.', $withdrawn['privacy']['reason']);
+                $this->assertNull($withdrawn['canonicalHref']);
+                $this->assertNull($withdrawn['historyHref']);
                 $this->assertSame('inactive', $inactive['privacy']['state']);
                 $this->assertSame('No active tracking consent is available.', $inactive['privacy']['reason']);
+                $this->assertNull($inactive['canonicalHref']);
+                $this->assertNull($inactive['historyHref']);
             });
     }
 

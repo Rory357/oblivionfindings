@@ -187,7 +187,7 @@ echo json_encode([
         ->applicable()
         ->count(),
     'audits' => \\App\\Models\\AuditLog::query()
-        ->where('auditable_type', \\App\\Models\\ControlRoomAlert::class)
+        ->where('auditable_type', $alert->getMorphClass())
         ->where('auditable_id', $alert->id)
         ->where('action', 'controlRoom.alert.dismiss')
         ->count(),
@@ -311,7 +311,7 @@ echo json_encode([
         ->count(),
     'reference' => $incident->reference_number,
     'reopen_audits' => \\App\\Models\\AuditLog::query()
-        ->where('auditable_type', \\App\\Models\\ControlRoomAlert::class)
+        ->where('auditable_type', $alert->getMorphClass())
         ->where('auditable_id', $alert->id)
         ->where('action', 'controlRoom.alert.reopenForIncident')
         ->count(),
@@ -434,7 +434,7 @@ echo json_encode([
     'snoozed_until' => $alert->snoozed_until?->toIso8601String(),
     'level' => (int) $alert->escalation_level,
     'audits' => \\App\\Models\\AuditLog::query()
-        ->where('auditable_type', \\App\\Models\\ControlRoomAlert::class)
+        ->where('auditable_type', $alert->getMorphClass())
         ->where('auditable_id', $alert->id)
         ->whereIn('action', [
             'controlRoom.alert.snooze',
@@ -458,18 +458,17 @@ echo json_encode([
             resolution_deadline: initialSla.resolution_deadline,
             active_queue_entries: 1,
         });
-        await page.goto('/control-room/escalations');
-        await expect(
-            page.getByText(
-                scalar<{ reference: string }>(`
+        const escalatedReference = scalar<{ reference: string }>(`
 echo json_encode([
     'reference' => \\App\\Models\\ControlRoomAlert::query()
         ->findOrFail(${snoozeId})
         ->reference_number,
 ], JSON_THROW_ON_ERROR);
-`).reference,
-            ),
-        ).toBeVisible();
+`).reference;
+        await page.goto(
+            `/control-room/escalations?search=${encodeURIComponent(escalatedReference)}`,
+        );
+        await expect(page.getByText(escalatedReference)).toBeVisible();
         await expect(
             page.getByText(
                 'Escalation queues — SLA-tracked tiers with guided moves and escalations.',

@@ -140,10 +140,11 @@ describe('AssetFinanceTechnologyProjectionPanel', () => {
             screen.getByText('Operational reconciliation is access restricted'),
         ).toBeVisible();
         expect(
-            screen.getAllByText(
-                'Details are hidden by source-module permissions.',
-            ),
-        ).toHaveLength(2);
+            screen.getByText('Fleet & Assets access required.'),
+        ).toBeVisible();
+        expect(
+            screen.getByText('Security & Devices access required.'),
+        ).toBeVisible();
         expect(
             screen.queryByText('Community gateway cabinet'),
         ).not.toBeInTheDocument();

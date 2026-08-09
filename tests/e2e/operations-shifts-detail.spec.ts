@@ -27,20 +27,23 @@ test.describe('operations shifts — detail assignment flow', () => {
         await expect(
             page.getByRole('heading', { name: /Shifts/i }),
         ).toBeVisible();
-        await page
-            .getByRole('row', { name: /Rostering Publish.*Unassigned/i })
-            .getByRole('link', { name: 'View' })
-            .click();
+        await page.getByTestId('shift-row-9201').click();
+        const quickView = page.getByRole('dialog', {
+            name: /Rostering Publish/i,
+        });
+        await expect(quickView).toBeVisible();
+        await quickView.getByRole('link', { name: /Open full view/i }).click();
         await expect(page).toHaveURL(/\/operations\/shifts\/9201/);
         await expect(page.getByText(/Unassigned/i).first()).toBeVisible();
 
-        await page.getByRole('button', { name: /Assignment/i }).click();
-        await expect(page.getByText(/Assignment coverage/i)).toBeVisible();
+        await page.getByRole('tab', { name: /Assignment/i }).click();
+        await expect(page.getByText(/Suggested cover/i)).toBeVisible();
 
         const candidateCard = page
-            .locator('.rounded-md.border')
-            .filter({ hasText: 'Rostering E2E Candidate' })
-            .first();
+            .getByText('Rostering E2E Candidate', { exact: true })
+            .locator(
+                'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " rounded-lg ")][1]',
+            );
         await expect(candidateCard).toBeVisible();
         await expect(candidateCard).toContainText(/Eligible|Warning|Score/i);
         await candidateCard.getByRole('button', { name: /^Assign$/ }).click();
@@ -51,7 +54,7 @@ test.describe('operations shifts — detail assignment flow', () => {
         ).toBeVisible();
         await expect(page.getByText(/Scheduled/i).first()).toBeVisible();
 
-        await page.getByRole('button', { name: /Notes/i }).click();
+        await page.getByRole('tab', { name: /Audit history/i }).click();
         await expect(page.getByText(/Shift assigned/i).first()).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);

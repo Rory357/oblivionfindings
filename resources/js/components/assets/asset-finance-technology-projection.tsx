@@ -255,6 +255,7 @@ export function AssetFinanceTechnologyProjectionPanel({
                                 permitted={permissions.operational_asset}
                                 available={false}
                                 label="No accessible operational Asset is linked."
+                                restrictedLabel="Fleet & Assets access required."
                             />
                         )}
                     </CardContent>
@@ -320,6 +321,7 @@ export function AssetFinanceTechnologyProjectionPanel({
                                 permitted={permissions.finance}
                                 available={false}
                                 label="No Fixed Asset record is linked."
+                                restrictedLabel="Finance Fixed Assets access required."
                             />
                         )}
                     </CardContent>
@@ -396,6 +398,7 @@ export function AssetFinanceTechnologyProjectionPanel({
                                     permitted={permissions.technology}
                                     available={false}
                                     label="Installed technology is not available."
+                                    restrictedLabel="Security & Devices access required."
                                 />
                             </div>
                         )}
@@ -438,20 +441,18 @@ function RestrictedState({
     permitted,
     available,
     label,
+    restrictedLabel,
 }: {
     permitted: boolean;
     available: boolean;
     label: string;
+    restrictedLabel: string;
 }) {
     return (
         <div className="flex items-start gap-2 text-sm text-muted-foreground">
             <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
-                {!permitted
-                    ? 'Details are hidden by source-module permissions.'
-                    : available
-                      ? 'Available'
-                      : label}
+                {!permitted ? restrictedLabel : available ? 'Available' : label}
             </p>
         </div>
     );

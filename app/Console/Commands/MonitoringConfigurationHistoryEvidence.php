@@ -52,6 +52,13 @@ final class MonitoringConfigurationHistoryEvidence extends Command
             $browser = $contract->loadBrowserEvidence($browserPath, base_path());
             $contract->assertLinked($manifest, $browser, $restore);
             $report = $evidence->report($manifest, $browser, $restore);
+            if (! $contract->restoredRuntimeIsIsolated(
+                $snapshots::class,
+                $timeSeries::class,
+                base_path(),
+            )) {
+                throw new \RuntimeException('The protected release identity changed during verification.');
+            }
         } catch (Throwable) {
             $this->error('Configuration history evidence verification refused. No target or configuration value was emitted.');
 

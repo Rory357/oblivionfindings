@@ -2,6 +2,9 @@ import { runLaravelJson } from './helpers';
 
 export function seedHealthcareWorkspaceReadinessFixtures() {
     return runLaravelJson<{
+        clientId: number;
+        clientFullName: string;
+        clientDeviceId: number;
         clientDisplayName: string;
         clientDeviceName: string;
         sharedDeviceName: string;
@@ -195,6 +198,9 @@ if (! $ticket) {
 );
 
 echo json_encode([
+    'clientId' => $client->id,
+    'clientFullName' => trim($client->first_name.' '.$client->last_name),
+    'clientDeviceId' => $clientDevice->id,
     'clientDisplayName' => $client->preferred_name,
     'clientDeviceName' => $clientDevice->name,
     'sharedDeviceName' => $sharedDevice->name,

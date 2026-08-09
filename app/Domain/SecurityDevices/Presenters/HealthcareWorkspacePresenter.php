@@ -349,10 +349,20 @@ class HealthcareWorkspacePresenter
             'health' => $device->health_status?->value,
             'lastSeenAt' => $device->last_seen_at?->toISOString(),
             'deviceHref' => "/security-devices/devices/{$device->id}",
-            'client' => $client ? [
-                'id' => $client->id,
-                'displayName' => $client->preferred_name ?: $client->first_name,
-                'href' => "/clients/{$client->id}",
+            'client' => $assignment?->assignable_type === DeviceAssignment::TARGET_CLIENT ? [
+                'id' => $client?->id,
+                'displayName' => $client
+                    ? ($client->preferred_name ?: $client->first_name)
+                    : 'Assigned client',
+                'href' => $client
+                    ? "/operations/clients/{$client->id}?tab=healthcare_devices"
+                    : null,
+                'access' => [
+                    'state' => $client ? 'available' : 'restricted',
+                    'label' => $client
+                        ? 'Open Client Profile healthcare devices'
+                        : 'Client Profile access required',
+                ],
             ] : null,
             'location' => $site ? [
                 'site' => [

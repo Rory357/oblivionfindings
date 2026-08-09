@@ -157,6 +157,21 @@ test('employee equipment and access is a read-only projection of canonical sourc
                     'Staff desk chair' => 'assets',
                     'Managed staff laptop' => 'security_devices',
                 ])
+            ->where('equipmentAccess.equipment', function ($rows): bool {
+                $managed = collect($rows)->firstWhere('name', 'Managed staff laptop');
+
+                expect($managed)->toMatchArray([
+                    'href' => null,
+                    'recovery_only' => false,
+                    'historical_only' => false,
+                    'destination_access' => [
+                        'state' => 'restricted',
+                        'label' => 'Device Profile access required',
+                    ],
+                ]);
+
+                return true;
+            })
             ->where('equipmentAccess.workflows.0.id', $workflow->id)
             ->where('equipmentAccess.access_work.0.item', 'VPN access')
             ->where('equipmentAccess.links.devices', '/security-devices/devices')
@@ -267,6 +282,8 @@ test('an exact device still held by a former employee remains visible for recove
             ->where('equipmentAccess.equipment.0.name', 'Unreturned leaver laptop')
             ->where('equipmentAccess.equipment.0.needs_recovery', true)
             ->where('equipmentAccess.equipment.0.recovery_only', true)
+            ->where('equipmentAccess.equipment.0.destination_access.state', 'recovery_only')
+            ->where('equipmentAccess.equipment.0.destination_access.label', 'Recovery-only HR view')
             ->where('equipmentAccess.equipment.0.href', null));
 
     $this->actingAs($this->viewer)
@@ -374,14 +391,69 @@ test('current canonical duplicates stay actionable while federated HR rows are l
                         'source_label' => 'Historical HR record',
                         'href' => null,
                         'historical_only' => true,
+                        'destination_access' => [
+                            'state' => 'historical_only',
+                            'label' => 'Historical HR record — no action available',
+                        ],
                     ])
                     ->and($byName->get('Historical laptop duplicate'))
                     ->toMatchArray([
                         'source_label' => 'Historical HR record',
                         'href' => null,
                         'historical_only' => true,
+                        'destination_access' => [
+                            'state' => 'historical_only',
+                            'label' => 'Historical HR record — no action available',
+                        ],
                     ]);
 
                 return true;
             }));
+});
+
+test('canonical staff Device and HR equipment handoffs reauthorise in both directions', function () {
+    grantEquipmentProjectionPermissions($this->viewer, [
+        'hazards.view',
+        'staff.viewAny',
+    ]);
+
+    $device = Device::factory()->create([
+        'name' => 'Canonical handoff laptop',
+        'domain' => 'network_it',
+        'category' => 'laptop',
+    ]);
+    DeviceAssignment::query()->create([
+        'device_id' => $device->id,
+        'assignable_type' => DeviceAssignment::TARGET_STAFF,
+        'assignable_id' => $this->employee->id,
+        'assignment_type' => 'permanent',
+        'assigned_at' => now(),
+        'assigned_by_user_id' => $this->viewer->id,
+    ]);
+
+    $this->actingAs($this->viewer)
+        ->get("/security-devices/devices/{$device->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('profile.header.location.type', 'staff')
+            ->where('profile.header.location.name', $this->employee->name)
+            ->where('profile.header.location.href', "/hr/people/{$this->profile->id}?tab=assets")
+            ->where('profile.header.location.access.state', 'available')
+            ->where('profile.header.location.access.label', 'Open HR equipment view'));
+
+    $this->viewer->permissionOverrides()->updateExistingPivot(
+        Permission::query()->where('key', 'hr.employees.viewAny')->firstOrFail()->id,
+        ['allowed' => false],
+    );
+    $this->viewer->unsetRelation('permissionOverrides');
+
+    $this->actingAs($this->viewer->fresh())
+        ->get("/security-devices/devices/{$device->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('profile.header.location.type', 'staff')
+            ->where('profile.header.location.name', $this->employee->name)
+            ->where('profile.header.location.href', null)
+            ->where('profile.header.location.access.state', 'restricted')
+            ->where('profile.header.location.access.label', 'HR employee equipment access required'));
 });

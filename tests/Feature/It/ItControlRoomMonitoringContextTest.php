@@ -155,6 +155,11 @@ test('one immutable incident snapshot preserves original evidence while both wor
         ->and(data_get($controlRoom, 'linked_it_work.id'))->toBe($ticket->id)
         ->and(data_get($controlRoom, 'linked_it_work.status'))->toBe('in_progress')
         ->and(data_get($controlRoom, 'linked_it_work.assignee.name'))->toBe($assignee->name)
+        ->and(data_get($controlRoom, 'linked_it_work.access.state'))->toBe('available')
+        ->and(data_get($controlRoom, 'linked_device.id'))->toBe($device->id)
+        ->and(data_get($controlRoom, 'linked_device.name'))->toBe('Kauri Core Switch — replacement')
+        ->and(data_get($controlRoom, 'linked_device.href'))->toBe("/security-devices/devices/{$device->id}")
+        ->and(data_get($controlRoom, 'linked_device.access.state'))->toBe('available')
         ->and(data_get($controlRoom, 'monitoring_incident_evidence.device.name'))->toBe('Kauri Core Switch')
         ->and(json_encode($controlRoom))->not->toContain('must-never-cross-modules');
 
@@ -179,8 +184,18 @@ test('source permissions Site access and checksum integrity fail closed on both 
 
     $itOnly = monitoringContextViewer($site, ['it.view']);
     $itContext = app(ItTicketContextPresenter::class)->present($ticket, $itOnly);
-    expect($itContext['devices'])->toBe([])
-        ->and($itContext['alerts'])->toBe([])
+    expect($itContext['devices'])->toHaveCount(1)
+        ->and(data_get($itContext, 'devices.0.id'))->toBeNull()
+        ->and(data_get($itContext, 'devices.0.name'))->toBeNull()
+        ->and(data_get($itContext, 'devices.0.href'))->toBeNull()
+        ->and(data_get($itContext, 'devices.0.access.state'))->toBe('restricted')
+        ->and(data_get($itContext, 'devices.0.access.message'))->toBe('Security & Devices access is required to open this Device.')
+        ->and($itContext['alerts'])->toHaveCount(1)
+        ->and(data_get($itContext, 'alerts.0.id'))->toBeNull()
+        ->and(data_get($itContext, 'alerts.0.reference'))->toBeNull()
+        ->and(data_get($itContext, 'alerts.0.href'))->toBeNull()
+        ->and(data_get($itContext, 'alerts.0.access.state'))->toBe('restricted')
+        ->and(data_get($itContext, 'alerts.0.access.message'))->toBe('Control Room access is required to open this alert.')
         ->and($itContext['incident_evidence'])->toBe([]);
 
     $controlRoomOnly = monitoringContextViewer($site, [
@@ -189,8 +204,25 @@ test('source permissions Site access and checksum integrity fail closed on both 
         'securityDevices.devices.view',
     ]);
     $controlRoom = app(AlertWorkspaceService::class)->build($controlRoomOnly, $alert->id);
-    expect(data_get($controlRoom, 'linked_it_work'))->toBeNull()
+    expect(data_get($controlRoom, 'linked_it_work.id'))->toBeNull()
+        ->and(data_get($controlRoom, 'linked_it_work.reference'))->toBeNull()
+        ->and(data_get($controlRoom, 'linked_it_work.href'))->toBeNull()
+        ->and(data_get($controlRoom, 'linked_it_work.access.state'))->toBe('restricted')
+        ->and(data_get($controlRoom, 'linked_it_work.access.message'))->toBe('IT workspace access is required to open this record.')
+        ->and(data_get($controlRoom, 'linked_device.id'))->toBe($device->id)
+        ->and(data_get($controlRoom, 'linked_device.access.state'))->toBe('available')
         ->and(data_get($controlRoom, 'monitoring_incident_evidence'))->toBeNull();
+
+    $controlRoomWithoutDevice = monitoringContextViewer($site, [
+        'controlRoom.viewAny',
+        'controlRoom.alerts.view',
+    ]);
+    $deviceRestricted = app(AlertWorkspaceService::class)->build($controlRoomWithoutDevice, $alert->id);
+    expect(data_get($deviceRestricted, 'linked_device.id'))->toBeNull()
+        ->and(data_get($deviceRestricted, 'linked_device.name'))->toBeNull()
+        ->and(data_get($deviceRestricted, 'linked_device.href'))->toBeNull()
+        ->and(data_get($deviceRestricted, 'linked_device.access.state'))->toBe('restricted')
+        ->and(data_get($deviceRestricted, 'linked_device.access.message'))->toBe('Security & Devices access is required to open this Device.');
 
     $otherSite = Site::factory()->create();
     $outsideViewer = monitoringContextViewer($otherSite, [

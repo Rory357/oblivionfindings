@@ -34,15 +34,16 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 export interface TicketLinkedDevice {
-    id: number;
-    uid: string;
-    name: string;
-    domain: string;
-    category: string;
-    status: string;
-    health_status: string;
+    id: number | null;
+    uid: string | null;
+    name: string | null;
+    domain: string | null;
+    category: string | null;
+    status: string | null;
+    health_status: string | null;
     last_seen_at: string | null;
-    href: string;
+    href: string | null;
+    access: LinkedWorkspaceAccess;
     is_monitoring_evidence: boolean;
     can_unlink: boolean;
 }
@@ -55,13 +56,14 @@ export interface TicketDeviceOption {
 }
 
 export interface TicketLinkedAlert {
-    id: number;
-    reference: string;
-    alert_type: string;
-    severity: string;
-    status: string;
+    id: number | null;
+    reference: string | null;
+    alert_type: string | null;
+    severity: string | null;
+    status: string | null;
     triggered_at: string | null;
-    href: string;
+    href: string | null;
+    access: LinkedWorkspaceAccess;
 }
 
 export interface TicketLinkedProblem {
@@ -264,7 +266,11 @@ export function TicketLinkedContext({
     const [processingDevice, setProcessingDevice] = useState<number | null>(
         null,
     );
-    const linkedDeviceIds = new Set(devices.map((device) => device.id));
+    const linkedDeviceIds = new Set(
+        devices
+            .map((device) => device.id)
+            .filter((id): id is number => typeof id === 'number'),
+    );
     const availableDevices = deviceOptions.filter(
         (device) => !linkedDeviceIds.has(device.id),
     );
@@ -483,106 +489,147 @@ export function TicketLinkedContext({
                         Affected devices
                     </h3>
                     <ul className="mt-1.5 space-y-2">
-                        {devices.map((device) => (
-                            <li
-                                key={device.id}
-                                className="overflow-hidden rounded-xl border border-border/70 bg-muted/20"
-                            >
-                                <Link
-                                    href={device.href}
-                                    className="frontline-focus flex min-h-11 items-start gap-2.5 px-3 py-2.5 hover:bg-muted/60"
+                        {devices.map((device, index) =>
+                            device.access.state === 'restricted' ||
+                            !device.href ||
+                            device.id === null ||
+                            !device.name ||
+                            !device.uid ||
+                            !device.category ? (
+                                <li
+                                    key={`restricted-device-${index}`}
+                                    className="overflow-hidden rounded-xl border border-border/70 bg-muted/20"
                                 >
-                                    <Server
-                                        aria-hidden="true"
-                                        className="mt-0.5 h-4 w-4 flex-none text-primary"
+                                    <WorkspaceRecordDestination
+                                        href={null}
+                                        access={device.access}
+                                        icon={Server}
+                                        iconClassName="text-primary"
+                                        reference="Security & Devices"
+                                        title="Affected Device"
                                     />
-                                    <span className="min-w-0 flex-1">
-                                        <span className="flex items-center justify-between gap-2">
-                                            <span className="truncate text-[12.5px] font-semibold">
-                                                {device.name}
+                                </li>
+                            ) : (
+                                <li
+                                    key={device.id}
+                                    className="overflow-hidden rounded-xl border border-border/70 bg-muted/20"
+                                >
+                                    <Link
+                                        href={device.href}
+                                        className="frontline-focus flex min-h-11 items-start gap-2.5 px-3 py-2.5 hover:bg-muted/60"
+                                    >
+                                        <Server
+                                            aria-hidden="true"
+                                            className="mt-0.5 h-4 w-4 flex-none text-primary"
+                                        />
+                                        <span className="min-w-0 flex-1">
+                                            <span className="flex items-center justify-between gap-2">
+                                                <span className="truncate text-[12.5px] font-semibold">
+                                                    {device.name}
+                                                </span>
+                                                <ExternalLink
+                                                    aria-hidden="true"
+                                                    className="h-3.5 w-3.5 flex-none text-muted-foreground"
+                                                />
                                             </span>
-                                            <ExternalLink
-                                                aria-hidden="true"
-                                                className="h-3.5 w-3.5 flex-none text-muted-foreground"
-                                            />
+                                            <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
+                                                {label(device.category)} ·{' '}
+                                                {device.uid}
+                                            </span>
                                         </span>
-                                        <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
-                                            {label(device.category)} ·{' '}
-                                            {device.uid}
-                                        </span>
-                                    </span>
-                                </Link>
-                                <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 px-3 py-2">
-                                    <ContextStatus
-                                        value={device.health_status}
-                                    />
-                                    <ContextStatus value={device.status} />
-                                    {device.is_monitoring_evidence ? (
-                                        <StatusBadge variant="info" size="sm">
-                                            <Link2
-                                                aria-hidden="true"
-                                                className="h-3 w-3"
+                                    </Link>
+                                    <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 px-3 py-2">
+                                        {device.health_status ? (
+                                            <ContextStatus
+                                                value={device.health_status}
                                             />
-                                            Monitoring evidence
-                                        </StatusBadge>
-                                    ) : null}
-                                    <span className="ml-auto text-[10.5px] text-muted-foreground">
-                                        Last seen{' '}
-                                        {formatDateTime(device.last_seen_at)}
-                                    </span>
-                                    {canChangeDevices && device.can_unlink ? (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="frontline-focus min-h-11"
-                                            disabled={
-                                                processingDevice === device.id
-                                            }
-                                            onClick={() => {
-                                                if (ticketId === undefined)
-                                                    return;
-                                                setProcessingDevice(device.id);
-                                                router.delete(
-                                                    `/it/tickets/${ticketId}/devices/${device.id}`,
-                                                    {
-                                                        preserveScroll: true,
-                                                        onSuccess: (page) => {
-                                                            const flash = page
-                                                                .props.flash as
-                                                                | {
-                                                                      error?: string;
-                                                                      success?: string;
-                                                                  }
-                                                                | undefined;
-                                                            if (flash?.error)
-                                                                toast.error(
-                                                                    flash.error,
-                                                                );
-                                                            else
-                                                                toast.success(
-                                                                    flash?.success ??
-                                                                        'Device link removed.',
-                                                                );
+                                        ) : null}
+                                        {device.status ? (
+                                            <ContextStatus
+                                                value={device.status}
+                                            />
+                                        ) : null}
+                                        {device.is_monitoring_evidence ? (
+                                            <StatusBadge
+                                                variant="info"
+                                                size="sm"
+                                            >
+                                                <Link2
+                                                    aria-hidden="true"
+                                                    className="h-3 w-3"
+                                                />
+                                                Monitoring evidence
+                                            </StatusBadge>
+                                        ) : null}
+                                        <span className="ml-auto text-[10.5px] text-muted-foreground">
+                                            Last seen{' '}
+                                            {formatDateTime(
+                                                device.last_seen_at,
+                                            )}
+                                        </span>
+                                        {canChangeDevices &&
+                                        device.can_unlink ? (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="frontline-focus min-h-11"
+                                                disabled={
+                                                    processingDevice ===
+                                                    device.id
+                                                }
+                                                onClick={() => {
+                                                    if (ticketId === undefined)
+                                                        return;
+                                                    setProcessingDevice(
+                                                        device.id,
+                                                    );
+                                                    router.delete(
+                                                        `/it/tickets/${ticketId}/devices/${device.id}`,
+                                                        {
+                                                            preserveScroll: true,
+                                                            onSuccess: (
+                                                                page,
+                                                            ) => {
+                                                                const flash =
+                                                                    page.props
+                                                                        .flash as
+                                                                        | {
+                                                                              error?: string;
+                                                                              success?: string;
+                                                                          }
+                                                                        | undefined;
+                                                                if (
+                                                                    flash?.error
+                                                                )
+                                                                    toast.error(
+                                                                        flash.error,
+                                                                    );
+                                                                else
+                                                                    toast.success(
+                                                                        flash?.success ??
+                                                                            'Device link removed.',
+                                                                    );
+                                                            },
+                                                            onFinish: () =>
+                                                                setProcessingDevice(
+                                                                    null,
+                                                                ),
                                                         },
-                                                        onFinish: () =>
-                                                            setProcessingDevice(
-                                                                null,
-                                                            ),
-                                                    },
-                                                );
-                                            }}
-                                        >
-                                            <Unlink
-                                                aria-hidden="true"
-                                                className="h-3.5 w-3.5"
-                                            />
-                                            Remove link
-                                        </Button>
-                                    ) : null}
-                                </div>
-                            </li>
-                        ))}
+                                                    );
+                                                }}
+                                            >
+                                                <Unlink
+                                                    aria-hidden="true"
+                                                    className="h-3.5 w-3.5"
+                                                />
+                                                Remove link
+                                            </Button>
+                                        ) : null}
+                                    </div>
+                                </li>
+                            ),
+                        )}
                     </ul>
                 </div>
             ) : null}
@@ -593,44 +640,72 @@ export function TicketLinkedContext({
                         Control Room alerts
                     </h3>
                     <ul className="mt-1.5 space-y-2">
-                        {alerts.map((alert) => (
-                            <li
-                                key={alert.id}
-                                className="overflow-hidden rounded-xl border border-border/70 bg-muted/20"
-                            >
-                                <Link
-                                    href={alert.href}
-                                    className="frontline-focus flex min-h-11 items-start gap-2.5 px-3 py-2.5 hover:bg-muted/60"
+                        {alerts.map((alert, index) =>
+                            alert.access.state === 'restricted' ||
+                            !alert.href ||
+                            alert.id === null ||
+                            !alert.reference ||
+                            !alert.alert_type ? (
+                                <li
+                                    key={`restricted-alert-${index}`}
+                                    className="overflow-hidden rounded-xl border border-border/70 bg-muted/20"
                                 >
-                                    <ShieldAlert
-                                        aria-hidden="true"
-                                        className="mt-0.5 h-4 w-4 flex-none text-primary"
+                                    <WorkspaceRecordDestination
+                                        href={null}
+                                        access={alert.access}
+                                        icon={ShieldAlert}
+                                        iconClassName="text-primary"
+                                        reference="Control Room"
+                                        title="Source alert"
                                     />
-                                    <span className="min-w-0 flex-1">
-                                        <span className="flex items-center justify-between gap-2">
-                                            <span className="font-mono text-[12px] font-bold">
-                                                {alert.reference}
+                                </li>
+                            ) : (
+                                <li
+                                    key={alert.id}
+                                    className="overflow-hidden rounded-xl border border-border/70 bg-muted/20"
+                                >
+                                    <Link
+                                        href={alert.href}
+                                        className="frontline-focus flex min-h-11 items-start gap-2.5 px-3 py-2.5 hover:bg-muted/60"
+                                    >
+                                        <ShieldAlert
+                                            aria-hidden="true"
+                                            className="mt-0.5 h-4 w-4 flex-none text-primary"
+                                        />
+                                        <span className="min-w-0 flex-1">
+                                            <span className="flex items-center justify-between gap-2">
+                                                <span className="font-mono text-[12px] font-bold">
+                                                    {alert.reference}
+                                                </span>
+                                                <ExternalLink
+                                                    aria-hidden="true"
+                                                    className="h-3.5 w-3.5 flex-none text-muted-foreground"
+                                                />
                                             </span>
-                                            <ExternalLink
-                                                aria-hidden="true"
-                                                className="h-3.5 w-3.5 flex-none text-muted-foreground"
+                                            <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">
+                                                {alert.alert_type}
+                                            </span>
+                                        </span>
+                                    </Link>
+                                    <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 px-3 py-2">
+                                        {alert.severity ? (
+                                            <ContextStatus
+                                                value={alert.severity}
                                             />
+                                        ) : null}
+                                        {alert.status ? (
+                                            <ContextStatus
+                                                value={alert.status}
+                                            />
+                                        ) : null}
+                                        <span className="ml-auto text-[10.5px] text-muted-foreground">
+                                            Triggered{' '}
+                                            {formatDateTime(alert.triggered_at)}
                                         </span>
-                                        <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">
-                                            {alert.alert_type}
-                                        </span>
-                                    </span>
-                                </Link>
-                                <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 px-3 py-2">
-                                    <ContextStatus value={alert.severity} />
-                                    <ContextStatus value={alert.status} />
-                                    <span className="ml-auto text-[10.5px] text-muted-foreground">
-                                        Triggered{' '}
-                                        {formatDateTime(alert.triggered_at)}
-                                    </span>
-                                </div>
-                            </li>
-                        ))}
+                                    </div>
+                                </li>
+                            ),
+                        )}
                     </ul>
                 </div>
             ) : null}

@@ -60,6 +60,7 @@ class DatabaseSeeder extends Seeder
         $this->call(RoadmapSeeder::class);
         $this->call(BoardMemberSeeder::class);
         $this->call(GovernanceSeeder::class);
+        $this->call(HrCalendarEventCategorySeeder::class);
         $this->call(HrSeeder::class);
         $this->call(HrPublicHolidaysSeeder::class);
         $this->call(HrPayEquityBandsSeeder::class);

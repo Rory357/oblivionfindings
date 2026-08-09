@@ -224,7 +224,7 @@ class JobBoardController extends Controller
             'jobs' => $formattedJobs,
             'filters' => array_merge($filters, [
                 'scope' => $scope,
-                'week' => $weekStart->toDateString(),
+                'week' => $weekFilterRequested ? $weekStart->toDateString() : null,
             ]),
             'available_skills' => $availableSkills,
             'week' => [

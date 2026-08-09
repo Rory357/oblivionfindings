@@ -11,6 +11,10 @@ import {
     SiteProfileHero,
     type SiteHeroStat,
 } from '@/components/sites/profile/hero';
+import {
+    SiteTechnologyProjectionPanel,
+    type SiteTechnologyProjection,
+} from '@/components/sites/site-technology-projection';
 import { useUiPreference } from '@/hooks/use-ui-preference';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
@@ -26,6 +30,8 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { EditLocationDialog } from './_overview-dialogs';
+import SiteGeofenceDialog from './_site-geofence-dialog';
 import { SiteProfileDialogHost } from './site-profile-dialog-host';
 import { SiteProfileAssets, type SiteAssetsData } from './tabs/assets';
 import {
@@ -125,6 +131,19 @@ export type SiteProfileSite = {
     is_high_risk: boolean;
     is_high_needs: boolean;
     primary_contact?: { id: number; name: string } | null;
+    manager_contact?: SiteProfileRoleContact | null;
+    site_lead_contact?: SiteProfileRoleContact | null;
+    after_hours_contact?: SiteProfileRoleContact | null;
+    primary_site_contact?: SiteProfileRoleContact | null;
+};
+
+export type SiteProfileRoleContact = {
+    id: number;
+    name: string;
+    role?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    is_primary?: boolean;
 };
 
 export type SiteProfileHeroData = {
@@ -243,6 +262,10 @@ export type SiteProfileProps = {
     overview: SiteProfileOverviewData;
     readiness: SiteReadinessData;
     uiPreferences: { pinned_tabs: string[] };
+    can: {
+        viewTechnology: boolean;
+        viewHardwarePlacement: boolean;
+    };
     clientsData?: SiteClientsData;
     contactsData?: SiteContactsData;
     staffRequirementsData?: SiteStaffRequirementsData;
@@ -265,6 +288,7 @@ export type SiteProfileProps = {
     financialsData?: SiteProfileFinancialsModule;
     vendorsCredentialsData?: SiteVendorsCredentialsData;
     servicesData?: SiteServicesData;
+    technology?: SiteTechnologyProjection;
 };
 
 const QUICK_ACTION_ICONS: Record<string, LucideIcon> = {
@@ -329,18 +353,35 @@ export default function SiteShow(props: SiteProfileProps) {
         readiness,
         uiPreferences,
     } = props;
+    const profilePermissions = useMemo(
+        () => ({
+            ...permissions,
+            viewTechnology: props.can.viewTechnology,
+        }),
+        [permissions, props.can.viewTechnology],
+    );
     const resolvedTabs = useMemo(
-        () => visibleSiteProfileTabs(site.type, permissions, tabMetrics(props)),
-        [props, site.type, permissions],
+        () =>
+            visibleSiteProfileTabs(
+                site.type,
+                profilePermissions,
+                tabMetrics(props),
+            ),
+        [profilePermissions, props, site.type],
     );
     const initialTab = useMemo(
         () =>
-            resolveSiteProfileTab(currentRequestedTab(), site.type, permissions)
-                .id,
-        [permissions, site.type],
+            resolveSiteProfileTab(
+                currentRequestedTab(),
+                site.type,
+                profilePermissions,
+            ).id,
+        [profilePermissions, site.type],
     );
     const [activeTab, setActiveTab] = useState(initialTab);
     const [searchOpen, setSearchOpen] = useState(false);
+    const [locationOpen, setLocationOpen] = useState(false);
+    const [geofenceOpen, setGeofenceOpen] = useState(false);
     const [loadingProps, setLoadingProps] = useState<
         Partial<Record<SiteProfileDataProp, boolean>>
     >({});
@@ -414,7 +455,7 @@ export default function SiteShow(props: SiteProfileProps) {
             const resolved = resolveSiteProfileTab(
                 requested,
                 site.type,
-                permissions,
+                profilePermissions,
             );
             if (resolved.locked) return;
 
@@ -423,7 +464,7 @@ export default function SiteShow(props: SiteProfileProps) {
             const dataProp = dataPropForTab(resolved.id);
             if (dataProp) requestProp(dataProp);
         },
-        [permissions, requestProp, site.type],
+        [profilePermissions, requestProp, site.type],
     );
 
     useGroupedProfileSearchShortcut(() => setSearchOpen(true));
@@ -432,7 +473,7 @@ export default function SiteShow(props: SiteProfileProps) {
         const normalized = resolveSiteProfileTab(
             currentRequestedTab(),
             site.type,
-            permissions,
+            profilePermissions,
         );
         if (currentRequestedTab() !== normalized.id) {
             replaceTabInUrl(normalized.id);
@@ -440,7 +481,7 @@ export default function SiteShow(props: SiteProfileProps) {
         setActiveTab(normalized.id);
         const dataProp = dataPropForTab(normalized.id);
         if (dataProp) requestProp(dataProp);
-    }, [permissions, requestProp, site.type]);
+    }, [profilePermissions, requestProp, site.type]);
 
     const navGroups = useMemo(
         () => buildNavGroups(resolvedTabs),
@@ -583,11 +624,56 @@ export default function SiteShow(props: SiteProfileProps) {
                         loadingProps={loadingProps}
                         propErrors={propErrors}
                         onNavigate={selectTab}
+                        onEditLocation={() => setLocationOpen(true)}
+                        onConfigureGeofence={() => setGeofenceOpen(true)}
                         onRetry={(dataProp) => requestProp(dataProp, true)}
                     />
                 </div>
             </PageLayout>
             <SiteProfileDialogHost />
+            <EditLocationDialog
+                siteId={site.id}
+                siteName={site.name}
+                isOpen={locationOpen}
+                onClose={() => setLocationOpen(false)}
+                initial={{
+                    address_line_1: site.address_line_1 ?? '',
+                    address_line_2: site.address_line_2 ?? '',
+                    suburb: site.suburb ?? '',
+                    city: site.city ?? '',
+                    postcode: site.postcode ?? '',
+                    country: site.country ?? '',
+                    region: site.region ?? '',
+                    latitude:
+                        site.latitude == null ? '' : String(site.latitude),
+                    longitude:
+                        site.longitude == null ? '' : String(site.longitude),
+                    access_instructions: site.access_instructions ?? '',
+                }}
+                geofences={overview.geofences}
+                onOpenGeofence={
+                    overview.can_manage_geofences
+                        ? () => {
+                              setLocationOpen(false);
+                              setGeofenceOpen(true);
+                          }
+                        : undefined
+                }
+            />
+            <SiteGeofenceDialog
+                isOpen={geofenceOpen}
+                onClose={() => setGeofenceOpen(false)}
+                onOpenLocation={() => {
+                    setGeofenceOpen(false);
+                    setLocationOpen(true);
+                }}
+                siteId={site.id}
+                siteName={site.name}
+                siteLat={site.latitude}
+                siteLng={site.longitude}
+                existing={overview.geofences[0] ?? null}
+                assets={overview.geofence_assets}
+            />
             <TabSearchPalette
                 open={searchOpen}
                 onClose={() => setSearchOpen(false)}
@@ -639,6 +725,8 @@ function SiteProfileContent({
     loadingProps,
     propErrors,
     onNavigate,
+    onEditLocation,
+    onConfigureGeofence,
     onRetry,
 }: {
     active?: ResolvedSiteProfileTab;
@@ -646,6 +734,8 @@ function SiteProfileContent({
     loadingProps: Partial<Record<SiteProfileDataProp, boolean>>;
     propErrors: Partial<Record<SiteProfileDataProp, boolean>>;
     onNavigate: (tab: string) => void;
+    onEditLocation: () => void;
+    onConfigureGeofence: () => void;
     onRetry: (dataProp: SiteProfileDataProp) => void;
 }) {
     if (!active) return null;
@@ -658,6 +748,8 @@ function SiteProfileContent({
                 overview={props.overview}
                 attention={props.attention}
                 onNavigate={onNavigate}
+                onEditLocation={onEditLocation}
+                onConfigureGeofence={onConfigureGeofence}
             />
         );
     }
@@ -666,6 +758,7 @@ function SiteProfileContent({
             <SiteProfileReadiness
                 readiness={props.readiness}
                 onNavigate={onNavigate}
+                onConfigureGeofence={onConfigureGeofence}
             />
         );
     }
@@ -779,6 +872,14 @@ function SiteProfileContent({
             return <SiteProfileFleet data={tabData as SiteFleetData} />;
         case 'hardware':
             return <SiteProfileHardware data={tabData as SiteHardwareData} />;
+        case 'technology':
+            return (
+                <SiteTechnologyProjectionPanel
+                    siteId={props.site.id}
+                    data={tabData as SiteTechnologyProjection}
+                    canViewHardwarePlacement={props.can.viewHardwarePlacement}
+                />
+            );
         case 'plan':
             return <SiteProfilePlan data={tabData as SitePlanData} />;
         case 'documents':

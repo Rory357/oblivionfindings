@@ -17,6 +17,7 @@ import { MedsWizardDialog } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field, InfoCard, SelectInput } from '@/components/wizard/primitives';
+import { submitEmarMutation } from '@/lib/emar-offline';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
@@ -171,47 +172,75 @@ export default function GuidedRoundDialog({
         return true;
     })();
 
-    const submit = () => {
+    const submit = async () => {
         if (!item || !pending) return;
         const medicationId = item.medication_id;
+        const payload = {
+            status: pending,
+            scheduled_for: item.scheduled_for,
+            reason: reason || null,
+            reason_code: pending === 'given' ? null : reasonCode || null,
+            witnessed_by:
+                pending === 'given' && witnessedBy ? Number(witnessedBy) : null,
+            witness_credential: witnessCredential || null,
+            quantity_administered:
+                pending === 'given' && quantityGiven
+                    ? Number(quantityGiven)
+                    : null,
+            blood_glucose_level:
+                pending === 'given' && bloodGlucose
+                    ? Number(bloodGlucose)
+                    : null,
+            pulse_bpm: pending === 'given' && pulse ? Number(pulse) : null,
+            client_request_uuid: crypto.randomUUID(),
+        };
+        const advance = () => {
+            setReRecording((prev) => {
+                const next = { ...prev };
+                delete next[medicationId];
+                return next;
+            });
+            const nextDue = items.findIndex(
+                (it, i) => i > stepIndex && !it.administration,
+            );
+            goTo(nextDue === -1 ? items.length : nextDue);
+        };
+
         setSaving(true);
+
+        if (!navigator.onLine) {
+            try {
+                const result = await submitEmarMutation(
+                    `/emar/rounds/${round.id}/guided/items/${medicationId}`,
+                    payload,
+                    {
+                        action: 'round_admin',
+                        queuedMessage:
+                            'Dose saved on this device and queued to sync when you reconnect.',
+                    },
+                );
+
+                if (result.status === 'queued') {
+                    advance();
+                }
+            } catch {
+                toast.error('Could not save this dose offline');
+            } finally {
+                setSaving(false);
+            }
+
+            return;
+        }
+
         router.post(
             `/emar/rounds/${round.id}/guided/items/${medicationId}`,
-            {
-                status: pending,
-                scheduled_for: item.scheduled_for,
-                reason: reason || null,
-                reason_code: pending === 'given' ? null : reasonCode || null,
-                witnessed_by:
-                    pending === 'given' && witnessedBy
-                        ? Number(witnessedBy)
-                        : null,
-                witness_credential: witnessCredential || null,
-                quantity_administered:
-                    pending === 'given' && quantityGiven
-                        ? Number(quantityGiven)
-                        : null,
-                blood_glucose_level:
-                    pending === 'given' && bloodGlucose
-                        ? Number(bloodGlucose)
-                        : null,
-                pulse_bpm: pending === 'given' && pulse ? Number(pulse) : null,
-                client_request_uuid: crypto.randomUUID(),
-            },
+            payload,
             {
                 preserveState: true,
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success(`Dose ${pending}`);
-                    setReRecording((prev) => {
-                        const next = { ...prev };
-                        delete next[medicationId];
-                        return next;
-                    });
-                    const nextDue = items.findIndex(
-                        (it, i) => i > stepIndex && !it.administration,
-                    );
-                    goTo(nextDue === -1 ? items.length : nextDue);
+                    advance();
                 },
                 onError: () => toast.error('Could not record this dose'),
                 onFinish: () => setSaving(false),

@@ -82,7 +82,7 @@ test('site readiness geofence flow saves a boundary and reuses the same dialog e
     await loginAsStaff(page);
     await page.goto(`/sites/${siteId}`, { waitUntil: 'domcontentloaded' });
 
-    await page.getByTestId('site-readiness-tab').click();
+    await page.getByTestId('site-profile-tab-readiness').click();
     await expect(page.getByTestId('readiness-item-geofence')).toContainText(
         'Geofence configured',
     );
@@ -98,7 +98,7 @@ test('site readiness geofence flow saves a boundary and reuses the same dialog e
     await page.getByTestId('site-geofence-save').click();
 
     await expect(page.getByTestId('site-geofence-dialog')).toHaveCount(0);
-    await page.getByTestId('site-readiness-tab').click();
+    await page.getByTestId('site-profile-tab-readiness').click();
     await expect(page.getByTestId('readiness-fix-geofence')).toHaveCount(0);
 
     await page.getByRole('tab', { name: /^Overview/ }).click();

@@ -73,6 +73,10 @@ async function globalSetup(): Promise<void> {
             'GovernancePermissionsSeeder',
             'SecurityDevicesPermissionsSeeder',
             'RoadmapPermissionsSeeder',
+            'SeedHrPermissionsSeeder',
+            // Schema dumps contain the category table but not the five system
+            // rows originally inserted by its migration.
+            'HrCalendarEventCategorySeeder',
             // Map every permission row to the admin role so loginAsStaff
             // (admin@demo.test) can exercise every gated UI surface.
             'SeedAllPermissionsToAdminSeeder',
@@ -121,8 +125,10 @@ async function globalSetup(): Promise<void> {
             .filter(Boolean)
             .join('\n');
         console.error(
-            `[playwright global-setup] failed to re-seed rostering demo data — tests may fail if fixtures are stale.\n${detail}`,
+            `[playwright global-setup] failed to re-seed deterministic UI data.\n${detail}`,
         );
+
+        throw error;
     }
 }
 

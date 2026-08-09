@@ -7,7 +7,24 @@ use App\Support\Monitoring\LoadSoakReleaseAuthorityVerifier;
 use App\Support\Monitoring\LoadSoakReleaseCheckoutVerifier;
 use App\Support\Monitoring\StrictJsonObjectDecoder;
 
-require dirname(__DIR__, 2).'/vendor/autoload.php';
+$root = dirname(__DIR__, 2);
+$bootstrapFiles = [
+    '/app/Support/Monitoring/StrictJsonObjectDecoder.php',
+    '/app/Support/Monitoring/LoadSoakEvidenceVerifier.php',
+    '/app/Support/Monitoring/LoadSoakPlatformAttestationVerifier.php',
+    '/app/Support/Monitoring/LoadSoakReleaseAuthorityVerifier.php',
+    '/app/Support/Monitoring/LoadSoakReleaseCheckoutVerifier.php',
+];
+
+foreach ($bootstrapFiles as $relativePath) {
+    $path = $root.$relativePath;
+    if (is_link($path) || ! is_file($path)) {
+        fwrite(STDOUT, '{"status":"failed","reason":"bootstrap","v09_release_evidence":false}'.PHP_EOL);
+        exit(1);
+    }
+
+    require_once $path;
+}
 
 $fail = static function (string $reason): never {
     fwrite(STDOUT, json_encode([

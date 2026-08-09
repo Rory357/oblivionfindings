@@ -10,6 +10,33 @@ const roots = [
     'resources/js/components/security-devices',
 ];
 
+const crossModuleSources = [
+    'resources/js/pages/control-room/alerts/index.tsx',
+    'resources/js/pages/control-room/show.tsx',
+    'resources/js/pages/control-room/map.tsx',
+    'resources/js/pages/control-room/devices/index.tsx',
+    'resources/js/pages/control-room/devices/show.tsx',
+    'resources/js/components/control-room/alert-workspace-dialog.tsx',
+    'resources/js/components/control-room/alert-workspace/linked-journey.tsx',
+    'resources/js/components/control-room/alert-worklist/alert-worklist.tsx',
+    'resources/js/components/control-room/alert-worklist/alert-worklist-row.tsx',
+    'resources/js/pages/sites/show.tsx',
+    'resources/js/components/sites/site-technology-projection.tsx',
+    'resources/js/pages/operations/clients/show.tsx',
+    'resources/js/pages/operations/clients/tabs/healthcare-devices.tsx',
+    'resources/js/components/client-location-tab.tsx',
+    'resources/js/pages/fleet-assets/vehicles/show.tsx',
+    'resources/js/pages/fleet-assets/vehicles/vehicle-technology-projection.tsx',
+    'resources/js/pages/fleet-assets/assets/show.tsx',
+    'resources/js/components/assets/asset-finance-technology-projection.tsx',
+    'resources/js/pages/fleet-assets/resident-tracking/history.tsx',
+    'resources/js/pages/hr/employees/show.tsx',
+    'resources/js/pages/settings/api.tsx',
+    'resources/js/pages/settings/it-mailbox.tsx',
+    'resources/js/components/monitoring/delivery-recovery-card.tsx',
+    'resources/js/components/monitoring/monitoring-incident-evidence-card.tsx',
+];
+
 const triggerPattern =
     /(?:Dialog|Popover|DropdownMenu|Tooltip|Sheet|Collapsible|Select)Trigger$/;
 
@@ -75,14 +102,62 @@ function isInsideTrigger(node: ts.Node): boolean {
     return false;
 }
 
+function isInsideDestinationBackedElement(
+    node: ts.Node,
+    source: ts.SourceFile,
+): boolean {
+    let parent: ts.Node | undefined = node.parent;
+
+    while (parent) {
+        if (ts.isJsxElement(parent)) {
+            const opening = parent.openingElement;
+            const tag = opening.tagName.getText(source);
+
+            if (tag === 'Link' || tag === 'a') {
+                const href = attributeMap(opening).get('href');
+                const literalHref = literalAttribute(href);
+
+                return (
+                    href !== undefined &&
+                    (literalHref === null ||
+                        (literalHref.trim() !== '' &&
+                            literalHref.trim() !== '#' &&
+                            !literalHref
+                                .trim()
+                                .toLowerCase()
+                                .startsWith('javascript:')))
+                );
+            }
+        }
+
+        parent = parent.parent;
+    }
+
+    return false;
+}
+
+function hasDndKitListeners(opening: ts.JsxOpeningLikeElement): boolean {
+    return opening.attributes.properties.some(
+        (attribute) =>
+            ts.isJsxSpreadAttribute(attribute) &&
+            ts.isIdentifier(attribute.expression) &&
+            attribute.expression.text === 'listeners',
+    );
+}
+
 describe('IT and Security & Devices production interactions', () => {
     it('keeps buttons actionable or explicitly unavailable and links destination-backed', () => {
         const workspace = process.cwd();
         const findings: string[] = [];
 
-        for (const file of roots.flatMap((root) =>
-            productionSources(resolve(workspace, root)),
-        )) {
+        const productionFiles = [
+            ...roots.flatMap((root) =>
+                productionSources(resolve(workspace, root)),
+            ),
+            ...crossModuleSources.map((file) => resolve(workspace, file)),
+        ];
+
+        for (const file of new Set(productionFiles)) {
             const source = ts.createSourceFile(
                 file,
                 readFileSync(file, 'utf8'),
@@ -139,7 +214,9 @@ describe('IT and Security & Devices production interactions', () => {
                             attributes.has('form') ||
                             type === 'submit' ||
                             type === 'reset' ||
-                            isInsideTrigger(node);
+                            isInsideTrigger(node) ||
+                            isInsideDestinationBackedElement(node, source) ||
+                            hasDndKitListeners(opening);
 
                         if (!actionable && !explicitlyUnavailable) {
                             findings.push(

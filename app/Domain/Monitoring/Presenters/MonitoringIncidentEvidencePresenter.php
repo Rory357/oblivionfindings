@@ -40,6 +40,10 @@ final class MonitoringIncidentEvidencePresenter
     /** @return array{linked_it_work: array<string, mixed>|null, incident_evidence: array<string, mixed>|null} */
     public function forAlert(ControlRoomAlert $alert, User $viewer): array
     {
+        if (! $this->canViewAlert($alert, $viewer)) {
+            return ['linked_it_work' => null, 'incident_evidence' => null];
+        }
+
         $tickets = ItTicket::query()
             ->whereHas('links', function ($links) use ($alert): void {
                 $links
@@ -53,10 +57,19 @@ final class MonitoringIncidentEvidencePresenter
             ->latest('id')
             ->limit(20)
             ->get()
-            ->filter(fn (ItTicket $ticket): bool => $this->workAccess->canView($viewer, $ticket));
+            ->filter(fn (ItTicket $ticket): bool => $this->ticketMatchesAlertSite($ticket, $alert));
 
-        $ticket = $this->preferredTicket($tickets);
+        $ticket = $this->preferredTicket(
+            $tickets->filter(fn (ItTicket $candidate): bool => $this->workAccess->canView($viewer, $candidate)),
+        );
         if (! $ticket) {
+            if (! $viewer->canDo('it.view') && $tickets->isNotEmpty()) {
+                return [
+                    'linked_it_work' => $this->restrictedItWork(),
+                    'incident_evidence' => null,
+                ];
+            }
+
             return ['linked_it_work' => null, 'incident_evidence' => null];
         }
 
@@ -82,6 +95,10 @@ final class MonitoringIncidentEvidencePresenter
                     'name' => $ticket->assignee->name,
                 ] : null,
                 'href' => route('it.tickets.show', $ticket),
+                'access' => [
+                    'state' => 'available',
+                    'message' => null,
+                ],
             ],
             'incident_evidence' => $snapshot ? $this->presentEvidence($snapshot, $viewer) : null,
         ];
@@ -92,6 +109,37 @@ final class MonitoringIncidentEvidencePresenter
     {
         return $tickets->first(fn (ItTicket $ticket): bool => in_array($ticket->status, ItTicket::OPEN_STATUSES, true))
             ?? $tickets->first();
+    }
+
+    private function ticketMatchesAlertSite(ItTicket $ticket, ControlRoomAlert $alert): bool
+    {
+        return is_numeric($ticket->site_id)
+            && (int) $ticket->site_id > 0
+            && is_numeric($alert->site_id)
+            && (int) $alert->site_id > 0
+            && (int) $ticket->site_id === (int) $alert->site_id;
+    }
+
+    /** @return array<string, mixed> */
+    private function restrictedItWork(): array
+    {
+        return [
+            'id' => null,
+            'reference' => null,
+            'title' => null,
+            'status' => null,
+            'status_reason' => null,
+            'priority' => null,
+            'sla_state' => null,
+            'resolution_due_at' => null,
+            'monitoring_recovered_at' => null,
+            'assignee' => null,
+            'href' => null,
+            'access' => [
+                'state' => 'restricted',
+                'message' => 'IT workspace access is required to open this record.',
+            ],
+        ];
     }
 
     /** @return array<string, mixed>|null */

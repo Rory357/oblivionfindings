@@ -1,4 +1,4 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
@@ -886,6 +886,30 @@ export default function MyDay() {
                                 onOpen={setActiveChecklistRun}
                             />
                         </ChecklistConfigProvider>
+                    ) : null}
+
+                    {(props.pending_claims_count ?? 0) > 0 ? (
+                        <Card>
+                            <CardContent className="p-4">
+                                <Link
+                                    href="/operations/job-board?scope=mine"
+                                    data-test="pending-claims-link"
+                                    className="frontline-focus flex items-center justify-between gap-4 rounded-lg"
+                                >
+                                    <div className="min-w-0">
+                                        <div className="font-semibold">
+                                            Pending claims (
+                                            {props.pending_claims_count})
+                                        </div>
+                                        <div className="mt-0.5 text-sm text-muted-foreground">
+                                            Awaiting manager approval — review
+                                            your claimed shifts
+                                        </div>
+                                    </div>
+                                    <ClipboardCheck className="h-5 w-5 shrink-0 text-primary" />
+                                </Link>
+                            </CardContent>
+                        </Card>
                     ) : null}
 
                     <DigestPanel

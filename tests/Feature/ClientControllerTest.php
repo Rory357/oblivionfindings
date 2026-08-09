@@ -947,6 +947,19 @@ class ClientControllerTest extends TestCase
         );
     }
 
+    public function test_show_canonicalizes_the_legacy_support_plan_tab_without_dropping_query_context(): void
+    {
+        $client = Client::factory()->create();
+
+        $response = $this->actingAs($this->admin)->get(
+            "/operations/clients/{$client->id}?tab=support_plan&dialog=quick_note&record=99&source=legacy"
+        );
+
+        $response->assertRedirect(
+            "/operations/clients/{$client->id}?dialog=quick_note&record=99&source=legacy&tab=care_plans"
+        );
+    }
+
     // =========================================================================
     // SHOW - Permission flags (can.*)
     // =========================================================================
