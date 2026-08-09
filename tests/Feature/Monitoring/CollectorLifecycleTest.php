@@ -631,6 +631,10 @@ it('delivers and ingests bounded remote discovery work through the authenticated
 
 it('denies every authenticated endpoint after revocation and permits governed re-enrolment', function () {
     $record = enrolledCollectorRecord($this);
+    $staleGeneralEnrollment = app(CollectorEnrollmentService::class)->issue(
+        $record['site']->id,
+        $record['actor']->id,
+    );
     $record['collector']->forceFill([
         'acknowledged_source_sequence' => 7,
         'highest_seen_source_sequence' => 7,
@@ -650,6 +654,14 @@ it('denies every authenticated endpoint after revocation and permits governed re
         $record,
         'revoked-heartbeat-nonce',
     )->assertUnauthorized()->assertExactJson(['message' => 'Collector authentication failed.']);
+
+    $bypassPair = sodium_crypto_sign_keypair();
+    $this->withToken($staleGeneralEnrollment->plainToken)->postJson('/api/monitoring/collectors/enrol', [
+        'collector_id' => $record['collector']->collector_uuid,
+        'collector_public_key' => base64_encode(sodium_crypto_sign_publickey($bypassPair)),
+    ])->assertUnprocessable();
+    expect($record['collector']->fresh()->revoked_at)->not->toBeNull()
+        ->and($staleGeneralEnrollment->enrollment->fresh()->consumed_at)->toBeNull();
 
     $replacement = app(CollectorEnrollmentService::class)->issue(
         $record['site']->id,

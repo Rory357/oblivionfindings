@@ -140,17 +140,19 @@ final class ProtocolPolicyEvidenceService
                 ->map(fn (mixed $id): int => (int) $id)
                 ->unique()
                 ->values();
-            $freshSiteIds = $fresh
-                ->map(function (Monitor $monitor): ?int {
-                    try {
-                        return app(CanonicalDeviceSiteResolver::class)->resolve((int) $monitor->device_id);
-                    } catch (Throwable) {
-                        return null;
-                    }
-                })
-                ->filter(fn (mixed $id): bool => is_int($id) && $id > 0)
-                ->unique()
-                ->values();
+            $freshSiteIds = collect();
+            $canonicalScopeFailures = 0;
+            foreach ($fresh as $monitor) {
+                $siteId = $this->canonicalMonitorSiteId($monitor);
+                if ($siteId === null || ! $mappedSiteIds->contains($siteId)) {
+                    $canonicalScopeFailures++;
+
+                    continue;
+                }
+
+                $freshSiteIds->push($siteId);
+            }
+            $freshSiteIds = $freshSiteIds->unique()->values();
             $freshMappedSites = $mappedSiteIds->intersect($freshSiteIds)->count();
             $capabilityCursors = ProviderCapabilityCursor::query()
                 ->where('provider', $provider)
@@ -196,6 +198,7 @@ final class ProtocolPolicyEvidenceService
                     && $mappedSiteIds->isNotEmpty()
                     && $configured->isNotEmpty()
                     && $fresh->count() === $configured->count()
+                    && $canonicalScopeFailures === 0
                     && $successfulSiteIds->count() === $mappedSiteIds->count()
                     && $freshMappedSites === $mappedSiteIds->count(),
                 [
@@ -206,6 +209,7 @@ final class ProtocolPolicyEvidenceService
                     'configured' => $configured->count(),
                     'fresh' => $fresh->count(),
                     'fresh_sites' => $freshMappedSites,
+                    'canonical_scope_failures' => $canonicalScopeFailures,
                 ],
             );
         }
@@ -503,8 +507,10 @@ final class ProtocolPolicyEvidenceService
                 'at' => $cursors->get($siteId)?->last_completed_at,
             ]);
             foreach ($configured as $monitor) {
+                $canonicalSiteId = $this->canonicalMonitorSiteId($monitor);
                 $members->push([
-                    'member' => 'provider-monitor:'.$provider.':'.(int) $monitor->id,
+                    'member' => 'provider-monitor:'.$provider.':'.(int) $monitor->id
+                        .':site:'.($canonicalSiteId ?? 'unresolved'),
                     'at' => $latestByMonitor->get((int) $monitor->id)?->observed_at,
                 ]);
             }
@@ -514,6 +520,15 @@ final class ProtocolPolicyEvidenceService
         ksort($rows);
 
         return $rows;
+    }
+
+    private function canonicalMonitorSiteId(Monitor $monitor): ?int
+    {
+        try {
+            return app(CanonicalDeviceSiteResolver::class)->resolve((int) $monitor->device_id);
+        } catch (UnexpectedValueException) {
+            return null;
+        }
     }
 
     /**

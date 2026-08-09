@@ -165,12 +165,16 @@ files, request headers, or Redis keys into the evidence record.
 5. Issue one replacement enrolment for the exact revoked collector UUID and
    consume the token once through the approved secret injector. `enrol`
    generates fresh request-signing and mTLS material; do not restore the old
-   key or certificate. Fetch a fresh signed configuration, run one bounded
-   collection cycle, repeat the active five-sample transport proof, confirm a
-   current heartbeat and contiguous zero-backlog checkpoint, then restart the
-   timer. Confirm a second use of the enrolment token is denied and the central
-   audit shows ordered revoke, replacement issue, consumption, and restored
-   service evidence.
+   key or certificate. A general Site enrolment token, including one issued
+   before revocation and still inside its validity window, cannot reactivate an
+   existing collector UUID; only the collector-specific replacement enrolment
+   can do so. Fetch a fresh signed configuration, run one bounded collection
+   cycle, repeat the active five-sample transport proof, confirm a current
+   heartbeat and contiguous zero-backlog checkpoint, then restart the timer.
+   Confirm a second use of the replacement token and an attempted use of a
+   still-valid general Site token against the revoked UUID are both denied, and
+   the central audit shows ordered revoke, replacement issue, consumption, and
+   restored service evidence.
 
 ## Escalation, repair rule, and closure evidence
 

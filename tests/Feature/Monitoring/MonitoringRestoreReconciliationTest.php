@@ -94,6 +94,8 @@ it('verifies process-scoped restore configuration before reading any restored st
         'REDIS_URL' => 'redis://:RESTORE-REDIS-SENTINEL@127.0.0.1:6379/9',
         'MONITORING_TIMESERIES_URL' => 'http://influx.restore.test:8086',
         'MONITORING_SNAPSHOT_DISK' => 'monitoring-restore',
+        'MONITORING_RESTORE_FILESYSTEM_DRIVER' => 'local',
+        'MONITORING_RESTORE_FILESYSTEM_ROOT' => storage_path('framework/testing/monitoring-restore-isolated'),
         'MONITORING_CREDENTIAL_DRIVER' => 'vault',
         'MONITORING_VAULT_URL' => 'https://vault.restore.test',
     ];
@@ -104,6 +106,8 @@ it('verifies process-scoped restore configuration before reading any restored st
         'database.redis.default.url' => $processValues['REDIS_URL'],
         'monitoring.storage.timeseries.url' => $processValues['MONITORING_TIMESERIES_URL'],
         'monitoring.storage.snapshots.disk' => $processValues['MONITORING_SNAPSHOT_DISK'],
+        'filesystems.disks.monitoring-restore.driver' => $processValues['MONITORING_RESTORE_FILESYSTEM_DRIVER'],
+        'filesystems.disks.monitoring-restore.root' => $processValues['MONITORING_RESTORE_FILESYSTEM_ROOT'],
         'monitoring.credentials.driver' => 'vault',
         'monitoring.credentials.vault.url' => $processValues['MONITORING_VAULT_URL'],
     ];
@@ -133,6 +137,22 @@ it('verifies process-scoped restore configuration before reading any restored st
         foreach ($processValues as $value) {
             expect(Artisan::output())->not->toContain($value);
         }
+
+        config()->set('filesystems.disks.monitoring-restore.root', storage_path('app/monitoring-restore'));
+        expect(Artisan::call('monitoring:reconcile-restore', [
+            '--assert-process-config' => true,
+            '--config-only' => true,
+        ]))->toBe(1)
+            ->and(Artisan::output())->toContain('process configuration was not applied')
+            ->and(Artisan::output())->not->toContain(
+                $processValues['MONITORING_RESTORE_FILESYSTEM_ROOT'],
+                storage_path('app/monitoring-restore'),
+            )
+            ->and($probe->healthChecks)->toBe(0);
+        config()->set(
+            'filesystems.disks.monitoring-restore.root',
+            $processValues['MONITORING_RESTORE_FILESYSTEM_ROOT'],
+        );
 
         config()->set('monitoring.storage.timeseries.url', 'http://stale-config.invalid');
         expect(Artisan::call('monitoring:reconcile-restore', [

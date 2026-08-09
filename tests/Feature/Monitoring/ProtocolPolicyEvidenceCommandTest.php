@@ -228,7 +228,62 @@ it('requires fresh provider monitor evidence at every mapped site', function () 
         'configured' => 2,
         'fresh' => 2,
         'fresh_sites' => 2,
+        'canonical_scope_failures' => 0,
     ]);
+
+    $unresolvedDevice = Device::factory()->itInfrastructure()->create(['provider' => 'unifi']);
+    $releasedAssignment = DeviceAssignment::query()->create([
+        'device_id' => $unresolvedDevice->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $sites->first()->id,
+        'assignment_type' => AssignmentType::Permanent,
+        'assigned_at' => now()->subMinutes(5),
+    ]);
+    $unresolvedMonitor = Monitor::factory()->create([
+        'device_id' => $unresolvedDevice->id,
+        'kind' => MonitorKind::Provider,
+        'config' => ['provider' => 'unifi', 'collection' => 'device_status'],
+        'current_state' => MonitorState::Healthy,
+        'effective_state' => MonitorState::Healthy,
+        'last_observation_at' => now(),
+    ]);
+    MonitorObservation::factory()->create([
+        'monitor_id' => $unresolvedMonitor->id,
+        'state' => MonitorState::Healthy,
+        'observed_at' => now(),
+    ]);
+    $releasedAssignment->forceFill(['released_at' => now()])->save();
+
+    $unresolved = app(ProtocolPolicyEvidenceService::class)->report(60);
+
+    expect($unresolved['protocols']['provider_unifi'])->toMatchArray([
+        'state' => 'not_verified',
+        'configured' => 3,
+        'fresh' => 3,
+        'fresh_sites' => 2,
+        'canonical_scope_failures' => 1,
+    ]);
+    $unresolvedRoster = $unresolved['continuous_execution']['provider_unifi']['roster_fingerprint'];
+
+    DeviceAssignment::query()->create([
+        'device_id' => $unresolvedDevice->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $sites->first()->id,
+        'assignment_type' => AssignmentType::Permanent,
+        'assigned_at' => now(),
+    ]);
+    $resolved = app(ProtocolPolicyEvidenceService::class)->report(60);
+
+    expect($resolved['protocols']['provider_unifi'])->toMatchArray([
+        'state' => 'verified',
+        'configured' => 3,
+        'fresh' => 3,
+        'fresh_sites' => 2,
+        'canonical_scope_failures' => 0,
+    ])->and($resolved['continuous_execution']['provider_unifi']['roster_fingerprint'])
+        ->not->toBe($unresolvedRoster);
+
+    $unresolvedMonitor->forceFill(['is_enabled' => false])->save();
 
     IntegrationProviderConnection::query()
         ->forProvider('unifi')

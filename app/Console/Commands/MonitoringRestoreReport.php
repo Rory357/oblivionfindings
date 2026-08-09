@@ -65,9 +65,52 @@ final class MonitoringRestoreReport extends Command
             && config('filesystems.disks.monitoring-restore.visibility') === 'private'
             && config('filesystems.disks.monitoring-restore.serve') === false
             && config('filesystems.disks.monitoring-restore.throw') === true
+            && $this->snapshotConfigurationMatches()
             && $this->configuredValueMatches('MONITORING_CREDENTIAL_DRIVER', config('monitoring.credentials.driver'))
             && config('monitoring.credentials.driver') === 'vault'
             && $this->configuredValueMatches('MONITORING_VAULT_URL', config('monitoring.credentials.vault.url'));
+    }
+
+    private function snapshotConfigurationMatches(): bool
+    {
+        $driver = getenv('MONITORING_RESTORE_FILESYSTEM_DRIVER');
+        if (! is_string($driver)
+            || ! in_array($driver, ['local', 's3'], true)
+            || ! hash_equals($driver, (string) config('filesystems.disks.monitoring-restore.driver'))) {
+            return false;
+        }
+
+        if ($driver === 'local') {
+            return $this->configuredValueMatches(
+                'MONITORING_RESTORE_FILESYSTEM_ROOT',
+                config('filesystems.disks.monitoring-restore.root'),
+            );
+        }
+
+        return $this->configuredValueMatches(
+            'MONITORING_RESTORE_OBJECT_ACCESS_KEY_ID',
+            config('filesystems.disks.monitoring-restore.key'),
+        )
+            && $this->configuredValueMatches(
+                'MONITORING_RESTORE_OBJECT_SECRET_ACCESS_KEY',
+                config('filesystems.disks.monitoring-restore.secret'),
+            )
+            && $this->configuredValueMatches(
+                'MONITORING_RESTORE_OBJECT_REGION',
+                config('filesystems.disks.monitoring-restore.region'),
+            )
+            && $this->configuredValueMatches(
+                'MONITORING_RESTORE_OBJECT_BUCKET',
+                config('filesystems.disks.monitoring-restore.bucket'),
+            )
+            && $this->configuredValueMatches(
+                'MONITORING_RESTORE_OBJECT_ENDPOINT',
+                config('filesystems.disks.monitoring-restore.endpoint'),
+            )
+            && $this->configuredBooleanMatches(
+                'MONITORING_RESTORE_OBJECT_PATH_STYLE',
+                config('filesystems.disks.monitoring-restore.use_path_style_endpoint'),
+            );
     }
 
     private function configuredValueMatches(string $environmentKey, mixed $configured): bool
@@ -78,5 +121,17 @@ final class MonitoringRestoreReport extends Command
             && $expected !== ''
             && is_string($configured)
             && hash_equals($expected, $configured);
+    }
+
+    private function configuredBooleanMatches(string $environmentKey, mixed $configured): bool
+    {
+        $expected = getenv($environmentKey);
+        $expectedBoolean = is_string($expected)
+            ? filter_var($expected, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+            : null;
+
+        return is_bool($expectedBoolean)
+            && is_bool($configured)
+            && $expectedBoolean === $configured;
     }
 }

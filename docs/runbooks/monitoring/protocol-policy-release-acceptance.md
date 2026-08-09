@@ -18,6 +18,14 @@ canonical provider monitor observation; currently this applies to UniFi and
 Milesight. Never create a cloud capability for a provider whose official
 contract does not support it.
 
+Every enabled provider monitor must independently resolve through the canonical
+Device provenance contract to exactly one active mapped Site. An unresolved,
+ambiguous or out-of-mapping monitor is an acceptance failure even when another
+fresh monitor already covers that Site. The sustained verifier binds each
+provider monitor to that resolved Site inside its opaque roster fingerprint, so
+moving a monitor between mapped Sites invalidates the observation period without
+printing either identity.
+
 For both UniFi and Milesight, run the real provider connection test inside the
 same bounded evidence window. Every active mapped Site must then complete a
 fresh observation-capability pull after it started, without a partial page,

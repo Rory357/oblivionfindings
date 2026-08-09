@@ -40,6 +40,8 @@ it('requires a complete value-free sustained protocol and policy evidence matrix
             "'evidence_roster_fingerprint'",
             "'continuous_execution'",
             '$fresh->count() === $configured->count()',
+            "'canonical_scope_failures'",
+            "':site:'.(\$canonicalSiteId ?? 'unresolved')",
             'private function continuousExecutionEvidence(',
             'private function executionWindow(',
             'private function opaqueFingerprint(',

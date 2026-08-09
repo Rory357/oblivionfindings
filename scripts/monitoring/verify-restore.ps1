@@ -41,6 +41,23 @@ $MySqlDsn = Get-RequiredProcessEnvironmentValue -Name 'MONITORING_RESTORE_MYSQL_
 $RedisUrl = Get-RequiredProcessEnvironmentValue -Name 'MONITORING_RESTORE_REDIS_URL'
 $InfluxUrl = Get-RequiredProcessEnvironmentValue -Name 'MONITORING_RESTORE_INFLUX_URL'
 $VaultUrl = Get-RequiredProcessEnvironmentValue -Name 'MONITORING_RESTORE_VAULT_URL'
+$RestoreFilesystemDriver = Get-RequiredProcessEnvironmentValue -Name 'MONITORING_RESTORE_FILESYSTEM_DRIVER'
+if ($RestoreFilesystemDriver -ceq 'local') {
+    Get-RequiredProcessEnvironmentValue -Name 'MONITORING_RESTORE_FILESYSTEM_ROOT' | Out-Null
+} elseif ($RestoreFilesystemDriver -ceq 's3') {
+    @(
+        'MONITORING_RESTORE_OBJECT_ACCESS_KEY_ID',
+        'MONITORING_RESTORE_OBJECT_SECRET_ACCESS_KEY',
+        'MONITORING_RESTORE_OBJECT_REGION',
+        'MONITORING_RESTORE_OBJECT_BUCKET',
+        'MONITORING_RESTORE_OBJECT_ENDPOINT',
+        'MONITORING_RESTORE_OBJECT_PATH_STYLE'
+    ) | ForEach-Object {
+        Get-RequiredProcessEnvironmentValue -Name $_ | Out-Null
+    }
+} else {
+    throw 'MONITORING_RESTORE_FILESYSTEM_DRIVER must be exactly local or s3.'
+}
 
 function Get-ConnectionHost {
     param([Parameter(Mandatory)] [string] $Connection)

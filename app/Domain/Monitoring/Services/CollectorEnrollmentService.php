@@ -127,8 +127,10 @@ final readonly class CollectorEnrollmentService
                 ->where('collector_uuid', $collectorUuid)
                 ->lockForUpdate()
                 ->first();
-            if ($collector !== null && ((int) $collector->site_id !== (int) $site->id
-                || ($collector->enrolled_at !== null && $collector->revoked_at === null))) {
+            if ($collector !== null && ($enrollment->replacement_collector_id === null
+                || (int) $enrollment->replacement_collector_id !== (int) $collector->id
+                || (int) $collector->site_id !== (int) $site->id
+                || $collector->revoked_at === null)) {
                 throw new DomainException('Collector identity is unavailable for enrolment.');
             }
             if (MonitoringCollector::query()
