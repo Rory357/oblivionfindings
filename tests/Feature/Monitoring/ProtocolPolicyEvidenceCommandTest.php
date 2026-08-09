@@ -322,7 +322,7 @@ it('requires current suppression and recovery evidence to correlate to the exerc
         'suppression_reason' => 'dependency',
     ])->save();
 
-    MonitoringMaintenanceWindow::query()->create([
+    $maintenanceWindow = MonitoringMaintenanceWindow::query()->create([
         'site_id' => $site->id,
         'monitor_id' => $maintenanceTarget->id,
         'name' => 'Controlled evidence drill',
@@ -383,6 +383,65 @@ it('requires current suppression and recovery evidence to correlate to the exerc
         ->toMatchArray(['state' => 'not_verified', 'observed_suppressions' => 0]);
 
     $downstream->forceFill(['suppressed_at' => now()->subMinute()])->save();
+    $maintenanceWindow->forceFill([
+        'starts_at' => now()->subMinutes(20),
+        'ends_at' => now()->subMinutes(10),
+        'status' => 'completed',
+    ])->save();
+    $maintenanceTarget->forceFill(['suppressed_at' => now()->subMinutes(9)])->save();
+
+    $outsideOneOffOccurrence = app(ProtocolPolicyEvidenceService::class)->report(60)['policy'];
+
+    expect($outsideOneOffOccurrence['dependencies'])
+        ->toMatchArray(['state' => 'verified', 'observed_suppressions' => 1])
+        ->and($outsideOneOffOccurrence['maintenance'])
+        ->toMatchArray(['state' => 'not_verified', 'observed_suppressions' => 0]);
+
+    $maintenanceTarget->forceFill(['suppressed_at' => $maintenanceWindow->ends_at])->save();
+
+    $atOneOffOccurrenceEnd = app(ProtocolPolicyEvidenceService::class)->report(60)['policy'];
+
+    expect($atOneOffOccurrenceEnd['maintenance'])
+        ->toMatchArray(['state' => 'not_verified', 'observed_suppressions' => 0]);
+
+    $maintenanceWindow->forceFill([
+        'starts_at' => now()->subDays(2)->subMinutes(30),
+        'ends_at' => now()->subDays(2)->subMinutes(20),
+        'recurrence' => 'daily',
+        'recurrence_until' => now()->subMinutes(25),
+    ])->save();
+    $maintenanceTarget->forceFill(['suppressed_at' => now()->subMinutes(24)])->save();
+
+    $afterRecurrenceCutoff = app(ProtocolPolicyEvidenceService::class)->report(60)['policy'];
+
+    expect($afterRecurrenceCutoff['maintenance'])
+        ->toMatchArray(['state' => 'not_verified', 'observed_suppressions' => 0]);
+
+    $maintenanceWindow->forceFill([
+        'recurrence_until' => now()->addDay(),
+        'status' => 'active',
+    ])->save();
+    $maintenanceTarget->forceFill(['suppressed_at' => now()->subMinutes(10)])->save();
+
+    $betweenRecurringOccurrences = app(ProtocolPolicyEvidenceService::class)->report(60)['policy'];
+
+    expect($betweenRecurringOccurrences['maintenance'])
+        ->toMatchArray(['state' => 'not_verified', 'observed_suppressions' => 0]);
+
+    $maintenanceTarget->forceFill(['suppressed_at' => now()->subMinutes(25)])->save();
+
+    $insideRecurringOccurrence = app(ProtocolPolicyEvidenceService::class)->report(60)['policy'];
+
+    expect($insideRecurringOccurrence['maintenance'])
+        ->toMatchArray(['state' => 'verified', 'observed_suppressions' => 1]);
+
+    $maintenanceWindow->forceFill([
+        'starts_at' => now()->subMinutes(30),
+        'ends_at' => now()->addMinutes(30),
+        'recurrence' => null,
+        'recurrence_until' => null,
+        'status' => 'active',
+    ])->save();
     $maintenanceTarget->forceFill(['suppressed_at' => now()->subMinute()])->save();
 
     $currentPolicy = app(ProtocolPolicyEvidenceService::class)->report(60)['policy'];

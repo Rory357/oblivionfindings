@@ -3,6 +3,7 @@
 
 use App\Support\Monitoring\LoadSoakEvidenceVerifier;
 use App\Support\Monitoring\LoadSoakPlatformAttestationVerifier;
+use App\Support\Monitoring\LoadSoakReleaseAuthorityVerifier;
 use App\Support\Monitoring\StrictJsonObjectDecoder;
 
 require dirname(__DIR__, 2).'/vendor/autoload.php';
@@ -45,10 +46,13 @@ if (array_keys($arguments) === []
     $fail('arguments');
 }
 
-$expectedPublicKeySha256 = getenv('MONITORING_LOAD_SOAK_ATTESTATION_PUBLIC_KEY_SHA256');
-if (! is_string($expectedPublicKeySha256)
-    || preg_match('/\A[0-9a-f]{64}\z/', $expectedPublicKeySha256) !== 1) {
-    $fail('public_key_pin');
+$testPublicKeySha256 = null;
+if ($testAuthority) {
+    $testPublicKeySha256 = getenv('MONITORING_LOAD_SOAK_ATTESTATION_PUBLIC_KEY_SHA256');
+    if (! is_string($testPublicKeySha256)
+        || preg_match('/\A[0-9a-f]{64}\z/', $testPublicKeySha256) !== 1) {
+        $fail('public_key_pin');
+    }
 }
 
 $resolveInput = static function (string $path, int $maximumBytes) use ($fail): string {
@@ -109,6 +113,23 @@ $verification = $evidence === null
     ]
     : (new LoadSoakEvidenceVerifier)->verify($evidence, $verifiedAt);
 
+$releaseAuthority = ! $testAuthority && $evidence !== null && $attestation !== null
+    ? (new LoadSoakReleaseAuthorityVerifier)->verifyInstalled(
+        hash('sha256', $rawEvidence),
+        hash('sha256', $rawAttestation),
+        $evidence,
+        $attestation,
+        $rawPublicKey,
+        $verifiedAt,
+    )
+    : [
+        'valid' => false,
+        'authority_reference' => null,
+        'public_key_sha256' => null,
+    ];
+$expectedPublicKeySha256 = $testAuthority
+    ? $testPublicKeySha256
+    : ($releaseAuthority['public_key_sha256'] ?? '');
 $attestationResult = $evidence !== null && $attestation !== null
     ? (new LoadSoakPlatformAttestationVerifier)->verify(
         $attestation,
@@ -121,7 +142,11 @@ $attestationResult = $evidence !== null && $attestation !== null
     : ['valid' => false, 'public_key_sha256' => null];
 $contractValid = $verification['status'] === 'contract_valid';
 $attestationValid = $attestationResult['valid'] === true;
-$releaseProvenance = $contractValid && $attestationValid && ! $testAuthority;
+$releaseAuthorityValid = $releaseAuthority['valid'] === true;
+$releaseProvenance = $contractValid
+    && $attestationValid
+    && $releaseAuthorityValid
+    && ! $testAuthority;
 $testContractValid = $contractValid && $attestationValid && $testAuthority;
 $status = match (true) {
     $releaseProvenance => 'passed',
@@ -141,14 +166,22 @@ $artifact = [
     'source_sha256' => hash('sha256', $rawEvidence),
     'attestation_sha256' => hash('sha256', $rawAttestation),
     'public_key_sha256' => $attestationResult['public_key_sha256'],
-    'authority_scope' => $testAuthority ? 'test_only' : 'release_platform',
+    'authority_scope' => match (true) {
+        $testAuthority => 'test_only',
+        $releaseAuthorityValid => 'release_platform',
+        default => 'unverified',
+    },
+    'release_authority_verified' => $releaseAuthorityValid,
+    'release_authority_reference' => $releaseAuthority['authority_reference'],
     'status' => $status,
     'source_contract_status' => $verification['status'],
     'platform_attestation_verified' => $attestationValid,
     'release_provenance_verified' => $releaseProvenance,
     'v09_release_evidence' => $releaseProvenance,
     'checks' => $verification['checks'],
-    'violations_count' => $verification['violations_count'] + ($attestationValid ? 0 : 1),
+    'violations_count' => $verification['violations_count']
+        + ($attestationValid ? 0 : 1)
+        + (! $testAuthority && ! $releaseAuthorityValid ? 1 : 0),
     'run_id' => $verification['run_id'],
     'release_revision' => $verification['release_revision'],
     'environment_fingerprint' => $verification['environment_fingerprint'],
@@ -210,6 +243,7 @@ fwrite(STDOUT, json_encode([
     'artifact_id' => $artifactId,
     'artifact_file' => $artifactFile,
     'release_provenance_verified' => $releaseProvenance,
+    'release_authority_verified' => $releaseAuthorityValid,
     'violations_count' => $artifact['violations_count'],
 ], JSON_UNESCAPED_SLASHES).PHP_EOL);
 

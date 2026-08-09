@@ -7,6 +7,7 @@ it('keeps local synthetic monitoring performance artifacts ineligible for V09 cl
     $script = (string) file_get_contents($root.'/scripts/monitoring/verify-load-soak-evidence.php');
     $verifier = (string) file_get_contents($root.'/app/Support/Monitoring/LoadSoakEvidenceVerifier.php');
     $attestation = (string) file_get_contents($root.'/app/Support/Monitoring/LoadSoakPlatformAttestationVerifier.php');
+    $releaseAuthority = (string) file_get_contents($root.'/app/Support/Monitoring/LoadSoakReleaseAuthorityVerifier.php');
     $strictJson = (string) file_get_contents($root.'/app/Support/Monitoring/StrictJsonObjectDecoder.php');
 
     expect($source)->toContain(
@@ -23,9 +24,15 @@ it('keeps local synthetic monitoring performance artifacts ineligible for V09 cl
 
     expect($script)->toContain(
         "getenv('MONITORING_LOAD_SOAK_ATTESTATION_PUBLIC_KEY_SHA256')",
+        'if ($testAuthority)',
         "'--test-authority'",
         "'contract_valid_test_authority'",
-        "'authority_scope' => \$testAuthority ? 'test_only' : 'release_platform'",
+        '(new LoadSoakReleaseAuthorityVerifier)->verifyInstalled(',
+        "\$releaseAuthorityValid => 'release_platform'",
+        "default => 'unverified'",
+        "'release_authority_verified' => \$releaseAuthorityValid",
+        "'release_authority_reference' => \$releaseAuthority['authority_reference']",
+        '&& $releaseAuthorityValid',
         "'release_provenance_verified' => \$releaseProvenance",
         "'v09_release_evidence' => \$releaseProvenance",
         "fopen(\$artifactPath, 'x+b')",
@@ -35,8 +42,39 @@ it('keeps local synthetic monitoring performance artifacts ineligible for V09 cl
         "'test_authority_can_close_v09' => false",
     )->not->toContain(
         'file_put_contents',
+        'MONITORING_LOAD_SOAK_AUTHORITY_PATH',
+        '--authority=',
         "'contains_targets_credentials_or_payloads' => false",
         "'output_storage_semantics' => 'immutable'",
+    );
+
+    expect($releaseAuthority)->toContain(
+        "AUTHORITY_PATH = '/etc/oblivion/monitoring-load-soak-authority.json'",
+        "PHP_OS_FAMILY !== 'Linux'",
+        'is_link(self::AUTHORITY_PATH)',
+        '@lstat(self::AUTHORITY_PATH)',
+        "@fopen(self::AUTHORITY_PATH, 'rb')",
+        '($mode & 0170000) === 0100000',
+        '($mode & 0022) === 0',
+        "(\$metadata['owner_uid'] ?? null) === 0",
+        '(new StrictJsonObjectDecoder)->decode($rawAuthority)',
+        "'monitoring_load_soak_release_authority_v1'",
+        "'attestation_public_key_sha256'",
+        "'release_revision'",
+        "'environment_reference_sha256'",
+        "'source_sha256'",
+        "'attestation_sha256'",
+        "'not_before'",
+        "'not_after'",
+        "'authority_reference'",
+        'SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES',
+        'hash_equals($expectedPublicKeySha256, $publicKeySha256)',
+        '$verifiedAt >= $notBefore',
+        '$verifiedAt <= $notAfter',
+    )->not->toContain(
+        'getenv(',
+        '$_ENV',
+        '$_SERVER',
     );
 
     expect($attestation)->toContain(

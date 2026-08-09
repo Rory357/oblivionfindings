@@ -436,65 +436,71 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
 
     public function test_dashboard_and_stats_cycle_metrics_reuse_canonical_alert_scope_integrity(): void
     {
-        $otherSite = Site::factory()->create();
-        $otherSiteClient = Client::factory()->create([
-            'site_id' => $otherSite->id,
-        ]);
-        $definition = SlaDefinition::query()->create([
-            'name' => 'Canonical alert scope cycle truth',
-            'code' => 'canonical-alert-scope-cycle-truth',
-            'acknowledge_target_minutes' => 10,
-            'is_active' => true,
-        ]);
+        Carbon::setTestNow(Carbon::parse('2026-08-09 12:00:00 UTC'));
 
-        $visibleLegacyAlert = ControlRoomAlert::factory()->open()->create([
-            'site_id' => null,
-            'client_id' => null,
-            'context' => ['site' => ['id' => $this->site->id]],
-            'triggered_at' => now()->subMinutes(30),
-            'created_by_user_id' => $this->operator->id,
-        ]);
-        $visibleSla = AlertSla::createFromDefinition(
-            $visibleLegacyAlert,
-            $definition,
-            now()->subMinutes(30),
-        );
-        $visibleSla->recordAcknowledge(now()->subMinutes(25));
+        try {
+            $otherSite = Site::factory()->create();
+            $otherSiteClient = Client::factory()->create([
+                'site_id' => $otherSite->id,
+            ]);
+            $definition = SlaDefinition::query()->create([
+                'name' => 'Canonical alert scope cycle truth',
+                'code' => 'canonical-alert-scope-cycle-truth',
+                'acknowledge_target_minutes' => 10,
+                'is_active' => true,
+            ]);
 
-        $explicitSiteAlert = ControlRoomAlert::factory()->open()->create([
-            'site_id' => $this->site->id,
-            'client_id' => $otherSiteClient->id,
-            'triggered_at' => now()->subMinutes(20),
-            'created_by_user_id' => $this->operator->id,
-        ]);
-        $explicitSiteSla = AlertSla::createFromDefinition(
-            $explicitSiteAlert,
-            $definition,
-            now()->subMinutes(20),
-        );
-        $explicitSiteSla->recordAcknowledge(now()->subMinutes(5));
-
-        $dashboardAnalytics = app(ControlRoomDeskService::class)->analytics($this->operator);
-        $this->assertSame(50.0, data_get($dashboardAnalytics, 'sla.compliance_pct'));
-        $this->assertSame([[
-            'date' => now()->toDateString(),
-            'compliance_pct' => 50,
-        ]], data_get($dashboardAnalytics, 'sla_daily_trend'));
-
-        $this->actingAs($this->operator)
-            ->get('/control-room')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->missing('analytics')
+            $visibleLegacyAlert = ControlRoomAlert::factory()->open()->create([
+                'site_id' => null,
+                'client_id' => null,
+                'context' => ['site' => ['id' => $this->site->id]],
+                'triggered_at' => now()->subMinutes(30),
+                'created_by_user_id' => $this->operator->id,
+            ]);
+            $visibleSla = AlertSla::createFromDefinition(
+                $visibleLegacyAlert,
+                $definition,
+                now()->subMinutes(30),
             );
+            $visibleSla->recordAcknowledge(now()->subMinutes(25));
 
-        $this->actingAs($this->operator)
-            ->get('/control-room/stats')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('kpis.avg_acknowledge_minutes', fn ($value) => is_numeric($value) && (float) $value === 10.0)
-                ->where('kpis.sla_compliance_pct', fn ($value) => is_numeric($value) && (float) $value === 50.0)
+            $explicitSiteAlert = ControlRoomAlert::factory()->open()->create([
+                'site_id' => $this->site->id,
+                'client_id' => $otherSiteClient->id,
+                'triggered_at' => now()->subMinutes(20),
+                'created_by_user_id' => $this->operator->id,
+            ]);
+            $explicitSiteSla = AlertSla::createFromDefinition(
+                $explicitSiteAlert,
+                $definition,
+                now()->subMinutes(20),
             );
+            $explicitSiteSla->recordAcknowledge(now()->subMinutes(5));
+
+            $dashboardAnalytics = app(ControlRoomDeskService::class)->analytics($this->operator);
+            $this->assertSame(50.0, data_get($dashboardAnalytics, 'sla.compliance_pct'));
+            $this->assertSame([[
+                'date' => now()->toDateString(),
+                'compliance_pct' => 50,
+            ]], data_get($dashboardAnalytics, 'sla_daily_trend'));
+
+            $this->actingAs($this->operator)
+                ->get('/control-room')
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page
+                    ->missing('analytics')
+                );
+
+            $this->actingAs($this->operator)
+                ->get('/control-room/stats')
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page
+                    ->where('kpis.avg_acknowledge_minutes', fn ($value) => is_numeric($value) && (float) $value === 10.0)
+                    ->where('kpis.sla_compliance_pct', fn ($value) => is_numeric($value) && (float) $value === 50.0)
+                );
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_task7_final_gap_dashboard_report_surfaces_use_canonical_explicit_site_precedence(): void

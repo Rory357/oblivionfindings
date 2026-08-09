@@ -2,6 +2,7 @@
 
 use App\Support\Monitoring\LoadSoakEvidenceVerifier;
 use App\Support\Monitoring\LoadSoakPlatformAttestationVerifier;
+use App\Support\Monitoring\LoadSoakReleaseAuthorityVerifier;
 use App\Support\Monitoring\StrictJsonObjectDecoder;
 use Symfony\Component\Process\Process;
 
@@ -167,6 +168,40 @@ function signedLoadSoakAttestation(array $evidence, string $rawEvidence): array
         'attestation' => [...$claims, 'signature_base64' => base64_encode($signature)],
         'public' => base64_encode($public),
         'pin' => hash('sha256', $public),
+    ];
+}
+
+/**
+ * @param  array{attestation: array<string, mixed>, public: string, pin: string}  $signed
+ * @return array<string, mixed>
+ */
+function validLoadSoakReleaseAuthority(array $evidence, string $rawEvidence, array $signed): array
+{
+    $rawAttestation = json_encode($signed['attestation'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+
+    return [
+        'schema_version' => 1,
+        'evidence_class' => 'monitoring_load_soak_release_authority_v1',
+        'authority_reference' => 'AUTHORITY-'.str_repeat('d', 32),
+        'attestation_public_key_sha256' => $signed['pin'],
+        'release_revision' => $evidence['release_revision'],
+        'environment_reference_sha256' => $evidence['environment_fingerprint'],
+        'source_sha256' => hash('sha256', $rawEvidence),
+        'attestation_sha256' => hash('sha256', $rawAttestation),
+        'not_before' => '2026-08-08T19:00:00Z',
+        'not_after' => '2026-08-09T19:00:00Z',
+    ];
+}
+
+/** @return array<string, mixed> */
+function protectedLoadSoakAuthorityMetadata(): array
+{
+    return [
+        'is_regular_file' => true,
+        'is_symlink' => false,
+        'mode' => 0100644,
+        'owner_uid' => 0,
+        'stable_identity' => true,
     ];
 }
 
@@ -348,6 +383,111 @@ it('requires an exact pinned Ed25519 authority and source binding', function ():
         ->and($invalidSignature['valid'])->toBeFalse();
 });
 
+it('accepts only an exact protected release-authority record bound to the source and attestation', function (): void {
+    $evidence = validLoadSoakEvidence();
+    $rawEvidence = json_encode($evidence, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $signed = signedLoadSoakAttestation($evidence, $rawEvidence);
+    $rawAttestation = json_encode($signed['attestation'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $authority = validLoadSoakReleaseAuthority($evidence, $rawEvidence, $signed);
+
+    $result = (new LoadSoakReleaseAuthorityVerifier)->verifyRecord(
+        json_encode($authority, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+        protectedLoadSoakAuthorityMetadata(),
+        hash('sha256', $rawEvidence),
+        hash('sha256', $rawAttestation),
+        $evidence,
+        $signed['attestation'],
+        $signed['public'],
+        new DateTimeImmutable('2026-08-08T19:02:00Z'),
+    );
+
+    expect($result)->toBe([
+        'valid' => true,
+        'authority_reference' => $authority['authority_reference'],
+        'public_key_sha256' => $signed['pin'],
+    ]);
+});
+
+it('rejects tampered expired and duplicate-key release-authority records', function (string $failure): void {
+    $evidence = validLoadSoakEvidence();
+    $rawEvidence = json_encode($evidence, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $signed = signedLoadSoakAttestation($evidence, $rawEvidence);
+    $rawAttestation = json_encode($signed['attestation'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $authority = validLoadSoakReleaseAuthority($evidence, $rawEvidence, $signed);
+
+    if ($failure === 'tampered source') {
+        $authority['source_sha256'] = str_repeat('0', 64);
+    } elseif ($failure === 'expired') {
+        $authority['not_after'] = '2026-08-08T19:01:59Z';
+    }
+
+    $rawAuthority = json_encode($authority, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    if ($failure === 'duplicate key') {
+        $rawAuthority = preg_replace(
+            '/\A\{"schema_version":1,/',
+            '{"schema_version":1,"schema_version":1,',
+            $rawAuthority,
+        );
+    }
+
+    $result = (new LoadSoakReleaseAuthorityVerifier)->verifyRecord(
+        (string) $rawAuthority,
+        protectedLoadSoakAuthorityMetadata(),
+        hash('sha256', $rawEvidence),
+        hash('sha256', $rawAttestation),
+        $evidence,
+        $signed['attestation'],
+        $signed['public'],
+        new DateTimeImmutable('2026-08-08T19:02:00Z'),
+    );
+
+    expect($result)->toBe([
+        'valid' => false,
+        'authority_reference' => null,
+        'public_key_sha256' => null,
+    ]);
+})->with(['tampered source', 'expired', 'duplicate key']);
+
+it('rejects an authority record without protected ownership mode and file identity', function (string $failure): void {
+    $evidence = validLoadSoakEvidence();
+    $rawEvidence = json_encode($evidence, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $signed = signedLoadSoakAttestation($evidence, $rawEvidence);
+    $rawAttestation = json_encode($signed['attestation'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $authority = validLoadSoakReleaseAuthority($evidence, $rawEvidence, $signed);
+    $metadata = protectedLoadSoakAuthorityMetadata();
+
+    match ($failure) {
+        'not root owned' => $metadata['owner_uid'] = 1000,
+        'group writable' => $metadata['mode'] = 0100664,
+        'other writable' => $metadata['mode'] = 0100646,
+        'symlink' => $metadata['is_symlink'] = true,
+        'not regular' => $metadata['is_regular_file'] = false,
+        'replaced while open' => $metadata['stable_identity'] = false,
+    };
+
+    $result = (new LoadSoakReleaseAuthorityVerifier)->verifyRecord(
+        json_encode($authority, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+        $metadata,
+        hash('sha256', $rawEvidence),
+        hash('sha256', $rawAttestation),
+        $evidence,
+        $signed['attestation'],
+        $signed['public'],
+        new DateTimeImmutable('2026-08-08T19:02:00Z'),
+    );
+
+    expect($result['valid'])->toBeFalse()
+        ->and($result['authority_reference'])->toBeNull()
+        ->and($result['public_key_sha256'])->toBeNull();
+})->with([
+    'not root owned',
+    'group writable',
+    'other writable',
+    'symlink',
+    'not regular',
+    'replaced while open',
+]);
+
 it('writes a collision-safe test-authority artifact that cannot claim V09 release provenance', function (): void {
     $root = dirname(__DIR__, 3);
     $temporary = sys_get_temp_dir().DIRECTORY_SEPARATOR.'oblivion-load-soak-'.bin2hex(random_bytes(8));
@@ -395,6 +535,56 @@ it('writes a collision-safe test-authority artifact that cannot claim V09 releas
             ->and($artifact['output_storage_semantics'])->toBe('collision_safe_exclusive_create')
             ->and($artifact['worm_receipt_verified'])->toBeFalse()
             ->and($artifact)->not->toHaveKeys(['target', 'hostname', 'credential', 'payload']);
+    } finally {
+        foreach (glob($temporary.DIRECTORY_SEPARATOR.'*') ?: [] as $path) {
+            unlink($path);
+        }
+        rmdir($temporary);
+    }
+});
+
+it('cannot turn a locally generated key and caller environment pin into release evidence', function (): void {
+    $root = dirname(__DIR__, 3);
+    $temporary = sys_get_temp_dir().DIRECTORY_SEPARATOR.'oblivion-load-soak-release-'.bin2hex(random_bytes(8));
+    mkdir($temporary, 0700, true);
+    $evidence = validLoadSoakEvidence();
+    $rawEvidence = json_encode($evidence, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $signed = signedLoadSoakAttestation($evidence, $rawEvidence);
+    $evidencePath = $temporary.DIRECTORY_SEPARATOR.'evidence.json';
+    $attestationPath = $temporary.DIRECTORY_SEPARATOR.'attestation.json';
+    $publicKeyPath = $temporary.DIRECTORY_SEPARATOR.'public-key.txt';
+    file_put_contents($evidencePath, $rawEvidence);
+    file_put_contents($attestationPath, json_encode($signed['attestation'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+    file_put_contents($publicKeyPath, $signed['public']);
+
+    try {
+        $process = new Process([
+            PHP_BINARY,
+            $root.'/scripts/monitoring/verify-load-soak-evidence.php',
+            '--evidence='.$evidencePath,
+            '--attestation='.$attestationPath,
+            '--public-key='.$publicKeyPath,
+            '--output-directory='.$temporary,
+        ], $root, [
+            'MONITORING_LOAD_SOAK_ATTESTATION_PUBLIC_KEY_SHA256' => $signed['pin'],
+        ]);
+        $process->run();
+
+        $output = json_decode($process->getOutput(), true, 32, JSON_THROW_ON_ERROR);
+        $artifacts = glob($temporary.DIRECTORY_SEPARATOR.'monitoring-load-soak-verification-*.json');
+
+        expect($process->getExitCode())->not->toBe(0)
+            ->and($output['status'])->toBe('failed')
+            ->and($output['authority_scope'])->toBe('unverified')
+            ->and($output['release_authority_verified'])->toBeFalse()
+            ->and($output['release_provenance_verified'])->toBeFalse()
+            ->and($artifacts)->toHaveCount(1);
+
+        $artifact = json_decode((string) file_get_contents($artifacts[0]), true, 32, JSON_THROW_ON_ERROR);
+        expect($artifact['release_authority_verified'])->toBeFalse()
+            ->and($artifact['release_authority_reference'])->toBeNull()
+            ->and($artifact['platform_attestation_verified'])->toBeFalse()
+            ->and($artifact['v09_release_evidence'])->toBeFalse();
     } finally {
         foreach (glob($temporary.DIRECTORY_SEPARATOR.'*') ?: [] as $path) {
             unlink($path);

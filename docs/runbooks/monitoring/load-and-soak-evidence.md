@@ -17,8 +17,10 @@ The v2 release verifier also has `--test-authority` solely for exercising strict
 JSON and Ed25519 contract mechanics. Its output status is
 `contract_valid_test_authority`, its authority is `test_only`, and both
 `release_provenance_verified` and `v09_release_evidence` remain false. Omitting
-the flag with a locally chosen key is not release evidence: only the protected
-platform runner is authorised to inject the pinned release-authority key hash.
+the flag with a locally chosen key and matching
+`MONITORING_LOAD_SOAK_ATTESTATION_PUBLIC_KEY_SHA256` is not release evidence.
+That environment pin is read only in explicit test-authority mode and cannot
+authorise a release run.
 
 ## Required deployed evidence
 
@@ -35,11 +37,39 @@ The source record is never trusted merely because it says `production` or
 `isolated_deployed_release`. A protected platform service must sign a separate
 `monitoring_load_soak_platform_attestation_v1` object using Ed25519. The private
 key remains outside the application host. The verifier reads the public key from
-a separate regular file and accepts it only when the SHA-256 of the decoded
-32-byte public key equals the value injected out of band as
-`MONITORING_LOAD_SOAK_ATTESTATION_PUBLIC_KEY_SHA256` by the protected release
-runner. The evidence, attestation, public-key file and key pin are independent
-inputs; no key identity declared inside the source is trusted.
+a separate regular file. Release mode accepts it only when the SHA-256 of the
+decoded 32-byte public key equals the key hash in the protected authority record
+at exactly `/etc/oblivion/monitoring-load-soak-authority.json`. There is no CLI
+or environment override for this path. A missing authority record, non-Linux
+runtime, symlink, non-regular file, non-root owner, group/other writable mode, or
+file identity change while it is read fails closed.
+
+The authority record is a duplicate-free exact JSON object:
+
+```json
+{
+  "schema_version": 1,
+  "evidence_class": "monitoring_load_soak_release_authority_v1",
+  "authority_reference": "AUTHORITY-00000000000000000000000000000000",
+  "attestation_public_key_sha256": "<64 lowercase hex>",
+  "release_revision": "<40 lowercase hex>",
+  "environment_reference_sha256": "<64 lowercase hex>",
+  "source_sha256": "<64 lowercase hex>",
+  "attestation_sha256": "<64 lowercase hex>",
+  "not_before": "YYYY-MM-DDTHH:MM:SSZ",
+  "not_after": "YYYY-MM-DDTHH:MM:SSZ"
+}
+```
+
+Provision it from the protected release-control plane as a root-owned regular
+file with no group or other write permission. The opaque authority reference
+identifies the approval without carrying an operator, Site, Device, endpoint,
+credential or payload. The record binds the exact source bytes, exact
+attestation bytes, exact release, environment reference and signer key and must
+be valid at verification time. Extra fields, duplicate keys, fractional times,
+an invalid interval, changed hash or changed key fail. The evidence,
+attestation, public-key input and protected authority record remain independent;
+no key identity declared inside the source or caller environment is trusted.
 
 The detached signature covers a canonical object containing:
 
@@ -151,8 +181,9 @@ The non-relaxable policy ceilings remain:
 ## Execute the release gate
 
 Run from the exact deployed release checkout under the protected release runner.
-The runner supplies the pinned key hash; do not type, copy or derive the pin from
-the source or attestation being verified.
+The protected control plane must install the exact authority record before the
+gate. Do not derive that record or its hashes from caller-controlled environment
+variables in the verification process.
 
 ```text
 php scripts/monitoring/verify-load-soak-evidence.php \
@@ -163,10 +194,13 @@ php scripts/monitoring/verify-load-soak-evidence.php \
 ```
 
 Release mode exits zero with `status: passed` only when the source contract and
-independently pinned Ed25519 attestation both pass. The output binds the source,
-attestation, authority key, run, release, environment, profile, measurement
-contract and Supervisor generation without emitting targets, credentials,
-payloads, Sites, Devices, process references or measurement values.
+independently pinned Ed25519 attestation both pass and the fixed protected
+authority record is verified. The output records
+`release_authority_verified: true` and its value-free
+`release_authority_reference`, and binds the source, attestation, authority key,
+run, release, environment, profile, measurement contract and Supervisor
+generation without emitting targets, credentials, payloads, Sites, Devices,
+process references or measurement values.
 
 The verifier uses exclusive file creation, flush and filesystem sync. This is
 collision-safe publication, not proof of immutability. It records

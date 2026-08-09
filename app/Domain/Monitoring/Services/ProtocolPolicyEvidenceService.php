@@ -25,6 +25,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use RuntimeException;
 use Throwable;
+use UnexpectedValueException;
 
 final class ProtocolPolicyEvidenceService
 {
@@ -32,6 +33,7 @@ final class ProtocolPolicyEvidenceService
         private readonly IntegrationAdapterRegistry $providers,
         private readonly CoverageAnalyzer $coverage,
         private readonly MonitoringRollupService $rollups,
+        private readonly MaintenanceEvaluator $maintenance,
     ) {}
 
     /** @return array<string, mixed> */
@@ -284,7 +286,18 @@ final class ProtocolPolicyEvidenceService
         $recentMaintenanceWindows = MonitoringMaintenanceWindow::query()
             ->whereIn('status', ['active', 'completed'])
             ->where('starts_at', '<=', $now)
-            ->where('ends_at', '>=', $since)
+            ->where(function ($query) use ($since): void {
+                $query->where(function ($oneOff) use ($since): void {
+                    $oneOff->whereNull('recurrence')
+                        ->where('ends_at', '>=', $since);
+                })->orWhere(function ($recurring) use ($since): void {
+                    $recurring->whereNotNull('recurrence')
+                        ->where(function ($horizon) use ($since): void {
+                            $horizon->whereNull('recurrence_until')
+                                ->orWhere('recurrence_until', '>=', $since);
+                        });
+                });
+            })
             ->get();
         $maintenanceSuppressions = $monitors
             ->where('effective_state', MonitorState::Suppressed)
@@ -293,14 +306,15 @@ final class ProtocolPolicyEvidenceService
             ->filter(function (Monitor $monitor) use ($recentMaintenanceWindows): bool {
                 try {
                     $siteId = app(CanonicalDeviceSiteResolver::class)->resolve((int) $monitor->device_id);
-                } catch (Throwable) {
+                } catch (UnexpectedValueException) {
                     return false;
                 }
 
                 return $recentMaintenanceWindows->contains(
                     fn (MonitoringMaintenanceWindow $window): bool => (int) $window->site_id === $siteId
                         && ($window->monitor_id === null || (int) $window->monitor_id === (int) $monitor->id)
-                        && ($window->device_id === null || (int) $window->device_id === (int) $monitor->device_id),
+                        && ($window->device_id === null || (int) $window->device_id === (int) $monitor->device_id)
+                        && $this->maintenance->containsOccurrence($window, $monitor->suppressed_at),
                 );
             })
             ->count();

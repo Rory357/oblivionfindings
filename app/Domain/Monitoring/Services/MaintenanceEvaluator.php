@@ -29,11 +29,14 @@ final class MaintenanceEvaluator
             ->orderByDesc('device_id')
             ->orderBy('id')
             ->get()
-            ->first(fn (MonitoringMaintenanceWindow $window): bool => $this->contains($window, $at));
+            ->first(fn (MonitoringMaintenanceWindow $window): bool => $this->containsOccurrence($window, $at));
     }
 
-    private function contains(MonitoringMaintenanceWindow $window, CarbonImmutable $at): bool
-    {
+    public function containsOccurrence(
+        MonitoringMaintenanceWindow $window,
+        DateTimeInterface $at,
+    ): bool {
+        $at = CarbonImmutable::instance($at)->utc();
         $start = CarbonImmutable::instance($window->starts_at)->utc();
         $end = CarbonImmutable::instance($window->ends_at)->utc();
 
