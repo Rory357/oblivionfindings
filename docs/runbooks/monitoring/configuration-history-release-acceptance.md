@@ -63,7 +63,7 @@ Keep the production manifest, the exact verified restore reconciliation JSON, an
 
 1. Run the supervised native read-only SSH or WinRM worker against one approved reachable production host. Capture a baseline, make one approved reversible configuration change through the normal workflow, capture the successor, and allow a real capacity series to advance.
 2. Complete the approved backup and the full isolated restore. Retain the exact green reconciliation artifact produced by [Monitoring storage restore](storage-restore.md); do not recreate its JSON manually.
-3. Run D07 from [IT and Security desktop release acceptance](../it-security-desktop-release-acceptance.md) against that same restored release. At both viewports inspect the configuration history/diff, firmware history and capacity history, plus page source, Inertia props, Fetch/XHR payloads, console and request targets for leaked target or configuration data.
+3. Only after the restore reconciliation artifact's `verification_completed_at_utc` has passed, run D07 from [IT and Security desktop release acceptance](../it-security-desktop-release-acceptance.md) against that same restored release. The browser companion's signed `verified_at_utc` must be at or after that completion time. At both viewports inspect the configuration history/diff, firmware history and capacity history, plus page source, Inertia props, Fetch/XHR payloads, console and request targets for leaked target or configuration data.
 4. Have the independent production reviewer and separate browser reviewer create and sign their exact schema-v2 documents. The browser reviewer must retain the capture and network-trace files whose hashes are signed.
 
 ## Execute

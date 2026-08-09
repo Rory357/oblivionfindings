@@ -498,9 +498,12 @@ final class ConfigurationHistoryEvidenceContract
         $completed = $this->utc($manifest['observation_completed_at_utc'] ?? null);
         $recoveryPoint = $this->utc(data_get($manifest, 'restore.recovery_point_at_utc'));
         $restoredRecoveryPoint = $this->utcFlexible(data_get($restore, 'document.recovery_point_utc'));
+        $restoreVerificationCompleted = $this->utcFlexible(
+            data_get($restore, 'document.verification_completed_at_utc'),
+        );
         $verified = $this->utc($browser['verified_at_utc'] ?? null);
         if (! $recoveryPoint->equalTo($restoredRecoveryPoint)
-            || $verified->lt($recoveryPoint)
+            || $verified->lt($restoreVerificationCompleted)
             || $recoveryPoint->lt($completed)) {
             $this->refuse();
         }

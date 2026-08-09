@@ -268,6 +268,9 @@ it('fails closed when exact restore browser firmware or immutable row linkage ch
     'firmware commitment' => function (array &$browser): void {
         $browser['commitments']['changed_firmware_hmac_sha256'] = str_repeat('0', 64);
     },
+    'browser acceptance before restore verification completed' => function (array &$browser): void {
+        $browser['verified_at_utc'] = '2026-08-02T01:20:00Z';
+    },
 ]);
 
 it('rejects a restore artifact with any continuity or recovery-objective failure', function (Closure $mutate): void {

@@ -162,6 +162,30 @@ final class RecordProductionMonitoringRetentionEvidence extends Command
         }
 
         try {
+            $currentAuthority = $releaseAuthority->loadInstalled();
+            $authorityIsCurrent = hash_equals(
+                $authority['release_revision'],
+                $currentAuthority['release_revision'],
+            ) && hash_equals(
+                $authority['key_reference'],
+                $currentAuthority['key_reference'],
+            ) && hash_equals(
+                $authority['public_key'],
+                $currentAuthority['public_key'],
+            );
+        } catch (Throwable) {
+            $authorityIsCurrent = false;
+        }
+        if (! $authorityIsCurrent) {
+            $report['errors'] = array_values(array_unique([
+                ...$report['errors'],
+                'release_authority_changed_or_expired',
+            ]));
+            $report['status'] = 'failed';
+            $report['a05_release_evidence'] = false;
+        }
+
+        try {
             $artifact = $writer->write($outputDirectory, $report, $authority['public_key']);
         } catch (Throwable) {
             return $this->finish(['evidence_artifact_write_failed']);
