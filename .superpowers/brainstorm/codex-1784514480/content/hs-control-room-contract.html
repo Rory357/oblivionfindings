@@ -1,0 +1,79 @@
+<style>
+  .diagnosis { margin: 0 0 22px; padding: 14px 16px; border: 1px solid #f2c94c; border-radius: 12px; background: #fff9df; color: #594600; }
+  .mini-app { overflow: hidden; border: 1px solid #d7deea; border-radius: 14px; background: #f6f8fb; box-shadow: 0 10px 30px rgba(22,34,51,.08); }
+  .mini-hero { padding: 16px; color: white; background: linear-gradient(135deg,#0e5670,#16748a 54%,#277f76); }
+  .mini-ribbon { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; }
+  .mini-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px; }
+  .mini-title { font-size:18px; font-weight:750; }
+  .mini-status { padding:4px 8px; border-radius:999px; background:rgba(255,255,255,.15); font-size:10px; }
+  .metric-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:12px; }
+  .metric { padding:8px; border:1px solid rgba(255,255,255,.18); border-radius:9px; background:rgba(255,255,255,.10); }
+  .metric b { display:block; font-size:16px; }
+  .metric span { font-size:9px; opacity:.75; }
+  .mini-tabs { display:flex; gap:6px; padding:10px 12px; border-bottom:1px solid #dde3ec; background:white; }
+  .mini-tab { padding:5px 8px; border-radius:7px; font-size:10px; color:#526071; }
+  .mini-tab.active { color:#0e6277; background:#e4f3f5; font-weight:700; }
+  .mini-body { display:grid; grid-template-columns:1.2fr .8fr; gap:8px; padding:11px; }
+  .panel { min-height:74px; padding:10px; border:1px solid #e0e5ed; border-radius:9px; background:white; }
+  .panel strong { display:block; margin-bottom:7px; font-size:10px; color:#344154; }
+  .row { height:8px; margin:6px 0; border-radius:4px; background:#e8edf3; }
+  .row.short { width:68%; }
+  .modal-chip { display:inline-block; margin-top:8px; padding:4px 7px; border-radius:6px; background:#e7f4f1; color:#176c61; font-size:9px; font-weight:700; }
+  .family { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .family .mini-body { grid-template-columns:1fr; }
+  .family .mini-title { font-size:14px; }
+  .family .metric-grid { grid-template-columns:repeat(2,1fr); }
+  .contract-tags { display:flex; flex-wrap:wrap; gap:5px; margin-top:10px; }
+  .contract-tags span { padding:4px 7px; border-radius:999px; background:#edf2f7; color:#475569; font-size:9px; }
+  @media (max-width: 800px) { .family { grid-template-columns:1fr; } .mini-body { grid-template-columns:1fr; } }
+</style>
+
+<h2>Which Health &amp; Safety reference should become the Oblivion UI contract?</h2>
+<p class="subtitle">The code confirms your concern: <code>origin/main</code> shares hero primitives between Health &amp; Safety and Control Room, but it does not enforce the same whole-page composition, density, tabs, worklists, dialogs, or interaction grammar.</p>
+
+<div class="diagnosis"><strong>Why it still feels inconsistent:</strong> sharing a gradient hero component is not the same as sharing a product design system.</div>
+
+<div class="cards">
+  <div class="card" data-choice="dashboard" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mini-app">
+        <div class="mini-hero">
+          <div class="mini-ribbon">Health &amp; Safety · command centre</div>
+          <div class="mini-heading"><div class="mini-title">Safety overview</div><div class="mini-status">System current</div></div>
+          <div class="metric-grid"><div class="metric"><b>7</b><span>Open events</span></div><div class="metric"><b>3</b><span>Actions due</span></div><div class="metric"><b>98%</b><span>Compliance</span></div></div>
+        </div>
+        <div class="mini-tabs"><div class="mini-tab active">Overview</div><div class="mini-tab">Leading</div><div class="mini-tab">Lagging</div></div>
+        <div class="mini-body"><div class="panel"><strong>Priority worklist</strong><div class="row"></div><div class="row"></div><div class="row short"></div></div><div class="panel"><strong>Performance</strong><div class="row"></div><div class="row short"></div></div></div>
+      </div>
+    </div>
+    <div class="card-body"><h3>A — Dashboard only</h3><p>Use the main H&amp;S command-centre dashboard as the single visual North Star.</p></div>
+  </div>
+
+  <div class="card" data-choice="register" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mini-app">
+        <div class="mini-hero">
+          <div class="mini-ribbon">Health &amp; Safety · register</div>
+          <div class="mini-heading"><div class="mini-title">Risk assessments</div><div class="mini-status">12 active</div></div>
+          <div class="metric-grid"><div class="metric"><b>4</b><span>Due review</span></div><div class="metric"><b>2</b><span>High risk</span></div><div class="metric"><b>1</b><span>Draft</span></div></div>
+        </div>
+        <div class="mini-tabs"><div class="mini-tab active">Active</div><div class="mini-tab">Due review</div><div class="mini-tab">Archived</div></div>
+        <div class="mini-body"><div class="panel"><strong>Operational register</strong><div class="row"></div><div class="row"></div><div class="row"></div><span class="modal-chip">Detail opens in modal</span></div><div class="panel"><strong>Filters &amp; actions</strong><div class="row short"></div><div class="row"></div></div></div>
+      </div>
+    </div>
+    <div class="card-body"><h3>B — Registers only</h3><p>Use Hazards, Risk Assessments, Incidents, and similar H&amp;S registers as the reference.</p></div>
+  </div>
+
+  <div class="card" data-choice="family" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="family">
+        <div class="mini-app"><div class="mini-hero"><div class="mini-ribbon">Hub pattern</div><div class="mini-title">Operational overview</div><div class="metric-grid"><div class="metric"><b>7</b><span>Open</span></div><div class="metric"><b>3</b><span>Due</span></div></div></div><div class="mini-tabs"><div class="mini-tab active">Overview</div><div class="mini-tab">Work</div></div><div class="mini-body"><div class="panel"><strong>Priorities + insight</strong><div class="row"></div><div class="row short"></div></div></div></div>
+        <div class="mini-app"><div class="mini-hero"><div class="mini-ribbon">Register pattern</div><div class="mini-title">Actionable records</div><div class="metric-grid"><div class="metric"><b>12</b><span>Active</span></div><div class="metric"><b>4</b><span>Review</span></div></div></div><div class="mini-tabs"><div class="mini-tab active">Active</div><div class="mini-tab">Closed</div></div><div class="mini-body"><div class="panel"><strong>Rows → detail modal</strong><div class="row"></div><div class="row"></div></div></div></div>
+      </div>
+      <div class="contract-tags"><span>Same spacing</span><span>Same hero grammar</span><span>Same tabs</span><span>Same row actions</span><span>Same modal family</span><span>Different domain content</span></div>
+    </div>
+    <div class="card-body"><h3>C — Pattern family (recommended)</h3><p>Use the correct H&amp;S blueprint by page type: command-centre hubs, operational registers, and workflow/detail dialogs.</p></div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:18px">Click the option that best matches what you mean by “make Control Room consistent with Health &amp; Safety.”</p>

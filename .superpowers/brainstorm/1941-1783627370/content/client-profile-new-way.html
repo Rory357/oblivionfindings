@@ -1,0 +1,97 @@
+<style>
+  .flow-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; align-items:stretch; }
+  .flow-node { border:1px solid var(--border); border-radius:12px; padding:12px; background:var(--card); min-height:88px; }
+  .flow-node strong { display:block; margin-bottom:5px; }
+  .flow-arrow { display:flex; align-items:center; justify-content:center; color:var(--muted-foreground); font-weight:700; }
+  .pill-row { display:flex; flex-wrap:wrap; gap:7px; margin:12px 0; }
+  .pill { border:1px solid var(--border); border-radius:999px; padding:5px 10px; font-size:12px; background:var(--card); }
+  .good { border-color:color-mix(in srgb, var(--primary) 45%, var(--border)); background:color-mix(in srgb, var(--primary) 8%, var(--card)); }
+  .warn { border-color:#f0a28f; background:#fff4f1; }
+  .mini { font-size:12px; color:var(--muted-foreground); line-height:1.45; }
+  .rule-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
+  .rule { border-left:3px solid var(--primary); background:var(--card); padding:9px 11px; border-radius:8px; font-size:12px; }
+  @media (max-width: 820px) { .flow-grid { grid-template-columns:1fr; } .flow-arrow { transform:rotate(90deg); } .rule-grid { grid-template-columns:1fr; } }
+</style>
+
+<h2>The client profile already points to a new way — it just stops halfway</h2>
+<p class="subtitle">Live client #9040 + repo evidence. The hero is strong; the completion loop is inconsistent.</p>
+
+<div class="section">
+  <div class="label">What is already the new UI/UX</div>
+  <div class="pill-row">
+    <span class="pill good">Snapshot</span><span class="pill good">Daily care</span><span class="pill good">Plans &amp; goals</span>
+    <span class="pill good">Health &amp; safety</span><span class="pill good">Day-to-day</span><span class="pill good">Relationships &amp; governance</span>
+  </div>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Working well</div>
+      <div class="mockup-body">
+        <p><strong>One person, one workspace</strong></p>
+        <p class="mini">Identity, safeguarding, care status, quick actions, health signals, group navigation and sticky subtabs remain visible.</p>
+      </div>
+    </div>
+    <div class="mockup warn">
+      <div class="mockup-header">What breaks the promise</div>
+      <div class="mockup-body">
+        <p><strong>Summary tabs that send the user elsewhere</strong></p>
+        <p class="mini">Medical, Finance, Documents, Consent Requests, Agreements, Respite, Incidents and more still leave the profile or stop at create/read.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">The completed interaction contract</div>
+  <div class="flow-grid">
+    <div class="flow-node"><strong>1. Pick group + subtab</strong><span class="mini">The content changes with the group; the URL remembers it.</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><strong>2. Work in context</strong><span class="mini">Summary, records, empty state and one obvious next action.</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node good"><strong>3. Open guided modal</strong><span class="mini">Add Client chrome: step rail, locked client, validation, review.</span></div>
+  </div>
+  <div class="flow-grid" style="margin-top:10px">
+    <div class="flow-node"><strong>5. Stay on the same tab</strong><span class="mini">Refresh only changed data, highlight the saved record, preserve scroll.</span></div>
+    <div class="flow-arrow">←</div>
+    <div class="flow-node"><strong>4. Finish confidently</strong><span class="mini">Success state, next action, dirty-close protection, permission-safe errors.</span></div>
+    <div class="flow-arrow">←</div>
+    <div class="flow-node good"><strong>No page escape</strong><span class="mini">Create, view, edit, approve, complete and delete all happen over the profile.</span></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Non-negotiable rules for every actionable tab</div>
+  <div class="rule-grid">
+    <div class="rule">View → Edit without closing</div>
+    <div class="rule">Create + complete lifecycle actions</div>
+    <div class="rule">Server permission + client/org scoping</div>
+    <div class="rule">Deep-linked modal + browser Back</div>
+    <div class="rule">Mobile full-screen, 44px controls</div>
+    <div class="rule">Loading, empty, error and success states</div>
+  </div>
+</div>
+
+<h3>Which one-goal approach should I turn into the final prompt?</h3>
+<p class="subtitle">Select one. My recommendation is A.</p>
+<div class="cards">
+  <div class="card" data-choice="complete-loop" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <div class="letter">A</div>
+      <h3>Complete the loop — recommended</h3>
+      <p>One goal, executed in internal batches: fix navigation and P0 security first; then finish modal CRUD tab-by-tab; then lazy-load, test and verify live.</p>
+    </div>
+  </div>
+  <div class="card" data-choice="modal-sweep" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <div class="letter">B</div>
+      <h3>Modal conversion sweep</h3>
+      <p>Fastest visual result. Replace page links with dialogs, but leaves security, lifecycle, duplication and payload debt underneath.</p>
+    </div>
+  </div>
+  <div class="card" data-choice="rebuild" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <div class="letter">C</div>
+      <h3>Rebuild the profile</h3>
+      <p>Cleanest theoretical architecture, but highest regression risk and needless churn because the new hero and modal system already exist.</p>
+    </div>
+  </div>
+</div>
