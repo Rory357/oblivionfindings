@@ -101,10 +101,11 @@ for (const target of authenticatedPages) {
         await stabiliseVolatileText(page, target.name);
         await expect(page).toHaveScreenshot(`${target.name}.png`, {
             fullPage: true,
-            // The incident wizard is rendered over a dimmed, freshly seeded
-            // incident register. Keep the wizard contract explicit above and
-            // bound only the expected timestamp/record-text churn behind it.
-            ...(target.name === 'incident-create'
+            // The dashboard renders current-day seeded counts, charts, shifts,
+            // and attestations. The incident wizard is rendered over a dimmed,
+            // freshly seeded incident register. Keep both page contracts
+            // explicit above and bound only their expected data/date churn.
+            ...(['dashboard', 'incident-create'].includes(target.name)
                 ? { maxDiffPixelRatio: 0.025 }
                 : {}),
         });
