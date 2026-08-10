@@ -94,7 +94,7 @@ configuration-history or restore evidence.
 - `RELEASE Alpha Fleet Tracker`: canonical tracker installed in `RELEASE Alpha Vehicle` through the active Device-to-Asset link.
 - `RELEASE Alpha Environment Sensor`: Alpha Facilities & IoT Device with current observation and maintenance evidence.
 - `RELEASE Hidden Device`: any canonical Device at Hidden used for list, count, search, picker, export, and direct-object denial.
-- `RELEASE Alpha Vehicle`, `RELEASE Alpha Asset`, and `RELEASE Alpha Financial Record`: canonical Fleet, Asset, and Finance owners linked to their authorised technology projections.
+- `RELEASE Alpha Vehicle`, `RELEASE Alpha Asset`, and `RELEASE Alpha Financial Record`: three uniquely named canonical owners. The active Vehicle has both current and home Site set to Alpha, category `Vehicle`, and no Client owner. The active operational Asset has category `IT Equipment`, Site Alpha, and no Client owner. The active Finance record has category `it_equipment` and links to that exact operational Asset. Their authorised technology projections must reuse these records.
 
 ### IT, Control Room, monitoring, and provider state
 

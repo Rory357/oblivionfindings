@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Finance\Models\FinFixedAsset;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
@@ -206,4 +207,89 @@ it('requires unique Devices with exact taxonomy and canonical owner bindings', f
     $duplicated = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
 
     expect($duplicated['gap_codes'])->toContain('release_device_name_not_unique');
+});
+
+it('requires unique canonical Asset and Finance owners with exact Alpha scope', function (): void {
+    $alpha = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $other = Site::factory()->create(['name' => 'Other Site']);
+    $actor = User::factory()->create();
+    $vehicle = Asset::factory()->create([
+        'name' => 'RELEASE Alpha Vehicle',
+        'category' => 'Vehicle',
+        'site_id' => $alpha->id,
+        'home_site_id' => $other->id,
+        'client_id' => null,
+        'status' => 'active',
+        'created_by_user_id' => $actor->id,
+        'updated_by_user_id' => $actor->id,
+    ]);
+    $asset = Asset::factory()->create([
+        'name' => 'RELEASE Alpha Asset',
+        'category' => 'Safety Equipment',
+        'site_id' => $alpha->id,
+        'client_id' => null,
+        'status' => 'active',
+        'created_by_user_id' => $actor->id,
+        'updated_by_user_id' => $actor->id,
+    ]);
+    $financial = FinFixedAsset::factory()->create([
+        'asset_name' => 'RELEASE Alpha Financial Record',
+        'category' => 'vehicle',
+        'status' => 'active',
+        'linked_asset_id' => $vehicle->id,
+    ]);
+
+    $invalid = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+
+    expect($invalid['sections']['assets'])->toMatchArray([
+        'required' => 3,
+        'present' => 3,
+        'ready' => 0,
+    ])->and($invalid['gap_codes'])->toContain(
+        'release_vehicle_scope_mismatch',
+        'release_asset_scope_mismatch',
+        'release_financial_record_link_mismatch',
+    );
+
+    $vehicle->update(['home_site_id' => $alpha->id]);
+    $asset->update(['category' => 'IT Equipment']);
+    $financial->update([
+        'category' => 'it_equipment',
+        'linked_asset_id' => $asset->id,
+    ]);
+
+    $valid = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+
+    expect($valid['sections']['assets']['ready'])->toBe(3)
+        ->and($valid['gap_codes'])->not->toContain(
+            'release_vehicle_scope_mismatch',
+            'release_asset_scope_mismatch',
+            'release_financial_record_link_mismatch',
+            'release_asset_name_not_unique',
+            'release_financial_record_name_not_unique',
+        );
+
+    Asset::factory()->create([
+        'name' => 'RELEASE Alpha Asset',
+        'category' => 'IT Equipment',
+        'site_id' => $alpha->id,
+        'client_id' => null,
+        'status' => 'active',
+        'created_by_user_id' => $actor->id,
+        'updated_by_user_id' => $actor->id,
+    ]);
+    FinFixedAsset::factory()->create([
+        'asset_name' => 'RELEASE Alpha Financial Record',
+        'category' => 'it_equipment',
+        'status' => 'active',
+        'linked_asset_id' => $asset->id,
+    ]);
+
+    $duplicated = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+
+    expect($duplicated['sections']['assets']['ready'])->toBe(1)
+        ->and($duplicated['gap_codes'])->toContain(
+            'release_asset_name_not_unique',
+            'release_financial_record_name_not_unique',
+        );
 });

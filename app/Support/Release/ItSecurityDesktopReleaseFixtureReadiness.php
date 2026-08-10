@@ -609,50 +609,70 @@ final class ItSecurityDesktopReleaseFixtureReadiness
      */
     private function assetSection(Collection $sites): array
     {
-        $assets = Asset::query()
+        $assetRows = Asset::query()
             ->whereIn('name', ['RELEASE Alpha Vehicle', 'RELEASE Alpha Asset'])
-            ->get()
-            ->keyBy('name');
-        $financial = FinFixedAsset::query()
+            ->get();
+        $assets = $assetRows->groupBy('name');
+        $financialRows = FinFixedAsset::query()
             ->where('asset_name', 'RELEASE Alpha Financial Record')
-            ->first();
+            ->get();
         $alpha = $sites->get('RELEASE Site Alpha');
         $ready = 0;
         $gaps = [];
-        $vehicle = $assets->get('RELEASE Alpha Vehicle');
-        $asset = $assets->get('RELEASE Alpha Asset');
+        $vehicleRows = $assets->get('RELEASE Alpha Vehicle', collect());
+        $assetRows = $assets->get('RELEASE Alpha Asset', collect());
+        $vehicle = $vehicleRows->count() === 1 ? $vehicleRows->first() : null;
+        $asset = $assetRows->count() === 1 ? $assetRows->first() : null;
+        $financial = $financialRows->count() === 1 ? $financialRows->first() : null;
+
+        if ($vehicleRows->count() > 1 || $assetRows->count() > 1) {
+            $gaps[] = 'release_asset_name_not_unique';
+        }
+
+        if ($financialRows->count() > 1) {
+            $gaps[] = 'release_financial_record_name_not_unique';
+        }
 
         if ($vehicle instanceof Asset
             && $alpha instanceof Site
             && $vehicle->status === 'active'
             && strtolower((string) $vehicle->category) === 'vehicle'
-            && in_array((int) $alpha->id, [(int) $vehicle->site_id, (int) $vehicle->home_site_id], true)) {
+            && (int) $vehicle->site_id === (int) $alpha->id
+            && (int) $vehicle->home_site_id === (int) $alpha->id
+            && $vehicle->client_id === null) {
             $ready++;
         } else {
-            $gaps[] = $vehicle instanceof Asset ? 'release_vehicle_scope_mismatch' : 'release_vehicle_missing';
+            $gaps[] = $vehicleRows->isNotEmpty() ? 'release_vehicle_scope_mismatch' : 'release_vehicle_missing';
         }
 
         if ($asset instanceof Asset
             && $alpha instanceof Site
             && $asset->status === 'active'
-            && (int) $asset->site_id === (int) $alpha->id) {
+            && strtolower((string) $asset->category) === 'it equipment'
+            && (int) $asset->site_id === (int) $alpha->id
+            && $asset->client_id === null) {
             $ready++;
         } else {
-            $gaps[] = $asset instanceof Asset ? 'release_asset_scope_mismatch' : 'release_asset_missing';
+            $gaps[] = $assetRows->isNotEmpty() ? 'release_asset_scope_mismatch' : 'release_asset_missing';
         }
 
         if ($financial instanceof FinFixedAsset
             && $financial->status === 'active'
+            && $financial->category === 'it_equipment'
             && $asset instanceof Asset
             && (int) $financial->linked_asset_id === (int) $asset->id) {
             $ready++;
         } else {
-            $gaps[] = $financial instanceof FinFixedAsset
+            $gaps[] = $financialRows->isNotEmpty()
                 ? 'release_financial_record_link_mismatch'
                 : 'release_financial_record_missing';
         }
 
-        return $this->section(3, $assets->count() + (int) ($financial !== null), $ready, $gaps);
+        $present = (int) $vehicleRows->isNotEmpty()
+            + (int) $assetRows->isNotEmpty()
+            + (int) $financialRows->isNotEmpty();
+
+        return $this->section(3, $present, $ready, $gaps);
     }
 
     /** @param Collection<string, Site> $sites
