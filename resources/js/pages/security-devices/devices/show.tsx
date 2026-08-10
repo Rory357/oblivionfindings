@@ -7,6 +7,7 @@ import {
     type PageHeroStat,
 } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { useGroupedProfileSearchShortcut } from '@/components/page/grouped-profile-nav';
 import { ReasonDialog } from '@/components/reason-dialog';
 import {
     DeviceDocumentHistory,
@@ -308,6 +309,7 @@ export default function DeviceShow({
         profile.sections[0]?.key ?? 'health',
     );
     const [profileSearchOpen, setProfileSearchOpen] = useState(false);
+    useGroupedProfileSearchShortcut(() => setProfileSearchOpen(true));
     const editDeviceDialog = useEditDeviceDialogState();
     const [releaseOpen, setReleaseOpen] = useState(false);
     const [decommissionOpen, setDecommissionOpen] = useState(false);

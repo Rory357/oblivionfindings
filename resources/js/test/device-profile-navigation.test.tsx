@@ -7,6 +7,8 @@ import {
     DeviceProfileNavigation,
 } from '@/pages/security-devices/devices/device-profile-navigation';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 
@@ -51,6 +53,23 @@ function NavigationHarness({ sections }: { sections: DeviceProfileSection[] }) {
 }
 
 describe('DeviceProfileNavigation', () => {
+    it('wires the shared Client and Site profile search shortcut into Device Profile', () => {
+        const source = readFileSync(
+            resolve(
+                process.cwd(),
+                'resources/js/pages/security-devices/devices/show.tsx',
+            ),
+            'utf8',
+        );
+
+        expect(source).toContain(
+            "import { useGroupedProfileSearchShortcut } from '@/components/page/grouped-profile-nav';",
+        );
+        expect(source).toContain(
+            'useGroupedProfileSearchShortcut(() => setProfileSearchOpen(true));',
+        );
+    });
+
     it('switches between four clear groups and selects the first section', () => {
         render(<NavigationHarness sections={allSections} />);
 
