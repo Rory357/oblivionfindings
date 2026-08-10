@@ -47,6 +47,8 @@ it('validates every isolated monitoring program before a scoped Supervisor updat
         'Supervisor does not discover .conf files from $INCLUDE_DIRECTORY.',
         'Supervisor did not discover $program from $INCLUDE_DIRECTORY.',
         'supervisorctl -c "$SUPERVISORD_CONFIG" update "${EXPECTED_PROGRAMS[@]}"',
+        'supervisorctl -c "$SUPERVISORD_CONFIG" restart "$program:*"',
+        'for attempt in {1..30}; do',
         'status "$program:*"',
         'INSTALL_COMMITTED=false',
         'the running Supervisor daemon rejected the include path probe',
@@ -63,10 +65,14 @@ it('validates every isolated monitoring program before a scoped Supervisor updat
     $reread = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" reread');
     $available = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" avail', $reread);
     $update = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" update', $available);
+    $restart = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" restart', $update);
+    $status = strpos($script, 'status "$program:*"', $restart);
 
     expect($reread)->not->toBeFalse()
         ->and($available)->toBeGreaterThan($reread)
-        ->and($update)->toBeGreaterThan($available);
+        ->and($update)->toBeGreaterThan($available)
+        ->and($restart)->toBeGreaterThan($update)
+        ->and($status)->toBeGreaterThan($restart);
 });
 
 it('supports an explicit include path while retaining the Ubuntu default', function () {

@@ -41,8 +41,10 @@ configuration, daemon connectivity, a non-starting include-path discovery probe,
 and discovery of every program through the active include path. It stages both
 files, requires the already-running daemon to accept them through
 `supervisorctl reread`, and rolls them back on pre-update
-failure. The final `update` names only the monitoring groups, then requires each
-group to reach `RUNNING`; unrelated Supervisor programs are never updated.
+failure. The final `update` names only the monitoring groups, then explicitly
+restarts each exact group so an unchanged definition cannot leave a failed
+listener stopped or an old worker on the previous release. Every group must
+reach `RUNNING`; unrelated Supervisor programs are never updated or restarted.
 The installer does not launch a second `supervisord` process as a configuration
 test because that can collide with the active daemon's control socket or HTTP
 port.
