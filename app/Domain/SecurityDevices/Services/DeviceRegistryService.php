@@ -35,6 +35,46 @@ class DeviceRegistryService
     }
 
     /**
+     * Register a Device and, when supplied, establish its initial canonical
+     * Site assignment in the same transaction.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function registerDevice(array $attributes, User $actor, ?int $siteId = null): Device
+    {
+        $site = null;
+        if ($siteId !== null) {
+            abort_unless($actor->canDo('securityDevices.devices.assign'), 403);
+            $this->access->assertCanViewSite($actor, $siteId);
+            $site = Site::query()
+                ->whereKey($siteId)
+                ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at')
+                ->firstOrFail();
+        }
+
+        return DB::transaction(function () use ($attributes, $actor, $site): Device {
+            $device = Device::query()->create([
+                ...$attributes,
+                'created_by_user_id' => $actor->id,
+            ]);
+
+            if ($site !== null) {
+                $this->deviceAssignments->assign(
+                    device: $device,
+                    assignableType: DeviceAssignment::TARGET_SITE,
+                    assignableId: (int) $site->id,
+                    assignedByUserId: (int) $actor->id,
+                    assignmentType: AssignmentType::Permanent,
+                );
+            }
+
+            return $device;
+        }, 3);
+    }
+
+    /**
      * Register a reviewed discovery result in the one canonical Device registry.
      *
      * @param  array<string, mixed>  $attributes

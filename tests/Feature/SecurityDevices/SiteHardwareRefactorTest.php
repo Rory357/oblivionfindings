@@ -6,6 +6,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\AuditLog;
 use App\Models\LocationHardware;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteRoom;
@@ -233,6 +234,21 @@ class SiteHardwareRefactorTest extends TestCase
             $this->assertArrayNotHasKey('assets', $props);
             $this->assertArrayNotHasKey('categories', $props);
         });
+    }
+
+    public function test_site_registration_action_requires_create_and_assignment_capability(): void
+    {
+        $assignPermission = Permission::query()
+            ->where('key', 'securityDevices.devices.assign')
+            ->firstOrFail();
+        $this->admin->permissionOverrides()->syncWithoutDetaching([
+            $assignPermission->id => ['allowed' => false],
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$this->siteA->id}/hardware")
+            ->assertInertia(fn ($page) => $page
+                ->where('can.register_device', false));
     }
 
     public function test_legacy_site_hardware_crud_routes_are_removed_but_room_bridge_routes_remain(): void

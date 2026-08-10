@@ -292,7 +292,9 @@ class SiteProfileOperationsPresenter
             'typePlan' => $typePlan,
             'can' => [
                 'manage_hardware' => ! $site->archived && $user->can('update', $site) && $user->canDo('siteHardware.manage'),
-                'register_device' => ! $site->archived && $user->can('create', Device::class),
+                'register_device' => ! $site->archived
+                    && $user->can('create', Device::class)
+                    && $user->canDo('securityDevices.devices.assign'),
             ],
             'href' => route('sites.hardware.index', $site),
         ];

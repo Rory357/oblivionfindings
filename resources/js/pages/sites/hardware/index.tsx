@@ -1326,6 +1326,8 @@ export function SiteHardwareSurface({
                 <AddDeviceDialog
                     open={addDeviceDialog.open}
                     onClose={addDeviceDialog.closeDialog}
+                    prefillSiteId={site.id}
+                    prefillSiteName={site.name}
                 />
             ) : null}
         </SiteHardwareFrame>

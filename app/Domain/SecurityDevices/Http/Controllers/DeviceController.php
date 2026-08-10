@@ -732,11 +732,13 @@ class DeviceController extends Controller
             'provider' => ['nullable', 'string', 'max:100'],
             'location_description' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
+            'site_id' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $validated['created_by_user_id'] = $user->id;
+        $siteId = isset($validated['site_id']) ? (int) $validated['site_id'] : null;
+        unset($validated['site_id']);
 
-        $device = Device::create($validated);
+        $device = $this->registry->registerDevice($validated, $user, $siteId);
 
         if ($request->boolean('_modal')) {
             return redirect()->back()

@@ -22,6 +22,7 @@ import {
     Check,
     Cpu,
     LoaderCircle,
+    MapPin,
     Network,
     NotebookText,
     ScanLine,
@@ -76,6 +77,7 @@ type AddDeviceForm = {
     provider: string;
     location_description: string;
     notes: string;
+    site_id: number | null;
     _modal: boolean;
 };
 
@@ -120,7 +122,10 @@ function dialogSteps(mode: 'add' | 'edit'): readonly WizardStep[] {
     );
 }
 
-function emptyForm(prefillDomain: string): AddDeviceForm {
+function emptyForm(
+    prefillDomain: string,
+    prefillSiteId: number | null,
+): AddDeviceForm {
     return {
         name: '',
         domain: prefillDomain,
@@ -138,6 +143,7 @@ function emptyForm(prefillDomain: string): AddDeviceForm {
         provider: '',
         location_description: '',
         notes: '',
+        site_id: prefillSiteId,
         _modal: true,
     };
 }
@@ -160,6 +166,7 @@ function formFromDevice(device: Partial<EditableDevice>): AddDeviceForm {
         provider: device.provider ?? '',
         location_description: device.location_description ?? '',
         notes: device.notes ?? '',
+        site_id: null,
         _modal: true,
     };
 }
@@ -225,12 +232,16 @@ export function AddDeviceDialog({
     open,
     onClose,
     prefillDomain = '',
+    prefillSiteId = null,
+    prefillSiteName = null,
     mode = 'add',
     deviceId,
 }: {
     open: boolean;
     onClose: () => void;
     prefillDomain?: string;
+    prefillSiteId?: number | null;
+    prefillSiteName?: string | null;
     mode?: 'add' | 'edit';
     deviceId?: number;
 }) {
@@ -238,16 +249,8 @@ export function AddDeviceDialog({
     const [options, setOptions] = useState<DeviceFormOptions | null>(null);
     const [optionsError, setOptionsError] = useState<string | null>(null);
     const [completedName, setCompletedName] = useState<string | null>(null);
-    const {
-        data,
-        setData,
-        post,
-        put,
-        processing,
-        errors,
-        clearErrors,
-        reset,
-    } = useForm<AddDeviceForm>(emptyForm(prefillDomain));
+    const { data, setData, post, put, processing, errors, clearErrors, reset } =
+        useForm<AddDeviceForm>(emptyForm(prefillDomain, prefillSiteId));
     const activeSteps = useMemo(() => dialogSteps(mode), [mode]);
     const setDataRef = useRef(setData);
 
@@ -476,14 +479,18 @@ export function AddDeviceDialog({
                                 <strong>{completedName}</strong>{' '}
                                 {mode === 'edit'
                                     ? 'has been updated in the canonical device registry.'
-                                    : 'is now in the canonical device registry.'}
+                                    : prefillSiteName
+                                      ? `is now registered and assigned to ${prefillSiteName}.`
+                                      : 'is now in the canonical device registry.'}
                             </>
                         }
                         actions={
                             <Button type="button" onClick={close}>
                                 {mode === 'edit'
                                     ? 'Return to profile'
-                                    : 'Return to devices'}
+                                    : prefillSiteName
+                                      ? 'Return to Site hardware'
+                                      : 'Return to devices'}
                             </Button>
                         }
                     />
@@ -712,6 +719,24 @@ export function AddDeviceDialog({
                         title="Connection and location"
                         description="Add operational context without storing credentials or raw provider targets."
                     />
+                    {mode === 'add' && prefillSiteId && prefillSiteName ? (
+                        <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                            <MapPin
+                                className="mt-0.5 h-5 w-5 shrink-0 text-primary"
+                                aria-hidden
+                            />
+                            <div>
+                                <p className="text-sm font-medium">
+                                    Initial Site: {prefillSiteName}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Registration and the canonical Site
+                                    assignment are saved together. If either
+                                    fails, neither record is created.
+                                </p>
+                            </div>
+                        </div>
+                    ) : null}
                     <div className="grid gap-4 sm:grid-cols-2">
                         <TextField
                             id="device-provider"
@@ -848,6 +873,12 @@ export function AddDeviceDialog({
                                 label="Location"
                                 value={data.location_description}
                             />
+                            {mode === 'add' && prefillSiteName ? (
+                                <ReviewRow
+                                    label="Initial Site"
+                                    value={prefillSiteName}
+                                />
+                            ) : null}
                             <ReviewRow label="Notes" value={data.notes} />
                         </ReviewCard>
                     </div>

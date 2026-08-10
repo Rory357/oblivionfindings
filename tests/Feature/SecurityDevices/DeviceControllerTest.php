@@ -474,6 +474,66 @@ class DeviceControllerTest extends TestCase
         ]);
     }
 
+    public function test_site_modal_registers_and_assigns_the_device_atomically(): void
+    {
+        $site = Site::factory()->create(['name' => 'Registration Site']);
+
+        $this->actingAs($this->admin)
+            ->from("/sites/{$site->id}/hardware?dialog=add-device")
+            ->post('/security-devices/devices', [
+                'name' => 'Site Modal Camera',
+                'domain' => 'security',
+                'category' => 'cctv',
+                'subcategory' => 'dome_camera',
+                'site_id' => $site->id,
+                '_modal' => true,
+            ])
+            ->assertRedirect("/sites/{$site->id}/hardware?dialog=add-device");
+
+        $device = Device::query()->where('name', 'Site Modal Camera')->firstOrFail();
+        $this->assertDatabaseHas('device_assignments', [
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_by_user_id' => $this->admin->id,
+            'released_at' => null,
+        ]);
+    }
+
+    public function test_site_modal_conceals_an_inaccessible_initial_site_without_creating_a_device(): void
+    {
+        $allowedSite = Site::factory()->create();
+        $hiddenSite = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->viewer->id,
+            'primary_site_id' => $allowedSite->id,
+            'secondary_site_ids' => [],
+        ]);
+        $permissions = Permission::query()
+            ->whereIn('key', [
+                'securityDevices.viewAny',
+                'securityDevices.devices.view',
+                'securityDevices.devices.create',
+                'securityDevices.devices.assign',
+            ])
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])
+            ->all();
+        $this->viewer->permissionOverrides()->syncWithoutDetaching($permissions);
+
+        $this->actingAs($this->viewer)
+            ->post('/security-devices/devices', [
+                'name' => 'Hidden Site Device',
+                'domain' => 'security',
+                'category' => 'cctv',
+                'site_id' => $hiddenSite->id,
+                '_modal' => true,
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseMissing('devices', ['name' => 'Hidden Site Device']);
+    }
+
     public function test_store_uses_application_storage_defaults(): void
     {
 
