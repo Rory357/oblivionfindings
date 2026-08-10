@@ -1229,20 +1229,20 @@ function LoneWorkerCheckInCard({
                 </div>
             </div>
 
-            <dl className="mt-3 space-y-1.5 text-xs">
+            <ul className="mt-3 space-y-1.5 text-xs">
                 {session.site ? (
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                    <li className="flex items-center gap-2 text-muted-foreground">
                         <Home className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{session.site.name}</span>
-                    </div>
+                    </li>
                 ) : null}
                 {session.expected_end_at ? (
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                    <li className="flex items-center gap-2 text-muted-foreground">
                         <Calendar className="h-3.5 w-3.5 shrink-0" />
                         <span>Until {formatTime(session.expected_end_at)}</span>
-                    </div>
+                    </li>
                 ) : null}
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <li className="flex items-center gap-2 text-muted-foreground">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     {state === 'overdue' ? (
                         <span className={tone.fg}>
@@ -1259,8 +1259,8 @@ function LoneWorkerCheckInCard({
                     ) : (
                         <span>Check in any time</span>
                     )}
-                </div>
-            </dl>
+                </li>
+            </ul>
 
             <div className="mt-3 flex gap-2">
                 <Button type="button" className="flex-1" onClick={onCheckIn}>

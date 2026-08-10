@@ -515,6 +515,9 @@ echo json_encode([
             `/control-room/shifts/${manifest.shift.id}/accept-handover`,
             { expected_version: preparedVersion },
         );
+        // Acceptance retires the handover page. Leave it before its live inbox
+        // poll refreshes a route that is now intentionally unavailable.
+        await page.goto('/control-room/shifts');
         await postLaravel(page, `/control-room/alerts/${alertId}/resolve`, {
             resolution_notes:
                 'Immediate response and transferred operational task are complete.',

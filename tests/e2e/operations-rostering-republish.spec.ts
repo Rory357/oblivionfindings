@@ -59,6 +59,9 @@ test.describe('operations rostering — republish flow', () => {
         const publishPanel = page.getByTestId('rostering-publish-panel');
         await expect(publishPanel).toContainText(/changed after publish/i);
         await page.getByRole('link', { name: /View diff/i }).click();
+        await expect(page).toHaveURL(
+            /\/operations\/rostering\/periods\/\d+\/diff$/,
+        );
 
         await expect(
             page.getByRole('heading', { name: /Publish diff/i }),
