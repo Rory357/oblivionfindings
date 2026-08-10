@@ -20,6 +20,9 @@ it('keeps every UDP listener alive while idle and separately supervised', functi
 
     $reporter = (string) file_get_contents($root.'/app/Domain/Monitoring/Services/ListenerHeartbeatReporter.php');
     $supervisor = (string) file_get_contents($root.'/ops/supervisor/oblivion-monitoring-listeners.conf');
+    $snmpCommand = (string) file_get_contents($root.'/app/Console/Commands/MonitoringListenSnmpTraps.php');
+    $monitoringConfig = (string) file_get_contents($root.'/config/monitoring.php');
+    $environmentExample = (string) file_get_contents($root.'/.env.example');
     expect($reporter)
         ->toContain("['flow', 'snmp_traps', 'syslog']", 'public function alive(')
         ->and($supervisor)->toContain(
@@ -27,6 +30,13 @@ it('keeps every UDP listener alive while idle and separately supervised', functi
             'monitoring:listen-syslog',
             'monitoring:listen-flow',
             'autorestart=true',
+        )
+        ->and($snmpCommand)->toContain("config('monitoring.snmp.traps.port', 1162)")
+        ->and($monitoringConfig)->toContain("env('MONITORING_SNMP_TRAP_PORT', 1162)")
+        ->and($environmentExample)->toContain(
+            'MONITORING_SNMP_TRAP_PORT=1162',
+            '# PHP worker unprivileged',
+            'standard UDP/162 edge port',
         );
 });
 

@@ -47,6 +47,14 @@ The installer does not launch a second `supervisord` process as a configuration
 test because that can collide with the active daemon's control socket or HTTP
 port.
 
+The supervised SNMP trap worker stays unprivileged and binds the configured
+high local port (default UDP/1162). The reviewed firewall or Site-network relay
+must terminate or redirect the standard external UDP/162 trap path to that
+approved bind address and port. Do not run the PHP listener as root and do not
+grant the shared PHP interpreter a broad bind-service capability. Prove the
+external UDP/162 path separately with an approved real trap during release
+acceptance.
+
 `scripts/deploy-server.sh` runs this installer before `queue:restart`. Use
 `--skip-monitoring-supervisor` only when the runtime is intentionally managed by
 an already-reviewed external deployment system. A skipped or failed install is
