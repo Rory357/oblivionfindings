@@ -9,21 +9,68 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('device_assignments', function (Blueprint $table): void {
-            $table->string('tracking_purpose', 160)->nullable()->after('consent_id');
-            $table->string('authority_basis', 80)->nullable()->after('tracking_purpose');
-            $table->json('access_audience')->nullable()->after('authority_basis');
-            $table->unsignedSmallInteger('retention_days')->nullable()->after('access_audience');
-            $table->timestamp('collection_started_at')->nullable()->after('retention_days');
-            $table->timestamp('collection_stopped_at')->nullable()->after('collection_started_at');
-            $table->string('collection_stop_reason', 80)->nullable()->after('collection_stopped_at');
-            $table->string('withdrawal_outcome', 120)->nullable()->after('collection_stop_reason');
+        if (! Schema::hasColumn('device_assignments', 'tracking_purpose')) {
+            Schema::table('device_assignments', function (Blueprint $table): void {
+                $table->text('tracking_purpose')->nullable()->after('consent_id');
+            });
+        } elseif (Schema::getColumnType('device_assignments', 'tracking_purpose') !== 'text') {
+            Schema::table('device_assignments', function (Blueprint $table): void {
+                $table->text('tracking_purpose')->nullable()->change();
+            });
+        }
 
-            $table->index(
-                ['device_id', 'collection_stopped_at'],
-                'dev_assign_collection_active_idx',
-            );
-        });
+        if (! Schema::hasColumn('device_assignments', 'authority_basis')) {
+            Schema::table('device_assignments', function (Blueprint $table): void {
+                $table->string('authority_basis', 80)->nullable()->after('tracking_purpose');
+            });
+        }
+
+        if (! Schema::hasColumn('device_assignments', 'access_audience')) {
+            Schema::table('device_assignments', function (Blueprint $table): void {
+                $table->json('access_audience')->nullable()->after('authority_basis');
+            });
+        }
+
+        if (! Schema::hasColumn('device_assignments', 'retention_days')) {
+            Schema::table('device_assignments', function (Blueprint $table): void {
+                $table->unsignedSmallInteger('retention_days')->nullable()->after('access_audience');
+            });
+        }
+
+        if (! Schema::hasColumn('device_assignments', 'collection_started_at')) {
+            Schema::table('device_assignments', function (Blueprint $table): void {
+                $table->timestamp('collection_started_at')->nullable()->after('retention_days');
+            });
+        }
+
+        if (! Schema::hasColumn('device_assignments', 'collection_stopped_at')) {
+            Schema::table('device_assignments', function (Blueprint $table): void {
+                $table->timestamp('collection_stopped_at')->nullable()->after('collection_started_at');
+            });
+        }
+
+        if (! Schema::hasColumn('device_assignments', 'collection_stop_reason')) {
+            Schema::table('device_assignments', function (Blueprint $table): void {
+                $table->string('collection_stop_reason', 80)->nullable()->after('collection_stopped_at');
+            });
+        }
+
+        if (! Schema::hasColumn('device_assignments', 'withdrawal_outcome')) {
+            Schema::table('device_assignments', function (Blueprint $table): void {
+                $table->string('withdrawal_outcome', 120)->nullable()->after('collection_stop_reason');
+            });
+        }
+
+        Schema::whenTableDoesntHaveIndex(
+            'device_assignments',
+            'dev_assign_collection_active_idx',
+            function (Blueprint $table): void {
+                $table->index(
+                    ['device_id', 'collection_stopped_at'],
+                    'dev_assign_collection_active_idx',
+                );
+            },
+        );
 
         $now = now()->toDateTimeString();
 
