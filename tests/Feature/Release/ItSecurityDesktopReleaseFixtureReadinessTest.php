@@ -1,6 +1,10 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\Asset;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -120,4 +124,86 @@ it('checks effective actor permissions in addition to the role label', function 
     expect($overPrivileged['sections']['actors']['ready'])->toBe(0)
         ->and($overPrivileged['gap_codes'])->toContain('release_actor_forbidden_permission_present')
         ->and($overPrivileged['gap_codes'])->not->toContain('release_actor_required_permission_missing');
+});
+
+it('requires unique Devices with exact taxonomy and canonical owner bindings', function (): void {
+    $site = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $actor = User::factory()->create();
+    $gateway = Device::factory()->create([
+        'name' => 'RELEASE Alpha Gateway',
+        'domain' => 'security',
+        'category' => 'cctv',
+        'subcategory' => 'dome_camera',
+    ]);
+
+    $invalid = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+
+    expect($invalid['sections']['devices']['ready'])->toBe(0)
+        ->and($invalid['gap_codes'])->toContain(
+            'release_device_taxonomy_mismatch',
+            'release_device_owner_binding_mismatch',
+            'release_device_canonical_scope_mismatch',
+        );
+
+    $gateway->update([
+        'domain' => 'it_infrastructure',
+        'category' => 'network',
+        'subcategory' => 'router',
+    ]);
+    DeviceAssignment::query()->create([
+        'device_id' => $gateway->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $site->id,
+        'assignment_type' => 'permanent',
+        'assigned_at' => now(),
+        'assigned_by_user_id' => $actor->id,
+    ]);
+
+    $valid = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+
+    expect($valid['sections']['devices']['ready'])->toBe(1)
+        ->and($valid['gap_codes'])->not->toContain(
+            'release_device_taxonomy_mismatch',
+            'release_device_owner_binding_mismatch',
+            'release_device_canonical_scope_mismatch',
+            'release_device_name_not_unique',
+        );
+
+    $unexpectedAsset = Asset::factory()->create([
+        'site_id' => $site->id,
+        'created_by_user_id' => $actor->id,
+        'updated_by_user_id' => $actor->id,
+    ]);
+    $unexpectedLink = DeviceAssetLink::query()->create([
+        'device_id' => $gateway->id,
+        'asset_id' => $unexpectedAsset->id,
+        'link_type' => 'installed_in',
+        'linked_at' => now(),
+        'linked_by_user_id' => $actor->id,
+    ]);
+
+    $dualBound = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+
+    expect($dualBound['gap_codes'])->toContain('release_device_owner_binding_mismatch');
+
+    $unexpectedLink->update(['unlinked_at' => now()]);
+
+    $duplicate = Device::factory()->create([
+        'name' => 'RELEASE Alpha Gateway',
+        'domain' => 'it_infrastructure',
+        'category' => 'network',
+        'subcategory' => 'router',
+    ]);
+    DeviceAssignment::query()->create([
+        'device_id' => $duplicate->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $site->id,
+        'assignment_type' => 'permanent',
+        'assigned_at' => now(),
+        'assigned_by_user_id' => $actor->id,
+    ]);
+
+    $duplicated = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+
+    expect($duplicated['gap_codes'])->toContain('release_device_name_not_unique');
 });

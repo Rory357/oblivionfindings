@@ -188,17 +188,89 @@ final class ItSecurityDesktopReleaseFixtureReadiness
         'RELEASE Staff Hidden' => 'RELEASE Site Hidden',
     ];
 
-    /** @var array<string, string> */
+    /**
+     * @var array<string, array{
+     *     site: string,
+     *     domain: string,
+     *     category: string,
+     *     subcategory: string,
+     *     binding_type: 'site'|'client'|'asset',
+     *     binding_name: string
+     * }>
+     */
     public const array DEVICES = [
-        'RELEASE Alpha Gateway' => 'RELEASE Site Alpha',
-        'RELEASE Alpha Switch' => 'RELEASE Site Alpha',
-        'RELEASE Alpha Door' => 'RELEASE Site Alpha',
-        'RELEASE Alpha Camera' => 'RELEASE Site Alpha',
-        'RELEASE Alpha Healthcare' => 'RELEASE Site Alpha',
-        'RELEASE Alpha Personal Tracker' => 'RELEASE Site Alpha',
-        'RELEASE Alpha Fleet Tracker' => 'RELEASE Site Alpha',
-        'RELEASE Alpha Environment Sensor' => 'RELEASE Site Alpha',
-        'RELEASE Hidden Device' => 'RELEASE Site Hidden',
+        'RELEASE Alpha Gateway' => [
+            'site' => 'RELEASE Site Alpha',
+            'domain' => 'it_infrastructure',
+            'category' => 'network',
+            'subcategory' => 'router',
+            'binding_type' => 'site',
+            'binding_name' => 'RELEASE Site Alpha',
+        ],
+        'RELEASE Alpha Switch' => [
+            'site' => 'RELEASE Site Alpha',
+            'domain' => 'it_infrastructure',
+            'category' => 'network',
+            'subcategory' => 'switch',
+            'binding_type' => 'site',
+            'binding_name' => 'RELEASE Site Alpha',
+        ],
+        'RELEASE Alpha Door' => [
+            'site' => 'RELEASE Site Alpha',
+            'domain' => 'security',
+            'category' => 'access_control',
+            'subcategory' => 'card_reader',
+            'binding_type' => 'site',
+            'binding_name' => 'RELEASE Site Alpha',
+        ],
+        'RELEASE Alpha Camera' => [
+            'site' => 'RELEASE Site Alpha',
+            'domain' => 'security',
+            'category' => 'cctv',
+            'subcategory' => 'dome_camera',
+            'binding_type' => 'site',
+            'binding_name' => 'RELEASE Site Alpha',
+        ],
+        'RELEASE Alpha Healthcare' => [
+            'site' => 'RELEASE Site Alpha',
+            'domain' => 'iot_healthcare',
+            'category' => 'fall_detection',
+            'subcategory' => 'wearable_fall',
+            'binding_type' => 'client',
+            'binding_name' => 'RELEASE Client Alpha',
+        ],
+        'RELEASE Alpha Personal Tracker' => [
+            'site' => 'RELEASE Site Alpha',
+            'domain' => 'tracking',
+            'category' => 'personal_tracker',
+            'subcategory' => 'wearable_gps',
+            'binding_type' => 'client',
+            'binding_name' => 'RELEASE Client Alpha',
+        ],
+        'RELEASE Alpha Fleet Tracker' => [
+            'site' => 'RELEASE Site Alpha',
+            'domain' => 'tracking',
+            'category' => 'vehicle_tracker',
+            'subcategory' => 'hardwired_gps',
+            'binding_type' => 'asset',
+            'binding_name' => 'RELEASE Alpha Vehicle',
+        ],
+        'RELEASE Alpha Environment Sensor' => [
+            'site' => 'RELEASE Site Alpha',
+            'domain' => 'facilities',
+            'category' => 'cold_chain',
+            'subcategory' => 'fridge_sensor',
+            'binding_type' => 'site',
+            'binding_name' => 'RELEASE Site Alpha',
+        ],
+        'RELEASE Hidden Device' => [
+            'site' => 'RELEASE Site Hidden',
+            'domain' => 'it_infrastructure',
+            'category' => 'endpoint',
+            'subcategory' => 'shared_device',
+            'binding_type' => 'site',
+            'binding_name' => 'RELEASE Site Hidden',
+        ],
     ];
 
     public function __construct(private readonly CanonicalDeviceSiteResolver $deviceSites) {}
@@ -430,8 +502,18 @@ final class ItSecurityDesktopReleaseFixtureReadiness
      */
     private function deviceSection(Collection $sites): array
     {
-        $devices = Device::query()
+        $deviceRows = Device::query()
             ->whereIn('name', array_keys(self::DEVICES))
+            ->with(['assignments', 'assetLinks'])
+            ->get();
+        $devices = $deviceRows->keyBy('name');
+        $clients = Client::query()
+            ->where('first_name', 'RELEASE Client')
+            ->whereIn('last_name', ['Alpha', 'Hidden'])
+            ->get()
+            ->keyBy(fn (Client $client): string => $client->full_name);
+        $assets = Asset::query()
+            ->whereIn('name', ['RELEASE Alpha Vehicle', 'RELEASE Alpha Asset'])
             ->get()
             ->keyBy('name');
         $ready = 0;
@@ -442,9 +524,13 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             DeviceStatus::Offline->value,
         ];
 
-        foreach (self::DEVICES as $name => $siteName) {
+        if ($deviceRows->count() !== $devices->count()) {
+            $gaps[] = 'release_device_name_not_unique';
+        }
+
+        foreach (self::DEVICES as $name => $contract) {
             $device = $devices->get($name);
-            $site = $sites->get($siteName);
+            $site = $sites->get($contract['site']);
             if (! $device instanceof Device) {
                 $gaps[] = 'release_device_missing';
 
@@ -459,14 +545,63 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 $siteReady = false;
             }
 
-            if (in_array($status, $operational, true) && $siteReady) {
+            $taxonomyReady = $device->domain === $contract['domain']
+                && $device->category === $contract['category']
+                && $device->subcategory === $contract['subcategory'];
+            $bindingReady = $this->deviceBindingReady($device, $contract, $sites, $clients, $assets);
+
+            if (! $taxonomyReady) {
+                $gaps[] = 'release_device_taxonomy_mismatch';
+            }
+            if (! $bindingReady) {
+                $gaps[] = 'release_device_owner_binding_mismatch';
+            }
+
+            if (in_array($status, $operational, true) && $siteReady && $taxonomyReady && $bindingReady) {
                 $ready++;
-            } else {
+            } elseif (! $siteReady || ! in_array($status, $operational, true)) {
                 $gaps[] = 'release_device_canonical_scope_mismatch';
             }
         }
 
         return $this->section(count(self::DEVICES), $devices->count(), $ready, $gaps);
+    }
+
+    /**
+     * @param  array{binding_type: 'site'|'client'|'asset', binding_name: string}  $contract
+     * @param  Collection<string, Site>  $sites
+     * @param  Collection<string, Client>  $clients
+     * @param  Collection<string, Asset>  $assets
+     */
+    private function deviceBindingReady(
+        Device $device,
+        array $contract,
+        Collection $sites,
+        Collection $clients,
+        Collection $assets,
+    ): bool {
+        if ($contract['binding_type'] === 'asset') {
+            $asset = $assets->get($contract['binding_name']);
+            $activeLinks = $device->assetLinks->whereNull('unlinked_at');
+            $activeAssignments = $device->assignments->whereNull('released_at');
+
+            return $asset instanceof Asset
+                && $activeLinks->count() === 1
+                && $activeAssignments->isEmpty()
+                && (int) $activeLinks->first()->asset_id === (int) $asset->id;
+        }
+
+        $target = $contract['binding_type'] === 'site'
+            ? $sites->get($contract['binding_name'])
+            : $clients->get($contract['binding_name']);
+        $activeAssignments = $device->assignments->whereNull('released_at');
+        $activeLinks = $device->assetLinks->whereNull('unlinked_at');
+
+        return ($target instanceof Site || $target instanceof Client)
+            && $activeAssignments->count() === 1
+            && $activeLinks->isEmpty()
+            && $activeAssignments->first()->assignable_type === $contract['binding_type']
+            && (int) $activeAssignments->first()->assignable_id === (int) $target->id;
     }
 
     /** @param Collection<string, Site> $sites
