@@ -407,17 +407,23 @@ class DeviceControllerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_create_form_accessible_for_admin(): void
+    public function test_legacy_create_route_opens_the_canonical_dialog_on_the_device_register(): void
     {
         $this->actingAs($this->admin)
             ->get('/security-devices/devices/create')
+            ->assertRedirect('/security-devices/devices?dialog=add-device');
+    }
+
+    public function test_create_options_are_available_to_the_authorised_modal_without_rendering_another_page(): void
+    {
+        $this->actingAs($this->admin)
+            ->getJson('/security-devices/devices/create')
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('security-devices/devices/create')
-                ->has('taxonomy')
-                ->has('domains')
-                ->has('statuses')
-            );
+            ->assertJsonStructure([
+                'taxonomy',
+                'domains' => [['value', 'label']],
+                'statuses' => [['value', 'label']],
+            ]);
     }
 
     public function test_store_creates_device(): void
@@ -444,6 +450,28 @@ class DeviceControllerTest extends TestCase
         $device = Device::where('name', 'New Test Camera')->first();
         $this->assertNotNull($device->device_uid);
         $this->assertEquals($this->admin->id, $device->created_by_user_id);
+    }
+
+    public function test_modal_store_returns_to_the_originating_workspace(): void
+    {
+        $response = $this->actingAs($this->admin)
+            ->from('/security-devices/devices?dialog=add-device')
+            ->post('/security-devices/devices', [
+                'name' => 'Modal Test Camera',
+                'domain' => 'security',
+                'category' => 'cctv',
+                'subcategory' => 'dome_camera',
+                '_modal' => true,
+            ]);
+
+        $response->assertRedirect(
+            '/security-devices/devices?dialog=add-device',
+        );
+        $this->assertDatabaseHas('devices', [
+            'name' => 'Modal Test Camera',
+            'domain' => 'security',
+            'category' => 'cctv',
+        ]);
     }
 
     public function test_store_uses_application_storage_defaults(): void

@@ -1,6 +1,10 @@
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import {
+    AddDeviceDialog,
+    useAddDeviceDialogState,
+} from '@/components/security-devices/add-device-dialog';
+import {
     BulkManagementWorkspace,
     type BulkManagementWorkspaceData,
 } from '@/components/security-devices/bulk-management-workspace';
@@ -162,12 +166,28 @@ export function CategoryRegisterAction({
     canRegister,
     href,
     label,
+    onRegister,
 }: {
     canRegister: boolean;
     href: string;
     label: string;
+    onRegister?: () => void;
 }) {
     if (!canRegister) return null;
+
+    if (onRegister) {
+        return (
+            <Button
+                type="button"
+                size="sm"
+                className="frontline-focus min-h-11"
+                onClick={onRegister}
+            >
+                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                {label}
+            </Button>
+        );
+    }
 
     return (
         <Button asChild size="sm" className="frontline-focus min-h-11">
@@ -197,6 +217,7 @@ export default function CategoryPage({
     can,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
+    const addDeviceDialog = useAddDeviceDialogState();
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
     const pageUrl = workspace.canonicalHref;
     const registerLabel =
@@ -254,6 +275,7 @@ export default function CategoryPage({
                             canRegister={can.registerDevice}
                             href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
                             label={registerLabel}
+                            onRegister={addDeviceDialog.openDialog}
                         />
                     }
                 />
@@ -493,11 +515,12 @@ export default function CategoryPage({
                                         }
                                         action={
                                             <CategoryRegisterAction
-                                                canRegister={
-                                                    can.registerDevice
-                                                }
+                                                canRegister={can.registerDevice}
                                                 href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
                                                 label={registerLabel}
+                                                onRegister={
+                                                    addDeviceDialog.openDialog
+                                                }
                                             />
                                         }
                                     />
@@ -535,6 +558,14 @@ export default function CategoryPage({
                         </>
                     )}
                 </SecurityDevicesWorkspaceShell>
+
+                {can.registerDevice ? (
+                    <AddDeviceDialog
+                        open={addDeviceDialog.open}
+                        onClose={addDeviceDialog.closeDialog}
+                        prefillDomain={pageConfig.domain}
+                    />
+                ) : null}
             </PageShell>
         </AppLayout>
     );

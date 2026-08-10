@@ -2,7 +2,10 @@ import type {
     DeviceProfileSection,
     DeviceProfileSectionKey,
 } from '@/pages/security-devices/devices/device-profile';
-import { DeviceProfileNavigation } from '@/pages/security-devices/devices/device-profile-navigation';
+import {
+    DeviceProfileGroupNavigation,
+    DeviceProfileNavigation,
+} from '@/pages/security-devices/devices/device-profile-navigation';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
@@ -29,11 +32,21 @@ function NavigationHarness({ sections }: { sections: DeviceProfileSection[] }) {
     const [active, setActive] = useState<DeviceProfileSectionKey>('health');
 
     return (
-        <DeviceProfileNavigation
-            sections={sections}
-            activeSection={active}
-            onSectionChange={setActive}
-        />
+        <>
+            <DeviceProfileGroupNavigation
+                sections={sections}
+                activeSection={active}
+                onSectionChange={setActive}
+                onSearch={() => undefined}
+            />
+            <DeviceProfileNavigation
+                sections={sections}
+                activeSection={active}
+                onSectionChange={setActive}
+                searchOpen={false}
+                onSearchClose={() => undefined}
+            />
+        </>
     );
 }
 
@@ -42,27 +55,27 @@ describe('DeviceProfileNavigation', () => {
         render(<NavigationHarness sections={allSections} />);
 
         expect(
-            screen.getByTestId('device-profile-mobile-select'),
+            screen.getByRole('toolbar', { name: 'Device profile groups' }),
         ).toBeInTheDocument();
-        expect(
-            screen.getByTestId('device-profile-section-health'),
-        ).toHaveAttribute('aria-current', 'page');
-
-        fireEvent.click(screen.getByTestId('device-profile-group-technical'));
-        expect(
-            screen.getByTestId('device-profile-section-topology'),
-        ).toHaveAttribute('aria-current', 'page');
-        expect(
-            screen.getByTestId('device-profile-section-interfaces-sensors'),
-        ).toBeInTheDocument();
-
-        fireEvent.click(screen.getByTestId('device-profile-group-operations'));
-        expect(
-            screen.getByTestId('device-profile-section-assignments'),
-        ).toHaveAttribute('aria-current', 'page');
-        expect(screen.getAllByTestId(/^device-profile-section-/)).toHaveLength(
-            4,
+        expect(screen.getByRole('tab', { name: 'Health' })).toHaveAttribute(
+            'aria-selected',
+            'true',
         );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Technology' }));
+        expect(screen.getByRole('tab', { name: 'Topology' })).toHaveAttribute(
+            'aria-selected',
+            'true',
+        );
+        expect(
+            screen.getByRole('tab', { name: 'Interfaces & sensors' }),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+        expect(
+            screen.getByRole('tab', { name: 'Assignments' }),
+        ).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getAllByRole('tab')).toHaveLength(4);
     });
 
     it('does not invent sections omitted by the server permission contract', () => {
@@ -78,28 +91,26 @@ describe('DeviceProfileNavigation', () => {
         render(<NavigationHarness sections={restricted} />);
 
         expect(
-            screen.queryByTestId('device-profile-section-monitors'),
+            screen.queryByRole('tab', { name: /Monitors/ }),
         ).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByTestId('device-profile-group-technical'));
+        fireEvent.click(screen.getByRole('button', { name: 'Technology' }));
         expect(
-            screen.queryByTestId('device-profile-section-interfaces-sensors'),
+            screen.queryByRole('tab', { name: 'Interfaces & sensors' }),
         ).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByTestId('device-profile-group-operations'));
-        expect(screen.getAllByTestId(/^device-profile-section-/)).toHaveLength(
-            1,
+        fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+        expect(screen.getAllByRole('tab')).toHaveLength(1);
+        expect(
+            screen.queryByRole('tab', { name: /Tickets/ }),
+        ).not.toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Records & governance' }),
         );
+        expect(screen.getAllByRole('tab')).toHaveLength(1);
         expect(
-            screen.queryByTestId('device-profile-section-tickets'),
-        ).not.toBeInTheDocument();
-
-        fireEvent.click(screen.getByTestId('device-profile-group-records'));
-        expect(screen.getAllByTestId(/^device-profile-section-/)).toHaveLength(
-            1,
-        );
-        expect(
-            screen.queryByTestId('device-profile-section-audit'),
+            screen.queryByRole('tab', { name: /Audit/ }),
         ).not.toBeInTheDocument();
     });
 });

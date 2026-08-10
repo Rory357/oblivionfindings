@@ -1,6 +1,10 @@
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import {
+    AddDeviceDialog,
+    useAddDeviceDialogState,
+} from '@/components/security-devices/add-device-dialog';
+import {
     CoverageIndicator,
     OperationalStateBadge,
 } from '@/components/security-devices/estate-operations';
@@ -172,6 +176,7 @@ export default function Dashboard({
     can,
 }: Props) {
     const totalAttention = stats.offline + stats.degraded + stats.lowBattery;
+    const addDeviceDialog = useAddDeviceDialogState();
 
     return (
         <AppLayout
@@ -224,11 +229,13 @@ export default function Dashboard({
                                 </p>
                             )}
                             {can.create ? (
-                                <Button size="sm" asChild>
-                                    <Link href="/security-devices/devices/create">
-                                        <Plus className="mr-2 h-4 w-4" />{' '}
-                                        Register device
-                                    </Link>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={addDeviceDialog.openDialog}
+                                >
+                                    <Plus className="mr-2 h-4 w-4" /> Register
+                                    device
                                 </Button>
                             ) : null}
                         </div>
@@ -646,10 +653,14 @@ export default function Dashboard({
                                         variant="compact"
                                         action={
                                             can.create ? (
-                                                <Button size="sm" asChild>
-                                                    <Link href="/security-devices/devices/create">
-                                                        Register device
-                                                    </Link>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    onClick={
+                                                        addDeviceDialog.openDialog
+                                                    }
+                                                >
+                                                    Register device
                                                 </Button>
                                             ) : undefined
                                         }
@@ -934,6 +945,13 @@ export default function Dashboard({
                         </Card>
                     </div>
                 </div>
+
+                {can.create ? (
+                    <AddDeviceDialog
+                        open={addDeviceDialog.open}
+                        onClose={addDeviceDialog.closeDialog}
+                    />
+                ) : null}
             </PageShell>
         </AppLayout>
     );

@@ -2550,6 +2550,76 @@ function SubPanel({
     );
 }
 
+function InlineSubPanelGroups({
+    groups,
+    currentUrl,
+    title,
+}: {
+    groups: SubPanelGroup[];
+    currentUrl: string;
+    title: string;
+}) {
+    const visibleGroups = filterVisibleSidebarGroups(groups);
+
+    return (
+        <div
+            role="group"
+            aria-label={`${title} navigation`}
+            className="mt-1 space-y-2 border-l border-sidebar-border/60 py-1 pl-3"
+        >
+            {visibleGroups.map((group) => (
+                <div key={group.label}>
+                    <div className="px-2 py-1 text-[10px] font-semibold tracking-wider text-sidebar-foreground/45 uppercase">
+                        {group.label}
+                    </div>
+                    <div className="space-y-0.5">
+                        {(group.items ?? []).map((subItem) => {
+                            const active = isSubItemActive(
+                                currentUrl,
+                                subItem.href,
+                            );
+
+                            return (
+                                <Link
+                                    key={resolveUrl(subItem.href)}
+                                    href={subItem.href}
+                                    aria-current={active ? 'page' : undefined}
+                                    prefetch
+                                    preserveScroll
+                                    className={cn(
+                                        'flex min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                                        active
+                                            ? 'bg-sidebar-primary/10 text-sidebar-foreground'
+                                            : 'text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                    )}
+                                >
+                                    {subItem.icon ? (
+                                        <SidebarItemIcon
+                                            icon={subItem.icon}
+                                            className="size-4"
+                                        />
+                                    ) : null}
+                                    <span className="min-w-0 flex-1 truncate">
+                                        {subItem.title}
+                                    </span>
+                                    {subItem.badge != null &&
+                                    subItem.badge > 0 ? (
+                                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
+                                            {subItem.badge > 9
+                                                ? '9+'
+                                                : subItem.badge}
+                                        </span>
+                                    ) : null}
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 // ── Main AppSidebar component ──────────────────────────────────────────────
 
 export function AppSidebar({
@@ -2622,10 +2692,24 @@ export function AppSidebar({
         }
     }, [isCollapsed, onCollapsedChange, setFallbackExpanded]);
 
-    // Close sub-panel on navigation
+    // Keep the active module expanded inside the primary sidebar after
+    // navigation. This avoids rendering a second persistent left rail.
     useEffect(() => {
-        setOpenPanelId(null);
-    }, [currentUrl]);
+        if (isCollapsed) {
+            setOpenPanelId(null);
+            return;
+        }
+
+        const activePanel = iconNavItems.find((item) => {
+            const panelGroups = item.subPanel
+                ? ((subPanelMap as any)[item.id] as SubPanelGroup[] | undefined)
+                : undefined;
+
+            return item.subPanel && isIconActive(currentUrl, item, panelGroups);
+        });
+
+        setOpenPanelId(activePanel?.id ?? null);
+    }, [currentUrl, iconNavItems, isCollapsed, subPanelMap]);
 
     return (
         <TooltipProvider delayDuration={0}>
@@ -2779,7 +2863,13 @@ export function AppSidebar({
                                                             <span className="min-w-0 flex-1 truncate text-left">
                                                                 {item.label}
                                                             </span>
-                                                            <ChevronRight className="size-4 shrink-0 opacity-70" />
+                                                            <ChevronRight
+                                                                className={cn(
+                                                                    'size-4 shrink-0 opacity-70 transition-transform',
+                                                                    isPanelOpen &&
+                                                                        'rotate-90',
+                                                                )}
+                                                            />
                                                         </>
                                                     )}
                                                 </Button>
@@ -2791,6 +2881,14 @@ export function AppSidebar({
                                                 {item.label}
                                             </TooltipContent>
                                         </Tooltip>
+
+                                        {!isCollapsed && isPanelOpen ? (
+                                            <InlineSubPanelGroups
+                                                groups={panelGroups ?? []}
+                                                currentUrl={currentUrl}
+                                                title={item.label}
+                                            />
+                                        ) : null}
                                     </div>
                                 );
                             }
@@ -2955,18 +3053,20 @@ export function AppSidebar({
                     </div>
                 </nav>
 
-                {openPanelId && (subPanelMap as any)[openPanelId] && (
-                    <SubPanel
-                        groups={(subPanelMap as any)[openPanelId]}
-                        currentUrl={currentUrl}
-                        isSidebarCollapsed={isCollapsed}
-                        onClose={closeSubPanel}
-                        title={
-                            iconNavItems.find((i) => i.id === openPanelId)
-                                ?.label ?? ''
-                        }
-                    />
-                )}
+                {isCollapsed &&
+                    openPanelId &&
+                    (subPanelMap as any)[openPanelId] && (
+                        <SubPanel
+                            groups={(subPanelMap as any)[openPanelId]}
+                            currentUrl={currentUrl}
+                            isSidebarCollapsed={isCollapsed}
+                            onClose={closeSubPanel}
+                            title={
+                                iconNavItems.find((i) => i.id === openPanelId)
+                                    ?.label ?? ''
+                            }
+                        />
+                    )}
             </div>
         </TooltipProvider>
     );

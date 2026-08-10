@@ -25,6 +25,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -699,12 +700,14 @@ class DeviceController extends Controller
             $prefillDomain = '';
         }
 
-        return Inertia::render('security-devices/devices/create', [
-            'taxonomy' => DeviceTaxonomy::all(),
-            'domains' => collect(DeviceDomain::cases())->map(fn ($d) => ['value' => $d->value, 'label' => $d->label()]),
-            'statuses' => collect(DeviceStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
-            'prefillDomain' => $prefillDomain,
-        ]);
+        if ($request->expectsJson()) {
+            return response()->json($this->deviceFormOptions());
+        }
+
+        return redirect()->route('security-devices.devices.index', array_filter([
+            'dialog' => 'add-device',
+            'domain' => $prefillDomain,
+        ]));
     }
 
     public function store(Request $request)
@@ -735,6 +738,11 @@ class DeviceController extends Controller
 
         $device = Device::create($validated);
 
+        if ($request->boolean('_modal')) {
+            return redirect()->back()
+                ->with('success', "Device '{$device->name}' registered.");
+        }
+
         return redirect()->route('security-devices.devices.show', $device)
             ->with('success', "Device '{$device->name}' registered.");
     }
@@ -747,9 +755,7 @@ class DeviceController extends Controller
 
         return Inertia::render('security-devices/devices/edit', [
             'device' => $this->mapDeviceForDetail($device),
-            'taxonomy' => DeviceTaxonomy::all(),
-            'domains' => collect(DeviceDomain::cases())->map(fn ($d) => ['value' => $d->value, 'label' => $d->label()]),
-            'statuses' => collect(DeviceStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
+            ...$this->deviceFormOptions(),
         ]);
     }
 
@@ -824,6 +830,22 @@ class DeviceController extends Controller
 
     // ── Mapping helpers ───────────────────────────────────────────
     // mapDeviceForList() and resolveAssignableName() are in MapsDevicesForList trait.
+
+    /** @return array{taxonomy: array<string, mixed>, domains: Collection<int, array{value: string, label: string}>, statuses: Collection<int, array{value: string, label: string}>} */
+    private function deviceFormOptions(): array
+    {
+        return [
+            'taxonomy' => DeviceTaxonomy::all(),
+            'domains' => collect(DeviceDomain::cases())->map(fn ($domain) => [
+                'value' => $domain->value,
+                'label' => $domain->label(),
+            ]),
+            'statuses' => collect(DeviceStatus::cases())->map(fn ($status) => [
+                'value' => $status->value,
+                'label' => $status->label(),
+            ]),
+        ];
+    }
 
     private function mapDeviceForDetail(Device $d): array
     {

@@ -1,5 +1,11 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { PageHero } from '@/components/page';
+import {
+    PageHero,
+    type PageHeroBadge,
+    type PageHeroBadgeTone,
+    type PageHeroMetaItem,
+    type PageHeroStat,
+} from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { ReasonDialog } from '@/components/reason-dialog';
 import {
@@ -38,12 +44,15 @@ import {
 } from '@/components/ui/select';
 import { TabsRoot as Tabs, TabsContent } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatDateTime } from '@/lib/datetime';
+import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import {
+    Activity,
+    AlertTriangle,
     ArrowRightLeft,
     Check,
     Clock,
+    Cpu,
     Edit,
     FileText,
     GitBranch,
@@ -52,12 +61,16 @@ import {
     Minus,
     Network,
     Plus,
+    Radio,
     Trash2,
     Wrench,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { DeviceProfile, DeviceProfileSectionKey } from './device-profile';
-import { DeviceProfileNavigation } from './device-profile-navigation';
+import {
+    DeviceProfileGroupNavigation,
+    DeviceProfileNavigation,
+} from './device-profile-navigation';
 import {
     DeviceAuditSection,
     DeviceConfigurationSection,
@@ -65,7 +78,6 @@ import {
     DeviceInterfacesSensorsSection,
     DeviceManagementSection,
     DeviceMonitorsSection,
-    DeviceProfileHeader,
     DeviceTicketsSection,
 } from './device-profile-sections';
 
@@ -210,33 +222,44 @@ type Props = {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function statusVariant(
-    s: string,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (s) {
+function heroTone(state: string | null | undefined): PageHeroBadgeTone {
+    switch (state) {
         case 'active':
-            return 'default';
-        case 'offline':
-        case 'decommissioned':
+        case 'available':
+        case 'fresh':
+        case 'healthy':
+        case 'online':
+            return 'success';
+        case 'attention':
+        case 'degraded':
+        case 'maintenance':
+        case 'stale':
+        case 'warning':
+            return 'warning';
+        case 'critical':
+        case 'failed':
         case 'lost':
-            return 'secondary';
+        case 'offline':
+            return 'critical';
         default:
-            return 'outline';
+            return 'default';
     }
 }
-function healthVariant(
-    h: string,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (h) {
-        case 'healthy':
-            return 'default';
-        case 'warning':
-            return 'outline';
-        case 'critical':
-            return 'destructive';
-        default:
-            return 'secondary';
-    }
+
+function heroStatTone(
+    state: string | null | undefined,
+): 'neutral' | 'success' | 'warning' | 'critical' | 'info' {
+    const tone = heroTone(state);
+
+    return tone === 'default' ? 'neutral' : tone;
+}
+
+function humanise(value: string | null | undefined): string {
+    if (!value) return 'Not recorded';
+
+    return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) =>
+        letter.toUpperCase(),
+    );
 }
 function targetTypeLabel(t: string): string {
     return (
@@ -280,26 +303,35 @@ export default function DeviceShow({
     const [activeSection, setActiveSection] = useState<DeviceProfileSectionKey>(
         profile.sections[0]?.key ?? 'health',
     );
+    const [profileSearchOpen, setProfileSearchOpen] = useState(false);
     const [releaseOpen, setReleaseOpen] = useState(false);
     const [decommissionOpen, setDecommissionOpen] = useState(false);
     useEffect(() => {
-        const requested = new URLSearchParams(window.location.search).get(
-            'section',
-        ) as DeviceProfileSectionKey | null;
-        if (
-            requested &&
-            profile.sections.some((section) => section.key === requested)
-        ) {
-            setActiveSection(requested);
-        }
+        const syncSectionFromUrl = () => {
+            const requested = new URLSearchParams(window.location.search).get(
+                'section',
+            ) as DeviceProfileSectionKey | null;
+            if (
+                requested &&
+                profile.sections.some((section) => section.key === requested)
+            ) {
+                setActiveSection(requested);
+            }
+        };
+
+        syncSectionFromUrl();
+        window.addEventListener('popstate', syncSectionFromUrl);
+        return () => window.removeEventListener('popstate', syncSectionFromUrl);
     }, [profile.sections]);
     const openProfileSection = (section: DeviceProfileSectionKey) => {
         setActiveSection(section);
         if (typeof window === 'undefined') return;
 
         const url = new URL(window.location.href);
+        if (url.searchParams.get('section') === section) return;
+
         url.searchParams.set('section', section);
-        window.history.replaceState(
+        window.history.pushState(
             window.history.state,
             '',
             `${url.pathname}${url.search}${url.hash}`,
@@ -697,6 +729,95 @@ export default function DeviceShow({
         );
     };
 
+    const identityDescription = [
+        profile.header.identity.manufacturer,
+        profile.header.identity.model,
+    ]
+        .filter(Boolean)
+        .join(' ');
+    const requiredActionIcon =
+        profile.header.requiredAction.state === 'none'
+            ? Check
+            : AlertTriangle;
+    const heroMeta: PageHeroMetaItem[] = [
+        {
+            icon: Cpu,
+            label: profile.header.identity.type || 'Registered device',
+        },
+        { label: profile.header.identity.uid },
+        {
+            icon: MapPin,
+            label: profile.header.location?.name ?? 'Unassigned',
+            href: profile.header.location?.href ?? undefined,
+        },
+        {
+            icon: Radio,
+            label: profile.header.providerObservation.label,
+        },
+    ];
+    const heroBadges: PageHeroBadge[] = [
+        {
+            icon: Activity,
+            label: humanise(profile.header.health.deviceState),
+            tone: heroTone(profile.header.health.deviceState),
+            dot: true,
+        },
+        {
+            icon: Radio,
+            label: profile.header.health.label,
+            tone: heroTone(profile.header.health.state),
+        },
+        {
+            icon: Clock,
+            label: humanise(profile.header.freshness.state),
+            tone: heroTone(profile.header.freshness.state),
+        },
+        {
+            icon: requiredActionIcon,
+            label: profile.header.requiredAction.label,
+            tone: heroTone(profile.header.requiredAction.state),
+            onClick: () =>
+                openProfileSection(profile.header.requiredAction.section),
+            'aria-label': `${profile.header.requiredAction.label}: ${profile.header.requiredAction.description}`,
+        },
+    ];
+    const heroStats: PageHeroStat[] = [
+        {
+            label: 'Monitors',
+            value: profile.health.monitoring
+                ? `${profile.health.monitoring.healthy}/${profile.health.monitoring.enabled}`
+                : '—',
+            sub: profile.health.monitoring
+                ? 'healthy / enabled'
+                : 'Unavailable',
+            tone:
+                profile.health.monitoring?.attention ||
+                profile.health.monitoring?.uncertain
+                    ? 'warning'
+                    : 'success',
+            hideOnMobile: false,
+        },
+        {
+            label: 'Last observation',
+            value: formatRelative(
+                profile.header.freshness.observedAt,
+                Date.now(),
+                'Never',
+            ),
+            sub: profile.header.providerObservation.label,
+            tone: heroStatTone(profile.header.freshness.state),
+            hideOnMobile: false,
+        },
+        {
+            label: 'Assignment',
+            value: profile.header.assignment?.name ?? 'Unassigned',
+            sub: profile.header.assignment
+                ? humanise(profile.header.assignment.type)
+                : 'No current owner',
+            hideOnMobile: false,
+        },
+    ];
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -709,38 +830,18 @@ export default function DeviceShow({
 
             <PageShell>
                 <PageHero
-                    variant="compact"
-                    title={
-                        <div className="flex flex-wrap items-center gap-3">
-                            <span>{device.name}</span>
-                            <Badge
-                                variant="outline"
-                                className="font-mono text-xs"
-                            >
-                                {profile.header.identity.uid}
-                            </Badge>
-                            <Badge
-                                variant={statusVariant(
-                                    profile.header.health.deviceState ??
-                                        'unknown',
-                                )}
-                            >
-                                {(
-                                    profile.header.health.deviceState ??
-                                    'unknown'
-                                ).replace(/_/g, ' ')}
-                            </Badge>
-                            <Badge
-                                variant={healthVariant(
-                                    profile.header.health.state,
-                                )}
-                            >
-                                {profile.header.health.label}
-                            </Badge>
-                        </div>
+                    title={device.name}
+                    description={
+                        identityDescription ||
+                        profile.header.identity.type ||
+                        'Registered device'
                     }
                     backHref="/security-devices/devices"
                     backLabel="Devices"
+                    icon={Cpu}
+                    meta={heroMeta}
+                    badges={heroBadges}
+                    stats={heroStats}
                     actions={
                         <div className="flex gap-2">
                             {can.update && (
@@ -764,28 +865,40 @@ export default function DeviceShow({
                                         <Trash2 className="mr-2 h-4 w-4" />{' '}
                                         Decommission
                                     </Button>
-                                )}
+                            )}
                         </div>
                     }
-                />
-
-                <DeviceProfileHeader
-                    profile={profile}
-                    onOpenSection={openProfileSection}
+                    footer={
+                        <DeviceProfileGroupNavigation
+                            sections={profile.sections}
+                            activeSection={activeSection}
+                            onSectionChange={openProfileSection}
+                            onSearch={() => setProfileSearchOpen(true)}
+                        />
+                    }
                 />
 
                 <DeviceProfileNavigation
                     sections={profile.sections}
                     activeSection={activeSection}
                     onSectionChange={openProfileSection}
+                    searchOpen={profileSearchOpen}
+                    onSearchClose={() => setProfileSearchOpen(false)}
                 />
 
-                <Tabs
-                    value={activeSection}
-                    onValueChange={(value) =>
-                        openProfileSection(value as DeviceProfileSectionKey)
-                    }
+                <div
+                    id="device-profile-panel"
+                    role="tabpanel"
+                    aria-labelledby={`device-profile-tab-${activeSection}`}
                 >
+                    <Tabs
+                        value={activeSection}
+                        onValueChange={(value) =>
+                            openProfileSection(
+                                value as DeviceProfileSectionKey,
+                            )
+                        }
+                    >
                     {/* ── Overview tab ──────────────────────────── */}
                     <TabsContent value="health" className="space-y-6">
                         <DeviceHealthSection profile={profile} />
@@ -2242,10 +2355,11 @@ export default function DeviceShow({
                         </Dialog>
                     </TabsContent>
 
-                    <TabsContent value="audit">
-                        <DeviceAuditSection profile={profile} />
-                    </TabsContent>
-                </Tabs>
+                        <TabsContent value="audit">
+                            <DeviceAuditSection profile={profile} />
+                        </TabsContent>
+                    </Tabs>
+                </div>
 
                 <Dialog open={serviceDueOpen} onOpenChange={setServiceDueOpen}>
                     <DialogContent className="sm:max-w-md">

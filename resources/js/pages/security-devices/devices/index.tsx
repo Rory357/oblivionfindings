@@ -1,11 +1,15 @@
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import {
+    AddDeviceDialog,
+    useAddDeviceDialogState,
+} from '@/components/security-devices/add-device-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -71,6 +75,7 @@ export default function DevicesIndex({
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const addDeviceDialog = useAddDeviceDialogState();
 
     const applyFilters = (newFilters: Record<string, string>) => {
         setSelectedIds(new Set());
@@ -162,14 +167,16 @@ export default function DevicesIndex({
                                 </Button>
                             ) : null}
                             {can.create ? (
-                                <Button asChild size="sm">
-                                    <Link href="/security-devices/devices/create">
-                                        <Plus
-                                            className="mr-2 h-4 w-4"
-                                            aria-hidden="true"
-                                        />
-                                        Register device
-                                    </Link>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={addDeviceDialog.openDialog}
+                                >
+                                    <Plus
+                                        className="mr-2 h-4 w-4"
+                                        aria-hidden="true"
+                                    />
+                                    Register device
                                 </Button>
                             ) : null}
                         </div>
@@ -369,7 +376,7 @@ export default function DevicesIndex({
                         itemName="device"
                         createHref={
                             can.create
-                                ? '/security-devices/devices/create'
+                                ? '/security-devices/devices?dialog=add-device'
                                 : undefined
                         }
                         createLabel={can.create ? 'Register device' : undefined}
@@ -399,6 +406,18 @@ export default function DevicesIndex({
                             />
                         ))}
                     </div>
+                ) : null}
+
+                {can.create ? (
+                    <AddDeviceDialog
+                        open={addDeviceDialog.open}
+                        onClose={addDeviceDialog.closeDialog}
+                        prefillDomain={
+                            filters.domain && filters.domain !== 'all'
+                                ? filters.domain
+                                : ''
+                        }
+                    />
                 ) : null}
             </PageShell>
         </AppLayout>
