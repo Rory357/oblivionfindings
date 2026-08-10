@@ -265,6 +265,7 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         'one distinct opaque result reference per row',
         '22 rows / 44 viewport records',
         'all nine revision/environment-bound companions',
+        'distinct evidence reference and SHA-256 for every companion',
         'verify-it-security-desktop-evidence.php',
         'v10_release_evidence=false',
     )->and($evidenceVerifier)->toContain(
@@ -280,6 +281,8 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         'foreach ([[1440, 900], [1280, 800]]',
         "'environment_reference_sha256'",
         'uniqueEvidenceReferences(',
+        'uniqueCompanionEvidence(',
+        'array_unique($evidenceHashes, SORT_STRING)',
         'array_unique($resultReferences, SORT_STRING)',
         'array_unique($captureReferences, SORT_STRING)',
         'array_unique($captureHashes, SORT_STRING)',

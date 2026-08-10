@@ -244,6 +244,12 @@ it('rejects incomplete mixed failed tampered or ambiguous desktop evidence', fun
     $wrongActors['rows'][0]['actors'] = ['release-it-manager'];
     $mixedRevision = desktopEvidencePayload($releaseRevision, $primaryEnvironment, $restoredEnvironment);
     $mixedRevision['companions']['central_runtime']['release_revision'] = str_repeat('0', 40);
+    $replayedCompanionReference = desktopEvidencePayload($releaseRevision, $primaryEnvironment, $restoredEnvironment);
+    $replayedCompanionReference['companions']['collector']['evidence_reference'] =
+        $replayedCompanionReference['companions']['central_runtime']['evidence_reference'];
+    $replayedCompanionHash = desktopEvidencePayload($releaseRevision, $primaryEnvironment, $restoredEnvironment);
+    $replayedCompanionHash['companions']['collector']['evidence_sha256'] =
+        $replayedCompanionHash['companions']['central_runtime']['evidence_sha256'];
     $failedViewport = desktopEvidencePayload($releaseRevision, $primaryEnvironment, $restoredEnvironment);
     $failedViewport['rows'][0]['viewports'][0]['status'] = 'failed';
     $missingRestored = desktopEvidencePayload($releaseRevision, $primaryEnvironment, $restoredEnvironment);
@@ -266,6 +272,8 @@ it('rejects incomplete mixed failed tampered or ambiguous desktop evidence', fun
         ->and($verify($missingViewport))->toBeFalse()
         ->and($verify($wrongActors))->toBeFalse()
         ->and($verify($mixedRevision))->toBeFalse()
+        ->and($verify($replayedCompanionReference))->toBeFalse()
+        ->and($verify($replayedCompanionHash))->toBeFalse()
         ->and($verify($failedViewport))->toBeFalse()
         ->and($verify($missingRestored))->toBeFalse()
         ->and($verify($primaryRowRelabelledAsRestored))->toBeFalse()

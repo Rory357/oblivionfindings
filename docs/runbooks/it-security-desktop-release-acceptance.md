@@ -248,7 +248,9 @@ all of the following to one exact release revision:
   retention, protocol/provider, load/soak, configuration-history and
   storage-restore companions. Every companion records the same release revision
   and either the protected primary or restored environment reference as defined
-  by its runbook.
+  by its runbook. Every companion also uses a distinct evidence reference and
+  SHA-256; one artifact cannot be relabelled to satisfy several companion
+  requirements.
 
 The signing authority exists only at
 `/etc/oblivion/it-security-desktop-release-authority.json`; there is no CLI or
@@ -285,7 +287,8 @@ three exact tracked support sources and never executes the ignored Composer
 autoloader before the checkout decision. It requires Linux, the fixed protected
 authority, a clean exact `HEAD == origin/main` checkout, a valid
 Ed25519 signature, all 18/36 primary and 4/8 restored records, exact actor and
-viewport contracts, distinct non-replayed result/capture evidence, and all nine revision/environment-bound companions. It
+viewport contracts, distinct non-replayed result/capture evidence, and all nine revision/environment-bound companions.
+It also requires a distinct evidence reference and SHA-256 for every companion. It
 rechecks the authority and checkout after verification and emits only a
 value-free aggregate result plus the signed manifest SHA-256. Any missing row,
 single viewport, wrong actor, failed criterion, primary evidence relabelled as

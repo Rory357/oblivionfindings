@@ -227,6 +227,7 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                 || $reviewedAt > $verifiedAt->modify('+60 seconds')
                 || $reviewedAt->getTimestamp() - $deployedAt->getTimestamp() > self::MAXIMUM_AUTHORITY_SECONDS
                 || ! $this->validCompanions($payload['companions'] ?? null, $authority)
+                || ! $this->uniqueCompanionEvidence($payload['companions'] ?? null)
                 || ! $this->validRows(
                     $payload['rows'] ?? null,
                     self::ROW_ACTORS,
@@ -320,6 +321,29 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
         }
 
         return true;
+    }
+
+    private function uniqueCompanionEvidence(mixed $companions): bool
+    {
+        if (! is_array($companions) || array_is_list($companions)) {
+            return false;
+        }
+
+        $evidenceReferences = [];
+        $evidenceHashes = [];
+        foreach ($companions as $companion) {
+            if (! is_array($companion)
+                || ! is_string($companion['evidence_reference'] ?? null)
+                || ! is_string($companion['evidence_sha256'] ?? null)) {
+                return false;
+            }
+
+            $evidenceReferences[] = $companion['evidence_reference'];
+            $evidenceHashes[] = $companion['evidence_sha256'];
+        }
+
+        return count($evidenceReferences) === count(array_unique($evidenceReferences, SORT_STRING))
+            && count($evidenceHashes) === count(array_unique($evidenceHashes, SORT_STRING));
     }
 
     /** @param mixed $rows @param array<string, list<string>> $expectedRows */
