@@ -64,6 +64,10 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         '`securityDevices.devices.viewAllSites`',
         'php artisan it-security:verify-desktop-release-fixtures --json',
         'It does not create or repair fixtures',
+        'effective allow/deny permission matrix',
+        "requester's self-service-only IT boundary",
+        "auditor's read-only",
+        "Hidden-Site actor's parent permissions",
         '`ready` result is only fixture readiness',
         '`v10_release_evidence=false`',
     )->and($rbac)->toContain(
@@ -149,6 +153,11 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         "'RELEASE Site Alpha'",
         "'RELEASE Site Hidden'",
         "'RELEASE Hidden Device'",
+        "'required_permissions'",
+        "'forbidden_permissions'",
+        "'release_actor_required_permission_missing'",
+        "'release_actor_forbidden_permission_present'",
+        "'roles.permissions:id,key'",
         "'fixture_readiness_query_failed'",
         "'v10_release_evidence' => false",
     )->and($fixtureReadiness)->not->toContain(

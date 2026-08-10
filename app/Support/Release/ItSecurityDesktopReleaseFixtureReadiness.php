@@ -29,38 +29,147 @@ final class ItSecurityDesktopReleaseFixtureReadiness
 
     public const string EVIDENCE_CLASS = 'it_security_desktop_release_fixture_readiness_v1';
 
-    /** @var array<string, array{role: string, site: string, mfa?: bool, explicit_denials?: list<string>}> */
+    /**
+     * @var array<string, array{
+     *     role: string,
+     *     site: string,
+     *     required_permissions: list<string>,
+     *     forbidden_permissions: list<string>,
+     *     mfa?: bool,
+     *     explicit_denials?: list<string>
+     * }>
+     */
     public const array ACTORS = [
         'release-requester@acceptance.invalid' => [
             'role' => 'support_worker',
             'site' => 'RELEASE Site Alpha',
+            'required_permissions' => ['it.request'],
+            'forbidden_permissions' => [
+                'it.view',
+                'it.manage',
+                'it.organisationWide',
+                'it.viewSensitive',
+            ],
         ],
         'release-it-manager@acceptance.invalid' => [
             'role' => 'it_manager',
             'site' => 'RELEASE Site Alpha',
+            'required_permissions' => [
+                'it.request',
+                'it.view',
+                'it.manage',
+                'securityDevices.viewAny',
+                'securityDevices.devices.view',
+                'securityDevices.events.view',
+                'securityDevices.integrations.view',
+                'securityDevices.monitoring.manage',
+                'securityDevices.commands.observe',
+                'securityDevices.commands.control',
+                'securityDevices.commands.approve',
+            ],
+            'forbidden_permissions' => [
+                'it.organisationWide',
+                'securityDevices.devices.viewAllSites',
+            ],
             'explicit_denials' => ['it.organisationWide', 'securityDevices.devices.viewAllSites'],
         ],
         'release-it-reviewer@acceptance.invalid' => [
             'role' => 'it_manager',
             'site' => 'RELEASE Site Alpha',
+            'required_permissions' => [
+                'it.view',
+                'securityDevices.viewAny',
+                'securityDevices.devices.view',
+                'securityDevices.commands.observe',
+                'securityDevices.commands.approve',
+            ],
+            'forbidden_permissions' => [
+                'it.organisationWide',
+                'securityDevices.devices.viewAllSites',
+            ],
             'mfa' => true,
             'explicit_denials' => ['it.organisationWide', 'securityDevices.devices.viewAllSites'],
         ],
         'release-control-room@acceptance.invalid' => [
             'role' => 'coordinator',
             'site' => 'RELEASE Site Alpha',
+            'required_permissions' => [
+                'controlRoom.viewAny',
+                'controlRoom.alerts.view',
+                'securityDevices.viewAny',
+                'securityDevices.devices.view',
+                'securityDevices.events.view',
+                'securityDevices.commands.observe',
+            ],
+            'forbidden_permissions' => ['securityDevices.devices.viewAllSites'],
         ],
         'release-auditor@acceptance.invalid' => [
             'role' => 'auditor',
             'site' => 'RELEASE Site Alpha',
+            'required_permissions' => [
+                'securityDevices.viewAny',
+                'securityDevices.devices.view',
+                'securityDevices.events.view',
+                'securityDevices.accessControl.view',
+                'securityDevices.reports.view',
+                'securityDevices.commands.observe',
+            ],
+            'forbidden_permissions' => [
+                'securityDevices.devices.create',
+                'securityDevices.devices.update',
+                'securityDevices.devices.delete',
+                'securityDevices.devices.assign',
+                'securityDevices.accessControl.manage',
+                'securityDevices.maintenance.manage',
+                'securityDevices.integrations.manage',
+                'securityDevices.monitoring.manage',
+                'securityDevices.commands.operate',
+                'securityDevices.commands.manage',
+                'securityDevices.commands.control',
+                'securityDevices.commands.approve',
+                'securityDevices.commands.admin',
+            ],
         ],
         'release-denied@acceptance.invalid' => [
             'role' => 'support_worker',
             'site' => 'RELEASE Site Hidden',
+            'required_permissions' => [
+                'securityDevices.viewAny',
+                'securityDevices.devices.view',
+                'securityDevices.events.view',
+                'securityDevices.integrations.view',
+                'securityDevices.reports.view',
+                'securityDevices.commands.observe',
+                'controlRoom.alerts.view',
+                'it.view',
+            ],
+            'forbidden_permissions' => [
+                'securityDevices.devices.create',
+                'securityDevices.devices.update',
+                'securityDevices.devices.delete',
+                'securityDevices.devices.assign',
+                'securityDevices.integrations.manage',
+                'securityDevices.monitoring.manage',
+                'securityDevices.commands.operate',
+                'securityDevices.commands.manage',
+                'securityDevices.commands.control',
+                'securityDevices.commands.approve',
+                'securityDevices.commands.admin',
+                'it.manage',
+                'it.organisationWide',
+                'securityDevices.devices.viewAllSites',
+            ],
         ],
         'release-source-denied@acceptance.invalid' => [
             'role' => 'finance',
             'site' => 'RELEASE Site Alpha',
+            'required_permissions' => ['finance.dashboard'],
+            'forbidden_permissions' => [
+                'securityDevices.viewAny',
+                'securityDevices.devices.view',
+                'controlRoom.viewAny',
+                'controlRoom.alerts.view',
+            ],
         ],
     ];
 
@@ -172,7 +281,7 @@ final class ItSecurityDesktopReleaseFixtureReadiness
     {
         $actors = User::query()
             ->whereIn('email', array_keys(self::ACTORS))
-            ->with(['roles:id,name', 'permissionOverrides:id,key', 'hrEmployeeProfile'])
+            ->with(['roles:id,name', 'roles.permissions:id,key', 'permissionOverrides:id,key', 'hrEmployeeProfile'])
             ->get()
             ->keyBy('email');
         $ready = 0;
@@ -211,6 +320,12 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                         && ! (bool) $permission->pivot->allowed,
                 ),
             );
+            $requiredPermissionsReady = collect($contract['required_permissions'])->every(
+                fn (string $key): bool => $actor->canDo($key),
+            );
+            $forbiddenPermissionsReady = collect($contract['forbidden_permissions'])->every(
+                fn (string $key): bool => ! $actor->canDo($key),
+            );
             $mfaReady = ! ($contract['mfa'] ?? false)
                 || ($actor->two_factor_secret !== null && $actor->two_factor_confirmed_at !== null);
 
@@ -226,11 +341,23 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             if (! $denialsReady) {
                 $gaps[] = 'release_actor_explicit_denial_missing';
             }
+            if (! $requiredPermissionsReady) {
+                $gaps[] = 'release_actor_required_permission_missing';
+            }
+            if (! $forbiddenPermissionsReady) {
+                $gaps[] = 'release_actor_forbidden_permission_present';
+            }
             if (! $mfaReady) {
                 $gaps[] = 'release_reviewer_mfa_missing';
             }
 
-            if ($actor->approved_at !== null && $roleReady && $profileReady && $denialsReady && $mfaReady) {
+            if ($actor->approved_at !== null
+                && $roleReady
+                && $profileReady
+                && $denialsReady
+                && $requiredPermissionsReady
+                && $forbiddenPermissionsReady
+                && $mfaReady) {
                 $ready++;
             }
         }

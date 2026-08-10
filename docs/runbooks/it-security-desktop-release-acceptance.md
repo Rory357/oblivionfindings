@@ -58,9 +58,13 @@ php artisan it-security:verify-desktop-release-fixtures --json
 ```
 
 The command checks the fixed non-Administrator actors, their exact roles,
-current Site assignments, reviewer MFA and explicit application-wide denials,
-plus the canonical Site, person, Device, Asset, IT and Control Room fixture
-roster below. It does not create or repair fixtures, print their identifiers, or
+current Site assignments, reviewer MFA, explicit application-wide denials and
+the effective allow/deny permission matrix required by each journey. This
+includes the requester's self-service-only IT boundary, the auditor's read-only
+boundary, the Hidden-Site actor's parent permissions and the Finance actor's
+missing Security & Devices and Control Room parent permissions. It also checks
+the canonical Site, person, Device, Asset, IT and Control Room fixture roster
+below. It does not create or repair fixtures, print their identifiers, or
 exercise a provider. A non-zero result blocks D01-D18 until the approved
 release-fixture process has corrected the reported value-free gap codes. A
 `ready` result is only fixture readiness: it sets `v10_release_evidence=false`
