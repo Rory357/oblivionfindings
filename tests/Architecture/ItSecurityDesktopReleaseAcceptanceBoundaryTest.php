@@ -18,6 +18,10 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
     $fixtureCommand = (string) file_get_contents(
         $root.'/app/Console/Commands/VerifyItSecurityDesktopReleaseFixtures.php',
     );
+    $fixtureMutationGuard = (string) file_get_contents(
+        $root.'/app/Support/Release/ItSecurityDesktopReleaseFixtureMutationGuard.php',
+    );
+    $itConfig = (string) file_get_contents($root.'/config/it.php');
     $package = json_decode(
         (string) file_get_contents($root.'/package.json'),
         true,
@@ -180,6 +184,28 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
     )->and($fixtureCommand)->toContain(
         'it-security:verify-desktop-release-fixtures',
         "return \$report['state'] === 'ready' ? self::SUCCESS : self::FAILURE;",
+    );
+
+    expect($fixtureMutationGuard)->toContain(
+        "EVIDENCE_CLASS = 'it_security_desktop_release_fixture_mutation_guard_v1'",
+        "ACTIONS = ['prepare', 'cleanup']",
+        "\$environment === 'testing'",
+        "\$environment === 'staging' && \$platform === 'Linux'",
+        "=== 'approved_non_production'",
+        "=== 'mysql'",
+        "hash('sha256', \$databaseName)",
+        'LoadSoakReleaseCheckoutVerifier',
+        'IT-SECURITY-DESKTOP-FIXTURES:',
+        "'fixture_write_authorized' => \$authorised",
+        "'v10_release_evidence' => false",
+    )->and($itConfig)->toContain(
+        'IT_SECURITY_DESKTOP_FIXTURES_ENABLED',
+        'IT_SECURITY_DESKTOP_FIXTURES_ENVIRONMENT_CLASS',
+        'IT_SECURITY_DESKTOP_FIXTURES_DATABASE_NAME_SHA256',
+    )->and($runbook)->toContain(
+        '`ItSecurityDesktopReleaseFixtureMutationGuard`',
+        'This mutation gate is an implementation prerequisite, not a fixture writer.',
+        'Never improvise partial rows in Tinker',
     );
 
     expect($runbook)->toContain(

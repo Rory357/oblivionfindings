@@ -39,4 +39,21 @@ return [
         'status_secret' => env('IT_OUTBOUND_MAIL_STATUS_SECRET'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Desktop release acceptance fixtures
+    |--------------------------------------------------------------------------
+    |
+    | Fixture writes remain disabled unless an approved non-production server
+    | explicitly enables them and pins the exact MySQL database name by hash.
+    | The mutation guard separately binds each action to clean origin/main.
+    |
+    */
+
+    'desktop_release_fixtures' => [
+        'enabled' => env('IT_SECURITY_DESKTOP_FIXTURES_ENABLED', false),
+        'environment_class' => env('IT_SECURITY_DESKTOP_FIXTURES_ENVIRONMENT_CLASS'),
+        'database_name_sha256' => env('IT_SECURITY_DESKTOP_FIXTURES_DATABASE_NAME_SHA256'),
+    ],
+
 ];

@@ -75,6 +75,24 @@ release-fixture process has corrected the reported value-free gap codes. A
 and does not replace deployed browser, runtime/provider, collector, retention,
 configuration-history or restore evidence.
 
+The approved fixture preparer must pass
+`ItSecurityDesktopReleaseFixtureMutationGuard` before its first write. The gate
+allows only `prepare` or `cleanup`, refuses production, permits staging only on
+Linux, requires `IT_SECURITY_DESKTOP_FIXTURES_ENABLED=true`, exact environment
+class `approved_non_production`, MySQL and the SHA-256 of the exact configured
+database name in `IT_SECURITY_DESKTOP_FIXTURES_DATABASE_NAME_SHA256`. It also
+requires the supplied 40-hex revision to be the clean checkout's exact
+`HEAD == refs/remotes/origin/main` and requires the action-specific confirmation
+`IT-SECURITY-DESKTOP-FIXTURES:<ACTION>:<revision>`. The gate emits no database
+name, checkout path or confirmation value, and a pass still sets
+`v10_release_evidence=false`.
+
+This mutation gate is an implementation prerequisite, not a fixture writer.
+Until the complete idempotent prepare-and-owned-record cleanup command is
+available and separately approved for execution, continue to use the read-only
+preflight above and report its gaps. Never improvise partial rows in Tinker,
+SQL, a browser, or a generic seeder.
+
 ### Sites and people
 
 - `RELEASE Site Alpha`: active operational Site reachable over the main SD-WAN.
