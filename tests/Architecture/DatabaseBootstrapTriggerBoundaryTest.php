@@ -95,6 +95,7 @@ it('gates production migration with value-free rootless preflight isolation and 
         ->and($command)->toContain(
             '@@GLOBAL.log_bin AS log_bin',
             '@@GLOBAL.log_bin_trust_function_creators',
+            'CURRENT_USER() AS current_user_name',
             'SHOW GRANTS FOR CURRENT_USER()',
             'SHOW GRANTS FOR CURRENT_USER() USING',
             'information_schema.ENABLED_ROLES',
