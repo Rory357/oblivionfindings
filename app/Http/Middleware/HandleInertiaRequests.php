@@ -1140,12 +1140,21 @@ class HandleInertiaRequests extends Middleware
                 self::medsOverdueBadgeCacheKey((int) $user->id, $now->toDateString()),
                 now()->addSeconds(60),
                 function () use ($user, $schedule, $now): int {
+                    $dayStartUtc = $now->copy()->startOfDay()->utc();
+                    $dayEndUtc = $now->copy()->endOfDay()->utc();
+
                     $clientIds = Shift::query()
                         ->where('user_id', $user->id)
-                        ->whereBetween('starts_at', [
-                            $now->copy()->startOfDay()->utc(),
-                            $now->copy()->addDay()->endOfDay()->utc(),
-                        ])
+                        // Include a live overnight shift that began before
+                        // midnight but still overlaps the worker's local day.
+                        // Filtering only by starts_at made the critical badge
+                        // disappear at midnight while the same due row
+                        // remained visible on the medication board.
+                        ->where('starts_at', '<=', $dayEndUtc)
+                        ->where(function ($query) use ($dayStartUtc) {
+                            $query->whereNull('ends_at')
+                                ->orWhere('ends_at', '>=', $dayStartUtc);
+                        })
                         ->pluck('client_id')
                         ->filter()
                         ->unique()

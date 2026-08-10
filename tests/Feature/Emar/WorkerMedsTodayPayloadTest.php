@@ -11,6 +11,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -30,7 +31,7 @@ class WorkerMedsTodayPayloadTest extends TestCase
     public function test_worker_meds_today_payload_sorts_due_now_and_prn_limit_state(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $worker = $this->makeRoleUser('support_worker');
         $this->grantPermissions($worker, ['medications.administer.record']);
@@ -112,7 +113,7 @@ class WorkerMedsTodayPayloadTest extends TestCase
     public function test_meds_due_matches_administrations_with_a_single_query(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $worker = $this->makeRoleUser('support_worker');
         $this->grantPermissions($worker, ['medications.administer.record']);
@@ -171,6 +172,54 @@ class WorkerMedsTodayPayloadTest extends TestCase
         $this->assertSame(2, $adminQueries);
     }
 
+    public function test_sidebar_badge_keeps_an_overnight_shift_after_midnight(): void
+    {
+        $timezone = config('app.worker_timezone', 'Pacific/Auckland');
+        Carbon::setTestNow(Carbon::parse('2026-05-01 00:20:00', $timezone));
+        $this->seed(RbacSeeder::class);
+
+        $worker = $this->makeRoleUser('support_worker');
+        $this->grantPermissions($worker, ['medications.administer.record']);
+
+        $serviceContext = ServiceContext::factory()->create([
+            'name' => 'Overnight worker meds',
+            'type' => 'residential',
+            'is_active' => true,
+        ]);
+
+        $client = Client::factory()->create([
+            'service_context_id' => $serviceContext->id,
+            'status' => 'active',
+        ]);
+
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'service_context_id' => $serviceContext->id,
+            'user_id' => $worker->id,
+            'starts_at' => Carbon::parse('2026-04-30 23:20:00', $timezone)->utc(),
+            'ends_at' => Carbon::parse('2026-05-01 05:00:00', $timezone)->utc(),
+            'status' => 'in_progress',
+        ]);
+
+        ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Overnight tablets',
+            'dosage' => '1 tablet',
+            'frequency' => 'Daily',
+            'dose_times' => ['00:05'],
+            'is_prn' => false,
+            'active' => true,
+            'state' => 'active',
+        ]);
+
+        $this->actingAs($worker)
+            ->get('/meds/today')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('auth.can.medications.overdueTodayCount', 1)
+            );
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create([
@@ -187,7 +236,7 @@ class WorkerMedsTodayPayloadTest extends TestCase
     }
 
     /**
-     * @param array<int, string> $permissionKeys
+     * @param  array<int, string>  $permissionKeys
      */
     protected function grantPermissions(User $user, array $permissionKeys): void
     {
