@@ -83,6 +83,9 @@ test('site readiness geofence flow saves a boundary and reuses the same dialog e
     await page.goto(`/sites/${siteId}`, { waitUntil: 'domcontentloaded' });
 
     await page.getByTestId('site-profile-tab-readiness').click();
+    await expect(
+        page.getByTestId('site-profile-tab-readiness'),
+    ).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('readiness-item-geofence')).toContainText(
         'Geofence configured',
     );

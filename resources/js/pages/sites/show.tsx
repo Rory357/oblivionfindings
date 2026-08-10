@@ -385,6 +385,7 @@ export default function SiteShow(props: SiteProfileProps) {
     const [loadingProps, setLoadingProps] = useState<
         Partial<Record<SiteProfileDataProp, boolean>>
     >({});
+    const propsRef = useRef(props);
     const loadingPropsRef = useRef<
         Partial<Record<SiteProfileDataProp, boolean>>
     >({});
@@ -399,7 +400,7 @@ export default function SiteShow(props: SiteProfileProps) {
     const requestProp = useCallback(
         (dataProp: SiteProfileDataProp, force = false) => {
             if (
-                (!force && props[dataProp] !== undefined) ||
+                (!force && propsRef.current[dataProp] !== undefined) ||
                 loadingPropsRef.current[dataProp]
             ) {
                 return;
@@ -447,7 +448,7 @@ export default function SiteShow(props: SiteProfileProps) {
                 },
             });
         },
-        [props],
+        [],
     );
 
     const selectTab = useCallback(
@@ -466,6 +467,10 @@ export default function SiteShow(props: SiteProfileProps) {
         },
         [profilePermissions, requestProp, site.type],
     );
+
+    useEffect(() => {
+        propsRef.current = props;
+    }, [props]);
 
     useGroupedProfileSearchShortcut(() => setSearchOpen(true));
 
