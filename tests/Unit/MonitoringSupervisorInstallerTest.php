@@ -40,6 +40,8 @@ it('validates every isolated monitoring program before a scoped Supervisor updat
         'user=$RUN_USER',
         'stdout_logfile=$LOG_DIRECTORY/',
         'combined_program_count',
+        'program_declaration_count',
+        'END { print count + 0 }',
         'PROBE_PROGRAM="oblivion-monitoring-install-probe-$$"',
         "'autostart=false'",
         'Supervisor does not discover .conf files from $INCLUDE_DIRECTORY.',
@@ -47,15 +49,22 @@ it('validates every isolated monitoring program before a scoped Supervisor updat
         'supervisorctl -c "$SUPERVISORD_CONFIG" update "${EXPECTED_PROGRAMS[@]}"',
         'status "$program:*"',
         'INSTALL_COMMITTED=false',
-    )->not->toContain('PASSWORD=', 'TOKEN=', 'sudo -E', 'queue:work redis --queue=default');
+        'the running Supervisor daemon rejected the include path probe',
+        'the running Supervisor daemon rejected the complete monitoring configuration',
+    )->not->toContain(
+        'PASSWORD=',
+        'TOKEN=',
+        'sudo -E',
+        'queue:work redis --queue=default',
+        'grep -h -Fxc',
+        'supervisord -c "$SUPERVISORD_CONFIG" -t',
+    );
 
-    $validate = strpos($script, 'supervisord -c "$SUPERVISORD_CONFIG" -t');
-    $reread = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" reread', $validate);
+    $reread = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" reread');
     $available = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" avail', $reread);
     $update = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" update', $available);
 
-    expect($validate)->not->toBeFalse()
-        ->and($reread)->toBeGreaterThan($validate)
+    expect($reread)->not->toBeFalse()
         ->and($available)->toBeGreaterThan($reread)
         ->and($update)->toBeGreaterThan($available);
 });
