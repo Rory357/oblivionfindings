@@ -124,9 +124,16 @@ report_maintenance_on_failure() {
     local exit_code=$?
 
     if [ "$exit_code" -ne 0 ] && [ "$MAINTENANCE_ACTIVE" -eq 1 ]; then
-        echo "✗ deployment failed after maintenance began; the application remains in maintenance mode."
-        echo "  Complete reviewed forward recovery and validation before running php artisan up."
+        if run_app php artisan down --retry=60 >/dev/null 2>&1; then
+            echo "✗ deployment failed after maintenance began; the application is in maintenance mode."
+            echo "  Complete reviewed forward recovery and validation before running php artisan up."
+        else
+            echo "✗ deployment failed and could not reconfirm maintenance mode automatically."
+            echo "  Restore maintenance mode immediately, then complete reviewed forward recovery."
+        fi
     fi
+
+    return "$exit_code"
 }
 
 trap report_maintenance_on_failure EXIT
@@ -402,6 +409,7 @@ else
         "--application-path=$(pwd -P)"
         "--run-user=${MONITORING_RUNTIME_USER:-www-data}"
         "--log-directory=${MONITORING_LOG_DIRECTORY:-/var/log/oblivion}"
+        "--allow-maintenance-paused-workers"
     )
     if [ -n "${MONITORING_SUPERVISOR_INCLUDE_DIR:-}" ]; then
         monitoring_supervisor_args+=("--include-directory=$MONITORING_SUPERVISOR_INCLUDE_DIR")
@@ -459,20 +467,22 @@ if [ "$queclink_consecutive_active" -lt 3 ]; then
 fi
 run_app php artisan queclink:install --check
 
-echo "▶ php artisan queue:restart"
+echo "▶ final application and lifecycle runtime validation"
+run_app php artisan about --only=environment --json >/dev/null
+run_app php artisan database:verify-lifecycle-triggers postflight --json
+
+echo "▶ final Queclink listener readiness check"
+run_app php artisan queclink:install --check
+
+echo "▶ leaving maintenance mode"
+run_app php artisan up
+
+echo "▶ php artisan queue:restart after maintenance release"
 run_app php artisan queue:restart
 
 echo "▶ verifying monitoring supervision is bound to this exact release"
 assert_stable_monitoring_runtime
 
-echo "▶ final application and lifecycle runtime validation"
-run_app php artisan about --only=environment --json >/dev/null
-run_app php artisan database:verify-lifecycle-triggers postflight --json
-
-echo "▶ leaving maintenance mode"
-echo "▶ final Queclink listener readiness check"
-run_app php artisan queclink:install --check
-run_app php artisan up
 MAINTENANCE_ACTIVE=0
 
 echo

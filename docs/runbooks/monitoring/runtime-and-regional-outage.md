@@ -42,9 +42,14 @@ and discovery of every program through the active include path. It stages both
 files, requires the already-running daemon to accept them through
 `supervisorctl reread`, and rolls them back on pre-update
 failure. The final `update` names only the monitoring groups, then explicitly
-restarts each exact group so an unchanged definition cannot leave a failed
-listener stopped or an old worker on the previous release. Every group must
-reach `RUNNING`; unrelated Supervisor programs are never updated or restarted.
+restarts the three listeners so an unchanged definition cannot leave a failed
+listener stopped. A standalone install requires every group to reach `RUNNING`.
+During the deployment maintenance window, the deploy script passes
+`--allow-maintenance-paused-workers`; this still validates and updates all
+worker definitions but checks listener runtime only. Once maintenance ends, the
+deploy script restarts the queues and requires every exact worker and listener
+process to remain release-bound and `RUNNING`; a failure returns the application
+to maintenance. Unrelated Supervisor programs are never updated or restarted.
 The installer does not launch a second `supervisord` process as a configuration
 test because that can collide with the active daemon's control socket or HTTP
 port.

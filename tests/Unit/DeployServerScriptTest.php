@@ -109,6 +109,7 @@ it('fails closed into the monitoring Supervisor installer unless explicitly skip
             'MONITORING_SUPERVISORD_CONFIG',
             'sudo bash scripts/monitoring/install-supervisor.sh',
             'monitoring Supervisor install requires root or sudo',
+            '--allow-maintenance-paused-workers',
         )
         ->not->toContain('sudo -E bash scripts/monitoring/install-supervisor.sh');
 
@@ -150,13 +151,16 @@ it('proves every monitoring process is stably bound to the exact release after t
     );
 
     $skip = strpos($script, 'if [ "$SKIP_MONITORING_SUPERVISOR" -eq 1 ]; then');
-    $queueRestart = strpos($script, 'run_app php artisan queue:restart', $skip);
+    $applicationUp = strpos($script, 'run_app php artisan up', $skip);
+    $queueRestart = strpos($script, 'run_app php artisan queue:restart', $applicationUp);
     $finalProof = strpos($script, 'assert_stable_monitoring_runtime', $queueRestart);
     $success = strpos($script, 'Server provisioning complete', $finalProof);
 
     expect($skip)
         ->not->toBeFalse()
+        ->and($applicationUp)->toBeGreaterThan($skip)
         ->and($queueRestart)->toBeGreaterThan($skip)
+        ->and($queueRestart)->toBeGreaterThan($applicationUp)
         ->and($finalProof)->toBeGreaterThan($queueRestart)
         ->and($success)->toBeGreaterThan($finalProof)
         ->and(substr_count($script, 'assert_stable_monitoring_runtime'))->toBe(2);
@@ -194,9 +198,9 @@ it('fails closed through stable Queclink readiness even when installation is ext
     $consecutiveGate = strpos($script, '"$queclink_consecutive_active" -ge 3', $activeStateProbe);
     $runtimeFailure = strpos($script, 'Queclink listener did not remain active for three consecutive readiness samples', $consecutiveGate);
     $readinessCheck = strpos($script, 'run_app php artisan queclink:install --check', $runtimeFailure);
-    $queueRestart = strpos($script, 'run_app php artisan queue:restart', $readinessCheck);
-    $finalReadinessCheck = strpos($script, 'run_app php artisan queclink:install --check', $queueRestart);
+    $finalReadinessCheck = strpos($script, 'run_app php artisan queclink:install --check', $readinessCheck + 1);
     $applicationUp = strpos($script, 'run_app php artisan up', $finalReadinessCheck);
+    $queueRestart = strpos($script, 'run_app php artisan queue:restart', $applicationUp);
     $success = strpos($script, 'Server provisioning complete', $applicationUp);
 
     expect($defaultInstall)
@@ -210,11 +214,30 @@ it('fails closed through stable Queclink readiness even when installation is ext
         ->and($consecutiveGate)->toBeGreaterThan($activeStateProbe)
         ->and($runtimeFailure)->toBeGreaterThan($consecutiveGate)
         ->and($readinessCheck)->toBeGreaterThan($runtimeFailure)
-        ->and($queueRestart)->toBeGreaterThan($readinessCheck)
-        ->and($finalReadinessCheck)->toBeGreaterThan($queueRestart)
+        ->and($finalReadinessCheck)->toBeGreaterThan($readinessCheck)
         ->and($applicationUp)->toBeGreaterThan($finalReadinessCheck)
+        ->and($queueRestart)->toBeGreaterThan($applicationUp)
         ->and($success)->toBeGreaterThan($applicationUp)
         ->and(substr_count($script, 'run_app php artisan queclink:install --check'))->toBe(2);
+});
+
+it('restores maintenance mode if post-up runtime verification fails', function () {
+    $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
+
+    expect($script)->toContain(
+        'if run_app php artisan down --retry=60',
+        'could not reconfirm maintenance mode automatically',
+    );
+
+    $applicationUp = strpos($script, 'run_app php artisan up');
+    $queueRestart = strpos($script, 'run_app php artisan queue:restart', $applicationUp);
+    $runtimeProof = strpos($script, 'assert_stable_monitoring_runtime', $queueRestart);
+    $maintenanceCleared = strpos($script, 'MAINTENANCE_ACTIVE=0', $runtimeProof);
+
+    expect($applicationUp)->not->toBeFalse()
+        ->and($queueRestart)->toBeGreaterThan($applicationUp)
+        ->and($runtimeProof)->toBeGreaterThan($queueRestart)
+        ->and($maintenanceCleared)->toBeGreaterThan($runtimeProof);
 });
 
 it('creates deploy artifacts with web-readable permissions even under a restrictive login umask', function () {
