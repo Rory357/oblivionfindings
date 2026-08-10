@@ -3139,13 +3139,13 @@ export default function RosteringIndex(props: Props) {
                                     {canRepublish ? 'Re-publish' : 'Publish'}
                                 </Button>
                                 {props.rosterPeriod && diffTotal > 0 ? (
-                                    <Link
-                                        href={`/operations/rostering/periods/${props.rosterPeriod.id}/diff`}
-                                    >
-                                        <Button size="sm" variant="outline">
+                                    <Button asChild size="sm" variant="outline">
+                                        <Link
+                                            href={`/operations/rostering/periods/${props.rosterPeriod.id}/diff`}
+                                        >
                                             View diff
-                                        </Button>
-                                    </Link>
+                                        </Link>
+                                    </Button>
                                 ) : null}
                                 {props.rosterPeriod?.status === 'published' ? (
                                     <Button
