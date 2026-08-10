@@ -17,12 +17,14 @@ beforeEach(function (): void {
     $this->seed(RbacSeeder::class);
     $this->visibleSite = Site::factory()->create([
         'name' => 'Visible Site',
+        'type' => 'house',
         'is_active' => true,
         'archived' => false,
         'archived_at' => null,
     ]);
     $this->hiddenSite = Site::factory()->create([
         'name' => 'Hidden Site',
+        'type' => 'facility',
         'is_active' => true,
         'archived' => false,
         'archived_at' => null,
