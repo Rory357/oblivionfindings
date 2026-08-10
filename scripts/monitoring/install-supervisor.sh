@@ -255,7 +255,15 @@ done
 supervisorctl -c "$SUPERVISORD_CONFIG" update "${EXPECTED_PROGRAMS[@]}"
 INSTALL_COMMITTED=true
 
-for attempt in {1..10}; do
+# An unchanged Supervisor definition does not restart a previously failed
+# listener or reload an already-running worker onto the deployed release. Every
+# expected group is therefore restarted explicitly after the scoped update.
+for program in "${EXPECTED_PROGRAMS[@]}"; do
+    supervisorctl -c "$SUPERVISORD_CONFIG" restart "$program:*" \
+        || fail "Supervisor could not restart $program on the deployed release."
+done
+
+for attempt in {1..30}; do
     all_running=true
     for program in "${EXPECTED_PROGRAMS[@]}"; do
         if status_output="$(supervisorctl -c "$SUPERVISORD_CONFIG" status "$program:*")"; then
