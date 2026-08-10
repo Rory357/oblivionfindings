@@ -1,6 +1,10 @@
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import {
+    AddDeviceDialog,
+    useAddDeviceDialogState,
+} from '@/components/security-devices/add-device-dialog';
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -112,6 +116,7 @@ type DeviceItem = {
 
 type Permissions = {
     manage_hardware?: boolean;
+    register_device?: boolean;
 };
 
 type TypePlanSummary = {
@@ -129,6 +134,23 @@ export type SiteHardwareProps = {
     can: Permissions;
     typePlan?: TypePlanSummary | null;
 };
+
+export function SiteHardwareRegisterAction({
+    canRegister,
+    onRegister,
+}: {
+    canRegister: boolean;
+    onRegister: () => void;
+}) {
+    if (!canRegister) return null;
+
+    return (
+        <Button type="button" onClick={onRegister}>
+            <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+            Register device
+        </Button>
+    );
+}
 
 function SiteHardwareFrame({
     embedded,
@@ -364,6 +386,8 @@ export function SiteHardwareSurface({
     }, [devices, search, filterStatus, filterCategory, filterProvider]);
 
     const canManageHardware = !!can?.manage_hardware;
+    const canRegisterDevice = !!can?.register_device;
+    const addDeviceDialog = useAddDeviceDialogState();
     const planForPins = typePlan?.published ?? typePlan?.draft ?? null;
 
     // ── handlers ───────────────────────────────────────────────────
@@ -527,14 +551,10 @@ export function SiteHardwareSurface({
                                         <ArrowRight className="ml-1 h-4 w-4" />
                                     </a>
                                 </Button>
-                                <Button asChild>
-                                    <a
-                                        href={`/security-devices/devices/create?domain=&site_id=${site.id}`}
-                                    >
-                                        <Plus className="mr-1 h-4 w-4" />
-                                        Register Device
-                                    </a>
-                                </Button>
+                                <SiteHardwareRegisterAction
+                                    canRegister={canRegisterDevice}
+                                    onRegister={addDeviceDialog.openDialog}
+                                />
                             </div>
                         }
                     />
@@ -1302,6 +1322,12 @@ export function SiteHardwareSurface({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            {canRegisterDevice ? (
+                <AddDeviceDialog
+                    open={addDeviceDialog.open}
+                    onClose={addDeviceDialog.closeDialog}
+                />
+            ) : null}
         </SiteHardwareFrame>
     );
 }

@@ -290,7 +290,10 @@ class SiteProfileOperationsPresenter
             'devices' => $devices,
             'rooms' => SiteRoom::query()->where('site_id', $site->id)->orderBy('sort_order')->get(['id', 'name', 'sort_order']),
             'typePlan' => $typePlan,
-            'can' => ['manage_hardware' => ! $site->archived && $user->can('update', $site) && $user->canDo('siteHardware.manage')],
+            'can' => [
+                'manage_hardware' => ! $site->archived && $user->can('update', $site) && $user->canDo('siteHardware.manage'),
+                'register_device' => ! $site->archived && $user->can('create', Device::class),
+            ],
             'href' => route('sites.hardware.index', $site),
         ];
     }

@@ -38,7 +38,7 @@ import { Button } from '@/components/ui/button';
 import { EmptySearch, EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     Building2,
     Cctv,
@@ -164,37 +164,24 @@ export function CategorySearchInput({
 
 export function CategoryRegisterAction({
     canRegister,
-    href,
     label,
     onRegister,
 }: {
     canRegister: boolean;
-    href: string;
     label: string;
-    onRegister?: () => void;
+    onRegister: () => void;
 }) {
     if (!canRegister) return null;
 
-    if (onRegister) {
-        return (
-            <Button
-                type="button"
-                size="sm"
-                className="frontline-focus min-h-11"
-                onClick={onRegister}
-            >
-                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-                {label}
-            </Button>
-        );
-    }
-
     return (
-        <Button asChild size="sm" className="frontline-focus min-h-11">
-            <Link href={href}>
-                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-                {label}
-            </Link>
+        <Button
+            type="button"
+            size="sm"
+            className="frontline-focus min-h-11"
+            onClick={onRegister}
+        >
+            <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+            {label}
         </Button>
     );
 }
@@ -273,7 +260,6 @@ export default function CategoryPage({
                     actions={
                         <CategoryRegisterAction
                             canRegister={can.registerDevice}
-                            href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
                             label={registerLabel}
                             onRegister={addDeviceDialog.openDialog}
                         />
@@ -516,7 +502,6 @@ export default function CategoryPage({
                                         action={
                                             <CategoryRegisterAction
                                                 canRegister={can.registerDevice}
-                                                href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
                                                 label={registerLabel}
                                                 onRegister={
                                                     addDeviceDialog.openDialog

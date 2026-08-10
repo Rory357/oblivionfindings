@@ -228,6 +228,7 @@ class SiteHardwareRefactorTest extends TestCase
             $props = $page->toArray()['props'];
             $this->assertNotEmpty($props['rooms']);
             $this->assertArrayHasKey('can', $props);
+            $this->assertTrue($props['can']['register_device']);
             $this->assertArrayNotHasKey('hardware', $props);
             $this->assertArrayNotHasKey('assets', $props);
             $this->assertArrayNotHasKey('categories', $props);

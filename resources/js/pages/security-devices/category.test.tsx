@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { CategoryRegisterAction, CategorySearchInput } from './category';
@@ -25,30 +25,35 @@ describe('CategoryRegisterAction', () => {
         render(
             <CategoryRegisterAction
                 canRegister={false}
-                href="/security-devices/devices/create?domain=security"
                 label="Register device"
+                onRegister={vi.fn()}
             />,
         );
+
+        expect(
+            screen.queryByRole('button', { name: 'Register device' }),
+        ).toBeNull();
+    });
+
+    it('opens the governed registration dialog with explicit create capability', () => {
+        const onRegister = vi.fn();
+
+        render(
+            <CategoryRegisterAction
+                canRegister
+                label="Register device"
+                onRegister={onRegister}
+            />,
+        );
+
+        const action = screen.getByRole('button', {
+            name: 'Register device',
+        });
 
         expect(
             screen.queryByRole('link', { name: 'Register device' }),
         ).toBeNull();
-    });
-
-    it('offers the governed registration route with explicit create capability', () => {
-        render(
-            <CategoryRegisterAction
-                canRegister
-                href="/security-devices/devices/create?domain=security"
-                label="Register device"
-            />,
-        );
-
-        expect(
-            screen.getByRole('link', { name: 'Register device' }),
-        ).toHaveAttribute(
-            'href',
-            '/security-devices/devices/create?domain=security',
-        );
+        fireEvent.click(action);
+        expect(onRegister).toHaveBeenCalledOnce();
     });
 });

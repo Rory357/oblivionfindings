@@ -49,10 +49,14 @@ describe('Site Profile asset, fleet, hardware, and plan depth', () => {
             'PlanThumbnail',
             'savePlanPin',
             'removePlanPin',
+            'useAddDeviceDialogState',
+            'AddDeviceDialog',
+            'addDeviceDialog.openDialog',
         ]) {
             expect(surface).toContain(term);
         }
         expect(surface).not.toContain("d.provider === 'unifi'");
+        expect(surface).not.toContain('/security-devices/devices/create?');
     });
 
     it('embeds one canonical full plan and room surface', () => {
