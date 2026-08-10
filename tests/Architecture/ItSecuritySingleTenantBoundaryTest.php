@@ -1133,12 +1133,26 @@ it('covers active IT Security Devices integration Site UI and browser dependenci
         ->toContain($root.'/app/Http/Controllers/Sites/SiteHardwareController.php')
         ->toContain($root.'/app/Http/Controllers/Sites/SiteIntegrationController.php')
         ->toContain($root.'/resources/js/components/it/it-module-shell.tsx')
-        ->toContain($root.'/resources/js/components/security-devices/security-devices-module-shell.tsx')
+        ->toContain($root.'/resources/js/components/security-devices/security-devices-navigation.ts')
         ->toContain($root.'/resources/js/pages/sites/compliance/Index.tsx')
         ->toContain($root.'/resources/js/pages/sites/feedback/Index.tsx')
         ->toContain($root.'/resources/js/pages/sites/show.tsx')
         ->toContain($root.'/tests/Feature/Sites/SiteComplianceWorkflowTest.php')
         ->toContain($root.'/tests/e2e/device-profile-fixtures.ts');
+});
+
+it('keeps Security and Devices navigation inside the original application sidebar', function () {
+    $root = str_replace('\\', '/', dirname(__DIR__, 2));
+    $layout = file_get_contents($root.'/resources/js/layouts/app-layout.tsx');
+    $sidebar = file_get_contents($root.'/resources/js/components/app-sidebar.tsx');
+
+    expect($layout)
+        ->not->toContain('SecurityDevicesModuleShell')
+        ->and($sidebar)
+        ->toContain('InlineSubPanelGroups')
+        ->toContain('aria-label={`${title} navigation`}')
+        ->and(file_exists($root.'/resources/js/components/security-devices/security-devices-module-shell.tsx'))
+        ->toBeFalse();
 });
 
 it('does not retain the obsolete HR organisation context concern', function () {

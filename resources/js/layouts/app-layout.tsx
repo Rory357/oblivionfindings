@@ -1,8 +1,6 @@
-import { SecurityDevicesModuleShell } from '@/components/security-devices/security-devices-module-shell';
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
 import StaffPageShell from '@/layouts/staff-page-shell';
 import { type BreadcrumbItem } from '@/types';
-import { usePage } from '@inertiajs/react';
 import { type ReactNode } from 'react';
 
 type Experience = 'default' | 'staff';
@@ -51,8 +49,6 @@ export default function AppLayout({
     header,
     contentClassName,
 }: AppLayoutProps) {
-    const page = usePage();
-
     if (experience === 'staff') {
         return (
             <StaffPageShell
@@ -67,19 +63,13 @@ export default function AppLayout({
         );
     }
 
-    const content = page.url.startsWith('/security-devices') ? (
-        <SecurityDevicesModuleShell>{children}</SecurityDevicesModuleShell>
-    ) : (
-        children
-    );
-
     return (
         <AppLayoutTemplate
             breadcrumbs={breadcrumbs}
             header={header}
             contentClassName={contentClassName}
         >
-            {content}
+            {children}
         </AppLayoutTemplate>
     );
 }
