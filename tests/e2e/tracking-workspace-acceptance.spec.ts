@@ -129,12 +129,10 @@ test.describe('Tracking specialist workspace', () => {
                 level: 1,
             }),
         ).toBeVisible();
-        const clientReturnLink = page
-            .locator('[data-testid="device-profile-header"]')
-            .getByRole('link', {
-                name: fixture.activeClientProfileName,
-                exact: true,
-            });
+        const clientReturnLink = page.getByRole('main').getByRole('link', {
+            name: fixture.activeClientProfileName,
+            exact: true,
+        });
         await expect(clientReturnLink).toHaveAttribute(
             'href',
             `/operations/clients/${fixture.activeClientId}?tab=location`,

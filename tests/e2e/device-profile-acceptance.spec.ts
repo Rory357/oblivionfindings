@@ -44,22 +44,20 @@ test.describe('Capability-driven device profile', () => {
         ).toBeVisible();
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
 
-        await page.getByTestId('device-profile-section-monitors').click();
+        await page.getByTestId('device-profile-tab-monitors').click();
         await expect(page.getByText(fixture.monitorName).first()).toBeVisible();
 
         await page.getByTestId('device-profile-group-technical').click();
-        await page
-            .getByTestId('device-profile-section-interfaces-sensors')
-            .click();
+        await page.getByTestId('device-profile-tab-interfaces-sensors').click();
         await expect(
             page.getByText(fixture.interfaceName).first(),
         ).toBeVisible();
 
         await page.getByTestId('device-profile-group-operations').click();
-        await page.getByTestId('device-profile-section-tickets').click();
+        await page.getByTestId('device-profile-tab-tickets').click();
         await expect(page.getByText(fixture.ticketTitle)).toBeVisible();
 
-        await page.getByTestId('device-profile-section-events').click();
+        await page.getByTestId('device-profile-tab-events').click();
         await expect(
             page.getByText(fixture.controlRoomReference),
         ).toBeVisible();
@@ -75,7 +73,7 @@ test.describe('Capability-driven device profile', () => {
         ).toBeVisible();
 
         await page.getByTestId('device-profile-group-records').click();
-        await page.getByTestId('device-profile-section-audit').click();
+        await page.getByTestId('device-profile-tab-audit').click();
         await expect(
             page.getByText(fixture.auditAction, { exact: true }),
         ).toBeVisible();
@@ -221,7 +219,7 @@ test.describe('Capability-driven device profile', () => {
             }),
         ).toBeVisible();
         await page.getByTestId('device-profile-group-operations').click();
-        await page.getByTestId('device-profile-section-assignments').click();
+        await page.getByTestId('device-profile-tab-assignments').click();
         const assetReturn = page.locator(
             `a[href="/fleet-assets/assets/${fixture.assetId}?tab=technology"]`,
             { hasText: fixture.assetName },
@@ -247,7 +245,7 @@ test.describe('Capability-driven device profile', () => {
         await page.goto(`/security-devices/devices/${fixture.deviceId}`);
 
         await page.getByTestId('device-profile-group-operations').click();
-        await page.getByTestId('device-profile-section-tickets').click();
+        await page.getByTestId('device-profile-tab-tickets').click();
         const ticketLink = page.locator(
             `a[href="/it/tickets/${fixture.ticketId}"]`,
             { hasText: fixture.ticketTitle },
@@ -294,7 +292,7 @@ test.describe('Capability-driven device profile', () => {
             }),
         ).toBeVisible();
         await page.getByTestId('device-profile-group-operations').click();
-        await page.getByTestId('device-profile-section-events').click();
+        await page.getByTestId('device-profile-tab-events').click();
         await expect(
             page.locator(
                 `a[href="/control-room/alerts/${fixture.controlRoomAlertId}"]`,

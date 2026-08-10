@@ -48,14 +48,14 @@ async function expectNoPageOverflow(page: Page) {
 }
 
 async function expectGroupedNavigation(page: Page) {
-    const navigation = page.locator(
-        'nav[aria-label="Security & Devices"]:visible',
-    );
+    const navigation = page.getByRole('group', {
+        name: 'Security & Devices navigation',
+    });
     await expect(navigation).toBeVisible();
 
     for (const [group, items] of groupedNavigation) {
         await expect(
-            navigation.getByRole('heading', { name: group, exact: true }),
+            navigation.getByText(group, { exact: true }),
         ).toBeVisible();
 
         for (const item of items) {
@@ -67,7 +67,7 @@ async function expectGroupedNavigation(page: Page) {
 }
 
 test.describe('Security & Devices grouped navigation', () => {
-    test('keeps the grouped secondary navigation visible across every destination', async ({
+    test('keeps grouped navigation inline inside the primary sidebar across every destination', async ({
         page,
     }) => {
         test.setTimeout(150_000);
