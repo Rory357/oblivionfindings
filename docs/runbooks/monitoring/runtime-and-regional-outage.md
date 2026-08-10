@@ -39,9 +39,13 @@ working directory, the configured runtime user, the exact log directory, both
 source files, all eleven uniquely named programs, a valid complete supervisord
 configuration, daemon connectivity, a non-starting include-path discovery probe,
 and discovery of every program through the active include path. It stages both
-files and rolls them back on pre-update
+files, requires the already-running daemon to accept them through
+`supervisorctl reread`, and rolls them back on pre-update
 failure. The final `update` names only the monitoring groups, then requires each
 group to reach `RUNNING`; unrelated Supervisor programs are never updated.
+The installer does not launch a second `supervisord` process as a configuration
+test because that can collide with the active daemon's control socket or HTTP
+port.
 
 `scripts/deploy-server.sh` runs this installer before `queue:restart`. Use
 `--skip-monitoring-supervisor` only when the runtime is intentionally managed by

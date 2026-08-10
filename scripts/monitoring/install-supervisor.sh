@@ -69,7 +69,7 @@ for argument in "$@"; do
 done
 
 [[ "$EUID" -eq 0 ]] || fail 'run as root or through sudo.'
-for command_name in awk cp flock grep id install mktemp mv readlink rm rmdir sleep supervisord supervisorctl tr wc; do
+for command_name in awk cp flock grep id install mktemp mv readlink rm rmdir sleep supervisorctl tr wc; do
     command -v "$command_name" >/dev/null 2>&1 || fail "required command $command_name is unavailable."
 done
 [[ -x /bin/true ]] || fail 'the non-starting Supervisor discovery probe command is unavailable.'
@@ -111,13 +111,22 @@ program_section() {
     ' "$file"
 }
 
+program_declaration_count() {
+    local program="$1"
+
+    awk -v header="[program:${program}]" '
+        $0 == header { count++ }
+        END { print count + 0 }
+    ' "$WORKER_SOURCE" "$LISTENER_SOURCE"
+}
+
 combined_program_count="$(grep -h -E '^\[program:[^]]+\]$' "$WORKER_SOURCE" "$LISTENER_SOURCE" | wc -l | tr -d '[:space:]')"
 [[ "$combined_program_count" -eq "${#EXPECTED_PROGRAMS[@]}" ]] || fail 'the source definitions contain an unexpected program count.'
 
 for index in "${!WORKER_PROGRAMS[@]}"; do
     program="${WORKER_PROGRAMS[$index]}"
     queue="${WORKER_QUEUES[$index]}"
-    [[ "$(grep -h -Fxc "[program:$program]" "$WORKER_SOURCE" "$LISTENER_SOURCE")" -eq 1 ]] \
+    [[ "$(program_declaration_count "$program")" -eq 1 ]] \
         || fail "worker program $program must be declared exactly once."
     section="$(program_section "$WORKER_SOURCE" "$program")"
     [[ -n "$section" ]] || fail "worker program $program has no configuration."
@@ -137,7 +146,7 @@ done
 for index in "${!LISTENER_PROGRAMS[@]}"; do
     program="${LISTENER_PROGRAMS[$index]}"
     listener_command="${LISTENER_COMMANDS[$index]}"
-    [[ "$(grep -h -Fxc "[program:$program]" "$WORKER_SOURCE" "$LISTENER_SOURCE")" -eq 1 ]] \
+    [[ "$(program_declaration_count "$program")" -eq 1 ]] \
         || fail "listener program $program must be declared exactly once."
     section="$(program_section "$LISTENER_SOURCE" "$program")"
     [[ -n "$section" ]] || fail "listener program $program has no configuration."
@@ -207,9 +216,8 @@ printf '%s\n' \
     'autostart=false' \
     'autorestart=false' > "$PROBE_FILE"
 chmod 0644 "$PROBE_FILE"
-supervisord -c "$SUPERVISORD_CONFIG" -t >/dev/null \
-    || fail 'the Supervisor include path probe made the daemon configuration invalid.'
-supervisorctl -c "$SUPERVISORD_CONFIG" reread >/dev/null
+supervisorctl -c "$SUPERVISORD_CONFIG" reread >/dev/null \
+    || fail 'the running Supervisor daemon rejected the include path probe.'
 probe_programs="$(supervisorctl -c "$SUPERVISORD_CONFIG" avail)" \
     || fail 'Supervisor could not report the include path probe.'
 grep -Eq "(^|[[:space:]])${PROBE_PROGRAM}(:|[[:space:]]|$)" <<< "$probe_programs" \
@@ -233,9 +241,8 @@ mv -f "$WORKER_STAGE" "$WORKER_TARGET"
 mv -f "$LISTENER_STAGE" "$LISTENER_TARGET"
 FILES_INSTALLED=true
 
-supervisord -c "$SUPERVISORD_CONFIG" -t >/dev/null \
-    || fail 'the complete Supervisor configuration failed validation.'
-supervisorctl -c "$SUPERVISORD_CONFIG" reread
+supervisorctl -c "$SUPERVISORD_CONFIG" reread \
+    || fail 'the running Supervisor daemon rejected the complete monitoring configuration.'
 available_programs="$(supervisorctl -c "$SUPERVISORD_CONFIG" avail)" \
     || fail 'Supervisor could not report discovered program definitions.'
 for program in "${EXPECTED_PROGRAMS[@]}"; do
