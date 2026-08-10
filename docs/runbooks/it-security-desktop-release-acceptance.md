@@ -50,6 +50,23 @@ If a required actor, seeded role grant, MFA prerequisite, or Site assignment is 
 
 The fixture pack must use the exact stable labels below so screenshots, route records, and denials can be reconciled without exposing production identities.
 
+Before opening a browser, run the read-only, value-free fixture preflight from
+the exact deployed checkout:
+
+```bash
+php artisan it-security:verify-desktop-release-fixtures --json
+```
+
+The command checks the fixed non-Administrator actors, their exact roles,
+current Site assignments, reviewer MFA and explicit application-wide denials,
+plus the canonical Site, person, Device, Asset, IT and Control Room fixture
+roster below. It does not create or repair fixtures, print their identifiers, or
+exercise a provider. A non-zero result blocks D01-D18 until the approved
+release-fixture process has corrected the reported value-free gap codes. A
+`ready` result is only fixture readiness: it sets `v10_release_evidence=false`
+and does not replace deployed browser, runtime/provider, collector, retention,
+configuration-history or restore evidence.
+
 ### Sites and people
 
 - `RELEASE Site Alpha`: active operational Site reachable over the main SD-WAN.

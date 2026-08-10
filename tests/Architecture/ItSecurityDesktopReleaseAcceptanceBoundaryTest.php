@@ -12,6 +12,12 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
     $evidenceScript = (string) file_get_contents(
         $root.'/scripts/release/verify-it-security-desktop-evidence.php',
     );
+    $fixtureReadiness = (string) file_get_contents(
+        $root.'/app/Support/Release/ItSecurityDesktopReleaseFixtureReadiness.php',
+    );
+    $fixtureCommand = (string) file_get_contents(
+        $root.'/app/Console/Commands/VerifyItSecurityDesktopReleaseFixtures.php',
+    );
     $package = json_decode(
         (string) file_get_contents($root.'/package.json'),
         true,
@@ -56,6 +62,10 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         '`RELEASE Hidden Device`',
         '`it.organisationWide`',
         '`securityDevices.devices.viewAllSites`',
+        'php artisan it-security:verify-desktop-release-fixtures --json',
+        'It does not create or repair fixtures',
+        '`ready` result is only fixture readiness',
+        '`v10_release_evidence=false`',
     )->and($rbac)->toContain(
         "['name' => 'it_manager'",
         "['name' => 'support_worker'",
@@ -126,6 +136,31 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
             'Never relabel a local Dusk result as deployed browser proof',
             'V10 remains open unless D01-D18 pass at both viewports against the deployed release',
         );
+
+    expect($fixtureReadiness)->toContain(
+        "EVIDENCE_CLASS = 'it_security_desktop_release_fixture_readiness_v1'",
+        "'release-requester@acceptance.invalid'",
+        "'release-it-manager@acceptance.invalid'",
+        "'release-it-reviewer@acceptance.invalid'",
+        "'release-control-room@acceptance.invalid'",
+        "'release-auditor@acceptance.invalid'",
+        "'release-denied@acceptance.invalid'",
+        "'release-source-denied@acceptance.invalid'",
+        "'RELEASE Site Alpha'",
+        "'RELEASE Site Hidden'",
+        "'RELEASE Hidden Device'",
+        "'fixture_readiness_query_failed'",
+        "'v10_release_evidence' => false",
+    )->and($fixtureReadiness)->not->toContain(
+        '->create(',
+        '->save(',
+        '->update(',
+        '->delete(',
+        'DB::statement(',
+    )->and($fixtureCommand)->toContain(
+        'it-security:verify-desktop-release-fixtures',
+        "return \$report['state'] === 'ready' ? self::SUCCESS : self::FAILURE;",
+    );
 
     expect($runbook)->toContain(
         '## Signed deployed evidence manifest',
