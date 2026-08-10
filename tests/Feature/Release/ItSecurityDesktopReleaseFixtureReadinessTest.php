@@ -2,10 +2,20 @@
 
 use App\Domain\Finance\Models\FinFixedAsset;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItTicketLinkService;
+use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\Asset;
+use App\Models\ControlRoomAlert;
+use App\Models\ItAttachment;
+use App\Models\ItTicket;
+use App\Models\ItTicketApproval;
+use App\Models\ItTicketComment;
+use App\Models\ItTicketLink;
+use App\Models\ItWorkTask;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -292,4 +302,125 @@ it('requires unique canonical Asset and Finance owners with exact Alpha scope', 
             'release_asset_name_not_unique',
             'release_financial_record_name_not_unique',
         );
+});
+
+it('binds the IT incident Control Room alert and immutable evidence to the exact Alpha Switch', function (): void {
+    $alpha = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $manager = User::factory()->create(['email' => 'release-it-manager@acceptance.invalid']);
+    $switch = Device::factory()->create([
+        'name' => 'RELEASE Alpha Switch',
+        'domain' => 'it_infrastructure',
+        'category' => 'network',
+        'subcategory' => 'switch',
+    ]);
+    $decoy = Device::factory()->create([
+        'name' => 'Unrelated Device',
+        'domain' => 'it_infrastructure',
+        'category' => 'network',
+        'subcategory' => 'switch',
+    ]);
+    DeviceAssignment::query()->create([
+        'device_id' => $switch->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $alpha->id,
+        'assignment_type' => 'permanent',
+        'assigned_at' => now(),
+        'assigned_by_user_id' => $manager->id,
+    ]);
+    $alert = ControlRoomAlert::factory()->create([
+        'source' => 'oblivion_monitoring',
+        'site_id' => $alpha->id,
+        'status' => ControlRoomAlert::STATUS_OPEN,
+    ]);
+    $event = DeviceEvent::query()->create([
+        'device_id' => $switch->id,
+        'event_type' => 'offline',
+        'severity' => 'high',
+        'source' => 'oblivion_monitoring',
+        'occurred_at' => now(),
+        'payload' => ['message' => 'Value-free release fixture evidence.'],
+    ]);
+    $incident = ItTicket::factory()->create([
+        'site_id' => $alpha->id,
+        'source' => 'system',
+        'work_type' => 'incident',
+        'is_organisation_wide' => false,
+        'assigned_to_user_id' => $manager->id,
+    ]);
+    ItTicketComment::factory()->create([
+        'ticket_id' => $incident->id,
+        'author_user_id' => $manager->id,
+        'is_internal' => false,
+    ]);
+    ItTicketComment::factory()->internal()->create([
+        'ticket_id' => $incident->id,
+        'author_user_id' => $manager->id,
+    ]);
+    ItAttachment::query()->create([
+        'attachable_type' => $incident->getMorphClass(),
+        'attachable_id' => $incident->id,
+        'path' => 'release/fixture-evidence.txt',
+        'original_name' => 'fixture-evidence.txt',
+        'mime' => 'text/plain',
+        'size' => 1,
+        'uploaded_by' => $manager->id,
+    ]);
+    $incident->watchers()->attach($manager->id);
+    ItWorkTask::factory()->create(['ticket_id' => $incident->id]);
+    ItTicketApproval::query()->create([
+        'it_ticket_id' => $incident->id,
+        'requested_by' => $manager->id,
+        'approver_id' => $manager->id,
+        'status' => 'approved',
+        'decided_at' => now(),
+    ]);
+    $linkContext = [
+        'system_principal' => ItTicketLinkService::MONITORING_PRINCIPAL,
+        'operation' => ItTicketLinkService::MONITORING_OPERATION,
+        'site_id' => $alpha->id,
+    ];
+    $deviceLink = ItTicketLink::query()->create([
+        'ticket_id' => $incident->id,
+        'relationship' => 'affected_device',
+        'linkable_type' => $switch->getMorphClass(),
+        'linkable_id' => $switch->id,
+        'context' => $linkContext,
+    ]);
+    ItTicketLink::query()->create([
+        'ticket_id' => $incident->id,
+        'relationship' => 'source_alert',
+        'linkable_type' => $alert->getMorphClass(),
+        'linkable_id' => $alert->id,
+        'context' => $linkContext,
+    ]);
+    $snapshotPayload = ['evidence_class' => 'release_fixture_test'];
+    MonitoringIncidentEvidenceSnapshot::query()->create([
+        'control_room_alert_id' => $alert->id,
+        'it_ticket_id' => $incident->id,
+        'device_id' => $switch->id,
+        'device_event_id' => $event->id,
+        'site_id' => $alpha->id,
+        'evidence_version' => 1,
+        'captured_at' => now(),
+        'snapshot' => $snapshotPayload,
+        'checksum' => MonitoringIncidentEvidenceSnapshot::checksumFor($snapshotPayload),
+    ]);
+
+    $valid = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+
+    expect($valid['gap_codes'])->not->toContain(
+        'release_incident_fixture_missing',
+        'release_correlation_fixture_missing',
+        'release_control_room_fixture_missing',
+    );
+
+    $deviceLink->update(['linkable_id' => $decoy->id]);
+
+    $unrelated = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+
+    expect($unrelated['gap_codes'])->toContain(
+        'release_incident_fixture_missing',
+        'release_correlation_fixture_missing',
+        'release_control_room_fixture_missing',
+    );
 });

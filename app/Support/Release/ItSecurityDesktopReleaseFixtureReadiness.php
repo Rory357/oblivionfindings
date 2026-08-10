@@ -3,6 +3,7 @@
 namespace App\Support\Release;
 
 use App\Domain\Finance\Models\FinFixedAsset;
+use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
@@ -683,6 +684,8 @@ final class ItSecurityDesktopReleaseFixtureReadiness
         $alpha = $sites->get('RELEASE Site Alpha');
         $requester = User::query()->where('email', 'release-requester@acceptance.invalid')->first();
         $manager = User::query()->where('email', 'release-it-manager@acceptance.invalid')->first();
+        $switchRows = Device::query()->where('name', 'RELEASE Alpha Switch')->get();
+        $switch = $switchRows->count() === 1 ? $switchRows->first() : null;
         $checks = [];
         $checks['catalog'] = ItCatalogItem::query()
             ->where('name', 'RELEASE Access Request')
@@ -701,10 +704,12 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 ->where('work_type', 'service_request')
                 ->first()
             : null;
-        $incident = $alpha instanceof Site && $manager instanceof User
+        $incident = $alpha instanceof Site && $manager instanceof User && $switch instanceof Device
             ? ItTicket::query()
                 ->where('site_id', $alpha->id)
                 ->where('work_type', 'incident')
+                ->where('source', 'system')
+                ->where('is_organisation_wide', false)
                 ->where(fn ($query) => $query
                     ->where('assigned_to_user_id', $manager->id)
                     ->orWhere('owner_user_id', $manager->id))
@@ -714,9 +719,47 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 ->whereHas('watchers')
                 ->whereHas('tasks')
                 ->whereHas('approvals')
-                ->whereHas('links', fn ($query) => $query->where('relationship', 'affected_device'))
+                ->whereHas('links', fn ($query) => $query
+                    ->where('relationship', 'affected_device')
+                    ->where('linkable_type', $switch->getMorphClass())
+                    ->where('linkable_id', $switch->id)
+                    ->where('context->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
+                    ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION))
+                ->whereHas('links', fn ($query) => $query
+                    ->where('relationship', 'source_alert')
+                    ->where('context->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
+                    ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION))
                 ->first()
             : null;
+
+        $snapshots = $alpha instanceof Site && $incident instanceof ItTicket && $switch instanceof Device
+            ? MonitoringIncidentEvidenceSnapshot::query()
+                ->with(['alert', 'deviceEvent'])
+                ->where('site_id', $alpha->id)
+                ->where('it_ticket_id', $incident->id)
+                ->where('device_id', $switch->id)
+                ->get()
+                ->filter(fn (MonitoringIncidentEvidenceSnapshot $snapshot): bool => $snapshot->hasValidChecksum())
+            : collect();
+        $snapshot = $snapshots->count() === 1 ? $snapshots->first() : null;
+        $canonicalAlertLinked = $snapshot instanceof MonitoringIncidentEvidenceSnapshot
+            && $incident instanceof ItTicket
+            && $incident->links()
+                ->where('relationship', 'source_alert')
+                ->where('linkable_type', $snapshot->alert?->getMorphClass())
+                ->where('linkable_id', $snapshot->control_room_alert_id)
+                ->where('context->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
+                ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION)
+                ->count() === 1;
+        $canonicalMonitoringAlert = $snapshot instanceof MonitoringIncidentEvidenceSnapshot
+            && $snapshot->alert instanceof ControlRoomAlert
+            && $snapshot->alert->source === 'oblivion_monitoring'
+            && (int) $snapshot->alert->site_id === (int) $alpha?->id
+            && in_array($snapshot->alert->status, ControlRoomAlert::ACTIVE_STATUSES, true);
+        $canonicalMonitoringEvent = $snapshot instanceof MonitoringIncidentEvidenceSnapshot
+            && $snapshot->deviceEvent !== null
+            && (int) $snapshot->deviceEvent->device_id === (int) $switch?->id
+            && $snapshot->deviceEvent->source === 'oblivion_monitoring';
 
         $checks['request'] = $request instanceof ItTicket;
         $checks['incident'] = $incident instanceof ItTicket;
@@ -737,18 +780,10 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 ->whereHas('requests')
                 ->exists(),
         );
-        $checks['correlation'] = $alpha instanceof Site
-            && $incident instanceof ItTicket
-            && MonitoringIncidentEvidenceSnapshot::query()
-                ->where('site_id', $alpha->id)
-                ->where('it_ticket_id', $incident->id)
-                ->whereHas('alert', fn ($query) => $query->where('site_id', $alpha->id))
-                ->get()
-                ->contains(fn (MonitoringIncidentEvidenceSnapshot $snapshot): bool => $snapshot->hasValidChecksum());
-        $checks['control_room'] = $alpha instanceof Site && ControlRoomAlert::query()
-            ->where('site_id', $alpha->id)
-            ->whereIn('status', ControlRoomAlert::ACTIVE_STATUSES)
-            ->exists();
+        $checks['correlation'] = $canonicalAlertLinked
+            && $canonicalMonitoringAlert
+            && $canonicalMonitoringEvent;
+        $checks['control_room'] = $canonicalMonitoringAlert;
 
         $gaps = collect($checks)
             ->reject(fn (bool $ready): bool => $ready)

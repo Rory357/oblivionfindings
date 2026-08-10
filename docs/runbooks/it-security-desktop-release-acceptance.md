@@ -102,7 +102,7 @@ configuration-history or restore evidence.
 - One requester-owned service request and one agent-owned incident at Alpha, with SLA, public and internal activity, attachment, watcher, task, approval, and canonical affected-Device context.
 - One Alpha joiner/mover/leaver provisioning workflow with account, licence, equipment, network, and access-control tasks plus an HR completion handoff.
 - One Problem, Known Error/workaround, Change with validation/backout, and Major Incident with a published update.
-- One monitoring-created Control Room alert and one canonical IT incident sharing the same valid sealed incident-time snapshot, while live Device state is visibly newer.
+- One monitoring-created Control Room alert and one canonical IT incident sharing the same valid sealed incident-time snapshot for the exact `RELEASE Alpha Switch`, while live Device state is visibly newer. Both ticket links must carry the native monitoring principal and operation context; an unrelated Device, alert, event, Site, human-authored link, duplicate snapshot, or checksum-only lookalike does not satisfy readiness.
 - All eight specialised monitoring workers and the SNMP-trap, syslog, and flow listeners current in the deployed runtime; the external heartbeat current; Alpha direct Site readiness current; no collector required for Alpha.
 - A separate remote-Site evidence fixture only when the approved collector rehearsal is being inspected. It must not change Alpha into a collector-dependent Site.
 - UniFi and Milesight connections with approved Site mappings, safe capability manifests, fresh supervised execution evidence, and no credential or raw payload in browser data.

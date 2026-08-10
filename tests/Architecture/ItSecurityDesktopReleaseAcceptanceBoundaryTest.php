@@ -161,6 +161,8 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         "'release_device_name_not_unique'",
         "'release_asset_name_not_unique'",
         "'release_financial_record_name_not_unique'",
+        'ItTicketLinkService::MONITORING_PRINCIPAL',
+        'ItTicketLinkService::MONITORING_OPERATION',
         "'release_device_taxonomy_mismatch'",
         "'release_device_owner_binding_mismatch'",
         "'assignments', 'assetLinks'",
