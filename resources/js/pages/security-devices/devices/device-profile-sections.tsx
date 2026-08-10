@@ -2212,14 +2212,15 @@ export function DeviceTicketsSection({ profile }: { profile: DeviceProfile }) {
                 ticket.access.state === 'restricted' ||
                 !ticket.href ||
                 ticket.id === null ? (
-                    <div
+                    <Card
+                        unstyled
                         key={`restricted-it-ticket-${index}`}
                         className="rounded-xl border bg-card px-4"
                     >
                         <ItWorkspaceAccessRequired
                             label={ticket.access.label}
                         />
-                    </div>
+                    </Card>
                 ) : (
                     <Link
                         key={ticket.id}
