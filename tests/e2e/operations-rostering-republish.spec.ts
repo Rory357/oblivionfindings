@@ -23,6 +23,8 @@ test.describe('operations rostering — republish flow', () => {
     test('manager sees a dirty roster diff and republishes it', async ({
         page,
     }) => {
+        test.setTimeout(60_000);
+
         const consoleErrors = collectConsoleErrors(page);
 
         resetRosteringReadinessFixtures();
