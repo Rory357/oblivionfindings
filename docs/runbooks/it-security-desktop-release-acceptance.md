@@ -63,10 +63,11 @@ the effective allow/deny permission matrix required by each journey. This
 includes the requester's self-service-only IT boundary, the auditor's read-only
 boundary, the Hidden-Site actor's parent permissions and the Finance actor's
 missing Security & Devices and Control Room parent permissions. It also checks
-the canonical Site, person, Device, Asset, IT and Control Room fixture roster
+the uniquely named canonical Site, person, Device, Asset, IT and Control Room fixture roster
 below. Device readiness also requires one unique canonical name, the exact
 workspace taxonomy and one current Site, Client or Asset ownership binding;
-matching a display name alone cannot pass. It does not create or repair fixtures,
+matching a display name alone cannot pass, and duplicate Site, Client, staff,
+Device, Asset, or Finance identities fail closed. It does not create or repair fixtures,
 print their identifiers, or exercise a provider. A non-zero result blocks
 D01-D18 until the approved
 release-fixture process has corrected the reported value-free gap codes. A

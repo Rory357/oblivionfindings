@@ -9,6 +9,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\Asset;
+use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\ItAttachment;
 use App\Models\ItTicket;
@@ -422,5 +423,45 @@ it('binds the IT incident Control Room alert and immutable evidence to the exact
         'release_incident_fixture_missing',
         'release_correlation_fixture_missing',
         'release_control_room_fixture_missing',
+    );
+});
+
+it('rejects duplicate canonical Site Client and staff identities', function (): void {
+    $alpha = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $hidden = Site::factory()->create(['name' => 'RELEASE Site Hidden']);
+    Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+
+    foreach ([
+        ['first_name' => 'RELEASE Client', 'last_name' => 'Alpha', 'site_id' => $alpha->id],
+        ['first_name' => 'RELEASE Client', 'last_name' => 'Hidden', 'site_id' => $hidden->id],
+        ['first_name' => 'RELEASE Client', 'last_name' => 'Alpha', 'site_id' => $alpha->id],
+    ] as $client) {
+        Client::factory()->create([...$client, 'status' => 'active']);
+    }
+
+    foreach ([
+        ['name' => 'RELEASE Staff Alpha', 'site' => $alpha],
+        ['name' => 'RELEASE Staff Hidden', 'site' => $hidden],
+        ['name' => 'RELEASE Staff Alpha', 'site' => $alpha],
+    ] as $staff) {
+        $user = User::factory()->create(['name' => $staff['name']]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $staff['site']->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subDay(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+    }
+
+    $report = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+
+    expect($report['gap_codes'])->toContain(
+        'release_site_name_not_unique',
+        'release_client_name_not_unique',
+        'release_staff_name_not_unique',
     );
 });

@@ -333,12 +333,16 @@ final class ItSecurityDesktopReleaseFixtureReadiness
      */
     private function siteSection(Collection $sites): array
     {
+        $siteRows = Site::query()->whereIn('name', self::SITES)->count();
         $ready = $sites->filter(fn (Site $site): bool => (bool) $site->is_active
             && ! (bool) $site->archived
             && $site->archived_at === null)->count();
         $gaps = [];
         if ($sites->count() !== count(self::SITES)) {
             $gaps[] = 'release_sites_missing';
+        }
+        if ($siteRows !== $sites->count()) {
+            $gaps[] = 'release_site_name_not_unique';
         }
         if ($ready !== count(self::SITES)) {
             $gaps[] = 'release_sites_not_operational';
@@ -443,18 +447,25 @@ final class ItSecurityDesktopReleaseFixtureReadiness
      */
     private function peopleSection(Collection $sites): array
     {
-        $clients = Client::query()
+        $clientRows = Client::query()
             ->where('first_name', 'RELEASE Client')
             ->whereIn('last_name', ['Alpha', 'Hidden'])
-            ->get()
-            ->keyBy(fn (Client $client): string => $client->full_name);
-        $staff = User::query()
+            ->get();
+        $clients = $clientRows->keyBy(fn (Client $client): string => $client->full_name);
+        $staffRows = User::query()
             ->whereIn('name', array_keys(self::STAFF))
             ->with('hrEmployeeProfile')
-            ->get()
-            ->keyBy('name');
+            ->get();
+        $staff = $staffRows->keyBy('name');
         $ready = 0;
         $gaps = [];
+
+        if ($clientRows->count() !== $clients->count()) {
+            $gaps[] = 'release_client_name_not_unique';
+        }
+        if ($staffRows->count() !== $staff->count()) {
+            $gaps[] = 'release_staff_name_not_unique';
+        }
 
         foreach (self::CLIENTS as $name => $siteName) {
             $client = $clients->get($name);
