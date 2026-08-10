@@ -1,0 +1,337 @@
+<?php
+
+use App\Domain\Governance\Http\Controllers\DashboardController;
+use App\Domain\Governance\Http\Controllers\GovernanceMeetingController;
+use App\Domain\Governance\Http\Controllers\ResolutionController;
+use App\Domain\Governance\Http\Controllers\RiskRegisterController;
+use App\Domain\Governance\Http\Controllers\ComplianceController;
+use App\Domain\Governance\Http\Controllers\PerformanceReviewController;
+use App\Domain\Governance\Http\Controllers\BoardPackController;
+use App\Domain\Governance\Http\Controllers\StrategicPlanController;
+use App\Domain\Governance\Http\Controllers\BudgetController;
+use App\Domain\Governance\Http\Controllers\BoardMemberAdminController;
+use Illuminate\Support\Facades\Route;
+
+/**
+ * Board & Governance Routes
+ */
+
+Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(function () {
+    
+    // Dashboard
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->name('dashboard')
+        ->middleware('permission:governance.view');
+
+    Route::get('/dashboard-data', fn () => redirect()->route('governance.dashboard'))
+        ->name('dashboard.legacy')
+        ->middleware('permission:governance.view');
+    
+    Route::get('/dashboard/data', [DashboardController::class, 'data'])
+        ->name('dashboard.data')
+        ->middleware('permission:governance.view');
+
+    Route::get('/dashboard/widget/{widget}', [DashboardController::class, 'widget'])
+        ->name('dashboard.widget')
+        ->middleware('permission:governance.view');
+
+    // Reports & Exports
+    Route::middleware('permission:governance.view')->group(function () {
+        Route::get('/reports/board-monthly', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'boardMonthly'])->name('reports.board-monthly');
+        Route::get('/reports/committee/{committee}', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'committeeReport'])->name('reports.committee');
+        Route::get('/reports/compliance-status', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'complianceStatus'])->name('reports.compliance-status');
+        Route::get('/reports/risk-narrative', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'riskNarrative'])->name('reports.risk-narrative');
+        Route::post('/reports/evidence-pack', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'evidencePack'])->name('reports.evidence-pack');
+        Route::get('/reports/export/{type}', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'export'])->name('reports.export');
+    });
+
+    // Meetings
+    Route::middleware('permission:governance.meetings.view')->group(function () {
+        Route::get('/meetings', [GovernanceMeetingController::class, 'index'])->name('meetings.index');
+        Route::get('/meetings/calendar', [GovernanceMeetingController::class, 'calendar'])->name('meetings.calendar');
+        Route::get('/meetings/create', [GovernanceMeetingController::class, 'create'])->name('meetings.create');
+        Route::get('/meetings/{meeting}', [GovernanceMeetingController::class, 'show'])->name('meetings.show');
+        
+        Route::middleware('permission:governance.meetings.manage')->group(function () {
+            Route::get('/meetings/{meeting}/edit', [GovernanceMeetingController::class, 'edit'])->name('meetings.edit');
+            Route::post('/meetings', [GovernanceMeetingController::class, 'store'])->name('meetings.store');
+            Route::put('/meetings/{meeting}', [GovernanceMeetingController::class, 'update'])->name('meetings.update');
+            Route::delete('/meetings/{meeting}', [GovernanceMeetingController::class, 'destroy'])->name('meetings.destroy');
+            
+            // Agenda items
+            Route::post('/meetings/{meeting}/agenda', [GovernanceMeetingController::class, 'addAgendaItem'])->name('meetings.agenda.add');
+            Route::put('/meetings/{meeting}/agenda/{item}', [GovernanceMeetingController::class, 'updateAgendaItem'])->name('meetings.agenda.update');
+            Route::delete('/meetings/{meeting}/agenda/{item}', [GovernanceMeetingController::class, 'removeAgendaItem'])->name('meetings.agenda.remove');
+            
+            // Minutes
+            Route::post('/meetings/{meeting}/minutes', [GovernanceMeetingController::class, 'storeMinutes'])->name('meetings.minutes.store');
+            Route::put('/meetings/{meeting}/minutes', [GovernanceMeetingController::class, 'updateMinutes'])->name('meetings.minutes.update');
+            Route::post('/meetings/{meeting}/minutes/approve', [GovernanceMeetingController::class, 'approveMinutes'])->name('meetings.minutes.approve');
+            
+            // Attendance
+            Route::post('/meetings/{meeting}/attendance', [GovernanceMeetingController::class, 'recordAttendance'])->name('meetings.attendance.record');
+
+            // Meeting status transitions
+            Route::post('/meetings/{meeting}/lock', [GovernanceMeetingController::class, 'lockMeeting'])->name('meetings.lock');
+            Route::post('/meetings/{meeting}/sign-minutes', [GovernanceMeetingController::class, 'signMinutes'])->name('meetings.minutes.sign');
+        });
+    });
+    
+    // Board Packs
+    Route::middleware('permission:governance.packs.view')->group(function () {
+        Route::get('/packs/{pack}', [BoardPackController::class, 'show'])->name('packs.show');
+        Route::get('/packs/{pack}/download', [BoardPackController::class, 'download'])->name('packs.download');
+        Route::post('/packs/{pack}/read', [BoardPackController::class, 'markAsRead'])->name('packs.read');
+
+        Route::middleware('permission:governance.packs.manage')->group(function () {
+            Route::post('/meetings/{meeting}/packs', [BoardPackController::class, 'generate'])->name('packs.generate');
+            Route::post('/packs/{pack}/distribute', [BoardPackController::class, 'distribute'])->name('packs.distribute');
+        });
+    });
+    
+    // Resolutions & Voting
+    Route::middleware('permission:governance.resolutions.view')->group(function () {
+        Route::get('/resolutions', [ResolutionController::class, 'index'])->name('resolutions.index');
+        Route::get('/resolutions/create', [ResolutionController::class, 'create'])->name('resolutions.create');
+        Route::get('/resolutions/{resolution}', [ResolutionController::class, 'show'])->name('resolutions.show');
+        
+        Route::middleware('permission:governance.resolutions.vote')->group(function () {
+            Route::post('/resolutions/{resolution}/vote', [ResolutionController::class, 'vote'])->name('resolutions.vote');
+            Route::post('/resolutions/{resolution}/conflict', [ResolutionController::class, 'declareConflict'])->name('resolutions.conflict.declare');
+        });
+        
+        Route::middleware('permission:governance.resolutions.manage')->group(function () {
+            Route::post('/resolutions', [ResolutionController::class, 'store'])->name('resolutions.store');
+            Route::put('/resolutions/{resolution}', [ResolutionController::class, 'update'])->name('resolutions.update');
+            Route::post('/resolutions/{resolution}/open', [ResolutionController::class, 'openVoting'])->name('resolutions.open');
+            Route::post('/resolutions/{resolution}/close', [ResolutionController::class, 'closeVoting'])->name('resolutions.close');
+            Route::post('/resolutions/{resolution}/finalize', [ResolutionController::class, 'finalize'])->name('resolutions.finalize');
+        });
+    });
+
+    // Governance Admin
+    Route::middleware('permission:governance.meetings.manage')->group(function () {
+        Route::get('/admin/board-members', [BoardMemberAdminController::class, 'index'])->name('admin.board-members.index');
+        Route::post('/admin/board-members', [BoardMemberAdminController::class, 'store'])->name('admin.board-members.store');
+        Route::put('/admin/board-members/{boardMember}', [BoardMemberAdminController::class, 'update'])->name('admin.board-members.update');
+        Route::delete('/admin/board-members/{boardMember}', [BoardMemberAdminController::class, 'destroy'])->name('admin.board-members.destroy');
+    });
+    
+    // Risk Register
+    Route::middleware('permission:governance.risks.view')->group(function () {
+        Route::get('/risks', [RiskRegisterController::class, 'index'])->name('risks.index');
+        Route::get('/risks/create', [RiskRegisterController::class, 'create'])->name('risks.create');
+        Route::get('/risks/heatmap', [RiskRegisterController::class, 'heatmap'])->name('risks.heatmap');
+        Route::get('/risks/trends', [RiskRegisterController::class, 'trends'])->name('risks.trends');
+        Route::get('/risks/committee/{committee}', [RiskRegisterController::class, 'committeeView'])->name('risks.committee');
+        Route::get('/risks/{risk}', [RiskRegisterController::class, 'show'])->name('risks.show');
+        
+        Route::get('/risks/{risk}/edit', [RiskRegisterController::class, 'edit'])->name('risks.edit');
+
+        Route::middleware('permission:governance.risks.manage')->group(function () {
+            Route::post('/risks', [RiskRegisterController::class, 'store'])->name('risks.store');
+            Route::put('/risks/{risk}', [RiskRegisterController::class, 'update'])->name('risks.update');
+            Route::post('/risks/{risk}/accept', [RiskRegisterController::class, 'accept'])->name('risks.accept');
+            Route::post('/risks/{risk}/close', [RiskRegisterController::class, 'close'])->name('risks.close');
+            Route::post('/risks/{risk}/treatments', [RiskRegisterController::class, 'addTreatment'])->name('risks.treatments.add');
+            Route::post('/risks/{risk}/link-event', [RiskRegisterController::class, 'linkEvent'])->name('risks.events.link');
+        });
+    });
+    
+    // Compliance
+    Route::middleware('permission:governance.compliance.view')->group(function () {
+        Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance.index');
+        Route::get('/compliance/create', [ComplianceController::class, 'create'])->name('compliance.create');
+        Route::get('/compliance/calendar', [ComplianceController::class, 'calendar'])->name('compliance.calendar');
+        Route::get('/compliance/{obligation}', [ComplianceController::class, 'show'])->name('compliance.show');
+        
+        Route::get('/compliance/{obligation}/edit', [ComplianceController::class, 'edit'])->name('compliance.edit');
+
+        Route::middleware('permission:governance.compliance.manage')->group(function () {
+            Route::post('/compliance', [ComplianceController::class, 'store'])->name('compliance.store');
+            Route::put('/compliance/{obligation}', [ComplianceController::class, 'update'])->name('compliance.update');
+            Route::post('/compliance/notifiable-incident', [ComplianceController::class, 'storeNotifiableIncident'])->name('compliance.notifiable-incident.store');
+            Route::post('/compliance/{obligation}/complete', [ComplianceController::class, 'complete'])->name('compliance.complete');
+            Route::post('/compliance/{obligation}/evidence', [ComplianceController::class, 'uploadEvidence'])->name('compliance.evidence.upload');
+        });
+    });
+    
+    // Performance Reviews
+    Route::middleware('permission:governance.performance.view')->group(function () {
+        Route::get('/performance', [PerformanceReviewController::class, 'index'])->name('performance.index');
+        Route::get('/performance/create', [PerformanceReviewController::class, 'create'])->name('performance.create');
+        Route::get('/performance/{review}', [PerformanceReviewController::class, 'show'])->name('performance.show');
+        
+        Route::get('/performance/{review}/edit', [PerformanceReviewController::class, 'edit'])->name('performance.edit');
+
+        Route::middleware('permission:governance.performance.manage')->group(function () {
+            Route::post('/performance', [PerformanceReviewController::class, 'store'])->name('performance.store');
+            Route::put('/performance/{review}', [PerformanceReviewController::class, 'update'])->name('performance.update');
+            Route::post('/performance/{review}/goals', [PerformanceReviewController::class, 'addGoal'])->name('performance.goals.add');
+            Route::post('/performance/{review}/assess', [PerformanceReviewController::class, 'submitAssessment'])->name('performance.assess');
+            Route::post('/performance/{review}/feedback', [PerformanceReviewController::class, 'submitFeedback'])->name('performance.feedback');
+        });
+    });
+    
+    // Strategic Plans
+    Route::middleware('permission:governance.strategy.view')->group(function () {
+        Route::get('/strategy', [StrategicPlanController::class, 'index'])->name('strategy.index');
+        Route::get('/strategy/create', [StrategicPlanController::class, 'create'])->name('strategy.create');
+        Route::get('/strategy/{plan}', [StrategicPlanController::class, 'show'])->name('strategy.show');
+        
+        Route::get('/strategy/{plan}/edit', [StrategicPlanController::class, 'edit'])->name('strategy.edit');
+        Route::get('/strategy/{plan}/changes', [StrategicPlanController::class, 'changes'])->name('strategy.changes');
+
+        Route::middleware('permission:governance.strategy.manage')->group(function () {
+            Route::post('/strategy', [StrategicPlanController::class, 'store'])->name('strategy.store');
+            Route::put('/strategy/{plan}', [StrategicPlanController::class, 'update'])->name('strategy.update');
+            Route::post('/strategy/{plan}/version', [StrategicPlanController::class, 'createVersion'])->name('strategy.version');
+            Route::post('/strategy/{plan}/goals', [StrategicPlanController::class, 'addGoal'])->name('strategy.goals.add');
+            Route::post('/strategy/{plan}/approve', [StrategicPlanController::class, 'approve'])->name('strategy.approve');
+        });
+    });
+    
+    // Budgets
+    Route::middleware('permission:governance.budgets.view')->group(function () {
+        Route::get('/budgets', [BudgetController::class, 'index'])->name('budgets.index');
+        Route::get('/budgets/create', [BudgetController::class, 'create'])->name('budgets.create');
+        Route::get('/budgets/{budget}', [BudgetController::class, 'show'])->name('budgets.show');
+
+        Route::middleware('permission:governance.budgets.create')->group(function () {
+            Route::get('/budgets/{budget}/edit', [BudgetController::class, 'edit'])->name('budgets.edit');
+            Route::post('/budgets', [BudgetController::class, 'store'])->name('budgets.store');
+            Route::put('/budgets/{budget}', [BudgetController::class, 'update'])->name('budgets.update');
+            Route::post('/budgets/{budget}/adjust', [BudgetController::class, 'requestAdjustment'])->name('budgets.adjust');
+
+            // Line items
+            Route::post('/budgets/{budget}/line-items', [BudgetController::class, 'storeLineItem'])->name('budgets.line-items.store');
+            Route::put('/budgets/{budget}/line-items/{lineItem}', [BudgetController::class, 'updateLineItem'])->name('budgets.line-items.update');
+            Route::delete('/budgets/{budget}/line-items/{lineItem}', [BudgetController::class, 'destroyLineItem'])->name('budgets.line-items.destroy');
+
+            // Record actuals
+            Route::post('/budgets/{budget}/record-actuals', [BudgetController::class, 'recordActuals'])->name('budgets.record-actuals');
+        });
+
+        Route::middleware('permission:governance.budgets.submit')->group(function () {
+            Route::post('/budgets/{budget}/propose', [BudgetController::class, 'propose'])->name('budgets.propose');
+        });
+
+        Route::middleware('permission:governance.budgets.approve')->group(function () {
+            Route::post('/budgets/{budget}/approve', [BudgetController::class, 'approve'])->name('budgets.approve');
+            Route::post('/budgets/{budget}/adjustments/{adjustment}/approve', [BudgetController::class, 'approveAdjustment'])->name('budgets.adjustments.approve');
+            Route::post('/budgets/{budget}/adjustments/{adjustment}/reject', [BudgetController::class, 'rejectAdjustment'])->name('budgets.adjustments.reject');
+        });
+    });
+    
+    // Action Items
+    Route::middleware('permission:governance.actions.view')->group(function () {
+        Route::get('/actions', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'index'])->name('actions.index');
+        Route::get('/actions/{action}', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'show'])->name('actions.show');
+        Route::post('/actions/{action}/complete', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'complete'])->name('actions.complete');
+    });
+
+    // Governance Policies
+    Route::middleware('permission:governance.policies.view')->group(function () {
+        Route::get('/policies', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'index'])->name('policies.index');
+        Route::get('/policies/create', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'create'])->name('policies.create');
+        Route::get('/policies/{policy}', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'show'])->name('policies.show');
+        Route::get('/policies/{policy}/edit', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'edit'])->name('policies.edit');
+
+        Route::middleware('permission:governance.policies.manage')->group(function () {
+            Route::post('/policies', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'store'])->name('policies.store');
+            Route::put('/policies/{policy}', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'update'])->name('policies.update');
+            Route::post('/policies/{policy}/approve', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'approve'])->name('policies.approve');
+            Route::post('/policies/{policy}/attest', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'attest'])->name('policies.attest');
+            Route::post('/policies/{policy}/version', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'newVersion'])->name('policies.version');
+        });
+    });
+
+    // CEO Board Reports
+    Route::middleware('permission:governance.ceo-reports.view')->group(function () {
+        Route::get('/ceo-reports', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'index'])->name('ceo-reports.index');
+        Route::get('/ceo-reports/create', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'create'])->name('ceo-reports.create');
+        Route::get('/ceo-reports/{report}', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'show'])->name('ceo-reports.show');
+
+        Route::middleware('permission:governance.ceo-reports.manage')->group(function () {
+            Route::post('/ceo-reports', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'store'])->name('ceo-reports.store');
+            Route::put('/ceo-reports/{report}', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'update'])->name('ceo-reports.update');
+            Route::post('/ceo-reports/{report}/submit', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'submit'])->name('ceo-reports.submit');
+        });
+    });
+
+    // Board Interests Register
+    Route::middleware('permission:governance.interests.view')->group(function () {
+        Route::get('/interests', [\App\Domain\Governance\Http\Controllers\BoardInterestController::class, 'index'])->name('interests.index');
+        Route::get('/interests/mine', [\App\Domain\Governance\Http\Controllers\BoardInterestController::class, 'myInterests'])->name('interests.mine');
+    });
+
+    Route::middleware('permission:governance.interests.manage')->group(function () {
+        Route::post('/interests', [\App\Domain\Governance\Http\Controllers\BoardInterestController::class, 'store'])->name('interests.store');
+        Route::put('/interests/{interest}', [\App\Domain\Governance\Http\Controllers\BoardInterestController::class, 'update'])->name('interests.update');
+    });
+
+    // Board Evaluations
+    Route::middleware('permission:governance.evaluations.view')->group(function () {
+        Route::get('/evaluations', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'index'])->name('evaluations.index');
+        Route::get('/evaluations/create', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'create'])->name('evaluations.create');
+        Route::get('/evaluations/{evaluation}', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'show'])->name('evaluations.show');
+        Route::get('/evaluations/{evaluation}/results', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'results'])->name('evaluations.results');
+        Route::post('/evaluations/{evaluation}/respond', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'respond'])->name('evaluations.respond');
+
+        Route::middleware('permission:governance.evaluations.manage')->group(function () {
+            Route::post('/evaluations', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'store'])->name('evaluations.store');
+            Route::post('/evaluations/{evaluation}/launch', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'launch'])->name('evaluations.launch');
+            Route::post('/evaluations/{evaluation}/close', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'close'])->name('evaluations.close');
+        });
+    });
+
+    // Governance Documents
+    Route::middleware('permission:governance.documents.view')->group(function () {
+        Route::get('/documents', [\App\Domain\Governance\Http\Controllers\GovernanceDocumentController::class, 'index'])->name('documents.index');
+        Route::get('/documents/{document}/download', [\App\Domain\Governance\Http\Controllers\GovernanceDocumentController::class, 'download'])->name('documents.download');
+
+        Route::middleware('permission:governance.documents.manage')->group(function () {
+            Route::post('/documents', [\App\Domain\Governance\Http\Controllers\GovernanceDocumentController::class, 'store'])->name('documents.store');
+            Route::delete('/documents/{document}', [\App\Domain\Governance\Http\Controllers\GovernanceDocumentController::class, 'destroy'])->name('documents.destroy');
+        });
+    });
+
+    // Clinical Governance
+    Route::middleware('permission:governance.clinical.view')->group(function () {
+        Route::get('/clinical', [\App\Domain\Governance\Http\Controllers\ClinicalGovernanceController::class, 'dashboard'])->name('clinical.dashboard');
+        Route::get('/clinical/trends', [\App\Domain\Governance\Http\Controllers\ClinicalGovernanceController::class, 'trends'])->name('clinical.trends');
+
+        Route::middleware('permission:governance.clinical.manage')->group(function () {
+            Route::post('/clinical/indicators', [\App\Domain\Governance\Http\Controllers\ClinicalGovernanceController::class, 'storeIndicator'])->name('clinical.indicators.store');
+            Route::post('/clinical/snapshots', [\App\Domain\Governance\Http\Controllers\ClinicalGovernanceController::class, 'recordSnapshot'])->name('clinical.snapshots.store');
+        });
+    });
+
+    // Te Tiriti o Waitangi Framework
+    Route::middleware('permission:governance.te-tiriti.view')->group(function () {
+        Route::get('/te-tiriti', [\App\Domain\Governance\Http\Controllers\TeTiritiController::class, 'index'])->name('te-tiriti.index');
+
+        Route::middleware('permission:governance.te-tiriti.manage')->group(function () {
+            Route::post('/te-tiriti', [\App\Domain\Governance\Http\Controllers\TeTiritiController::class, 'store'])->name('te-tiriti.store');
+            Route::put('/te-tiriti/{obligation}', [\App\Domain\Governance\Http\Controllers\TeTiritiController::class, 'update'])->name('te-tiriti.update');
+        });
+    });
+
+    // Meeting RSVP & Status Advance
+    Route::middleware('permission:governance.meetings.view')->group(function () {
+        Route::post('/meetings/{meeting}/rsvp', [GovernanceMeetingController::class, 'submitRsvp'])->name('meetings.rsvp');
+
+        Route::middleware('permission:governance.meetings.manage')->group(function () {
+            Route::post('/meetings/{meeting}/advance-status', [GovernanceMeetingController::class, 'advanceStatus'])->name('meetings.advance-status');
+        });
+    });
+
+    // Action Item progress management
+    Route::middleware('permission:governance.actions.view')->group(function () {
+        Route::post('/actions', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'store'])->name('actions.store');
+        Route::post('/actions/{action}/progress', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'updateProgress'])->name('actions.progress');
+        Route::post('/actions/{action}/block', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'block'])->name('actions.block');
+        Route::post('/actions/{action}/unblock', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'unblock'])->name('actions.unblock');
+        Route::post('/actions/{action}/escalate', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'escalate'])->name('actions.escalate');
+    });
+});
