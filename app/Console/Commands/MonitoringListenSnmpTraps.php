@@ -21,7 +21,7 @@ final class MonitoringListenSnmpTraps extends Command
         UdpListenerLiveness $liveness,
     ): int {
         $bind = config('monitoring.snmp.traps.bind', '0.0.0.0');
-        $port = config('monitoring.snmp.traps.port', 162);
+        $port = config('monitoring.snmp.traps.port', 1162);
         $maximum = config('monitoring.snmp.traps.max_datagram_bytes', 65_507);
         if (! is_string($bind) || filter_var($bind, FILTER_VALIDATE_IP) === false
             || ! is_int($port) || $port < 1 || $port > 65_535

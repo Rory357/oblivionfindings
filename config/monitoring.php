@@ -169,7 +169,7 @@ return [
         'max_varbinds' => 4096,
         'traps' => [
             'bind' => env('MONITORING_SNMP_TRAP_BIND', '127.0.0.1'),
-            'port' => (int) env('MONITORING_SNMP_TRAP_PORT', 162),
+            'port' => (int) env('MONITORING_SNMP_TRAP_PORT', 1162),
             'max_datagram_bytes' => 65_507,
             'timeliness_window_seconds' => 150,
         ],
