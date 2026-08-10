@@ -241,6 +241,24 @@ if ($profile === null) {
     $profile->restore();
 }
 
+$acceptanceSite = \App\Models\Site::query()
+    ->where('is_active', true)
+    ->where('archived', false)
+    ->whereNull('archived_at')
+    ->orderBy('id')
+    ->firstOrFail();
+$adminProfile = \App\Domain\Hr\Models\HrEmployeeProfile::query()
+    ->where('user_id', $admin->id)
+    ->firstOrFail();
+foreach ([$adminProfile, $profile] as $acceptanceProfile) {
+    $acceptanceProfile->forceFill([
+        'primary_site_id' => $acceptanceSite->id,
+        'is_active' => true,
+        'start_date' => now()->subYear()->toDateString(),
+        'end_date' => null,
+    ])->save();
+}
+
 foreach (['joiner', 'mover', 'leaver'] as $offset => $lifecycle) {
     $template = \App\Models\ItProvisioningTemplate::query()
         ->where('lifecycle_type', $lifecycle)
@@ -256,7 +274,7 @@ foreach (['joiner', 'mover', 'leaver'] as $offset => $lifecycle) {
             'status' => $lifecycle === 'joiner' ? 'in_progress' : 'pending',
             'effective_at' => now()->addDays($offset),
             'role_snapshot' => $profile->position_role,
-            'site_id_snapshot' => $profile->primary_site_id,
+            'site_id_snapshot' => $acceptanceSite->id,
             'employment_type_snapshot' => $profile->employment_type,
             'changes' => $lifecycle === 'mover' ? ['position_role' => ['from' => 'support_worker', 'to' => 'senior_support_worker']] : null,
             'created_by_user_id' => $admin->id,
