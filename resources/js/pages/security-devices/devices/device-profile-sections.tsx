@@ -2029,11 +2029,11 @@ export function DeviceInterfacesSensorsSection({
 
 export function DeviceConfigurationSection({
     profile,
-    editHref,
+    onEditRegistry,
     onEditServiceDue,
 }: {
     profile: DeviceProfile;
-    editHref: string;
+    onEditRegistry: () => void;
     onEditServiceDue?: () => void;
 }) {
     const { registry, configuration, firmware } = profile.configuration;
@@ -2063,8 +2063,12 @@ export function DeviceConfigurationSection({
                                     Update service date
                                 </Button>
                             )}
-                            <Button size="sm" variant="outline" asChild>
-                                <Link href={editHref}>Edit registry</Link>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={onEditRegistry}
+                            >
+                                Edit registry
                             </Button>
                         </div>
                     )}

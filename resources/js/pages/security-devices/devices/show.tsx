@@ -16,6 +16,10 @@ import {
     ControlRoomAlertAccessRequired,
     FleetTechnologyAccessRequired,
 } from '@/components/security-devices/permission-destinations';
+import {
+    EditDeviceDialog,
+    useEditDeviceDialogState,
+} from '@/components/security-devices/add-device-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -304,6 +308,7 @@ export default function DeviceShow({
         profile.sections[0]?.key ?? 'health',
     );
     const [profileSearchOpen, setProfileSearchOpen] = useState(false);
+    const editDeviceDialog = useEditDeviceDialogState();
     const [releaseOpen, setReleaseOpen] = useState(false);
     const [decommissionOpen, setDecommissionOpen] = useState(false);
     useEffect(() => {
@@ -845,12 +850,12 @@ export default function DeviceShow({
                     actions={
                         <div className="flex gap-2">
                             {can.update && (
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link
-                                        href={`/security-devices/devices/${device.id}/edit`}
-                                    >
-                                        <Edit className="mr-2 h-4 w-4" /> Edit
-                                    </Link>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={editDeviceDialog.openDialog}
+                                >
+                                    <Edit className="mr-2 h-4 w-4" /> Edit
                                 </Button>
                             )}
                             {can.delete &&
@@ -915,7 +920,7 @@ export default function DeviceShow({
                     <TabsContent value="configuration">
                         <DeviceConfigurationSection
                             profile={profile}
-                            editHref={`/security-devices/devices/${device.id}/edit`}
+                            onEditRegistry={editDeviceDialog.openDialog}
                             onEditServiceDue={() => setServiceDueOpen(true)}
                         />
                     </TabsContent>
@@ -2360,6 +2365,14 @@ export default function DeviceShow({
                         </TabsContent>
                     </Tabs>
                 </div>
+
+                {can.update && (
+                    <EditDeviceDialog
+                        open={editDeviceDialog.open}
+                        onClose={editDeviceDialog.closeDialog}
+                        deviceId={device.id}
+                    />
+                )}
 
                 <Dialog open={serviceDueOpen} onOpenChange={setServiceDueOpen}>
                     <DialogContent className="sm:max-w-md">

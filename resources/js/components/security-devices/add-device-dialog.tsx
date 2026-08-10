@@ -27,7 +27,7 @@ import {
     ScanLine,
     Server,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 type FilterOption = { value: string; label: string };
 type DeviceTaxonomy = Record<string, Record<string, Record<string, string>>>;
@@ -36,6 +36,27 @@ type DeviceFormOptions = {
     taxonomy: DeviceTaxonomy;
     domains: FilterOption[];
     statuses: FilterOption[];
+    device?: Partial<EditableDevice>;
+};
+
+type EditableDevice = {
+    id: number;
+    name: string;
+    domain: string;
+    category: string;
+    subcategory: string | null;
+    manufacturer: string | null;
+    model: string | null;
+    serial_number: string | null;
+    mac_address: string | null;
+    imei: string | null;
+    asset_tag: string | null;
+    firmware_version: string | null;
+    ip_address: string | null;
+    status: string | null;
+    provider: string | null;
+    location_description: string | null;
+    notes: string | null;
 };
 
 type AddDeviceForm = {
@@ -85,6 +106,20 @@ const steps: readonly WizardStep[] = [
     },
 ];
 
+function dialogSteps(mode: 'add' | 'edit'): readonly WizardStep[] {
+    if (mode === 'add') return steps;
+
+    return steps.map((step) =>
+        step.key === 'review'
+            ? {
+                  ...step,
+                  label: 'Review & save',
+                  blurb: 'Confirm the registry changes',
+              }
+            : step,
+    );
+}
+
 function emptyForm(prefillDomain: string): AddDeviceForm {
     return {
         name: '',
@@ -107,6 +142,28 @@ function emptyForm(prefillDomain: string): AddDeviceForm {
     };
 }
 
+function formFromDevice(device: Partial<EditableDevice>): AddDeviceForm {
+    return {
+        name: device.name ?? '',
+        domain: device.domain ?? '',
+        category: device.category ?? '',
+        subcategory: device.subcategory ?? '',
+        manufacturer: device.manufacturer ?? '',
+        model: device.model ?? '',
+        serial_number: device.serial_number ?? '',
+        mac_address: device.mac_address ?? '',
+        imei: device.imei ?? '',
+        asset_tag: device.asset_tag ?? '',
+        firmware_version: device.firmware_version ?? '',
+        ip_address: device.ip_address ?? '',
+        status: device.status ?? 'active',
+        provider: device.provider ?? '',
+        location_description: device.location_description ?? '',
+        notes: device.notes ?? '',
+        _modal: true,
+    };
+}
+
 function humanise(value: string): string {
     if (!value) return '—';
 
@@ -115,25 +172,25 @@ function humanise(value: string): string {
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-export function useAddDeviceDialogState() {
+function useDeviceDialogState(dialog: 'add-device' | 'edit-device') {
     const [open, setOpen] = useState(false);
 
     useEffect(() => {
         const syncDialogFromUrl = () => {
             setOpen(
                 new URLSearchParams(window.location.search).get('dialog') ===
-                    'add-device',
+                    dialog,
             );
         };
 
         syncDialogFromUrl();
         window.addEventListener('popstate', syncDialogFromUrl);
         return () => window.removeEventListener('popstate', syncDialogFromUrl);
-    }, []);
+    }, [dialog]);
 
     const openDialog = () => {
         const url = new URL(window.location.href);
-        url.searchParams.set('dialog', 'add-device');
+        url.searchParams.set('dialog', dialog);
         window.history.pushState(
             window.history.state,
             '',
@@ -156,28 +213,59 @@ export function useAddDeviceDialogState() {
     return { open, openDialog, closeDialog };
 }
 
+export function useAddDeviceDialogState() {
+    return useDeviceDialogState('add-device');
+}
+
+export function useEditDeviceDialogState() {
+    return useDeviceDialogState('edit-device');
+}
+
 export function AddDeviceDialog({
     open,
     onClose,
     prefillDomain = '',
+    mode = 'add',
+    deviceId,
 }: {
     open: boolean;
     onClose: () => void;
     prefillDomain?: string;
+    mode?: 'add' | 'edit';
+    deviceId?: number;
 }) {
     const [stepIndex, setStepIndex] = useState(0);
     const [options, setOptions] = useState<DeviceFormOptions | null>(null);
     const [optionsError, setOptionsError] = useState<string | null>(null);
-    const [createdName, setCreatedName] = useState<string | null>(null);
-    const { data, setData, post, processing, errors, clearErrors, reset } =
-        useForm<AddDeviceForm>(emptyForm(prefillDomain));
+    const [completedName, setCompletedName] = useState<string | null>(null);
+    const {
+        data,
+        setData,
+        post,
+        put,
+        processing,
+        errors,
+        clearErrors,
+        reset,
+    } = useForm<AddDeviceForm>(emptyForm(prefillDomain));
+    const activeSteps = useMemo(() => dialogSteps(mode), [mode]);
+    const setDataRef = useRef(setData);
+
+    useEffect(() => {
+        setDataRef.current = setData;
+    }, [setData]);
 
     useEffect(() => {
         if (!open || options) return;
 
         const controller = new AbortController();
         setOptionsError(null);
-        fetch('/security-devices/devices/create', {
+        const optionsUrl =
+            mode === 'edit' && deviceId
+                ? `/security-devices/devices/${deviceId}/edit`
+                : '/security-devices/devices/create';
+
+        fetch(optionsUrl, {
             signal: controller.signal,
             headers: {
                 Accept: 'application/json',
@@ -187,12 +275,17 @@ export function AddDeviceDialog({
         })
             .then(async (response) => {
                 if (!response.ok) {
-                    throw new Error('Device registration options unavailable');
+                    throw new Error('Device form options unavailable');
                 }
 
                 return (await response.json()) as DeviceFormOptions;
             })
-            .then(setOptions)
+            .then((payload) => {
+                setOptions(payload);
+                if (mode === 'edit' && payload.device) {
+                    setDataRef.current(formFromDevice(payload.device));
+                }
+            })
             .catch((error: unknown) => {
                 if (
                     error instanceof DOMException &&
@@ -200,12 +293,12 @@ export function AddDeviceDialog({
                 )
                     return;
                 setOptionsError(
-                    'Device registration could not be loaded. Close the dialog and try again.',
+                    'Device details could not be loaded. Close the dialog and try again.',
                 );
             });
 
         return () => controller.abort();
-    }, [open, options]);
+    }, [deviceId, mode, open, options]);
 
     const categories = useMemo(() => {
         if (!data.domain || !options?.taxonomy[data.domain]) return [];
@@ -232,20 +325,20 @@ export function AddDeviceDialog({
 
     const close = () => {
         if (processing) return;
-        setCreatedName(null);
+        setCompletedName(null);
         setStepIndex(0);
+        setOptions(null);
         clearErrors();
         reset();
         onClose();
     };
 
     const submit = () => {
-        post('/security-devices/devices', {
+        const submitOptions = {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
-                setCreatedName(data.name);
-                reset();
+                setCompletedName(data.name);
                 clearErrors();
             },
             onError: (serverErrors) => {
@@ -279,7 +372,13 @@ export function AddDeviceDialog({
                     setStepIndex(2);
                 }
             },
-        });
+        };
+
+        if (mode === 'edit' && deviceId) {
+            put(`/security-devices/devices/${deviceId}`, submitOptions);
+        } else {
+            post('/security-devices/devices', submitOptions);
+        }
     };
 
     const basicsComplete = Boolean(
@@ -290,18 +389,24 @@ export function AddDeviceDialog({
         <WizardShell
             open={open}
             onClose={close}
-            title="Register device"
-            description="Create one canonical Security & Devices registry record."
+            title={mode === 'edit' ? 'Edit device' : 'Register device'}
+            description={
+                mode === 'edit'
+                    ? 'Update the canonical Security & Devices registry record.'
+                    : 'Create one canonical Security & Devices registry record.'
+            }
             railIcon={Cpu}
-            railTitle="Register device"
+            railTitle={mode === 'edit' ? 'Edit device' : 'Register device'}
             railSub="Canonical inventory"
-            steps={steps}
+            steps={activeSteps}
             stepIndex={stepIndex}
             onStepClick={(index) => {
                 if (index <= stepIndex || basicsComplete) setStepIndex(index);
             }}
-            pct={Math.round(((stepIndex + 1) / steps.length) * 100)}
-            pctLabel="Registration progress"
+            pct={Math.round(((stepIndex + 1) / activeSteps.length) * 100)}
+            pctLabel={
+                mode === 'edit' ? 'Update progress' : 'Registration progress'
+            }
             maxWidth="min(94vw, 1040px)"
             maxHeight="min(88vh, 820px)"
             footerStart={
@@ -325,7 +430,7 @@ export function AddDeviceDialog({
                 </Button>
             }
             footerEnd={
-                stepIndex === steps.length - 1 ? (
+                stepIndex === activeSteps.length - 1 ? (
                     <Button
                         type="button"
                         onClick={submit}
@@ -336,7 +441,13 @@ export function AddDeviceDialog({
                         ) : (
                             <Check className="mr-2 h-4 w-4" />
                         )}
-                        {processing ? 'Registering…' : 'Register device'}
+                        {processing
+                            ? mode === 'edit'
+                                ? 'Saving…'
+                                : 'Registering…'
+                            : mode === 'edit'
+                              ? 'Save changes'
+                              : 'Register device'}
                     </Button>
                 ) : (
                     <Button
@@ -353,18 +464,26 @@ export function AddDeviceDialog({
                 )
             }
             success={
-                createdName ? (
+                completedName ? (
                     <WizardSuccessPane
-                        title="Device registered"
+                        title={
+                            mode === 'edit'
+                                ? 'Device updated'
+                                : 'Device registered'
+                        }
                         blurb={
                             <>
-                                <strong>{createdName}</strong> is now in the
-                                canonical device registry.
+                                <strong>{completedName}</strong>{' '}
+                                {mode === 'edit'
+                                    ? 'has been updated in the canonical device registry.'
+                                    : 'is now in the canonical device registry.'}
                             </>
                         }
                         actions={
                             <Button type="button" onClick={close}>
-                                Return to devices
+                                {mode === 'edit'
+                                    ? 'Return to profile'
+                                    : 'Return to devices'}
                             </Button>
                         }
                     />
@@ -380,7 +499,7 @@ export function AddDeviceDialog({
                     ) : (
                         <>
                             <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                            Loading device registration…
+                            Loading device details…
                         </>
                     )}
                 </div>
@@ -651,8 +770,16 @@ export function AddDeviceDialog({
                 <WizardStepPane>
                     <StepHeading
                         icon={NotebookText}
-                        title="Review the canonical record"
-                        description="Confirm the device identity before adding it to the shared registry."
+                        title={
+                            mode === 'edit'
+                                ? 'Review the registry changes'
+                                : 'Review the canonical record'
+                        }
+                        description={
+                            mode === 'edit'
+                                ? 'Confirm the device identity before saving the shared registry record.'
+                                : 'Confirm the device identity before adding it to the shared registry.'
+                        }
                     />
                     <div className="grid gap-4 sm:grid-cols-2">
                         <ReviewCard
@@ -727,6 +854,25 @@ export function AddDeviceDialog({
                 </WizardStepPane>
             )}
         </WizardShell>
+    );
+}
+
+export function EditDeviceDialog({
+    open,
+    onClose,
+    deviceId,
+}: {
+    open: boolean;
+    onClose: () => void;
+    deviceId: number;
+}) {
+    return (
+        <AddDeviceDialog
+            open={open}
+            onClose={onClose}
+            mode="edit"
+            deviceId={deviceId}
+        />
     );
 }
 

@@ -753,9 +753,18 @@ class DeviceController extends Controller
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
         $this->access->assertCanViewDevice($user, $device);
 
-        return Inertia::render('security-devices/devices/edit', [
+        $payload = [
             'device' => $this->mapDeviceForDetail($device),
             ...$this->deviceFormOptions(),
+        ];
+
+        if ($request->expectsJson()) {
+            return response()->json($payload);
+        }
+
+        return redirect()->route('security-devices.devices.show', [
+            'device' => $device,
+            'dialog' => 'edit-device',
         ]);
     }
 
@@ -811,6 +820,11 @@ class DeviceController extends Controller
         ]);
 
         $device->update($validated);
+
+        if ($request->boolean('_modal')) {
+            return redirect()->back()
+                ->with('success', "Device '{$device->name}' updated.");
+        }
 
         return redirect()->route('security-devices.devices.show', $device)
             ->with('success', "Device '{$device->name}' updated.");
@@ -876,6 +890,8 @@ class DeviceController extends Controller
             'expected_lifespan_months' => $d->expected_lifespan_months,
             'purchase_price' => $d->purchase_price,
             'provider' => $d->provider,
+            'location_description' => $d->location_description,
+            'notes' => $d->notes,
             'created_at' => $d->created_at?->toISOString(),
             'created_by' => $d->createdBy ? ['id' => $d->createdBy->id, 'name' => $d->createdBy->name] : null,
         ];

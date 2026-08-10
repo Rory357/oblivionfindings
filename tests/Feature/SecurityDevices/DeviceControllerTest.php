@@ -528,6 +528,40 @@ class DeviceControllerTest extends TestCase
 
     // ── Update ────────────────────────────────────────────────────
 
+    public function test_legacy_edit_route_opens_the_canonical_profile_dialog(): void
+    {
+        $device = Device::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->get("/security-devices/devices/{$device->id}/edit")
+            ->assertRedirect(
+                "/security-devices/devices/{$device->id}?dialog=edit-device",
+            );
+    }
+
+    public function test_edit_options_and_current_values_are_available_to_the_authorised_modal(): void
+    {
+        $device = Device::factory()->create([
+            'name' => 'Edit modal camera',
+            'location_description' => 'Main entrance',
+            'notes' => 'Operational note',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->getJson("/security-devices/devices/{$device->id}/edit")
+            ->assertOk()
+            ->assertJsonPath('device.id', $device->id)
+            ->assertJsonPath('device.name', 'Edit modal camera')
+            ->assertJsonPath('device.location_description', 'Main entrance')
+            ->assertJsonPath('device.notes', 'Operational note')
+            ->assertJsonStructure([
+                'device',
+                'taxonomy',
+                'domains' => [['value', 'label']],
+                'statuses' => [['value', 'label']],
+            ]);
+    }
+
     public function test_update_modifies_device(): void
     {
         $device = Device::factory()->create(['name' => 'Old Name']);
@@ -541,6 +575,25 @@ class DeviceControllerTest extends TestCase
 
         $response->assertRedirect();
         $this->assertEquals('New Name', $device->fresh()->name);
+    }
+
+    public function test_modal_update_returns_to_the_device_profile(): void
+    {
+        $device = Device::factory()->create(['name' => 'Old modal name']);
+
+        $this->actingAs($this->admin)
+            ->from("/security-devices/devices/{$device->id}?dialog=edit-device")
+            ->put("/security-devices/devices/{$device->id}", [
+                'name' => 'Updated in modal',
+                'domain' => $device->domain,
+                'category' => $device->category,
+                '_modal' => true,
+            ])
+            ->assertRedirect(
+                "/security-devices/devices/{$device->id}?dialog=edit-device",
+            );
+
+        $this->assertEquals('Updated in modal', $device->fresh()->name);
     }
 
     public function test_update_requires_update_permission(): void
