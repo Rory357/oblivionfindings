@@ -14,8 +14,8 @@ it('installs only a built and healthy Inertia SSR runtime through a scoped Super
         'inertia:start-ssr --runtime=node',
         'environment=NODE_ENV=\"production\",PATH=\"$RUNTIME_PATH\"',
         'supervisorctl -c "$SUPERVISORD_CONFIG" pid',
-        'supervisord -c "$SUPERVISORD_CONFIG" -t',
         'supervisorctl -c "$SUPERVISORD_CONFIG" reread',
+        'the running Supervisor daemon rejected the updated configuration',
         'supervisorctl -c "$SUPERVISORD_CONFIG" avail',
         'supervisorctl -c "$SUPERVISORD_CONFIG" update "$PROGRAM"',
         'supervisorctl -c "$SUPERVISORD_CONFIG" restart "$PROGRAM"',
@@ -23,11 +23,16 @@ it('installs only a built and healthy Inertia SSR runtime through a scoped Super
         'inertia:check-ssr',
         'inertia:check-ssr did not confirm a healthy SSR gateway',
         'INSTALL_COMMITTED=false',
-    )->not->toContain('PASSWORD=', 'TOKEN=', 'sudo -E', 'autorestart=false');
+    )->not->toContain(
+        'PASSWORD=',
+        'TOKEN=',
+        'sudo -E',
+        'autorestart=false',
+        'supervisord -c "$SUPERVISORD_CONFIG" -t',
+    );
 
     $bundle = strpos($script, 'bootstrap/ssr/ssr.js');
-    $configValidation = strpos($script, 'supervisord -c "$SUPERVISORD_CONFIG" -t', $bundle);
-    $reread = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" reread', $configValidation);
+    $reread = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" reread', $bundle);
     $available = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" avail', $reread);
     $update = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" update "$PROGRAM"', $available);
     $restart = strpos($script, 'supervisorctl -c "$SUPERVISORD_CONFIG" restart "$PROGRAM"', $update);
@@ -37,8 +42,7 @@ it('installs only a built and healthy Inertia SSR runtime through a scoped Super
 
     expect($bundle)
         ->not->toBeFalse()
-        ->and($configValidation)->toBeGreaterThan($bundle)
-        ->and($reread)->toBeGreaterThan($configValidation)
+        ->and($reread)->toBeGreaterThan($bundle)
         ->and($available)->toBeGreaterThan($reread)
         ->and($update)->toBeGreaterThan($available)
         ->and($restart)->toBeGreaterThan($update)

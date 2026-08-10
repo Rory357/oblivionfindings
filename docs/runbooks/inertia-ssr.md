@@ -1,6 +1,6 @@
 # Inertia SSR runtime
 
-The normal server deployment builds both Vite bundles with `npm run build:ssr`, installs `oblivion-inertia-ssr` in Supervisor, restarts it so the new bundle is loaded, and refuses to report provisioning success until both Supervisor and `php artisan inertia:check-ssr` confirm the runtime is healthy.
+The normal server deployment builds both Vite bundles with `npm run build:ssr`, installs `oblivion-inertia-ssr` in Supervisor, asks the already-running daemon to parse and discover the updated definition with `supervisorctl reread`, restarts it so the new bundle is loaded, and refuses to report provisioning success until both Supervisor and `php artisan inertia:check-ssr` confirm the runtime is healthy. Do not start a second `supervisord` process as a configuration test: it can collide with the active daemon's control socket or HTTP port without proving the running daemon accepted the definition.
 
 ## Operator checks
 
