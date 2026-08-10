@@ -23,6 +23,7 @@ import {
 import {
     type SecurityDevicesWorkspace,
     SecurityDevicesWorkspaceShell,
+    SecurityDevicesWorkspaceTabs,
     WorkspaceDeviceList,
     WorkspaceFilterBar,
 } from '@/components/security-devices/security-devices-workspace-shell';
@@ -186,6 +187,75 @@ export function CategoryRegisterAction({
     );
 }
 
+export function CategoryWorkspaceHero({
+    pageConfig,
+    workspace,
+    filters,
+    canRegister,
+    registerLabel,
+    onRegister,
+}: {
+    pageConfig: PageConfig;
+    workspace: SecurityDevicesWorkspace;
+    filters: Record<string, string | undefined>;
+    canRegister: boolean;
+    registerLabel: string;
+    onRegister: () => void;
+}) {
+    const PageIcon = iconMap[pageConfig.icon] ?? Server;
+
+    return (
+        <PageHero
+            category="ops"
+            icon={PageIcon}
+            title={pageConfig.title}
+            description={pageConfig.description}
+            stats={[
+                {
+                    label: 'Devices',
+                    value: workspace.summary.devices,
+                    hideOnMobile: false,
+                },
+                {
+                    label: 'Need attention',
+                    value: workspace.summary.attention,
+                    tone:
+                        workspace.summary.attention > 0 ? 'warning' : 'success',
+                    hideOnMobile: false,
+                },
+                {
+                    label: 'Monitored',
+                    value: workspace.summary.monitored,
+                    hideOnMobile: false,
+                },
+                {
+                    label: 'Unmonitored',
+                    value: workspace.summary.unmonitored,
+                    tone:
+                        workspace.summary.unmonitored > 0
+                            ? 'warning'
+                            : 'success',
+                    hideOnMobile: false,
+                },
+            ]}
+            actions={
+                <CategoryRegisterAction
+                    canRegister={canRegister}
+                    label={registerLabel}
+                    onRegister={onRegister}
+                />
+            }
+            footer={
+                <SecurityDevicesWorkspaceTabs
+                    workspace={workspace}
+                    filters={filters}
+                    onDark
+                />
+            }
+        />
+    );
+}
+
 // ── Component ─────────────────────────────────────────────────────
 
 export default function CategoryPage({
@@ -248,27 +318,20 @@ export default function CategoryPage({
             <Head title={`${pageConfig.title} - Security & Devices`} />
 
             <PageShell>
-                <PageHero
-                    variant="compact"
-                    title={
-                        <span className="flex items-center gap-3">
-                            <PageIcon className="h-6 w-6 text-primary" />
-                            {pageConfig.title}
-                        </span>
-                    }
-                    description={pageConfig.description}
-                    actions={
-                        <CategoryRegisterAction
-                            canRegister={can.registerDevice}
-                            label={registerLabel}
-                            onRegister={addDeviceDialog.openDialog}
-                        />
-                    }
+                <CategoryWorkspaceHero
+                    pageConfig={pageConfig}
+                    workspace={workspace}
+                    filters={filters}
+                    canRegister={can.registerDevice}
+                    registerLabel={registerLabel}
+                    onRegister={addDeviceDialog.openDialog}
                 />
 
                 <SecurityDevicesWorkspaceShell
                     workspace={workspace}
                     filters={filters}
+                    showNavigation={false}
+                    showSummary={false}
                 >
                     {bulkManagement ? (
                         <BulkManagementWorkspace data={bulkManagement} />

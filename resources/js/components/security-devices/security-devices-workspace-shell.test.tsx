@@ -143,4 +143,30 @@ describe('SecurityDevicesWorkspaceShell', () => {
             screen.queryByText('Restricted event details'),
         ).not.toBeInTheDocument();
     });
+
+    it('lets a full page move navigation and summary into its hero without duplicating them', () => {
+        render(
+            <SecurityDevicesWorkspaceShell
+                workspace={workspace}
+                filters={{}}
+                showNavigation={false}
+                showSummary={false}
+            >
+                <p>Canonical access-control inventory</p>
+            </SecurityDevicesWorkspaceShell>,
+        );
+
+        expect(
+            screen.queryByRole('navigation', {
+                name: 'Security workspace tabs',
+            }),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText('Unmonitored')).not.toBeInTheDocument();
+        expect(
+            screen.getByText('Latest device observation'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Canonical access-control inventory'),
+        ).toBeInTheDocument();
+    });
 });

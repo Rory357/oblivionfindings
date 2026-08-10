@@ -49,6 +49,8 @@ type ShellProps = {
     workspace: SecurityDevicesWorkspace;
     filters: Record<string, string | undefined>;
     children: ReactNode;
+    showNavigation?: boolean;
+    showSummary?: boolean;
 };
 
 type SummaryItem = {
@@ -198,10 +200,69 @@ export function WorkspaceDeviceList({ children }: { children: ReactNode }) {
     return <section aria-label="Workspace devices">{children}</section>;
 }
 
+export function SecurityDevicesWorkspaceTabs({
+    workspace,
+    filters,
+    onDark = false,
+}: {
+    workspace: SecurityDevicesWorkspace;
+    filters: Record<string, string | undefined>;
+    onDark?: boolean;
+}) {
+    return (
+        <nav aria-label={`${workspace.title} workspace tabs`}>
+            <ul className="scrollbar-pretty flex gap-1 overflow-x-auto py-2">
+                {workspace.tabs.map((tab) => {
+                    const active = tab.key === workspace.activeTab;
+
+                    return (
+                        <li key={tab.key} className="shrink-0">
+                            <Link
+                                href={tabHref(workspace, filters, tab.key)}
+                                aria-current={active ? 'page' : undefined}
+                                title={tab.description}
+                                className={`frontline-focus inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                                    onDark
+                                        ? active
+                                            ? 'border-primary-foreground bg-primary-foreground text-primary shadow-sm'
+                                            : 'border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/20 hover:text-primary-foreground'
+                                        : active
+                                          ? 'border-primary bg-primary text-primary-foreground'
+                                          : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                                }`}
+                            >
+                                <span>{tab.label}</span>
+                                {tab.state !== 'available' && (
+                                    <Badge
+                                        variant="outline"
+                                        className={
+                                            onDark
+                                                ? active
+                                                    ? 'border-primary/25 text-primary'
+                                                    : 'border-primary-foreground/30 text-primary-foreground/80'
+                                                : active
+                                                  ? 'border-primary-foreground/40 text-primary-foreground'
+                                                  : 'text-muted-foreground'
+                                        }
+                                    >
+                                        {tab.stateLabel}
+                                    </Badge>
+                                )}
+                            </Link>
+                        </li>
+                    );
+                })}
+            </ul>
+        </nav>
+    );
+}
+
 export function SecurityDevicesWorkspaceShell({
     workspace,
     filters,
     children,
+    showNavigation = true,
+    showSummary = true,
 }: ShellProps) {
     const activeTab =
         workspace.tabs.find((tab) => tab.key === workspace.activeTab) ??
@@ -213,44 +274,16 @@ export function SecurityDevicesWorkspaceShell({
 
     return (
         <div className="space-y-4">
-            <nav aria-label={`${workspace.title} workspace tabs`}>
-                <ul className="flex flex-wrap gap-2">
-                    {workspace.tabs.map((tab) => {
-                        const active = tab.key === workspace.activeTab;
+            {showNavigation ? (
+                <SecurityDevicesWorkspaceTabs
+                    workspace={workspace}
+                    filters={filters}
+                />
+            ) : null}
 
-                        return (
-                            <li key={tab.key}>
-                                <Link
-                                    href={tabHref(workspace, filters, tab.key)}
-                                    aria-current={active ? 'page' : undefined}
-                                    title={tab.description}
-                                    className={`frontline-focus flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
-                                        active
-                                            ? 'border-primary bg-primary text-primary-foreground'
-                                            : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                                    }`}
-                                >
-                                    <span>{tab.label}</span>
-                                    {tab.state !== 'available' && (
-                                        <Badge
-                                            variant="outline"
-                                            className={
-                                                active
-                                                    ? 'border-primary-foreground/40 text-primary-foreground'
-                                                    : 'text-muted-foreground'
-                                            }
-                                        >
-                                            {tab.stateLabel}
-                                        </Badge>
-                                    )}
-                                </Link>
-                            </li>
-                        );
-                    })}
-                </ul>
-            </nav>
-
-            <WorkspaceSummary summary={workspace.summary} />
+            {showSummary ? (
+                <WorkspaceSummary summary={workspace.summary} />
+            ) : null}
             <WorkspaceFreshness freshness={workspace.freshness} />
 
             {workspace.activeTabState === 'available' ? (
