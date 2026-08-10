@@ -7,6 +7,7 @@ RUN_USER='www-data'
 LOG_DIRECTORY='/var/log/oblivion'
 INCLUDE_DIRECTORY="${MONITORING_SUPERVISOR_INCLUDE_DIR:-/etc/supervisor/conf.d}"
 SUPERVISORD_CONFIG="${MONITORING_SUPERVISORD_CONFIG:-}"
+ALLOW_MAINTENANCE_PAUSED_WORKERS=false
 
 WORKER_PROGRAMS=(
     oblivion-monitoring-events
@@ -48,6 +49,7 @@ Usage: install-supervisor.sh [options]
   --log-directory=/var/log/oblivion
   --include-directory=/etc/supervisor/conf.d
   --supervisord-config=/etc/supervisor/supervisord.conf
+  --allow-maintenance-paused-workers
 EOF
 }
 
@@ -63,6 +65,7 @@ for argument in "$@"; do
         --log-directory=*) LOG_DIRECTORY="${argument#*=}" ;;
         --include-directory=*) INCLUDE_DIRECTORY="${argument#*=}" ;;
         --supervisord-config=*) SUPERVISORD_CONFIG="${argument#*=}" ;;
+        --allow-maintenance-paused-workers) ALLOW_MAINTENANCE_PAUSED_WORKERS=true ;;
         --help|-h) usage; exit 0 ;;
         *) usage >&2; fail "unknown option $argument" ;;
     esac
@@ -256,16 +259,22 @@ supervisorctl -c "$SUPERVISORD_CONFIG" update "${EXPECTED_PROGRAMS[@]}"
 INSTALL_COMMITTED=true
 
 # An unchanged Supervisor definition does not restart a previously failed
-# listener or reload an already-running worker onto the deployed release. Every
-# expected group is therefore restarted explicitly after the scoped update.
-for program in "${EXPECTED_PROGRAMS[@]}"; do
+# listener. Queue workers are deliberately not restarted here: the deployment
+# command drains/restarts them after maintenance ends, while a standalone
+# installer validates that they are already running.
+for program in "${LISTENER_PROGRAMS[@]}"; do
     supervisorctl -c "$SUPERVISORD_CONFIG" restart "$program:*" \
         || fail "Supervisor could not restart $program on the deployed release."
 done
 
+STATUS_PROGRAMS=("${EXPECTED_PROGRAMS[@]}")
+if [[ "$ALLOW_MAINTENANCE_PAUSED_WORKERS" == true ]]; then
+    STATUS_PROGRAMS=("${LISTENER_PROGRAMS[@]}")
+fi
+
 for attempt in {1..30}; do
     all_running=true
-    for program in "${EXPECTED_PROGRAMS[@]}"; do
+    for program in "${STATUS_PROGRAMS[@]}"; do
         if status_output="$(supervisorctl -c "$SUPERVISORD_CONFIG" status "$program:*")"; then
             awk 'NF < 2 || $2 != "RUNNING" { exit 1 } END { if (NR == 0) exit 1 }' <<< "$status_output" \
                 || all_running=false

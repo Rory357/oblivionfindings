@@ -48,6 +48,10 @@ it('validates every isolated monitoring program before a scoped Supervisor updat
         'Supervisor did not discover $program from $INCLUDE_DIRECTORY.',
         'supervisorctl -c "$SUPERVISORD_CONFIG" update "${EXPECTED_PROGRAMS[@]}"',
         'supervisorctl -c "$SUPERVISORD_CONFIG" restart "$program:*"',
+        'for program in "${LISTENER_PROGRAMS[@]}"; do',
+        '--allow-maintenance-paused-workers',
+        'STATUS_PROGRAMS=("${LISTENER_PROGRAMS[@]}")',
+        'for program in "${STATUS_PROGRAMS[@]}"; do',
         'for attempt in {1..30}; do',
         'status "$program:*"',
         'INSTALL_COMMITTED=false',
@@ -73,6 +77,10 @@ it('validates every isolated monitoring program before a scoped Supervisor updat
         ->and($update)->toBeGreaterThan($available)
         ->and($restart)->toBeGreaterThan($update)
         ->and($status)->toBeGreaterThan($restart);
+
+    expect(substr_count($script, 'for program in "${LISTENER_PROGRAMS[@]}"; do'))->toBe(1)
+        ->and($script)->not->toContain('for program in "${EXPECTED_PROGRAMS[@]}"; do'."\n".
+            '    supervisorctl -c "$SUPERVISORD_CONFIG" restart');
 });
 
 it('supports an explicit include path while retaining the Ubuntu default', function () {
