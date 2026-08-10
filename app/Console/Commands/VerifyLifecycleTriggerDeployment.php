@@ -43,7 +43,7 @@ final class VerifyLifecycleTriggerDeployment extends Command
                 'SELECT VERSION() AS version, @@version_comment AS version_comment, '
                 .'@@GLOBAL.log_bin AS log_bin, '
                 .'@@GLOBAL.log_bin_trust_function_creators AS log_bin_trust_function_creators, '
-                .'CURRENT_USER() AS current_user, DATABASE() AS database_name',
+                .'CURRENT_USER() AS current_user_name, DATABASE() AS database_name',
             );
 
             if ($server === null) {
@@ -51,7 +51,7 @@ final class VerifyLifecycleTriggerDeployment extends Command
             }
 
             $database = (string) $server->database_name;
-            $currentUser = (string) $server->current_user;
+            $currentUser = (string) $server->current_user_name;
             $binaryLogging = (bool) $server->log_bin;
             $trustFunctionCreators = (bool) $server->log_bin_trust_function_creators;
             $errors = $sourceErrors;
