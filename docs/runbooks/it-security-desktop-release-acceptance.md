@@ -240,8 +240,11 @@ all of the following to one exact release revision:
 - passed overflow, console, network, privacy, keyboard and accessibility
   outcomes plus positive route-evidence counts for every viewport;
 - immutable SHA-256 commitments for each capture archive, network trace,
-  console record, accessibility report, route manifest, fixture manifest and
-  actor-session reference;
+  console record, accessibility report, route manifest and fixture manifest;
+- an exact actor-to-session reference map for every viewport, keyed by all and
+  only the row's required actor aliases. Multi-actor rows require a distinct
+  session reference for each actor. Across the primary and restored matrix, a
+  session reference cannot be reused by another actor alias;
 - one distinct opaque result reference per row and one distinct capture archive
   reference and SHA-256 per viewport across all 22 rows / 44 viewport records; and
 - verified local-automated, deployment/runtime, central-runtime, collector,
@@ -264,8 +267,10 @@ environment references, an opaque `KEY-` reference, the independent reviewer's
 `not_after_utc` bounds. The private signing key remains outside the application
 host and is never copied into the manifest or release checkout.
 
-The manifest has exactly `payload` and `signature_base64`. The payload uses the
-exact value-free schema enforced by
+The manifest has exactly `payload` and `signature_base64`. The payload uses
+`schema_version=2`,
+`evidence_class=it_security_desktop_release_evidence_v2`, and the exact
+value-free schema enforced by
 `ItSecurityDesktopReleaseEvidenceVerifier`; sign its recursively key-sorted,
 compact UTF-8 JSON representation. Use only the fixed actor aliases, opaque
 references, UTC timestamps, counts, booleans and SHA-256 commitments. Never

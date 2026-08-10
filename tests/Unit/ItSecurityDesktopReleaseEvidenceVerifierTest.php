@@ -29,11 +29,21 @@ function desktopEvidenceActors(): array
 }
 
 /** @return array<string, mixed> */
-function desktopEvidenceViewport(int $width, int $height, string $verifiedAt, string $seed): array
-{
+function desktopEvidenceViewport(
+    int $width,
+    int $height,
+    string $verifiedAt,
+    string $seed,
+    array $actors,
+): array {
+    $actorSessions = [];
+    foreach ($actors as $actor) {
+        $actorSessions[$actor] = hash('sha256', 'session-'.$actor.'-'.$seed);
+    }
+
     return [
         'accessibility_report_sha256' => hash('sha256', 'accessibility-'.$seed),
-        'actor_session_reference_sha256' => hash('sha256', 'session-'.$seed),
+        'actor_session_references_sha256' => $actorSessions,
         'capture_archive_reference' => 'CAPTURE-'.substr(hash('sha256', 'capture-reference-'.$seed), 0, 32),
         'capture_archive_sha256' => hash('sha256', 'capture-'.$seed),
         'console_clean' => true,
@@ -70,8 +80,8 @@ function desktopEvidenceRow(
         'result_reference' => 'RESULT-'.substr(hash('sha256', 'result-'.$scope.'-'.$id), 0, 32),
         'route_manifest_sha256' => hash('sha256', 'route-'.$scope.'-'.$id),
         'viewports' => [
-            desktopEvidenceViewport(1440, 900, $verifiedAt, $scope.'-'.$id.'-1440x900'),
-            desktopEvidenceViewport(1280, 800, $verifiedAt, $scope.'-'.$id.'-1280x800'),
+            desktopEvidenceViewport(1440, 900, $verifiedAt, $scope.'-'.$id.'-1440x900', $actors),
+            desktopEvidenceViewport(1280, 800, $verifiedAt, $scope.'-'.$id.'-1280x800', $actors),
         ],
     ];
 }
@@ -127,7 +137,7 @@ function desktopEvidencePayload(string $releaseRevision, string $primaryEnvironm
         'companions' => $companions,
         'deployed_at_utc' => '2026-08-09T01:00:00Z',
         'environment_reference_sha256' => $primaryEnvironment,
-        'evidence_class' => 'it_security_desktop_release_evidence_v1',
+        'evidence_class' => 'it_security_desktop_release_evidence_v2',
         'release_identifier_reference' => 'RELEASE-'.str_repeat('b', 32),
         'release_revision' => $releaseRevision,
         'restored_environment_reference_sha256' => $restoredEnvironment,
@@ -135,7 +145,7 @@ function desktopEvidencePayload(string $releaseRevision, string $primaryEnvironm
         'reviewed_at_utc' => '2026-08-09T03:00:00Z',
         'reviewer_reference' => 'REVIEWER-'.str_repeat('c', 32),
         'rows' => $rows,
-        'schema_version' => 1,
+        'schema_version' => 2,
     ];
 }
 
@@ -260,6 +270,17 @@ it('rejects incomplete mixed failed tampered or ambiguous desktop evidence', fun
     $replayedResult['rows'][1]['result_reference'] = $replayedResult['rows'][0]['result_reference'];
     $replayedCapture = desktopEvidencePayload($releaseRevision, $primaryEnvironment, $restoredEnvironment);
     $replayedCapture['rows'][1]['viewports'][0] = $replayedCapture['rows'][0]['viewports'][0];
+    $missingActorSession = desktopEvidencePayload($releaseRevision, $primaryEnvironment, $restoredEnvironment);
+    unset($missingActorSession['rows'][7]['viewports'][0]['actor_session_references_sha256']['release-auditor']);
+    $sharedMultiActorSession = desktopEvidencePayload($releaseRevision, $primaryEnvironment, $restoredEnvironment);
+    $sharedMultiActorSession['rows'][7]['viewports'][0]['actor_session_references_sha256']['release-auditor'] =
+        $sharedMultiActorSession['rows'][7]['viewports'][0]['actor_session_references_sha256']['release-it-manager'];
+    $crossRoleSessionReuse = desktopEvidencePayload($releaseRevision, $primaryEnvironment, $restoredEnvironment);
+    $crossRoleSessionReuse['rows'][9]['viewports'][0]['actor_session_references_sha256']['release-control-room'] =
+        $crossRoleSessionReuse['rows'][0]['viewports'][0]['actor_session_references_sha256']['release-requester'];
+    $legacySingleSessionSchema = desktopEvidencePayload($releaseRevision, $primaryEnvironment, $restoredEnvironment);
+    $legacySingleSessionSchema['schema_version'] = 1;
+    $legacySingleSessionSchema['evidence_class'] = 'it_security_desktop_release_evidence_v1';
     $validRaw = signedDesktopEvidence(
         $verifier,
         desktopEvidencePayload($releaseRevision, $primaryEnvironment, $restoredEnvironment),
@@ -279,6 +300,10 @@ it('rejects incomplete mixed failed tampered or ambiguous desktop evidence', fun
         ->and($verify($primaryRowRelabelledAsRestored))->toBeFalse()
         ->and($verify($replayedResult))->toBeFalse()
         ->and($verify($replayedCapture))->toBeFalse()
+        ->and($verify($missingActorSession))->toBeFalse()
+        ->and($verify($sharedMultiActorSession))->toBeFalse()
+        ->and($verify($crossRoleSessionReuse))->toBeFalse()
+        ->and($verify($legacySingleSessionSchema))->toBeFalse()
         ->and($verifier->verifyManifest($tampered, $authority, new DateTimeImmutable('2026-08-09T03:00:30Z'))['valid'])->toBeFalse()
         ->and($verifier->verifyManifest((string) $duplicate, $authority, new DateTimeImmutable('2026-08-09T03:00:30Z'))['valid'])->toBeFalse();
 });

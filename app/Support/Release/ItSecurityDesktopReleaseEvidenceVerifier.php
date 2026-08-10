@@ -213,8 +213,8 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
             $deployedAt = $this->utc($payload['deployed_at_utc'] ?? null);
             $reviewedAt = $this->utc($payload['reviewed_at_utc'] ?? null);
             $verifiedAt = $verifiedAt->setTimezone(new DateTimeZone('UTC'));
-            if (($payload['schema_version'] ?? null) !== 1
-                || ($payload['evidence_class'] ?? null) !== 'it_security_desktop_release_evidence_v1'
+            if (($payload['schema_version'] ?? null) !== 2
+                || ($payload['evidence_class'] ?? null) !== 'it_security_desktop_release_evidence_v2'
                 || ! hash_equals((string) $authority['release_revision'], (string) ($payload['release_revision'] ?? ''))
                 || ! hash_equals((string) $authority['environment_reference_sha256'], (string) ($payload['environment_reference_sha256'] ?? ''))
                 || ! hash_equals((string) $authority['restored_environment_reference_sha256'], (string) ($payload['restored_environment_reference_sha256'] ?? ''))
@@ -243,6 +243,10 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                     $reviewedAt,
                 )
                 || ! $this->uniqueEvidenceReferences(
+                    $payload['rows'] ?? null,
+                    $payload['restored_rows'] ?? null,
+                )
+                || ! $this->actorSessionReferencesAreRoleBound(
                     $payload['rows'] ?? null,
                     $payload['restored_rows'] ?? null,
                 )) {
@@ -386,7 +390,12 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                 || ! $this->sha($row['fixture_manifest_sha256'] ?? null)
                 || ! $this->sha($row['route_manifest_sha256'] ?? null)
                 || ! $this->matches($row['result_reference'] ?? null, '/\ARESULT-[a-f0-9]{32}\z/')
-                || ! $this->validViewports($row['viewports'] ?? null, $deployedAt, $reviewedAt)) {
+                || ! $this->validViewports(
+                    $row['viewports'] ?? null,
+                    $actors,
+                    $deployedAt,
+                    $reviewedAt,
+                )) {
                 return false;
             }
         }
@@ -427,6 +436,7 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
 
     private function validViewports(
         mixed $viewports,
+        array $expectedActors,
         DateTimeImmutable $deployedAt,
         DateTimeImmutable $reviewedAt,
     ): bool {
@@ -440,7 +450,7 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                 || array_is_list($viewport)
                 || ! $this->exactKeys($viewport, [
                     'accessibility_report_sha256',
-                    'actor_session_reference_sha256',
+                    'actor_session_references_sha256',
                     'capture_archive_reference',
                     'capture_archive_sha256',
                     'console_clean',
@@ -468,7 +478,10 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                 || $viewport['route_evidence_count'] < 1
                 || $viewport['route_evidence_count'] > 64
                 || ! $this->matches($viewport['capture_archive_reference'] ?? null, '/\ACAPTURE-[a-f0-9]{32}\z/')
-                || ! $this->sha($viewport['actor_session_reference_sha256'] ?? null)
+                || ! $this->validActorSessionReferences(
+                    $viewport['actor_session_references_sha256'] ?? null,
+                    $expectedActors,
+                )
                 || ! $this->sha($viewport['capture_archive_sha256'] ?? null)
                 || ! $this->sha($viewport['network_trace_sha256'] ?? null)
                 || ! $this->sha($viewport['console_log_sha256'] ?? null)
@@ -477,6 +490,57 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                 || $verifiedAt < $deployedAt
                 || $verifiedAt > $reviewedAt) {
                 return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @param list<string> $expectedActors */
+    private function validActorSessionReferences(mixed $references, array $expectedActors): bool
+    {
+        if (! is_array($references)
+            || array_is_list($references)
+            || ! $this->exactKeys($references, $expectedActors)) {
+            return false;
+        }
+
+        foreach ($expectedActors as $actor) {
+            if (! $this->sha($references[$actor] ?? null)) {
+                return false;
+            }
+        }
+
+        return count($references) === count(array_unique(array_values($references), SORT_STRING));
+    }
+
+    private function actorSessionReferencesAreRoleBound(mixed ...$rowSets): bool
+    {
+        $actorBySessionReference = [];
+        foreach ($rowSets as $rows) {
+            if (! is_array($rows) || ! array_is_list($rows)) {
+                return false;
+            }
+            foreach ($rows as $row) {
+                if (! is_array($row) || ! is_array($row['viewports'] ?? null)) {
+                    return false;
+                }
+                foreach ($row['viewports'] as $viewport) {
+                    $references = is_array($viewport)
+                        ? ($viewport['actor_session_references_sha256'] ?? null)
+                        : null;
+                    if (! is_array($references) || array_is_list($references)) {
+                        return false;
+                    }
+                    foreach ($references as $actor => $reference) {
+                        if (! is_string($actor) || ! is_string($reference)
+                            || (isset($actorBySessionReference[$reference])
+                                && $actorBySessionReference[$reference] !== $actor)) {
+                            return false;
+                        }
+                        $actorBySessionReference[$reference] = $actor;
+                    }
+                }
             }
         }
 
