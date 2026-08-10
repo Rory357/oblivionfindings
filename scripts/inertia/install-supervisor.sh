@@ -38,7 +38,7 @@ for argument in "$@"; do
 done
 
 [[ "$EUID" -eq 0 ]] || fail 'run as root or through sudo.'
-for command_name in awk chmod cp env flock grep id install mktemp mv node php readlink rm rmdir runuser sleep supervisord supervisorctl; do
+for command_name in awk chmod cp env flock grep id install mktemp mv node php readlink rm rmdir runuser sleep supervisorctl; do
     command -v "$command_name" >/dev/null 2>&1 || fail "required command $command_name is unavailable."
 done
 
@@ -155,9 +155,8 @@ chmod 0644 "$STAGE"
 mv -f "$STAGE" "$TARGET"
 FILES_INSTALLED=true
 
-supervisord -c "$SUPERVISORD_CONFIG" -t >/dev/null \
-    || fail 'the complete Supervisor configuration failed validation.'
-supervisorctl -c "$SUPERVISORD_CONFIG" reread
+supervisorctl -c "$SUPERVISORD_CONFIG" reread \
+    || fail 'the running Supervisor daemon rejected the updated configuration.'
 available_programs="$(supervisorctl -c "$SUPERVISORD_CONFIG" avail)" \
     || fail 'Supervisor could not report discovered program definitions.'
 grep -Eq "(^|[[:space:]])${PROGRAM}(:|[[:space:]]|$)" <<< "$available_programs" \
