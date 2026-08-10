@@ -219,14 +219,17 @@ export function ProviderCard({
         <Card className="min-w-0">
             <CardHeader className="space-y-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                         <CardTitle>{provider.name}</CardTitle>
                         <p className="text-xs text-muted-foreground">
                             {provider.vendor}
                         </p>
                     </div>
-                    <div className="flex flex-wrap justify-end gap-2">
-                        <Badge variant="outline">
+                    <div className="flex max-w-full min-w-0 flex-wrap justify-end gap-2">
+                        <Badge
+                            variant="outline"
+                            className="h-auto max-w-full text-center leading-tight whitespace-normal"
+                        >
                             {provider.runtime.contract_label}
                         </Badge>
                         <ConnectionBadge provider={provider} />
