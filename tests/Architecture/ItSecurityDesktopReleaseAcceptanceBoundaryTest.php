@@ -21,6 +21,15 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
     $fixtureMutationGuard = (string) file_get_contents(
         $root.'/app/Support/Release/ItSecurityDesktopReleaseFixtureMutationGuard.php',
     );
+    $fixtureManager = (string) file_get_contents(
+        $root.'/app/Support/Release/ItSecurityDesktopReleaseFixtureManager.php',
+    );
+    $fixtureManagementCommand = (string) file_get_contents(
+        $root.'/app/Console/Commands/ManageItSecurityDesktopReleaseFixtures.php',
+    );
+    $fixturePackMigration = (string) file_get_contents(
+        $root.'/database/migrations/2026_08_10_000049_create_it_security_desktop_release_fixture_packs.php',
+    );
     $itConfig = (string) file_get_contents($root.'/config/it.php');
     $package = json_decode(
         (string) file_get_contents($root.'/package.json'),
@@ -202,10 +211,47 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         'IT_SECURITY_DESKTOP_FIXTURES_ENABLED',
         'IT_SECURITY_DESKTOP_FIXTURES_ENVIRONMENT_CLASS',
         'IT_SECURITY_DESKTOP_FIXTURES_DATABASE_NAME_SHA256',
+        'IT_SECURITY_DESKTOP_FIXTURES_PASSWORD',
+        'IT_SECURITY_DESKTOP_FIXTURES_REVIEWER_TOTP_SECRET',
     )->and($runbook)->toContain(
         '`ItSecurityDesktopReleaseFixtureMutationGuard`',
-        'This mutation gate is an implementation prerequisite, not a fixture writer.',
-        'Never improvise partial rows in Tinker',
+        'The preparer is dry-run-only unless `--execute` is supplied.',
+        'deletes only the records and private attachment named in that manifest',
+        'Never improvise partial rows',
+    );
+
+    expect($fixtureManagementCommand)->toContain(
+        'it-security:desktop-release-fixtures',
+        '{--execute : Apply the planned database mutation}',
+        '? $manager->execute($action, $revision)',
+        ': $manager->plan($action, $revision)',
+        "'fixture_mutation_applied' => false",
+        "'v10_release_evidence' => false",
+    )->and($fixtureManager)->toContain(
+        'ItSecurityDesktopReleaseFixturePack::PACK_KEY',
+        'release_fixture_reserved_identity_present',
+        'release_fixture_pack_integrity_failed',
+        'release_fixture_owned_record_missing',
+        'release_fixture_owned_file_mismatch',
+        'Storage::disk(ItAttachment::DISK)',
+        'linkMonitoringEvidence',
+        'MonitoringIncidentEvidenceService',
+        'DeviceEvent::withoutEvents',
+        "'fixture_mutation_applied' => \$mutationApplied",
+        "'v10_release_evidence' => false",
+    )->and($fixtureManager)->not->toContain(
+        'DatabaseSeeder',
+        'RbacSeeder',
+        'User::factory',
+        'Device::factory',
+        'Artisan::call',
+        'tinker',
+        'impersonate',
+    )->and($fixturePackMigration)->toContain(
+        "Schema::create('it_security_desktop_release_fixture_packs'",
+        "\$table->string('pack_key', 100)->unique()",
+        "\$table->json('manifest')",
+        "\$table->char('manifest_sha256', 64)",
     );
 
     expect($runbook)->toContain(

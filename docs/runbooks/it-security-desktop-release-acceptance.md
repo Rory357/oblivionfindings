@@ -87,11 +87,23 @@ requires the supplied 40-hex revision to be the clean checkout's exact
 name, checkout path or confirmation value, and a pass still sets
 `v10_release_evidence=false`.
 
-This mutation gate is an implementation prerequisite, not a fixture writer.
-Until the complete idempotent prepare-and-owned-record cleanup command is
-available and separately approved for execution, continue to use the read-only
-preflight above and report its gaps. Never improvise partial rows in Tinker,
-SQL, a browser, or a generic seeder.
+The owned fixture manager is available through
+`it-security:desktop-release-fixtures`. The preparer is dry-run-only unless `--execute` is supplied. It refuses reserved fixture identities, creates one
+registry manifest containing every owned database record plus the exact private
+attachment hash, verifies the complete readiness contract before commit, and
+reuses an intact pack idempotently. Cleanup first revalidates that manifest and
+deletes only the records and private attachment named in that manifest; it does
+not delete by a broad label or touch unrelated application data.
+
+Configure the actor password and reviewer TOTP secret through
+`IT_SECURITY_DESKTOP_FIXTURES_PASSWORD` and
+`IT_SECURITY_DESKTOP_FIXTURES_REVIEWER_TOTP_SECRET` in the approved staging
+runtime. Keep both outside the checkout. Use the mutation guard's exact
+revision-bound confirmation for `prepare` or `cleanup`, review the dry-run JSON,
+and obtain separate execution approval before adding `--execute`. Fixture
+preparation remains `v10_release_evidence=false`; run the read-only readiness
+command again afterward, then complete D01-D18. Never improvise partial rows in
+Tinker, SQL, a browser, or a generic seeder.
 
 ### Sites and people
 
