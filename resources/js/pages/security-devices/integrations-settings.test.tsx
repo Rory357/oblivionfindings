@@ -176,9 +176,9 @@ describe('Security & Devices integrations and settings', () => {
         const { rerender } = render(
             <ProviderCard provider={provider} canManage />,
         );
-        expect(
-            screen.getByText('Inventory, sync, topology and events'),
-        ).toBeInTheDocument();
+        expect(screen.getByText('Inventory, sync, topology and events'))
+            .toBeInTheDocument()
+            .toHaveClass('max-w-full', 'whitespace-normal');
         expect(
             screen.getByText('Typed topology contract is available.'),
         ).toBeInTheDocument();
