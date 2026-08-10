@@ -239,9 +239,12 @@ test('client linking candidates and mutations require explicit Client permission
     $scopedManager = siteProfileCurrentStaff('Scoped client manager', $this->visibleSite);
     $provider = siteProfileCurrentStaff('Application client manager', $this->visibleSite, 'provider_manager');
     $unassigned = Client::factory()->create([
-        'first_name' => 'Unassigned',
+        // Keep the fixture inside the presenter's bounded first-100 picker even
+        // when this file follows another client-heavy CI batch.
+        'first_name' => 'AAA Unassigned',
         'last_name' => 'Person',
         'site_id' => null,
+        'status' => 'active',
     ]);
     $assigned = Client::factory()->create([
         'first_name' => 'Already',
