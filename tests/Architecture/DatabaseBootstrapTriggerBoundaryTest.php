@@ -61,10 +61,12 @@ it('gates production migration with value-free rootless preflight isolation and 
     $writerDrain = strpos($deploy, 'wait_for_queue_writer_exit', $writerRestart);
     $migration = strpos($deploy, 'php artisan migrate --force --isolated=75');
     $postflight = strpos($deploy, 'database:verify-lifecycle-triggers postflight --json');
-    $runtimeRestart = strpos($deploy, 'run_app php artisan queue:restart', $postflight);
-    $runtimeValidation = strpos($deploy, 'final application and lifecycle runtime validation', $runtimeRestart);
+    $runtimeValidation = strpos($deploy, 'final application and lifecycle runtime validation', $postflight);
     $finalPostflight = strrpos($deploy, 'database:verify-lifecycle-triggers postflight --json');
     $leaveMaintenance = strpos($deploy, 'run_app php artisan up', $finalPostflight);
+    $runtimeRestart = strpos($deploy, 'run_app php artisan queue:restart', $leaveMaintenance);
+    $exactReleaseRuntime = strpos($deploy, 'assert_stable_monitoring_runtime', $runtimeRestart);
+    $provisioningComplete = strpos($deploy, 'Server provisioning complete', $exactReleaseRuntime);
     $databaseTry = strpos($command, 'try {');
     $databaseConnection = strpos($command, 'DB::connection($connectionName)', $databaseTry);
     $valueFreeCatch = strpos($command, 'catch (Throwable) {', $databaseConnection);
@@ -76,10 +78,12 @@ it('gates production migration with value-free rootless preflight isolation and 
         ->and($migration)->toBeGreaterThan($writerDrain)
         ->and($migration)->toBeGreaterThan($preflight)
         ->and($postflight)->toBeGreaterThan($migration)
-        ->and($runtimeRestart)->toBeGreaterThan($postflight)
-        ->and($runtimeValidation)->toBeGreaterThan($runtimeRestart)
+        ->and($runtimeValidation)->toBeGreaterThan($postflight)
         ->and($finalPostflight)->toBeGreaterThan($runtimeValidation)
         ->and($leaveMaintenance)->toBeGreaterThan($finalPostflight)
+        ->and($runtimeRestart)->toBeGreaterThan($leaveMaintenance)
+        ->and($exactReleaseRuntime)->toBeGreaterThan($runtimeRestart)
+        ->and($provisioningComplete)->toBeGreaterThan($exactReleaseRuntime)
         ->and(substr_count($deploy, 'run_app php artisan up'))->toBe(1)
         ->and($databaseTry)->not->toBeFalse()
         ->and($databaseConnection)->toBeGreaterThan($databaseTry)
@@ -87,7 +91,7 @@ it('gates production migration with value-free rootless preflight isolation and 
         ->and($deploy)->toContain(
             'MAINTENANCE_ACTIVE=1',
             'trap report_maintenance_on_failure EXIT',
-            'the application remains in maintenance mode',
+            'the application is in maintenance mode',
             'pre_migration_queue_writer_pids',
             'DEPLOY_WRITER_DRAIN_TIMEOUT_SECONDS',
         )

@@ -2569,7 +2569,7 @@ function InlineSubPanelGroups({
         >
             {visibleGroups.map((group) => (
                 <div key={group.label}>
-                    <div className="px-2 py-1 text-[10px] font-semibold tracking-wider text-sidebar-foreground/45 uppercase">
+                    <div className="px-2 py-1 text-[10px] font-semibold tracking-wider text-sidebar-foreground/70 uppercase">
                         {group.label}
                     </div>
                     <div className="space-y-0.5">
@@ -2590,7 +2590,7 @@ function InlineSubPanelGroups({
                                         'flex min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
                                         active
                                             ? 'bg-sidebar-primary/10 text-sidebar-foreground'
-                                            : 'text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                                     )}
                                 >
                                     {subItem.icon ? (

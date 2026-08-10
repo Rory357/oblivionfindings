@@ -405,7 +405,7 @@ export async function loginAsFrontlineDemoWorker(page: Page) {
 }
 
 export async function loginAsJobBoardDemoWorker(page: Page) {
-    await loginAs(page, 'sw8@demo.test', 'password');
+    await loginAs(page, 'job-board@demo.test', 'password');
 }
 
 export async function loginAsMedsDemoWorker(page: Page) {

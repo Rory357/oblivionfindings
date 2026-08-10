@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Client;
+use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
@@ -16,14 +17,31 @@ use App\Models\StaffTrainingRecord;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Hash;
 
 class JobBoardReadinessDemoSeeder extends Seeder
 {
     public function run(): void
     {
-        // Keep job-board fatigue/claim evidence isolated from the frontline
-        // lifecycle worker whose roster is intentionally dense.
-        $worker = User::query()->where('email', 'sw8@demo.test')->first();
+        // Keep job-board fatigue and claim evidence isolated from every
+        // frontline lifecycle actor whose roster is deliberately dense.
+        $worker = User::query()->updateOrCreate(
+            ['email' => 'job-board@demo.test'],
+            [
+                'name' => 'Job Board Worker',
+                'password' => Hash::make('password'),
+                'role' => 'support_worker',
+                'approved_at' => now(),
+                'email_verified_at' => now(),
+                'two_factor_secret' => null,
+                'two_factor_recovery_codes' => null,
+                'two_factor_confirmed_at' => null,
+            ],
+        );
+        $supportRole = Role::query()->where('name', 'support_worker')->first();
+        if ($supportRole) {
+            $worker->roles()->sync([$supportRole->id]);
+        }
         $currentStaff = User::query()->where('email', 'sw2@demo.test')->first();
         $admin = User::query()->where('role', 'admin')->first();
         $serviceContext = ServiceContext::query()->first();
